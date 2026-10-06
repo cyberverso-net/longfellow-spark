@@ -1,0 +1,12 @@
+name = "longfellow_spark"
+description = "Formally verified Ada/SPARK reimplementation of Longfellow ZK (libzk)"
+version = "0.1.0-dev"
+
+authors = ["Paolo"]
+maintainers = ["Paolo <paolo@users.noreply.github.com>"]
+licenses = "Apache-2.0"
+website = ""
+tags = []
+
+[[depends-on]]
+gnatprove = "^16.1.0"

@@ -1,0 +1,10 @@
+/obj/
+/lib/
+/alire/
+/config/
+
+# gnatprove artefacts
+/proof/sessions/
+/gnatprove/
+obj/
+lib/
