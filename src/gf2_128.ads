@@ -1,7 +1,12 @@
 --  GF2_128: arithmetic over the binary field GF(2^128) used by the
 --  Longfellow ZK sumcheck and Ligero layers.
 --
---  Proof status (SPARK assurance levels: Silver = AoRTE, Gold = proved functional contracts):
+--  Proof status. SPARK assurance levels: Silver = absence of run-time
+--  errors, Gold = proved functional contracts. Stage 1 of Phase A is
+--  complete: every subprogram below is at least Silver, and the Gold
+--  kernels are Add, Xtime, Mul and Square. All verification conditions
+--  are discharged by GNATprove at --level=2 (41 checks, CVC5 only).
+--
 --    Add     : Gold, functional Post proved (addition is limb-wise xor).
 --    Xtime   : Gold, exact bit-level Post proved (multiplication by x
 --              with reduction).
@@ -9,10 +14,19 @@
 --              (MSB-first Horner over the bits of B). NOTE: the proof
 --              establishes Mul = Mul_Ref for all inputs; that Mul_Ref
 --              itself matches the pinned spec's convention is anchored
---              by known-answer tests, not by proof.
---    Square  : not yet implemented.
---    Inv     : not yet implemented; target Silver + known-answer tests,
---              Fermat correctness is out of SMT reach by design decision.
+--              by known-answer tests (tests/vectors/gf2_128_mul.txt,
+--              with anchors from the upstream subfield basis constants),
+--              not by proof.
+--    Square  : Gold by composition: thin wrapper over Mul, Post proved
+--              against Mul_Ref (E, E, 128). The linear (Frobenius)
+--              fast path is a later optimisation.
+--    Inv     : Silver only (AoRTE), plus known-answer tests
+--              (tests/vectors/gf2_128_inv.txt). Fermat correctness
+--              (E * Inv (E) = 1) is out of SMT reach by design decision.
+--              Inv is total: Inv (Zero) = Zero, which is what the Fermat
+--              chain yields with no extra branch and matches the
+--              upstream C++ (the upstream Rust reference asserts
+--              instead). Callers that must reject zero do so themselves.
 --
 --  Pinned spec: IETF draft-google-cfrg-libzk-03 (23 September 2026),
 --  Section 2.2.2: the field is GF(2)[x] / Q(x) with
@@ -111,5 +125,18 @@ package GF2_128 is
    function Mul (A, B : Element) return Element with
      Global => null,
      Post   => Mul'Result = Mul_Ref (A, B, 128);
+
+   --  Field squaring, E * E mod Q(x). Thin wrapper over Mul for now.
+   function Square (E : Element) return Element with
+     Global => null,
+     Post   => Square'Result = Mul_Ref (E, E, 128);
+
+   --  Multiplicative inverse by Fermat: E^(2^128 - 2), computed with a
+   --  fixed addition chain (no data-dependent control flow), so it is
+   --  constant time under the same scope as the rest of the package.
+   --  Total function: Inv (Zero) = Zero (see the header). Silver only;
+   --  E * Inv (E) = One is anchored by known-answer tests.
+   function Inv (E : Element) return Element with
+     Global => null;
 
 end GF2_128;

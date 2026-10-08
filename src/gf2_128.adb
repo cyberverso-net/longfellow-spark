@@ -45,4 +45,46 @@ package body GF2_128 is
       return R;
    end Mul;
 
+   function Square (E : Element) return Element is
+   begin
+      return Mul (E, E);
+   end Square;
+
+   --  E^(2^N): N successive squarings. Local helper, not in the spec.
+   function Square_N (E : Element; N : Positive) return Element with
+     Global => null;
+
+   function Square_N (E : Element; N : Positive) return Element is
+      R : Element := E;
+   begin
+      for I in 1 .. N loop
+         R := Square (R);
+      end loop;
+      return R;
+   end Square_N;
+
+   function Inv (E : Element) return Element is
+      --  Itoh-Tsujii style chain. T_k holds E^(2^k - 1); the step
+      --  T_(a+b) = T_a^(2^b) * T_b follows from
+      --  (2^a - 1) * 2^b + (2^b - 1) = 2^(a+b) - 1.
+      --  Chain: 1, 2, 3, 6, 7, 14, 15, 30, 31, 62, 63, 126, 127:
+      --  12 multiplications and 126 squarings, then one final squaring
+      --  gives (E^(2^127 - 1))^2 = E^(2^128 - 2).
+      T1   : constant Element := E;
+      T2   : constant Element := Mul (Square_N (T1, 1), T1);
+      T3   : constant Element := Mul (Square_N (T2, 1), T1);
+      T6   : constant Element := Mul (Square_N (T3, 3), T3);
+      T7   : constant Element := Mul (Square_N (T6, 1), T1);
+      T14  : constant Element := Mul (Square_N (T7, 7), T7);
+      T15  : constant Element := Mul (Square_N (T14, 1), T1);
+      T30  : constant Element := Mul (Square_N (T15, 15), T15);
+      T31  : constant Element := Mul (Square_N (T30, 1), T1);
+      T62  : constant Element := Mul (Square_N (T31, 31), T31);
+      T63  : constant Element := Mul (Square_N (T62, 1), T1);
+      T126 : constant Element := Mul (Square_N (T63, 63), T63);
+      T127 : constant Element := Mul (Square_N (T126, 1), T1);
+   begin
+      return Square (T127);
+   end Inv;
+
 end GF2_128;

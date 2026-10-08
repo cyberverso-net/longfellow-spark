@@ -8,3 +8,7 @@
 /gnatprove/
 obj/
 lib/
+
+# test harness build
+/tests/obj/
+/tests/bin/

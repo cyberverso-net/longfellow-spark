@@ -1,0 +1,37 @@
+--  Test harness project for longfellow_spark. Test code, outside the
+--  proof perimeter.
+--
+--  The library sources are compiled here directly (not through the
+--  library project) so that -gnata applies to them as well: every
+--  contract, loop invariant and ghost function of the library then
+--  executes at run time, which is the point of the harness. This is
+--  NOT the constant-time build (see the gf2_128.ads header); never
+--  measure or deploy binaries produced by this project.
+--
+--  Build:  alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
+--  Run:    tests/bin/gf2_128_kat [tests/vectors/gf2_128_mul.txt]
+
+project Longfellow_Spark_Tests is
+
+   for Source_Dirs use ("src", "../src");
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   for Create_Missing_Dirs use "True";
+   for Main use ("gf2_128_kat.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-gnata",     --  Assertions on: Pre, Post, Loop_Invariant, ghost
+         "-g",
+         "-O0",
+         "-gnatwa",    --  All warnings
+         "-gnatVa",    --  All validity checks
+         "-gnatW8",
+         "-gnaty3aAbBcefhiIklmnOprStux");  --  Same style checks as the library
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es");  --  Symbolic traceback
+   end Binder;
+
+end Longfellow_Spark_Tests;
