@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-09, after review)
 
 ## Date
 
@@ -12,7 +12,7 @@ Proposed
 
 The inverse in F_p is E^(p - 2) by Fermat's little theorem. The two upstream implementations differ: the Rust reference computes `pow (p - 2)` and asserts on zero; the C++ (`fp_generic.h`, `invertf`) uses a binary extended Euclidean algorithm with data-dependent branches and loop length, which returns zero for zero and is not constant time. [0008](0008-inv-fixed-chain-total-function.md) fixed, for GF(2^128), a total function with `Inv (Zero) = Zero` computed by a fixed chain; consistency across fields matters for callers and for the trust model.
 
-## Decision (proposed)
+## Decision
 
 - Fermat exponentiation with a fixed addition chain for p - 2 = 2^256 - 2^224 + 2^192 + 2^96 - 3, exploiting the structure of the exponent (long runs of ones and zeros): a short sequence of windowed powers combined with repeated squarings, in the style of the P-256 chains used by constant-time libraries, about 255 squarings and under 20 multiplications. The chain is written out as constants, as in stage 1; no exponent bit is tested at run time.
 - Total function, `Inv (Zero) = Zero`, as in [0008](0008-inv-fixed-chain-total-function.md); the chain yields zero on zero with no extra statement. The header documents the C++ and Rust behaviours.

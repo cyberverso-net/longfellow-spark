@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-09, after review)
 
 ## Date
 
@@ -14,7 +14,7 @@ The product of two 256-bit values has 512 bits and must be reduced modulo p. Thr
 
 Upstream C++ (`fp_generic.h`, `fp_p256.h`) uses Montgomery form with a P-256-specific reduction step; for this prime the Montgomery constant m' = -p^-1 mod 2^64 equals 1 (checked), so each step adds a0 * p shifted, which the C++ writes out as a handful of word adds and subtracts. The Rust reference reduces with a big-integer library and stores canonical values. Serialisation (Section 7.2.1) is the canonical integer, little-endian; the Rust `from_bytes` rejects values >= p.
 
-## Decision (proposed)
+## Decision
 
 Direct (non-Montgomery) representation with Solinas reduction, structured in proof-sized steps:
 

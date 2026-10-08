@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-09, after review)
 
 ## Date
 
@@ -18,7 +18,7 @@ Facts established for this record:
 - GNAT 16 provides `Interfaces.Unsigned_128` on this target and GNATprove accepts it: a feasibility experiment proved the postcondition of a 64x64 to 128-bit product and the range checks of its high and low halves at level 2.
 - SPARKNaCl (Curve25519, 16 limbs of 16 bits held in 64-bit signed integers) makes bound propagation provable with limb subtypes and `Dynamic_Predicate` (`Normal_GF`, `Product_GF`, `Seminormal_GF`), but states no functional property against a mathematical value; its proofs are type safety plus bound properties (README and `sparknacl.ads`, read 2026-10-09).
 
-## Decision (proposed)
+## Decision
 
 Four 64-bit limbs, saturated (each limb holds a full 64 bits of the value), little-endian limb order: `Limbs (0)` is the least significant word, so `To_Int (E) = sum of Limbs (i) * 2^(64 i)`. Partial products are formed in `Unsigned_128` and split into halves. This is the upstream C++ layout, and serialisation to the 32 bytes of Section 7.2.1 is a byte copy of the limbs in order.
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-09, after review)
 
 ## Date
 
@@ -20,7 +20,7 @@ A feasibility experiment on 2026-10-09 (GNATprove 16.1, level 2) analysed a four
 
 Result: the postcondition and invariant were proved once a lemma `Conv128 (X) = Conv (Lo (X)) + Conv (Hi (X)) * Two_64` was available, and that lemma was itself proved from `X / 2^64`, `X mod 2^64` and their equality with the shift and mask forms, with no axiom and no `pragma Assume`. Without the lemma, the per-limb carry step was not proved at level 2 and not at level 4 either: the gap is the connection between modular word arithmetic and the big-integer value, which must be supplied as a lemma. All 94 checks of the final experiment were discharged at level 2.
 
-## Decision (proposed)
+## Decision
 
 - The model is `To_Int : Element -> Big_Integer`, a ghost expression function over the four limbs, with `P : constant Big_Integer` as the ghost prime. All functional contracts are stated as equalities of `To_Int` values modulo `P`, plus canonical form ([0015](0015-p256-canonical-form-and-conditional-subtraction.md)).
 - Gold targets: `Add`, `Sub`, `Neg`, `Mul`, `Square` (as `Mul (E, E)` by composition, as in [0007](0007-square-as-wrapper-over-mul.md)), `From_Bytes` (value and canonical check), `To_Bytes` (round trip). `Inv` is Silver plus vectors ([0016](0016-p256-inversion.md)).

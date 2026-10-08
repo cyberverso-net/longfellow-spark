@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-09, after review)
 
 ## Date
 
@@ -12,7 +12,7 @@ Proposed
 
 With a direct representation ([0013](0013-p256-reduction-strategy.md)) every element should be stored as its unique integer in 0 .. p - 1. Then equality is limb equality, serialisation is a copy, and `From_Bytes` can reject non-canonical input as the Rust reference does (`from_bytes` returns an error for values >= p). The invariant has to be stated somewhere SPARK can use it at every call site, and the last step of every reduction, "subtract p if the value is at least p", must be branch-free.
 
-## Decision (proposed)
+## Decision
 
 - An executable, branch-free Boolean function `Is_Canonical (L)` compares the limbs with the limbs of p from the most significant down, computed with masks (no early exit), and the element type carries `Dynamic_Predicate => Is_Canonical (Element.Limbs)`. A ghost lemma proves `Is_Canonical (L) = (To_Int (L) < P)`, so contracts can speak in values while the predicate stays cheap and executable.
 - Every operation takes and returns the predicated type, so canonical form is checked by GNATprove at every call and return, with no preconditions to write by hand.

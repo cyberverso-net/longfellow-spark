@@ -15,9 +15,9 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md). Records
 | [0009](0009-known-answer-vectors.md) | Known-answer vectors: notation, tiers, anchors | Accepted | 2026-10-08 |
 | [0010](0010-assertion-enabled-test-project.md) | Test project compiling the library with assertions | Accepted | 2026-10-08 |
 | [0011](0011-circuits-as-data.md) | Circuits are data | Accepted | 2026-10-06 |
-| [0012](0012-p256-limb-representation.md) | P-256 base field: limb representation | Proposed | 2026-10-09 |
-| [0013](0013-p256-reduction-strategy.md) | P-256 base field: reduction strategy | Proposed | 2026-10-09 |
-| [0014](0014-p256-functional-specification-and-ghost-model.md) | P-256 base field: functional specification and ghost model | Proposed | 2026-10-09 |
-| [0015](0015-p256-canonical-form-and-conditional-subtraction.md) | P-256 base field: canonical form and conditional subtraction | Proposed | 2026-10-09 |
-| [0016](0016-p256-inversion.md) | P-256 base field: inversion | Proposed | 2026-10-09 |
-| [0017](0017-p256-test-anchors.md) | P-256 base field: test anchors | Proposed | 2026-10-09 |
+| [0012](0012-p256-limb-representation.md) | P-256 base field: limb representation | Accepted | 2026-10-09 |
+| [0013](0013-p256-reduction-strategy.md) | P-256 base field: reduction strategy | Accepted | 2026-10-09 |
+| [0014](0014-p256-functional-specification-and-ghost-model.md) | P-256 base field: functional specification and ghost model | Accepted | 2026-10-09 |
+| [0015](0015-p256-canonical-form-and-conditional-subtraction.md) | P-256 base field: canonical form and conditional subtraction | Accepted | 2026-10-09 |
+| [0016](0016-p256-inversion.md) | P-256 base field: inversion | Accepted | 2026-10-09 |
+| [0017](0017-p256-test-anchors.md) | P-256 base field: test anchors | Accepted | 2026-10-09 |

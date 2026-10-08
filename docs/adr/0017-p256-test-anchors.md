@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-09, after review)
 
 ## Date
 
@@ -16,7 +16,7 @@ As in stage 1, the proofs relate the implementation to a model (here the integer
 - Upstream C++ `lib/algebra/fp_test.cc` has property tests (commutativity, inverses, Montgomery round trips) and fixed values for other field sizes, no fixed P-256 field vectors. The Rust reference anchors behaviour: `from_bytes` rejects values >= p, `sumcheck_eval_points` are 0, 1, 2, sampling is by rejection.
 - The NIST P-256 curve parameters are public constants: the base point G = (Gx, Gy) satisfies Gy^2 = Gx^3 - 3 Gx + b mod p. Checked locally with Python on 2026-10-09 with the values as commonly published; the constants are to be re-read from the published text (SEC 2 v2.0 Section 2.4.2; NIST SP 800-186) before they enter the vector file, and the file cites the source.
 
-## Decision (proposed)
+## Decision
 
 - Vector files `tests/vectors/p256_*.txt`, same conventions as [0009](0009-known-answer-vectors.md): one case per line, values as 64 hex digits of the integer (big-endian notation for readability), plus a byte-encoding file in the 32-byte little-endian form of Section 7.2.1 for `From_Bytes` and `To_Bytes`.
 - Tier (a), external anchors: the curve equation at the base point, which exercises `Mul`, `Square`, `Add`, `Sub` and the constant b in one identity (`Mul (Gy, Gy) = Sub (Sub (Mul (Mul (Gx, Gx), Gx), Mul (Three, Gx)), Neg (b))` arranged as separate cases with the intermediate values); `Inv` on the coordinates; the identities (p - 1)^2 = 1, 2^256 mod p = 2^224 - 2^192 - 2^96 + 1 (the fold identity), (p + 1) / 2 as the inverse of two.

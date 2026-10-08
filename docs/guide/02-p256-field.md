@@ -1,6 +1,6 @@
 # Chapter 2: the P-256 base field F_p
 
-Outline. Stage 2 is in design; the decisions are proposed in ADR 0012 to 0017 and this chapter is written as they are accepted and implemented. Headings only.
+Outline. Stage 2 is in design; the decisions are recorded in ADR 0012 to 0017 (accepted 2026-10-09) and this chapter is written as they are implemented. Headings only.
 
 ## 1. The mathematics
 
