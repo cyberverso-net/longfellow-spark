@@ -33,10 +33,10 @@ Requires [Alire](https://alire.ada.dev) with a GNAT toolchain selected (`alr too
 
 ```bash
 alr build
-alr exec -- gnatprove -P longfellow_spark.gpr --level=2 --report=all
+alr exec -- gnatprove -P longfellow_spark.gpr
 ```
 
-The default proof level is 2; any use of a higher level is recorded in the commit message with its rationale.
+The prover configuration is in `package Prove` of `longfellow_spark.gpr`: the three provers of level 2 (CVC5, Z3, Alt-Ergo) with a step budget of 600000 and no timeout, so that a proof that passes on one machine passes on every machine with the same toolchain. Any change to that configuration is recorded with its rationale (ADR 0003, ADR 0018).
 
 ## Testing
 
@@ -50,13 +50,13 @@ tests/bin/p256_kat           # default: the p256_*.txt files (about three minute
 
 Each harness takes vector file paths as arguments, prints pass and fail counts and exits with a non-zero status on any failure or if no case ran. Vector files are rebuilt with `python3 -I tests/vectors/gen_gf2_128_vectors.py` and `python3 -I tests/vectors/gen_p256_vectors.py`; the generators abort if their recomputed anchors disagree with the external constants they embed, and the P-256 generator also re-derives the Solinas reduction table and the inversion chain used by the implementation.
 
-Definition of done, for every commit: `make check` passes. It runs, in order, `alr build`, the full proof at level 2 with unproved checks treated as errors, both harnesses, the vector generators with a comparison against the committed files, and a lint over tracked files; `scripts/check.sh` is the single definition of these steps and `make build`, `make prove`, `make test`, `make vectors` and `make lint` run them one at a time. The GitHub Actions workflow runs the same script, step by step, on every push and pull request to `main`.
+Definition of done, for every commit: `make check` passes. It runs, in order, `alr build`, the full proof with the project's prover configuration and unproved checks treated as errors, both harnesses, the vector generators with a comparison against the committed files, and a lint over tracked files; `scripts/check.sh` is the single definition of these steps and `make build`, `make prove`, `make test`, `make vectors` and `make lint` run them one at a time. The GitHub Actions workflow runs the same script, step by step, on every push and pull request to `main`.
 
 ## Continuous integration
 
 [![verify](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/verify.yml/badge.svg)](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/verify.yml)
 
-The workflow `verify` (ADR 0018) runs on every push and pull request with the same Alire-provisioned toolchain as the local environment (`gnat_native 16.1.0`, `gprbuild 26.0.1`, `gnatprove 16.1.0`, pinned in `alire.toml` and in the workflow's toolchain string): build, the full proof at level 2 with unproved checks treated as errors, both harnesses, the vector generators compared with the committed files, and the lint, one step each. Ubuntu runs for every change; macOS runs for `main` and manual dispatch. The GNATprove report is uploaded as an artifact of every run. A green badge certifies exactly what `make check` certifies locally, on the pinned toolchain; it says nothing about constant time or about specification fidelity beyond the vectors (see the trust model).
+The workflow `verify` (ADR 0018) runs on every push and pull request with the same Alire-provisioned toolchain as the local environment (`gnat_native 16.1.0`, `gprbuild 26.0.1`, `gnatprove 16.1.0`, pinned in `alire.toml` and in the workflow's toolchain string): build, the full proof with the project's prover configuration and unproved checks treated as errors, both harnesses, the vector generators compared with the committed files, and the lint, one step each. Ubuntu runs for every change; macOS runs for `main` and manual dispatch. The GNATprove report is uploaded as an artifact of every run. A green badge certifies exactly what `make check` certifies locally, on the pinned toolchain; it says nothing about constant time or about specification fidelity beyond the vectors (see the trust model).
 
 To reproduce locally: `make check`.
 

@@ -265,7 +265,7 @@ In plain terms, for every input, not on samples:
 Reproduce with:
 
 ```bash
-alr exec -- gnatprove -P longfellow_spark.gpr --level=2 --report=all
+alr exec -- gnatprove -P longfellow_spark.gpr
 sed -n 1,20p obj/development/gnatprove/gnatprove.out
 ```
 

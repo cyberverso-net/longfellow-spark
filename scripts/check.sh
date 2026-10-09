@@ -31,9 +31,11 @@ do_build() {
 }
 
 do_prove() {
-   header "prove: gnatprove --level=2 --report=all -j0 --checks-as-errors=on"
-   alr -n exec -- gnatprove -P longfellow_spark.gpr --level=2 --report=all \
-      -j0 --checks-as-errors=on
+   #  The prover configuration (provers, step budget, no timeout) lives in
+   #  package Prove of longfellow_spark.gpr, so that a plain gnatprove -P
+   #  run and this gate prove the same thing.
+   header "prove: gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on"
+   alr -n exec -- gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on
    header "prove: summary (obj/development/gnatprove/gnatprove.out)"
    sed -n '/^Summary of SPARK/,/^max steps/p' obj/development/gnatprove/gnatprove.out
 }
