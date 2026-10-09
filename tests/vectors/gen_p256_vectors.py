@@ -181,6 +181,32 @@ def derive_reduction():
     return q, k, s_max, n_max, v_max, v4_max, w_max
 
 
+def check_inversion_chain() -> None:
+    """The fixed chain used by P256_Field.Inv (ADR 0016), tracked on
+    exponents: it must compute x^(p - 2) with no data-dependent step."""
+    counts = {"sq": 0, "mul": 0}
+    def sq(e, n): counts["sq"] += n; return e << n
+    def mul(e1, e2): counts["mul"] += 1; return e1 + e2
+    x1 = 1
+    x2 = mul(sq(x1, 1), x1)
+    x3 = mul(sq(x2, 1), x1)
+    x6 = mul(sq(x3, 3), x3)
+    x12 = mul(sq(x6, 6), x6)
+    x15 = mul(sq(x12, 3), x3)
+    x30 = mul(sq(x15, 15), x15)
+    x32 = mul(sq(x30, 2), x2)
+    r = x32
+    r = mul(sq(r, 32), x1)
+    r = sq(r, 96)
+    r = mul(sq(r, 32), x32)
+    r = mul(sq(r, 32), x32)
+    r = mul(sq(r, 30), x30)
+    r = mul(sq(r, 2), x1)
+    if r != P - 2:
+        fail("inversion chain does not compute p - 2")
+    print(f"inversion chain: {counts['sq']} squarings, {counts['mul']} multiplications, exponent p - 2 verified")
+
+
 def main() -> None:
     out_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).parent
 
@@ -196,6 +222,7 @@ def main() -> None:
     if half != (P + 1) // 2:
         fail("inverse of two")
 
+    check_inversion_chain()
     q, k, s_max, n_max, v_max, v4_max, w_max = derive_reduction()
     print("reduction: quotient coefficients q_j (X = S - N + sum_j q_j c_j * p):")
     for j in range(8, 16):
@@ -344,10 +371,11 @@ def main() -> None:
         fb(v, True)
     w("#")
     w("# Section B: acceptance boundary: 0, 1, p - 1 accepted; p, p + 1, 2^256 - 1,")
-    w("#   p + 2^96, 2^256 - 2^64, and p with the top limb only, rejected.")
+    w("#   p + 2^96, 2^256 - 2^64, and the top limb of p over all-ones limbs, rejected.")
     for v in (0, 1, P - 1):
         fb(v, True)
-    for v in (P, P + 1, MASK256, P + 2**96, MASK256 - 2**64, 0xFFFFFFFF00000001 << 192):
+    for v in (P, P + 1, MASK256, P + 2**96, MASK256 - 2**64,
+              (0xFFFFFFFF00000001 << 192) | (2**192 - 1)):
         fb(v, False)
     w("#")
     w(f"# Section C: {RANDOM_CASES // 2} random encodings below p, and")
