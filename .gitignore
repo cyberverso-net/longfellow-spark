@@ -1,7 +1,6 @@
 /obj/
 /lib/
-/alire/*
-!/alire/alire.lock
+/alire/
 /config/
 
 # gnatprove artefacts

@@ -14,7 +14,7 @@ A continuous integration step existed, but it installed GNAT from the system pac
 
 ## Decision
 
-- The toolchain in continuous integration is provisioned by Alire (`alire-project/setup-alire`) with the same versions as the local environment: `gnat_native 16.1.0`, `gprbuild 26.0.1`, and `gnatprove 16.1.0`, the latter pinned exactly in `alire.toml` with `alire/alire.lock` tracked in git. Alire may rewrite the lock file when dependencies change; the diff is the audit trail of such a change.
+- The toolchain in continuous integration is provisioned by Alire (`alire-project/setup-alire`) with the same versions as the local environment: `gnat_native 16.1.0`, `gprbuild 26.0.1`, and `gnatprove 16.1.0`, the first two selected by the workflow's toolchain string and the latter pinned exactly in `alire.toml`. Alire's lock file is not tracked: it stores the origin already resolved for the platform it was written on (a macOS arm64 archive here), so committing it would make the Linux runner deploy the wrong binary; the exact version in the manifest is the pin.
 - `gnatprove` runs with `--checks-as-errors=on` at the project's default level (`--level=2 --report=all -j0`), so an unproved check fails the job. The full proof runs on every push and pull request; it takes about two minutes locally and is expected to take a few minutes on a hosted runner.
 - `scripts/check.sh` is the single definition of the checks (build, prove, test, vectors, lint), used locally through `make check` and in the workflow step by step, so that local and continuous verification cannot drift apart.
 - The workflow `verify` runs on Ubuntu for every push and pull request and additionally on macOS for `main` and manual runs, mirroring the author's environment.
@@ -31,7 +31,7 @@ A continuous integration step existed, but it installed GNAT from the system pac
 
 - Every commit on every branch is built, fully proved, tested against the known-answer vectors, checked for vector drift and linted, with the toolchain pinned.
 - The GNATprove report (`gnatprove.out`) is uploaded as an artifact of every run, including failed ones, so the summary table and the per-subprogram counts are inspectable without reproducing the run.
-- Toolchain upgrades are deliberate: a change to `alire.toml`, the lock file, or the workflow's toolchain string, reviewed as a pull request whose checks show whether the proofs survive.
+- Toolchain upgrades are deliberate: a change to `alire.toml` or to the workflow's toolchain string, reviewed as a pull request whose checks show whether the proofs survive.
 - The job's duration is a cost paid on every push; if it exceeds ten minutes, caching of proof sessions is reconsidered.
 
 ## Verification impact
@@ -47,6 +47,6 @@ What it does not certify: constant-time execution ([ADR 0006](0006-constant-time
 
 ## References
 
-- `.github/workflows/verify.yml`, `scripts/check.sh`, `Makefile`, `alire.toml`, `alire/alire.lock`.
+- `.github/workflows/verify.yml`, `scripts/check.sh`, `Makefile`, `alire.toml`.
 - alire-project/setup-alire (GitHub Action), inputs `version`, `toolchain`, `cache`.
 - [ADR 0003](0003-proof-policy-and-trust-model.md), [ADR 0009](0009-known-answer-vectors.md), [ADR 0010](0010-assertion-enabled-test-project.md).
