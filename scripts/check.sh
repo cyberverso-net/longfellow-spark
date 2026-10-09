@@ -27,12 +27,12 @@ fi
 
 do_build() {
    header "build: alr build"
-   alr build
+   alr -n build
 }
 
 do_prove() {
    header "prove: gnatprove --level=2 --report=all -j0 --checks-as-errors=on"
-   alr exec -- gnatprove -P longfellow_spark.gpr --level=2 --report=all \
+   alr -n exec -- gnatprove -P longfellow_spark.gpr --level=2 --report=all \
       -j0 --checks-as-errors=on
    header "prove: summary (obj/development/gnatprove/gnatprove.out)"
    sed -n '/^Summary of SPARK/,/^max steps/p' obj/development/gnatprove/gnatprove.out
@@ -40,7 +40,7 @@ do_prove() {
 
 do_test() {
    header "test: build the harnesses (assertions on)"
-   alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
+   alr -n exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
    header "test: gf2_128_kat"
    tests/bin/gf2_128_kat
    header "test: p256_kat"
