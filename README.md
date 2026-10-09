@@ -48,7 +48,9 @@ tests/bin/gf2_128_kat        # default: the gf2_128_*.txt files under tests/vect
 tests/bin/p256_kat           # default: the p256_*.txt files (about three minutes with assertions on)
 ```
 
-Each harness takes vector file paths as arguments, prints pass and fail counts and exits with a non-zero status on any failure or if no case ran. Vector files are regenerated with `python3 -I tests/vectors/gen_gf2_128_vectors.py` and `python3 -I tests/vectors/gen_p256_vectors.py`; the generators abort if their recomputed anchors disagree with the external constants they embed, and the P-256 generator also re-derives the Solinas reduction table and the inversion chain used by the implementation.
+Each harness takes vector file paths as arguments, prints pass and fail counts and exits with a non-zero status on any failure or if no case ran. Vector files are rebuilt with `python3 -I tests/vectors/gen_gf2_128_vectors.py` and `python3 -I tests/vectors/gen_p256_vectors.py`; the generators abort if their recomputed anchors disagree with the external constants they embed, and the P-256 generator also re-derives the Solinas reduction table and the inversion chain used by the implementation.
+
+Definition of done, for every commit: `make check` passes. It runs, in order, `alr build`, the full proof at level 2 with unproved checks treated as errors, both harnesses, the vector generators with a comparison against the committed files, and a lint over tracked files; `scripts/check.sh` is the single definition of these steps and `make build`, `make prove`, `make test`, `make vectors` and `make lint` run them one at a time. The GitHub Actions workflow runs the same script, step by step, on every push and pull request to `main`.
 
 ## Licence
 
