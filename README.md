@@ -52,6 +52,16 @@ Each harness takes vector file paths as arguments, prints pass and fail counts a
 
 Definition of done, for every commit: `make check` passes. It runs, in order, `alr build`, the full proof at level 2 with unproved checks treated as errors, both harnesses, the vector generators with a comparison against the committed files, and a lint over tracked files; `scripts/check.sh` is the single definition of these steps and `make build`, `make prove`, `make test`, `make vectors` and `make lint` run them one at a time. The GitHub Actions workflow runs the same script, step by step, on every push and pull request to `main`.
 
+## Continuous integration
+
+[![verify](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/verify.yml/badge.svg)](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/verify.yml)
+
+The workflow `verify` (ADR 0018) runs on every push and pull request with the same Alire-provisioned toolchain as the local environment (`gnat_native 16.1.0`, `gprbuild 26.0.1`, `gnatprove 16.1.0`, pinned in `alire.toml` and `alire/alire.lock`): build, the full proof at level 2 with unproved checks treated as errors, both harnesses, the vector generators compared with the committed files, and the lint, one step each. Ubuntu runs for every change; macOS runs for `main` and manual dispatch. The GNATprove report is uploaded as an artifact of every run. A green badge certifies exactly what `make check` certifies locally, on the pinned toolchain; it says nothing about constant time or about specification fidelity beyond the vectors (see the trust model).
+
+To reproduce locally: `make check`.
+
+Branch model: work happens on a branch per stage or block; changes reach `main` through a pull request, merged only with the `verify` checks green; direct pushes to `main` are not used.
+
 ## Licence
 
 Apache-2.0.
