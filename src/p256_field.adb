@@ -1320,6 +1320,28 @@ package body P256_Field is
              + (Two_64 - 1) * Weight (2) + (Two_32 - 2) * Weight (3));
    end Lemma_Constants;
 
+   --  Equal limbs denote equal values (stated element-wise, so that the
+   --  proof does not rely on array extensionality).
+   procedure Lemma_To_Int_Eq (A, B : Limb_Array) with
+     Ghost, Global => null,
+     Pre  => (for all I in Limb_Index => A (I) = B (I)),
+     Post => To_Int (A) = To_Int (B);
+
+   procedure Lemma_To_Int_Eq (A, B : Limb_Array) is
+   begin
+      pragma Assert
+        (A (0) = B (0) and then A (1) = B (1)
+         and then A (2) = B (2) and then A (3) = B (3));
+      pragma Assert
+        (Partial (A, 4)
+           = Conv (A (0)) * Weight (0) + Conv (A (1)) * Weight (1)
+           + Conv (A (2)) * Weight (2) + Conv (A (3)) * Weight (3));
+      pragma Assert
+        (Partial (B, 4)
+           = Conv (B (0)) * Weight (0) + Conv (B (1)) * Weight (1)
+           + Conv (B (2)) * Weight (2) + Conv (B (3)) * Weight (3));
+   end Lemma_To_Int_Eq;
+
    --  The low four words of a five-word value, and a four-word value
    --  extended by a zero word.
    function Low (V : Five_Array) return Limb_Array is
@@ -1559,13 +1581,22 @@ package body P256_Field is
       declare
          R : constant Limb_Array := Select_Limbs (Low (W), Low (Diff), Mask);
       begin
-         pragma Assert (if Bw = 0 then R = Low (Diff) else R = Low (W));
          Lemma_To_Int_Bounds (R);
-         pragma Assert (To_Int (R) >= 0);
-         pragma Assert
-           (if Bw = 0 then To_Int (R) = To_Int (W) - P
-            else To_Int (R) = To_Int (W));
-         pragma Assert (To_Int (R) < P);
+         if Bw = 0 then
+            pragma Assert (Mask = Unsigned_64'Last);
+            pragma Assert (R = Low (Diff));
+            pragma Assert (for all I in Limb_Index => R (I) = Low (Diff) (I));
+            Lemma_To_Int_Eq (R, Low (Diff));
+            pragma Assert (To_Int (R) = To_Int (Diff));
+            pragma Assert (To_Int (R) = To_Int (W) - P);
+         else
+            pragma Assert (Mask = 0);
+            pragma Assert (R = Low (W));
+            pragma Assert (for all I in Limb_Index => R (I) = Low (W) (I));
+            Lemma_To_Int_Eq (R, Low (W));
+            pragma Assert (To_Int (R) = To_Int (W));
+         end if;
+         pragma Assert (To_Int (R) >= 0 and then To_Int (R) < P);
          return R;
       end;
    end Stage_Final;
