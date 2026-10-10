@@ -27,7 +27,7 @@ jobs:
         #  ubuntu-latest always; macos-latest only on main or on dispatch.
         os: ${{ (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && fromJSON('["ubuntu-latest", "macos-latest"]') || fromJSON('["ubuntu-latest"]') }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out
         uses: actions/checkout@v4

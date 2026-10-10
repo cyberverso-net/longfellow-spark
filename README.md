@@ -36,7 +36,7 @@ alr build
 alr exec -- gnatprove -P longfellow_spark.gpr
 ```
 
-The prover configuration is in `package Prove` of `longfellow_spark.gpr`: the three provers of level 2 (CVC5, Z3, Alt-Ergo) with a step budget of 600000 and no timeout, so that a proof that passes on one machine passes on every machine with the same toolchain. Any change to that configuration is recorded with its rationale (ADR 0003, ADR 0018).
+The prover configuration is in `package Prove` of `longfellow_spark.gpr`: the three provers of level 2 (CVC5, Z3, Alt-Ergo) with a step budget of 600000, so that a proof that fits the budget on one machine fits it on every machine with the same toolchain, and a timeout of 20 seconds as a safety net against prover runs that do not honour the budget. Any change to that configuration is recorded with its rationale (ADR 0003, ADR 0018).
 
 ## Testing
 
