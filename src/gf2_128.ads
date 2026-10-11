@@ -5,16 +5,17 @@
 --  implementation walked through, what is proved, tested and trusted).
 --  Decisions implemented here: ADR 0004 (element representation),
 --  0005 (Mul_Ref as proof target), 0006 (constant-time scope),
---  0007 (Square), 0008 (Inv), with 0002 (pinned spec) and 0003 (proof
---  policy) as the frame; see docs/adr/README.md.
+--  0007 (Square), 0008 (Inv), with 0002 (pinned spec), 0003 (proof
+--  policy) and 0020 (prover configuration) as the frame; see
+--  docs/adr/README.md.
 --
 --  Proof status. SPARK assurance levels: Silver = absence of run-time
 --  errors, Gold = proved functional contracts. Stage 1 of Phase A is
 --  complete: every subprogram below is at least Silver, and the Gold
 --  kernels are Add, Xtime, Mul and Square. All verification conditions
 --  are discharged by GNATprove with the project's proof switches
---  (package Prove in longfellow_spark.gpr: the level 2 provers with a
---  step budget; 41 checks, CVC5 only).
+--  (package Prove in longfellow_spark.gpr, ADR 0020: the level 2
+--  provers with a step budget; 41 checks).
 --
 --    Add     : Gold, functional Post proved (addition is limb-wise xor).
 --    Xtime   : Gold, exact bit-level Post proved (multiplication by x

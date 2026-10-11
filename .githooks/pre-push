@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#  pre-push: run the full proof before anything leaves this machine
+#  (ADR 0019). The hosted gate does not prove; this hook does, in about
+#  three minutes, with the project's prover configuration and unproved
+#  checks treated as errors. Installed with `make hooks`, which points
+#  core.hooksPath at this directory. `git push --no-verify` skips it;
+#  the pushed commits are then unproved until the weekly hosted run.
+#  Git runs hooks from the repository root, where check.sh insists on
+#  being run.
+
+set -euo pipefail
+
+exec scripts/check.sh prove

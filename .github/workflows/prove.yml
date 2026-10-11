@@ -1,0 +1,56 @@
+#  prove: the full proof on the hosted runner (ADR 0019, ADR 0021). It
+#  runs on every pull request to main as a required check, weekly as an
+#  independent record that the proof still holds on the pinned
+#  toolchain, and on demand before a release or after a toolchain
+#  change. Pushes to branches do not run it: the pre-push hook
+#  (.githooks/pre-push) proves them locally in about six minutes, where
+#  the hosted runner needs twenty-five to forty. Scheduled workflows are
+#  suspended by GitHub after sixty days without activity on the
+#  repository; a manual run resumes them.
+
+name: prove
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: prove-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Alire and the pinned toolchain
+        uses: alire-project/setup-alire@latest
+        with:
+          toolchain: "gnat_native=16.1.0 gprbuild=26.0.1"
+
+      - name: Toolchain versions
+        run: |
+          alr -n toolchain
+          alr -n exec -- gnatprove --version
+
+      - name: Build
+        run: make build
+
+      - name: Prove
+        run: make prove
+
+      - name: Upload the GNATprove report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gnatprove-report
+          path: obj/development/gnatprove/gnatprove.out

@@ -6,9 +6,9 @@ A formally verified Ada/SPARK reimplementation of [Longfellow ZK](https://github
 
 ## Status
 
-Phase A, stage 1 (GF(2^128)) complete: `Add`, `Xtime`, `Mul` and `Square` proved Gold at level 2 (Mul and Square proved equal to the ghost Horner reference `Mul_Ref`); `Inv` implemented as a fixed Fermat chain, Silver, total with `Inv (Zero) = Zero`; 41 verification conditions discharged; 209 known-answer cases anchored on upstream constants.
+Phase A, stage 1 (GF(2^128)) complete: `Add`, `Xtime`, `Mul` and `Square` proved Gold (Mul and Square proved equal to the ghost Horner reference `Mul_Ref`); `Inv` implemented as a fixed Fermat chain, Silver, total with `Inv (Zero) = Zero`; 41 verification conditions discharged; 209 known-answer cases anchored on upstream constants.
 
-Phase A, stage 2 (P-256 base field) complete: `Add`, `Sub`, `Neg`, `Mul`, `Square`, `From_Bytes`, `To_Bytes` proved Gold at level 2 against a ghost big-integer model (`To_Int (Mul (A, B)) = To_Int (A) * To_Int (B) mod p`, for all inputs); canonical form enforced by a type predicate; `Inv` a fixed Fermat chain, Silver, total; 467 known-answer cases anchored on the P-256 base point. Verification condition counts are in `docs/guide/02-p256-field.md`. Next: stage 3, the sumcheck verifier. Field polynomial verified against the pinned spec (Q(x) = x^128 + x^7 + x^2 + x + 1, Section 2.2.2).
+Phase A, stage 2 (P-256 base field) complete: `Add`, `Sub`, `Neg`, `Mul`, `Square`, `From_Bytes`, `To_Bytes` proved Gold against a ghost big-integer model (`To_Int (Mul (A, B)) = To_Int (A) * To_Int (B) mod p`, for all inputs); canonical form enforced by a type predicate; `Inv` a fixed Fermat chain, Silver, total; 467 known-answer cases anchored on the P-256 base point. Verification condition counts are in `docs/guide/02-p256-field.md`. Next: stage 3, the sumcheck verifier. Field polynomial verified against the pinned spec (Q(x) = x^128 + x^7 + x^2 + x + 1, Section 2.2.2).
 
 Pinned spec: **IETF draft-google-cfrg-libzk-03 (23 September 2026)**; field definition in Section 2.2.2. Divergences in later draft versions are handled as explicit migrations (ADR 0002).
 
@@ -36,7 +36,7 @@ alr build
 alr exec -- gnatprove -P longfellow_spark.gpr
 ```
 
-The prover configuration is in `package Prove` of `longfellow_spark.gpr`: the three provers of level 2 (CVC5, Z3, Alt-Ergo) with a step budget of 600000, so that a proof that fits the budget on one machine fits it on every machine with the same toolchain, and a timeout of 20 seconds as a safety net against prover runs that do not honour the budget. Any change to that configuration is recorded with its rationale (ADR 0003, ADR 0018).
+The prover configuration is in `package Prove` of `longfellow_spark.gpr` (ADR 0020): the three provers of level 2 (CVC5, Z3, Alt-Ergo) with a step budget of 600000, so that a proof that fits the budget on one machine fits it on every machine with the same toolchain, and a timeout of 120 seconds as a guard against prover runs that do not terminate; the longest successful proof takes 4 to 10 seconds, so the timeout is never the binding limit. Any change to that configuration is recorded with its rationale (ADR 0003, ADR 0020).
 
 ## Testing
 
@@ -50,17 +50,23 @@ tests/bin/p256_kat           # default: the p256_*.txt files (about three minute
 
 Each harness takes vector file paths as arguments, prints pass and fail counts and exits with a non-zero status on any failure or if no case ran. Vector files are rebuilt with `python3 -I tests/vectors/gen_gf2_128_vectors.py` and `python3 -I tests/vectors/gen_p256_vectors.py`; the generators abort if their recomputed anchors disagree with the external constants they embed, and the P-256 generator also re-derives the Solinas reduction table and the inversion chain used by the implementation.
 
-Definition of done, for every commit: `make check` passes. It runs, in order, `alr build`, the full proof with the project's prover configuration and unproved checks treated as errors, both harnesses, the vector generators with a comparison against the committed files, and a lint over tracked files; `scripts/check.sh` is the single definition of these steps and `make build`, `make prove`, `make test`, `make vectors` and `make lint` run them one at a time. The GitHub Actions workflow runs the same script, step by step, on every push and pull request to `main`.
+Definition of done, for every commit: `make check` passes. It runs, in order, `alr build`, the full proof with the project's prover configuration and unproved checks treated as errors, both harnesses, the vector generators with a comparison against the committed files, and a lint over tracked files; `scripts/check.sh` is the single definition of these steps and `make build`, `make prove`, `make test`, `make vectors` and `make lint` run them one at a time. The proof runs before every push through a hook: install it once per clone with `make hooks`. A clone without the hook pushes unproved code; `git push --no-verify` does the same knowingly.
 
 ## Continuous integration
 
 [![verify](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/verify.yml/badge.svg)](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/verify.yml)
+[![prove](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/prove.yml/badge.svg)](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/prove.yml)
 
-The workflow `verify` (ADR 0018) runs on every push and pull request with the same Alire-provisioned toolchain as the local environment (`gnat_native 16.1.0`, `gprbuild 26.0.1`, `gnatprove 16.1.0`, pinned in `alire.toml` and in the workflow's toolchain string): build, the full proof with the project's prover configuration and unproved checks treated as errors, both harnesses, the vector generators compared with the committed files, and the lint, one step each. Ubuntu runs for every change; macOS runs for `main` and manual dispatch. The GNATprove report is uploaded as an artifact of every run. A green badge certifies exactly what `make check` certifies locally, on the pinned toolchain; it says nothing about constant time or about specification fidelity beyond the vectors (see the trust model).
+Two workflows, both with the same Alire-provisioned toolchain as the local environment (`gnat_native 16.1.0`, `gprbuild 26.0.1`, `gnatprove 16.1.0`, pinned in `alire.toml` and in the workflows' toolchain string), both running the steps of `scripts/check.sh` one at a time (ADR 0018, 0019, 0021):
+
+- `verify` runs on every push and pull request, on Ubuntu: build, both harnesses, the vector generators compared with the committed files, and the lint. About five minutes. Required check for merging.
+- `prove` runs the full proof with the project's prover configuration (ADR 0020) and unproved checks treated as errors, on Ubuntu, and uploads the GNATprove report as an artifact. It runs on every pull request to `main`, where it is a required check, weekly as an independent record, and on manual dispatch before a release or after a toolchain change. It takes twenty-five to forty minutes on the hosted runner against about six locally, which is why pushes to branches are proved by the local pre-push hook instead.
+
+A green `verify` badge certifies what `make build`, `make test`, `make vectors` and `make lint` certify locally, on the pinned toolchain. A green `prove` badge certifies that the full proof held on the pinned toolchain at its last run: every SPARK check proved within the step budget, no justification, no `pragma Assume`. Together they certify what `make check` certifies. Neither says anything about constant time or about specification fidelity beyond the vectors (see the trust model).
 
 To reproduce locally: `make check`.
 
-Branch model: work happens on a branch per stage or block; changes reach `main` through a pull request, merged only with the `verify` checks green; direct pushes to `main` are not used.
+Branch model: work happens on a branch per stage or block; changes reach `main` through a pull request, merged only with `verify` and `prove` green; pushes to the branch are proved locally by the pre-push hook; direct pushes to `main` are not used.
 
 ## Licence
 
