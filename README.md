@@ -1,7 +1,5 @@
 # longfellow-spark
 
-Naming: the repository is `longfellow-spark`; the Alire crate and the GPR project are `longfellow_spark`, because Alire crate names and Ada project identifiers do not allow hyphens.
-
 A formally verified Ada/SPARK reimplementation of [Longfellow ZK](https://github.com/google/longfellow-zk) (libzk), built progressively: verified field arithmetic first, then a complete verifier consuming upstream-generated circuits as validated data, then the prover, and finally the circuit compiler.
 
 ## Status
@@ -36,6 +34,8 @@ alr build
 alr exec -- gnatprove -P longfellow_spark.gpr
 ```
 
+Naming: the repository is `longfellow-spark`; the Alire crate and the GPR project are `longfellow_spark`, because Alire crate names and Ada project identifiers do not allow hyphens.
+
 The prover configuration is in `package Prove` of `longfellow_spark.gpr` (ADR 0020): the three provers of level 2 (CVC5, Z3, Alt-Ergo) with a step budget of 600000, so that a proof that fits the budget on one machine fits it on every machine with the same toolchain, and a timeout of 120 seconds as a guard against prover runs that do not terminate; the longest successful proof takes 4 to 10 seconds, so the timeout is never the binding limit. Any change to that configuration is recorded with its rationale (ADR 0003, ADR 0020).
 
 ## Testing
@@ -60,7 +60,7 @@ Definition of done, for every commit: `make check` passes. It runs, in order, `a
 Two workflows, both with the same Alire-provisioned toolchain as the local environment (`gnat_native 16.1.0`, `gprbuild 26.0.1`, `gnatprove 16.1.0`, pinned in `alire.toml` and in the workflows' toolchain string), both running the steps of `scripts/check.sh` one at a time (ADR 0018, 0019, 0021):
 
 - `verify` runs on every push and pull request, on Ubuntu: build, both harnesses, the vector generators compared with the committed files, and the lint. About five minutes. Required check for merging.
-- `prove` runs the full proof with the project's prover configuration (ADR 0020) and unproved checks treated as errors, on Ubuntu, and uploads the GNATprove report as an artifact. It runs on every pull request to `main`, where it is a required check, weekly as an independent record, and on manual dispatch before a release or after a toolchain change. It takes twenty-five to forty minutes on the hosted runner against about six locally, which is why pushes to branches are proved by the local pre-push hook instead.
+- `prove` runs the full proof with the project's prover configuration (ADR 0020) and unproved checks treated as errors, on Ubuntu, and uploads the GNATprove report as an artifact. It runs on every pull request to `main`, where it is a required check, weekly as an independent record, and on manual dispatch before a release or after a toolchain change. It takes about five minutes on the hosted runner (first run on a pull request, 2026-10-11: 4 min 51 s for the proof, 5 min 23 s for the job) against about six locally; pushes to branches are proved by the local pre-push hook, which gives the result without waiting for a runner.
 
 A green `verify` badge certifies what `make build`, `make test`, `make vectors` and `make lint` certify locally, on the pinned toolchain. A green `prove` badge certifies that the full proof held on the pinned toolchain at its last run: every SPARK check proved within the step budget, no justification, no `pragma Assume`. Together they certify what `make check` certifies. Neither says anything about constant time or about specification fidelity beyond the vectors (see the trust model).
 
