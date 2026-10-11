@@ -1,13 +1,32 @@
 #!/usr/bin/env bash
 #  pre-push: run the full proof before anything leaves this machine
-#  (ADR 0019). The hosted gate does not prove; this hook does, in about
-#  three minutes, with the project's prover configuration and unproved
-#  checks treated as errors. Installed with `make hooks`, which points
-#  core.hooksPath at this directory. `git push --no-verify` skips it;
-#  the pushed commits are then unproved until the weekly hosted run.
+#  (ADR 0019). The hosted gate proves pull requests only (ADR 0021);
+#  this hook proves every push, in about six minutes, with the project's
+#  prover configuration and unproved checks treated as errors. Installed
+#  with `make hooks`, which points core.hooksPath at this directory.
+#  `git push --no-verify` skips it; the pushed commits are then unproved
+#  until the pull request or the weekly hosted run.
 #  Git runs hooks from the repository root, where check.sh insists on
 #  being run.
+#
+#  Git feeds one line per ref on standard input:
+#     <local ref> <local sha> <remote ref> <remote sha>
+#  A deletion has an all-zero local sha and pushes no commits, so there
+#  is nothing to prove; the hook skips the proof when every line is one.
 
 set -euo pipefail
+
+zero=0000000000000000000000000000000000000000
+pushing=false
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+   if [ "$local_sha" != "$zero" ]; then
+      pushing=true
+   fi
+done
+
+if [ "$pushing" = false ]; then
+   echo "pre-push: deletion only, nothing to prove"
+   exit 0
+fi
 
 exec scripts/check.sh prove
