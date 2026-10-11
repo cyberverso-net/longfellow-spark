@@ -23,3 +23,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md). Records
 | [0017](0017-p256-test-anchors.md) | P-256 base field: test anchors | Accepted | 2026-10-09 |
 | [0018](0018-continuous-verification-gate.md) | Continuous verification gate | Accepted, superseded in part by 0019 and 0020 | 2026-10-09 |
 | [0019](0019-proof-off-the-hosted-gate.md) | Proof off the hosted gate | Accepted | 2026-10-11 |
+| [0020](0020-prover-configuration-step-budget.md) | Prover configuration by step budget | Accepted | 2026-10-11 |
