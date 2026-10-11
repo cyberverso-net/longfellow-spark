@@ -1,7 +1,5 @@
 # longfellow-spark
 
-Naming: the repository is `longfellow-spark`; the Alire crate and the GPR project are `longfellow_spark`, because Alire crate names and Ada project identifiers do not allow hyphens.
-
 A formally verified Ada/SPARK reimplementation of [Longfellow ZK](https://github.com/google/longfellow-zk) (libzk), built progressively: verified field arithmetic first, then a complete verifier consuming upstream-generated circuits as validated data, then the prover, and finally the circuit compiler.
 
 ## Status
@@ -35,6 +33,8 @@ Requires [Alire](https://alire.ada.dev) with a GNAT toolchain selected (`alr too
 alr build
 alr exec -- gnatprove -P longfellow_spark.gpr
 ```
+
+Naming: the repository is `longfellow-spark`; the Alire crate and the GPR project are `longfellow_spark`, because Alire crate names and Ada project identifiers do not allow hyphens.
 
 The prover configuration is in `package Prove` of `longfellow_spark.gpr` (ADR 0020): the three provers of level 2 (CVC5, Z3, Alt-Ergo) with a step budget of 600000, so that a proof that fits the budget on one machine fits it on every machine with the same toolchain, and a timeout of 120 seconds as a guard against prover runs that do not terminate; the longest successful proof takes 4 to 10 seconds, so the timeout is never the binding limit. Any change to that configuration is recorded with its rationale (ADR 0003, ADR 0020).
 
