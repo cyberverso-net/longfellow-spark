@@ -50,17 +50,23 @@ tests/bin/p256_kat           # default: the p256_*.txt files (about three minute
 
 Each harness takes vector file paths as arguments, prints pass and fail counts and exits with a non-zero status on any failure or if no case ran. Vector files are rebuilt with `python3 -I tests/vectors/gen_gf2_128_vectors.py` and `python3 -I tests/vectors/gen_p256_vectors.py`; the generators abort if their recomputed anchors disagree with the external constants they embed, and the P-256 generator also re-derives the Solinas reduction table and the inversion chain used by the implementation.
 
-Definition of done, for every commit: `make check` passes. It runs, in order, `alr build`, the full proof with the project's prover configuration and unproved checks treated as errors, both harnesses, the vector generators with a comparison against the committed files, and a lint over tracked files; `scripts/check.sh` is the single definition of these steps and `make build`, `make prove`, `make test`, `make vectors` and `make lint` run them one at a time. The GitHub Actions workflow runs the same script, step by step, on every push and pull request to `main`.
+Definition of done, for every commit: `make check` passes. It runs, in order, `alr build`, the full proof with the project's prover configuration and unproved checks treated as errors, both harnesses, the vector generators with a comparison against the committed files, and a lint over tracked files; `scripts/check.sh` is the single definition of these steps and `make build`, `make prove`, `make test`, `make vectors` and `make lint` run them one at a time. The proof runs before every push through a hook: install it once per clone with `make hooks`. A clone without the hook pushes unproved code; `git push --no-verify` does the same knowingly.
 
 ## Continuous integration
 
 [![verify](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/verify.yml/badge.svg)](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/verify.yml)
+[![prove](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/prove.yml/badge.svg)](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/prove.yml)
 
-The workflow `verify` (ADR 0018) runs on every push and pull request with the same Alire-provisioned toolchain as the local environment (`gnat_native 16.1.0`, `gprbuild 26.0.1`, `gnatprove 16.1.0`, pinned in `alire.toml` and in the workflow's toolchain string): build, the full proof with the project's prover configuration and unproved checks treated as errors, both harnesses, the vector generators compared with the committed files, and the lint, one step each. Ubuntu runs for every change; macOS runs for `main` and manual dispatch. The GNATprove report is uploaded as an artifact of every run. A green badge certifies exactly what `make check` certifies locally, on the pinned toolchain; it says nothing about constant time or about specification fidelity beyond the vectors (see the trust model).
+Two workflows, both with the same Alire-provisioned toolchain as the local environment (`gnat_native 16.1.0`, `gprbuild 26.0.1`, `gnatprove 16.1.0`, pinned in `alire.toml` and in the workflows' toolchain string), both running the steps of `scripts/check.sh` one at a time (ADR 0018, ADR 0019):
+
+- `verify` runs on every push and pull request, on Ubuntu: build, both harnesses, the vector generators compared with the committed files, and the lint. About five minutes. This is the required check for merging.
+- `prove` runs the full proof weekly and on manual dispatch, on Ubuntu, and uploads the GNATprove report as an artifact. It takes fifteen to twenty-five minutes on the hosted runner against three locally, which is why the proof gates each push through the local hook rather than here. Run it by hand after a toolchain change or before a release.
+
+A green `verify` badge certifies what `make build`, `make test`, `make vectors` and `make lint` certify locally, on the pinned toolchain. A green `prove` badge certifies that the full proof held on the pinned toolchain at its last run. Neither says anything about constant time or about specification fidelity beyond the vectors (see the trust model).
 
 To reproduce locally: `make check`.
 
-Branch model: work happens on a branch per stage or block; changes reach `main` through a pull request, merged only with the `verify` checks green; direct pushes to `main` are not used.
+Branch model: work happens on a branch per stage or block; changes reach `main` through a pull request, merged only with `verify` green and the proof run locally by the pre-push hook; direct pushes to `main` are not used.
 
 ## Licence
 

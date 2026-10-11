@@ -1,8 +1,10 @@
-#  verify: the continuous verification gate (ADR 0018). Runs the steps of
-#  scripts/check.sh, one workflow step each so that the failing one is
-#  visible, with the same Alire-provisioned toolchain as the local
-#  development environment. The full proof runs on every push and pull
-#  request; the macOS leg runs on main and on manual dispatch only.
+#  verify: the gate on every push and pull request (ADR 0018, ADR 0019).
+#  Runs build, test, vectors and lint from scripts/check.sh, one workflow
+#  step each so that the failing one is visible, with the same
+#  Alire-provisioned toolchain as the local development environment.
+#  The proof is not part of this gate: it runs locally before every push
+#  (.githooks/pre-push) and on the hosted runner weekly and on demand
+#  (prove.yml).
 
 name: verify
 
@@ -21,13 +23,8 @@ permissions:
 
 jobs:
   verify:
-    strategy:
-      fail-fast: false
-      matrix:
-        #  ubuntu-latest always; macos-latest only on main or on dispatch.
-        os: ${{ (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && fromJSON('["ubuntu-latest", "macos-latest"]') || fromJSON('["ubuntu-latest"]') }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -38,15 +35,10 @@ jobs:
           toolchain: "gnat_native=16.1.0 gprbuild=26.0.1"
 
       - name: Toolchain versions
-        run: |
-          alr -n toolchain
-          alr -n exec -- gnatprove --version
+        run: alr -n toolchain
 
       - name: Build
-        run: alr -n build
-
-      - name: Prove
-        run: make prove
+        run: make build
 
       - name: Test
         run: make test
@@ -56,10 +48,3 @@ jobs:
 
       - name: Lint
         run: make lint
-
-      - name: Upload the GNATprove report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gnatprove-report-${{ matrix.os }}
-          path: obj/development/gnatprove/gnatprove.out

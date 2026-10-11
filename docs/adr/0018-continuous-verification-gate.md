@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted; superseded in part by [ADR 0019](0019-proof-off-the-hosted-gate.md) on 2026-10-11 (the proof is no longer a required check on the hosted runner)
 
 ## Date
 

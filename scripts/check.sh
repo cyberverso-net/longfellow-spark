@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #  check.sh: the single definition of the project's checks, used locally
-#  (make check) and in continuous integration. Run from the repository
-#  root. Every step prints a header and the script stops at the first
+#  (make check), by the pre-push hook (prove) and in continuous
+#  integration (build, test, vectors, lint on every push; prove weekly
+#  and on demand). Run from the repository root. Every step prints a header and the script stops at the first
 #  failure with a non-zero exit status.
 #
 #  Subcommands: build, prove, test, vectors, lint, all.
@@ -31,9 +32,9 @@ do_build() {
 }
 
 do_prove() {
-   #  The prover configuration (provers, step budget, no timeout) lives in
-   #  package Prove of longfellow_spark.gpr, so that a plain gnatprove -P
-   #  run and this gate prove the same thing.
+   #  The prover configuration (provers, step budget, safety timeout) lives
+   #  in package Prove of longfellow_spark.gpr, so that a plain gnatprove -P
+   #  run and this check prove the same thing.
    header "prove: gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on"
    alr -n exec -- gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on
    header "prove: summary (obj/development/gnatprove/gnatprove.out)"
