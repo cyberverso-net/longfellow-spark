@@ -23,6 +23,20 @@ project Longfellow_Spark is
       for Switches ("Ada") use ("-Es"); --  Symbolic traceback
    end Binder;
 
+   --  Proof configuration (ADR 0003 as amended by ADR 0018): the three
+   --  provers of level 2 with a step budget, so that a proof that fits
+   --  the budget on one machine fits it on every machine, and a
+   --  wall-clock timeout as a safety net. The budget sits above the
+   --  429702 steps of the hardest proof observed; the timeout is four
+   --  times the longest successful attempt observed, and is necessary:
+   --  Alt-Ergo does not always honour its step bound (two goals of
+   --  Lemma_Solinas ran for over seven hours with --timeout=0).
+   package Prove is
+      for Proof_Switches ("Ada") use
+        ("--prover=cvc5,z3,altergo", "--steps=600000", "--timeout=20",
+         "--memlimit=1000", "--report=all");
+   end Prove;
+
    package Install is
       for Artifacts (".") use ("share");
    end Install;

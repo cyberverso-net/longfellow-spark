@@ -17,7 +17,7 @@ Requirements: [Alire](https://alire.ada.dev) with a GNAT toolchain selected (`al
 
 ```bash
 alr build                                                     # the library
-alr exec -- gnatprove -P longfellow_spark.gpr --level=2 --report=all
+alr exec -- gnatprove -P longfellow_spark.gpr
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p   # the test harness, assertions on
 tests/bin/gf2_128_kat && tests/bin/p256_kat                   # known-answer tests
 python3 -I tests/vectors/gen_gf2_128_vectors.py               # regenerate vectors (optional)

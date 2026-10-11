@@ -12,7 +12,9 @@
 --  errors, Gold = proved functional contracts. Stage 1 of Phase A is
 --  complete: every subprogram below is at least Silver, and the Gold
 --  kernels are Add, Xtime, Mul and Square. All verification conditions
---  are discharged by GNATprove at --level=2 (41 checks, CVC5 only).
+--  are discharged by GNATprove with the project's proof switches
+--  (package Prove in longfellow_spark.gpr: the level 2 provers with a
+--  step budget; 41 checks, CVC5 only).
 --
 --    Add     : Gold, functional Post proved (addition is limb-wise xor).
 --    Xtime   : Gold, exact bit-level Post proved (multiplication by x

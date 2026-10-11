@@ -19,7 +19,7 @@ SPARK offers graded assurance: Stone (valid SPARK subset), Bronze (flow analysis
 - Everything else is covered by known-answer tests, interoperability vectors and spec-derived checklists.
 - Platinum over the whole system is explicitly not a goal.
 - The README keeps a trust model in which every claim is one of proved, tested or trusted, maintained from the first commit and reduced over time.
-- Default prover configuration: `gnatprove --level=2 --report=all`. A higher level is used only with a recorded rationale.
+- Default prover configuration: `gnatprove --level=2 --report=all`. A higher level is used only with a recorded rationale. Amended by [ADR 0018](0018-continuous-verification-gate.md) on 2026-10-09: the configuration is now stated in `package Prove` of the project file as the provers of level 2 with a step budget (`--steps=600000`) and a safety timeout (`--timeout=20`), because a timeout alone makes the outcome depend on the machine while no timeout at all lets a prover run forever; raising either needs the same recorded rationale as raising the level did.
 
 ## Alternatives considered
 

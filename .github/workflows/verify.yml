@@ -1,0 +1,65 @@
+#  verify: the continuous verification gate (ADR 0018). Runs the steps of
+#  scripts/check.sh, one workflow step each so that the failing one is
+#  visible, with the same Alire-provisioned toolchain as the local
+#  development environment. The full proof runs on every push and pull
+#  request; the macOS leg runs on main and on manual dispatch only.
+
+name: verify
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        #  ubuntu-latest always; macos-latest only on main or on dispatch.
+        os: ${{ (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && fromJSON('["ubuntu-latest", "macos-latest"]') || fromJSON('["ubuntu-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Alire and the pinned toolchain
+        uses: alire-project/setup-alire@latest
+        with:
+          toolchain: "gnat_native=16.1.0 gprbuild=26.0.1"
+
+      - name: Toolchain versions
+        run: |
+          alr -n toolchain
+          alr -n exec -- gnatprove --version
+
+      - name: Build
+        run: alr -n build
+
+      - name: Prove
+        run: make prove
+
+      - name: Test
+        run: make test
+
+      - name: Vectors
+        run: make vectors
+
+      - name: Lint
+        run: make lint
+
+      - name: Upload the GNATprove report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gnatprove-report-${{ matrix.os }}
+          path: obj/development/gnatprove/gnatprove.out
