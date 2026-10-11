@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted; superseded in part by [ADR 0019](0019-proof-off-the-hosted-gate.md) on 2026-10-11 (the proof is no longer a required check on the hosted runner)
+Accepted; superseded in part by [ADR 0019](0019-proof-off-the-hosted-gate.md) and [ADR 0020](0020-prover-configuration-step-budget.md) on 2026-10-11
 
 ## Date
 
@@ -14,8 +14,8 @@ A continuous integration step existed, but it installed GNAT from the system pac
 
 ## Decision
 
-- The toolchain in continuous integration is provisioned by Alire (`alire-project/setup-alire`) with the same versions as the local environment: `gnat_native 16.1.0`, `gprbuild 26.0.1`, and `gnatprove 16.1.0`, the first two selected by the workflow's toolchain string and the latter pinned exactly in `alire.toml`. Alire's lock file is not tracked: it stores the origin already resolved for the platform it was written on (a macOS arm64 archive here), so committing it would make the Linux runner deploy the wrong binary; the exact version in the manifest is the pin.
-- `gnatprove` runs with `--checks-as-errors=on`, so an unproved check fails the job. The prover configuration is stated once, in `package Prove` of `longfellow_spark.gpr`: `--prover=cvc5,z3,altergo --steps=600000 --timeout=20 --memlimit=1000 --report=all`. These are the provers of level 2 with a step budget as the primary bound and the timeout raised to a safety net: `--level=2` means `--timeout=5 --steps=0`, and the first run of the gate on a hosted Ubuntu runner left five checks unproved with "provers reached time limit" that the author's machine proves in under five seconds (the postconditions of `Lemma_Shift_1`, `Lemma_Shift_2` and `Sub`, an assertion in `Lemma_Shift_3`, a predicate check in `From_Bytes`). The GNATprove user's guide states that `--level` is not reproducible across machines and recommends `--steps` for shared repositories. The budget of 600000 is about forty per cent above the 429702 steps of the hardest proof observed; raising it is a recorded decision, as raising the level was ([ADR 0003](0003-proof-policy-and-trust-model.md)). The timeout cannot be dropped: a first attempt with `--timeout=0` hung both the runner (cancelled at the job limit) and the author's machine, where two Alt-Ergo processes on goals of `Lemma_Solinas` ran for over seven hours at full CPU without reaching their `--steps-bound`; Alt-Ergo's step accounting does not cover every loop, so the step budget is not a termination guarantee on its own. On the author's machine the longest successful attempt takes about five seconds (CVC5 on the postcondition of `Sub`), so twenty seconds leaves a factor of four for a slower runner; a check that needs more than twenty seconds on the runner for a proof that fits the step budget is reported as a time limit, which distinguishes it from a genuine proof failure. The full proof runs on every push and pull request; it takes about two minutes locally and several minutes on the hosted runner.
+- The toolchain in continuous integration is provisioned by Alire (`alire-project/setup-alire`) with the same versions as the local environment: `gnat_native 16.1.0`, `gprbuild 26.0.1`, and `gnatprove 16.1.0`, the latter pinned exactly in `alire.toml` with `alire/alire.lock` tracked in git. Alire may rewrite the lock file when dependencies change; the diff is the audit trail of such a change.
+- `gnatprove` runs with `--checks-as-errors=on` at the project's default level (`--level=2 --report=all -j0`), so an unproved check fails the job. The full proof runs on every push and pull request; it takes about two minutes locally and is expected to take a few minutes on a hosted runner.
 - `scripts/check.sh` is the single definition of the checks (build, prove, test, vectors, lint), used locally through `make check` and in the workflow step by step, so that local and continuous verification cannot drift apart.
 - The workflow `verify` runs on Ubuntu for every push and pull request and additionally on macOS for `main` and manual runs, mirroring the author's environment.
 - Changes reach `main` through pull requests with branch protection requiring the `verify` checks; direct pushes to `main` are not used.
@@ -25,21 +25,18 @@ A continuous integration step existed, but it installed GNAT from the system pac
 - **System packages (apt, Homebrew).** Rejected: version drift between the runner and the developer's machine would make a green or red result meaningless for the proofs, and Homebrew does not ship GNATprove.
 - **Proof only on `main`, build and tests on branches.** Rejected: an unproved check would be detected after merge, when it is most expensive to attribute and revert.
 - **No proof in continuous integration.** Rejected: the property the gate exists to protect is the proof; a gate that skips it does not gate.
-- **Keeping `--level=2` and raising its timeout.** Rejected: a longer timeout still ties the result to the speed and load of the machine; a slower or busier runner turns the gate red without any change to the code or the toolchain. The step budget is the primary bound; the timeout kept alongside it is a safety net, not the bound.
-- **A step budget with no timeout at all (`--timeout=0`).** Tried and rejected: see the Decision for the Alt-Ergo runs that never terminated.
 - **A version range for GNATprove (`^16.1.0`).** Rejected in favour of an exact pin: a later 16.x may change prover versions and proof outcomes; upgrades become explicit commits that re-establish the proof.
 
 ## Consequences
 
 - Every commit on every branch is built, fully proved, tested against the known-answer vectors, checked for vector drift and linted, with the toolchain pinned.
-- The proof outcome depends on the machine only through the safety timeout: a proof that fits the step budget is reproduced on any machine fast enough to run those steps in twenty seconds. Wall-clock time otherwise affects only the job's duration.
 - The GNATprove report (`gnatprove.out`) is uploaded as an artifact of every run, including failed ones, so the summary table and the per-subprogram counts are inspectable without reproducing the run.
-- Toolchain upgrades are deliberate: a change to `alire.toml` or to the workflow's toolchain string, reviewed as a pull request whose checks show whether the proofs survive.
+- Toolchain upgrades are deliberate: a change to `alire.toml`, the lock file, or the workflow's toolchain string, reviewed as a pull request whose checks show whether the proofs survive.
 - The job's duration is a cost paid on every push; if it exceeds ten minutes, caching of proof sessions is reconsidered.
 
 ## Verification impact
 
-What a green `verify` badge certifies: on the pinned toolchain, every SPARK check of the project is proved within the step budget with no unproved check and no justification; the harnesses pass all known-answer cases; the committed vectors are exactly what the generators produce; no tracked file contains forbidden content. The macOS leg additionally shows the same on the author's platform.
+What a green `verify` badge certifies: on the pinned toolchain, every SPARK check of the project is proved at level 2 with no unproved check and no justification; the harnesses pass all known-answer cases; the committed vectors are exactly what the generators produce; no tracked file contains forbidden content. The macOS leg additionally shows the same on the author's platform.
 
 What it does not certify: constant-time execution ([ADR 0006](0006-constant-time-discipline-and-scope.md)), fidelity to the pinned specification beyond what the vectors anchor ([ADR 0009](0009-known-answer-vectors.md), [ADR 0017](0017-p256-test-anchors.md)), the soundness of the compiler, GNATprove and the solvers (trusted, [ADR 0003](0003-proof-policy-and-trust-model.md)), or anything about proofs on other toolchain versions. The gate is a regression guard for the stated trust model, not an extension of it.
 
@@ -50,7 +47,6 @@ What it does not certify: constant-time execution ([ADR 0006](0006-constant-time
 
 ## References
 
-- `.github/workflows/verify.yml`, `scripts/check.sh`, `Makefile`, `alire.toml`, `package Prove` in `longfellow_spark.gpr`.
-- GNATprove user's guide, "How to run GNATprove", on the meaning of `--level` and the use of `--steps` for reproducible results.
+- `.github/workflows/verify.yml`, `scripts/check.sh`, `Makefile`, `alire.toml`, `alire/alire.lock`.
 - alire-project/setup-alire (GitHub Action), inputs `version`, `toolchain`, `cache`.
 - [ADR 0003](0003-proof-policy-and-trust-model.md), [ADR 0009](0009-known-answer-vectors.md), [ADR 0010](0010-assertion-enabled-test-project.md).

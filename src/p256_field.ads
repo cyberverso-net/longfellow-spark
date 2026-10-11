@@ -14,8 +14,8 @@
 --  Phase A is complete: all verification conditions of this package
 --  (3604 checks) are discharged by GNATprove with the project's proof
 --  switches (package Prove in longfellow_spark.gpr: the level 2 provers
---  with a step budget), with no justification and no pragma Assume; see docs/guide/02-p256-field.md
---  for the table.
+--  with a step budget), with no justification and no pragma Assume;
+--  see docs/guide/02-p256-field.md for the table.
 --
 --    Is_Canonical : Gold, equals To_Int (L) < P.
 --    Add, Sub     : Gold, result value is the sum or difference mod P.
