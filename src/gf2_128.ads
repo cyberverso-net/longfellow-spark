@@ -37,6 +37,8 @@
 --              chain yields with no extra branch and matches the
 --              upstream C++ (the upstream Rust reference asserts
 --              instead). Callers that must reject zero do so themselves.
+--    Bit, Mul_Ref : Ghost, specification vocabulary only; absent from
+--              the library when assertions are disabled.
 --
 --  Pinned spec: IETF draft-google-cfrg-libzk-03 (23 September 2026),
 --  Section 2.2.2: the field is GF(2)[x] / Q(x) with
@@ -87,10 +89,13 @@ package GF2_128 is
    subtype Bit_Index_128 is Natural range 0 .. 127;
    subtype Bit_Count is Natural range 0 .. 128;
 
-   --  Coefficient of x^I (bit I) of E.
+   --  Coefficient of x^I (bit I) of E. Ghost: it is the vocabulary of
+   --  the contracts and of Mul_Ref, and it is not compiled into the
+   --  library when assertions are disabled, so no executable path
+   --  branches on a bit of an element (its body compiles to a branch).
    function Bit (E : Element; I : Bit_Index_128) return Boolean is
      ((Shift_Right (E.Limbs (Limb_Index (I / 64)), I mod 64) and 1) = 1)
-   with Global => null;
+   with Ghost, Global => null;
 
    --  Field addition. In characteristic 2 this is exact xor and is its
    --  own inverse; no reduction is involved, so it is polynomial-agnostic.
