@@ -57,16 +57,16 @@ Definition of done, for every commit: `make check` passes. It runs, in order, `a
 [![verify](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/verify.yml/badge.svg)](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/verify.yml)
 [![prove](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/prove.yml/badge.svg)](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/prove.yml)
 
-Two workflows, both with the same Alire-provisioned toolchain as the local environment (`gnat_native 16.1.0`, `gprbuild 26.0.1`, `gnatprove 16.1.0`, pinned in `alire.toml` and in the workflows' toolchain string), both running the steps of `scripts/check.sh` one at a time (ADR 0018, ADR 0019):
+Two workflows, both with the same Alire-provisioned toolchain as the local environment (`gnat_native 16.1.0`, `gprbuild 26.0.1`, `gnatprove 16.1.0`, pinned in `alire.toml` and in the workflows' toolchain string), both running the steps of `scripts/check.sh` one at a time (ADR 0018, 0019, 0021):
 
-- `verify` runs on every push and pull request, on Ubuntu: build, both harnesses, the vector generators compared with the committed files, and the lint. About five minutes. This is the required check for merging.
-- `prove` runs the full proof weekly and on manual dispatch, on Ubuntu, and uploads the GNATprove report as an artifact. It takes fifteen to twenty-five minutes on the hosted runner against three locally, which is why the proof gates each push through the local hook rather than here. Run it by hand after a toolchain change or before a release.
+- `verify` runs on every push and pull request, on Ubuntu: build, both harnesses, the vector generators compared with the committed files, and the lint. About five minutes. Required check for merging.
+- `prove` runs the full proof with the project's prover configuration (ADR 0020) and unproved checks treated as errors, on Ubuntu, and uploads the GNATprove report as an artifact. It runs on every pull request to `main`, where it is a required check, weekly as an independent record, and on manual dispatch before a release or after a toolchain change. It takes twenty-five to forty minutes on the hosted runner against about six locally, which is why pushes to branches are proved by the local pre-push hook instead.
 
-A green `verify` badge certifies what `make build`, `make test`, `make vectors` and `make lint` certify locally, on the pinned toolchain. A green `prove` badge certifies that the full proof held on the pinned toolchain at its last run. Neither says anything about constant time or about specification fidelity beyond the vectors (see the trust model).
+A green `verify` badge certifies what `make build`, `make test`, `make vectors` and `make lint` certify locally, on the pinned toolchain. A green `prove` badge certifies that the full proof held on the pinned toolchain at its last run: every SPARK check proved within the step budget, no justification, no `pragma Assume`. Together they certify what `make check` certifies. Neither says anything about constant time or about specification fidelity beyond the vectors (see the trust model).
 
 To reproduce locally: `make check`.
 
-Branch model: work happens on a branch per stage or block; changes reach `main` through a pull request, merged only with `verify` green and the proof run locally by the pre-push hook; direct pushes to `main` are not used.
+Branch model: work happens on a branch per stage or block; changes reach `main` through a pull request, merged only with `verify` and `prove` green; pushes to the branch are proved locally by the pre-push hook; direct pushes to `main` are not used.
 
 ## Licence
 

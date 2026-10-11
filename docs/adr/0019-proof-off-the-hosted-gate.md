@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted; amended by [ADR 0021](0021-proof-on-pull-requests.md) on 2026-10-11 (the proof is again a required check on pull requests to `main`)
 
 ## Date
 

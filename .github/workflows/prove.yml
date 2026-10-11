@@ -1,18 +1,25 @@
-#  prove: the full proof on the hosted runner, weekly and on demand
-#  (ADR 0019). It is not a required check: the proof gates each push
-#  locally through .githooks/pre-push, where it takes about three
-#  minutes; here it takes fifteen to twenty-five, so it runs on a
-#  schedule as an independent record that the proof still holds on the
-#  pinned toolchain, and by hand before a release or after a toolchain
-#  change. Scheduled workflows are suspended by GitHub after sixty days
-#  without activity on the repository; a manual run resumes them.
+#  prove: the full proof on the hosted runner (ADR 0019, ADR 0021). It
+#  runs on every pull request to main as a required check, weekly as an
+#  independent record that the proof still holds on the pinned
+#  toolchain, and on demand before a release or after a toolchain
+#  change. Pushes to branches do not run it: the pre-push hook
+#  (.githooks/pre-push) proves them locally in about six minutes, where
+#  the hosted runner needs twenty-five to forty. Scheduled workflows are
+#  suspended by GitHub after sixty days without activity on the
+#  repository; a manual run resumes them.
 
 name: prove
 
 on:
+  pull_request:
+    branches: [main]
   schedule:
     - cron: "0 3 * * 1"
   workflow_dispatch:
+
+concurrency:
+  group: prove-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
