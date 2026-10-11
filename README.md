@@ -6,9 +6,9 @@ A formally verified Ada/SPARK reimplementation of [Longfellow ZK](https://github
 
 ## Status
 
-Phase A, stage 1 (GF(2^128)) complete: `Add`, `Xtime`, `Mul` and `Square` proved Gold at level 2 (Mul and Square proved equal to the ghost Horner reference `Mul_Ref`); `Inv` implemented as a fixed Fermat chain, Silver, total with `Inv (Zero) = Zero`; 41 verification conditions discharged; 209 known-answer cases anchored on upstream constants.
+Phase A, stage 1 (GF(2^128)) complete: `Add`, `Xtime`, `Mul` and `Square` proved Gold (Mul and Square proved equal to the ghost Horner reference `Mul_Ref`); `Inv` implemented as a fixed Fermat chain, Silver, total with `Inv (Zero) = Zero`; 41 verification conditions discharged; 209 known-answer cases anchored on upstream constants.
 
-Phase A, stage 2 (P-256 base field) complete: `Add`, `Sub`, `Neg`, `Mul`, `Square`, `From_Bytes`, `To_Bytes` proved Gold at level 2 against a ghost big-integer model (`To_Int (Mul (A, B)) = To_Int (A) * To_Int (B) mod p`, for all inputs); canonical form enforced by a type predicate; `Inv` a fixed Fermat chain, Silver, total; 467 known-answer cases anchored on the P-256 base point. Verification condition counts are in `docs/guide/02-p256-field.md`. Next: stage 3, the sumcheck verifier. Field polynomial verified against the pinned spec (Q(x) = x^128 + x^7 + x^2 + x + 1, Section 2.2.2).
+Phase A, stage 2 (P-256 base field) complete: `Add`, `Sub`, `Neg`, `Mul`, `Square`, `From_Bytes`, `To_Bytes` proved Gold against a ghost big-integer model (`To_Int (Mul (A, B)) = To_Int (A) * To_Int (B) mod p`, for all inputs); canonical form enforced by a type predicate; `Inv` a fixed Fermat chain, Silver, total; 467 known-answer cases anchored on the P-256 base point. Verification condition counts are in `docs/guide/02-p256-field.md`. Next: stage 3, the sumcheck verifier. Field polynomial verified against the pinned spec (Q(x) = x^128 + x^7 + x^2 + x + 1, Section 2.2.2).
 
 Pinned spec: **IETF draft-google-cfrg-libzk-03 (23 September 2026)**; field definition in Section 2.2.2. Divergences in later draft versions are handled as explicit migrations (ADR 0002).
 

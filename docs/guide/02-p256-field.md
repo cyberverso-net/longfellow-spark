@@ -179,6 +179,7 @@ A *lemma* in SPARK is a ghost procedure whose postcondition states a fact and wh
 - `Lemma_Mul_Split`: the 128-bit product of two words neither wraps nor exceeds (2^64 - 1)^2, and its value is the product of the values. This is the one place where a nonlinear bound is proved; the provers manage it from the bounds of the factors.
 - `Lemma_Weight_Add`: 2^(64 I) * 2^(64 J) = 2^(64 (I + J)), by recursion on J.
 - `Lemma_Add_Step` and `Lemma_Sub_Step`: one word of addition with carry, or subtraction with borrow, extends the prefix identity from K words to K + 1. The addition and subtraction procedures call them once per iteration, so the loop invariant is the lemma's postcondition.
+- `Lemma_To_Int_Eq`: two limb arrays that are equal element by element have the same `To_Int`. Stated with a precondition `for all I => A (I) = B (I)` rather than `A = B`, and proved by writing `Partial (A, 4)` and `Partial (B, 4)` out over the four limbs. The fact looks trivial, and it is, but the provers reach it from an array equality only through array extensionality, which they applied in some cold runs and not in others; the element-wise statement is proved every time. It exists for the last step of `Stage_Final` (3.6).
 - `Lemma_Shift`, `Lemma_Weight_T32`, `Lemma_P_Poly`, `Lemma_Word_Split`, `Lemma_Word_Sum`, `Lemma_WVal_Bounds`, `Lemma_Term_Bound`, `Lemma_Solinas`, `Lemma_Constants`, `Lemma_Mod_Multiple`: the multiplication lemmas, described with the pipeline in 3.6.
 
 ### 3.4 Add_Words and Sub_Words
@@ -222,6 +223,8 @@ which is exactly the postcondition restricted to the words processed so far. `Su
 
 with `Q_Val` the explicit quotient. The executable side mirrors it: `Word (R, J)` extracts a 32-bit word (the if-expression selects on the constant slot index from the table, never on data), `Term (R, S)` assembles a 256-bit term from a row of the table, `Add_Term` accumulates terms into five words with a precondition that the sum fits, and `Reduce` runs the six stages with ghost variables `M_V` and `M_W` tracking the exact multiple of p by which each intermediate differs from the product. `Lemma_Mod_Multiple` closes: a value that differs from X by a multiple of p and lies in 0 .. p - 1 is X mod p. `Mul` is `Reduce (Product (A.Limbs, B.Limbs))`; `Square` is `Mul (E, E)`.
 
+*Stage 6, the conditional subtraction.* `Stage_Final` takes the five-word value W of stage 5, which the earlier postconditions bound below 2p, and returns the four-limb canonical result. The executable part is three lines: `Sub_Words` computes W - p with a borrow `Bw`, which is 1 exactly when W < p; `Mask` is all ones when `Bw` is 0 and zero otherwise; `Select_Limbs` picks the low four words of the difference under the mask and of W otherwise, with no branch on data ([ADR 0015](../adr/0015-p256-canonical-form-and-conditional-subtraction.md)). The proof is written branch by branch on `Bw`, in ghost `if` statements that the compiler removes with the rest of the ghost code. In the branch `Bw = 0`, the difference is W - p and lies below p, so its top word times 2^256 is below 2^256 and `Lemma_Div_Bound` makes that word zero; the value of the difference is then the value of its low four words. In the branch `Bw = 1`, the same argument applies to W itself. Each branch then fixes the mask, asserts that the selected array equals the low words of the chosen operand element by element, and calls `Lemma_To_Int_Eq` to carry the equality to `To_Int`. The postcondition, the value is W or W - p according to the comparison and in either case canonical, follows in each branch separately. An earlier version proved the last step with one assertion over the selected array, relying on the provers to connect array equality with equal `To_Int`; it was proved in some cold runs and not in others. The branch-wise form, with the lemma, has been stable on every cold run since.
+
 A ghost variable (`M_V : Big_Integer with Ghost`) exists only for proof and is removed with the other ghost code when assertions are disabled; `pragma Unreferenced` silences the warning for a lemma parameter that appears only in the contract; square-bracket aggregates `[a, b, c]` are the Ada 2022 array notation; `A (0 .. 7)` is a *slice*, a contiguous part of an array.
 
 ### 3.7 Inv
@@ -234,18 +237,18 @@ A ghost variable (`M_V : Big_Integer with Ghost`) exists only for proof and is r
 
 ## 4. What the proofs guarantee
 
-GNATprove 16.1, `--level=2 --report=all`, the whole project (GF(2^128) and P-256 together): 3645 checks, all proved, no justification, no `pragma Assume`; of these, 3604 belong to `P256_Field` (the remaining 41 are Chapter 1's). Maximum steps for a single successful proof: 429702, within the level 2 budget.
+GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-prover-configuration-step-budget.md): CVC5, Z3 and Alt-Ergo, `--steps=600000`, `--timeout=120`), the whole project (GF(2^128) and P-256 together): 3694 checks, all proved, no justification, no `pragma Assume`; of these, 3653 belong to `P256_Field` (the remaining 41 are Chapter 1's). Maximum steps for a single successful proof: 429702, within the budget of 600000; longest successful attempt 4 to 10 seconds on a ten-core machine, far from the timeout.
 
 | Category | Checks | Discharged by |
 |----------|--------|---------------|
-| Data dependencies (`Global => null`) | 93 | flow analysis |
+| Data dependencies (`Global => null`) | 94 | flow analysis |
 | Initialization | 38 | flow analysis |
-| Run-time checks (indices, ranges, overflow, predicates) | 2175 | CVC5 18%, trivial 82% |
-| Assertions (`pragma Assert`, loop invariants, variants) | 264 | CVC5 87%, Z3 8%, Alt-Ergo 4%, trivial 1% |
-| Functional contracts (postconditions, lemma postconditions, preconditions at calls) | 1012 | CVC5 98%, Z3 1%, Alt-Ergo 1% |
-| Termination | 63 | 55 flow, 8 CVC5 |
+| Run-time checks (indices, ranges, overflow, predicates) | 2197 | 82% trivial, the rest CVC5 and Z3 |
+| Assertions (`pragma Assert`, loop invariants, variants) | 273 | CVC5 and Z3, Alt-Ergo about 4%, trivial 1% |
+| Functional contracts (postconditions, lemma postconditions, preconditions at calls) | 1029 | CVC5 and Z3, Alt-Ergo about 1% |
+| Termination | 63 | 55 flow, 8 provers |
 
-Where the checks are, by subprogram (proof checks, excluding flow): the field operations themselves are small (`Add` 45, `Sub` 44, `Neg` 7, `Mul` 10, `Square` 9, `Is_Canonical` 4, `From_Bytes` 3, `To_Bytes` 1, `Inv` and `Square_N` 0); the word primitives and the multiplication pipeline carry more (`Add_Words` 41, `Sub_Words` 66, `Mul_Row` 54, `Product` 132, `Term` 64, `Add_Term` 35, `Sum_S` 15, `Sum_N` 12, `Stage_V` 46, `Stage_W` 63, `Stage_Final` 96, `Reduce` 35); and the lemmas carry the rest, the largest being `Lemma_Unfold_T32` (471, the explicit monomials of t), `Lemma_Term_Bound` (188), `Lemma_Solinas_Identity` (126) and `Lemma_Unfold` (124). Three solvers were needed: CVC5 does almost everything, Z3 and Alt-Ergo close a few assertions CVC5 leaves.
+Where the checks are, by subprogram (proof checks, excluding flow): the field operations themselves are small (`Add` 45, `Sub` 44, `Neg` 7, `Mul` 10, `Square` 9, `Is_Canonical` 4, `From_Bytes` 3, `To_Bytes` 1, `Inv` and `Square_N` 0); the word primitives and the multiplication pipeline carry more (`Add_Words` 41, `Sub_Words` 66, `Mul_Row` 54, `Product` 132, `Term` 64, `Add_Term` 35, `Sum_S` 15, `Sum_N` 12, `Stage_V` 46, `Stage_W` 63, `Stage_Final` 108, `Reduce` 35); and the lemmas carry the rest, the largest being `Lemma_Unfold_T32` (471, the explicit monomials of t), `Lemma_Term_Bound` (188), `Lemma_Solinas_Identity` (126) and `Lemma_Unfold` (124); `Lemma_To_Int_Eq` has 36. Three solvers are needed: CVC5 and Z3 share almost everything, and which of the two is credited with a check varies from run to run, since the first to answer wins; Alt-Ergo alone closes fifteen checks, polynomial normalisation steps and the bridges between modular words and the integer model, listed in ADR 0020.
 
 Four lessons from closing the proofs, recorded here because they are reusable in the next stages:
 
@@ -262,12 +265,7 @@ In plain terms, for every input, not on samples:
 - `From_Bytes` accepts an encoding exactly when its integer is below p and then returns that integer's limbs; `To_Bytes` inverts it;
 - every subprogram terminates.
 
-Reproduce with:
-
-```bash
-alr exec -- gnatprove -P longfellow_spark.gpr
-sed -n 1,20p obj/development/gnatprove/gnatprove.out
-```
+Reproduce with `make prove`, which runs `gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on` with the switches of `package Prove` in the project file (`--prover=cvc5,z3,altergo --steps=600000 --timeout=120 --memlimit=1000 --report=all`) and prints the summary of `obj/development/gnatprove/gnatprove.out`; a plain `alr exec -- gnatprove -P longfellow_spark.gpr` proves the same thing.
 
 ## 5. What is only tested
 
