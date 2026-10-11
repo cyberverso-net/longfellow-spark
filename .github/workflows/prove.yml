@@ -3,10 +3,10 @@
 #  independent record that the proof still holds on the pinned
 #  toolchain, and on demand before a release or after a toolchain
 #  change. Pushes to branches do not run it: the pre-push hook
-#  (.githooks/pre-push) proves them locally in about six minutes, where
-#  the hosted runner needs twenty-five to forty. Scheduled workflows are
-#  suspended by GitHub after sixty days without activity on the
-#  repository; a manual run resumes them.
+#  (.githooks/pre-push) proves them locally in about six minutes; the
+#  hosted runner took five on its first pull-request run. Scheduled
+#  workflows are suspended by GitHub after sixty days without activity
+#  on the repository; a manual run resumes them.
 
 name: prove
 
