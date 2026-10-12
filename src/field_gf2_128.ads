@@ -20,20 +20,26 @@ with Field_Signature;
 
 package Field_GF2_128 is
 
+   --  Logical equality for contracts (see Field_Signature). The body
+   --  is the predefined "=", outside SPARK; the provers treat Same as
+   --  equality of terms (annotation Logical_Equal).
+   function Same (A, B : GF2_128.Element) return Boolean with
+     Ghost, Global => null, Annotate => (GNATprove, Logical_Equal);
+
    P2 : constant GF2_128.Element :=
-     (Limbs => (0 => 16#F1871E01B64FDA4C#, 1 => 16#5C5971877501D4B8#));
+     (Limbs => [0 => 16#F1871E01B64FDA4C#, 1 => 16#5C5971877501D4B8#]);
 
    --  1 / P2
    L0_Den_Inv : constant GF2_128.Element :=
-     (Limbs => (0 => 16#252A689FEFCCF959#, 1 => 16#FB6E50F87BFCABD9#));
+     (Limbs => [0 => 16#252A689FEFCCF959#, 1 => 16#FB6E50F87BFCABD9#]);
 
    --  1 / (1 + P2)
    L1_Den_Inv : constant GF2_128.Element :=
-     (Limbs => (0 => 16#9E82A474CF1D1D21#, 1 => 16#8AFD39472A529157#));
+     (Limbs => [0 => 16#9E82A474CF1D1D21#, 1 => 16#8AFD39472A529157#]);
 
    --  1 / (P2 (1 + P2))
    L2_Den_Inv : constant GF2_128.Element :=
-     (Limbs => (0 => 16#BBA8CCEB20D1E478#, 1 => 16#719369BF51AE3A8E#));
+     (Limbs => [0 => 16#BBA8CCEB20D1E478#, 1 => 16#719369BF51AE3A8E#]);
 
    package Sig is new Field_Signature
      (Element    => GF2_128.Element,
@@ -46,6 +52,7 @@ package Field_GF2_128 is
       Neg        => GF2_128.Neg,
       L0_Den_Inv => L0_Den_Inv,
       L1_Den_Inv => L1_Den_Inv,
-      L2_Den_Inv => L2_Den_Inv);
+      L2_Den_Inv => L2_Den_Inv,
+      Same       => Same);
 
 end Field_GF2_128;

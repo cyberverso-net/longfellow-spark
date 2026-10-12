@@ -17,6 +17,19 @@
 --  listed separately from "-" because the reference implementation
 --  uses the negation of One (mone) as a coefficient.
 --
+--  Same is the logical equality of the element type, for contracts
+--  only: a ghost function that GNATprove interprets, through the
+--  annotation Logical_Equal on the actual, as equality of terms, so
+--  that two elements proved Same can be substituted for each other
+--  under any function (congruence). The predefined "=" of a record
+--  with an array component is encoded as a pointwise predicate, which
+--  gives no congruence through an opaque function; the structural
+--  proofs of the protocol code (ADR 0023) need congruence and state
+--  their equalities with Same. The actual's body returns the
+--  predefined "=" and is outside SPARK, so that it executes in the
+--  test build and is assumed, not checked, by the provers; what is
+--  proved with Same implies the predefined equality.
+--
 --  The three constants L0_Den_Inv, L1_Den_Inv and L2_Den_Inv are the
 --  inverses of the Lagrange denominators on the evaluation points
 --  0, 1, P2 (ADR 0025): d0 = (0 - 1) (0 - P2), d1 = (1 - 0) (1 - P2),
@@ -27,6 +40,9 @@
 
 pragma SPARK_Mode (On);
 
+--  A signature package references none of its formals itself.
+pragma Warnings (Off, "is not referenced");
+
 generic
    type Element is private;
    Zero, One, P2 : Element;
@@ -35,5 +51,6 @@ generic
    with function "*" (A, B : Element) return Element;
    with function Neg (A : Element) return Element;
    L0_Den_Inv, L1_Den_Inv, L2_Den_Inv : Element;
+   with function Same (A, B : Element) return Boolean with Ghost;
 package Field_Signature is
 end Field_Signature;

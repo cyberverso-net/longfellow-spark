@@ -17,6 +17,12 @@ with Field_Signature;
 
 package Field_P256 is
 
+   --  Logical equality for contracts (see Field_Signature). The body
+   --  is the predefined "=", outside SPARK; the provers treat Same as
+   --  equality of terms (annotation Logical_Equal).
+   function Same (A, B : P256_Field.Element) return Boolean with
+     Ghost, Global => null, Annotate => (GNATprove, Logical_Equal);
+
    P2 : constant P256_Field.Element := (Limbs => [2, 0, 0, 0]);
 
    --  (p + 1) / 2 = 1 / 2
@@ -40,6 +46,7 @@ package Field_P256 is
       Neg        => P256_Field.Neg,
       L0_Den_Inv => Half,
       L1_Den_Inv => Minus_One,
-      L2_Den_Inv => Half);
+      L2_Den_Inv => Half,
+      Same       => Same);
 
 end Field_P256;
