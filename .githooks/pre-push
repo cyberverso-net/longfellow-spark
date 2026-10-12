@@ -13,20 +13,44 @@
 #     <local ref> <local sha> <remote ref> <remote sha>
 #  A deletion has an all-zero local sha and pushes no commits, so there
 #  is nothing to prove; the hook skips the proof when every line is one.
+#
+#  The proof runs on the working tree, so it certifies the pushed commit
+#  only if the two coincide. The hook therefore refuses a push when the
+#  working tree differs from HEAD (tracked changes, staged or not, or
+#  files that are neither tracked nor ignored, since a new source file
+#  would enter the proof) and when a pushed ref is not HEAD (pushing a
+#  branch other than the one checked out). Both cases are stated with
+#  what to do; `--no-verify` remains the explicit way past them.
 
 set -euo pipefail
 
 zero=0000000000000000000000000000000000000000
+head=$(git rev-parse HEAD)
 pushing=false
-while read -r _local_ref local_sha _remote_ref _remote_sha; do
-   if [ "$local_sha" != "$zero" ]; then
-      pushing=true
+while read -r local_ref local_sha _remote_ref _remote_sha; do
+   if [ "$local_sha" = "$zero" ]; then
+      continue
+   fi
+   pushing=true
+   if [ "$local_sha" != "$head" ]; then
+      echo "pre-push: $local_ref ($local_sha) is not HEAD ($head);" >&2
+      echo "pre-push: the proof runs on the working tree, so push a branch" \
+           "from its own checkout, or use --no-verify knowingly" >&2
+      exit 1
    fi
 done
 
 if [ "$pushing" = false ]; then
    echo "pre-push: deletion only, nothing to prove"
    exit 0
+fi
+
+if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+   echo "pre-push: the working tree differs from HEAD;" \
+        "the proof would not certify the pushed commit" >&2
+   git status --short >&2
+   echo "pre-push: commit or stash the changes (git stash -u), then push" >&2
+   exit 1
 fi
 
 exec scripts/check.sh prove
