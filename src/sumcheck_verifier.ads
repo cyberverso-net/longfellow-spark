@@ -221,12 +221,6 @@ package Sumcheck_Verifier is
    with Global => null,
         Pre => Claim.Capacity >= Claim.Length + 3;
 
-   --  Every variable of E is below Bound: the claim expressions only
-   --  ever name pad variables already assigned.
-   function Below (E : Expression; Bound : Natural) return Boolean is
-     (for all W in Natural => (if Has (E, W) then W < Bound))
-   with Ghost, Global => null;
-
    --  The exact shape of a round when the two pad variables are fresh.
    procedure Lemma_Round_Shape
      (Claim      : Expression;

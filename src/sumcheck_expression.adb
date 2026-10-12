@@ -19,21 +19,9 @@ package body Sumcheck_Expression is
    end Find;
 
    ----------------------------------------------------------------------
-   --  Lemmas on Find: two expressions with the same variables at the
-   --  same positions have the same Find; inserting a variable at Pos
-   --  shifts the positions above it by one.
+   --  Lemma on Find: inserting a variable at Pos shifts the positions
+   --  above it by one and leaves the other variables where they were.
    ----------------------------------------------------------------------
-
-   procedure Lemma_Find_Equiv (E, F : Expression) with
-     Ghost, Global => null,
-     Pre  => E.Length = F.Length
-       and then (for all I in 1 .. E.Length => E.Terms (I).V = F.Terms (I).V),
-     Post => (for all W in Natural => Find (E, W) = Find (F, W));
-
-   procedure Lemma_Find_Equiv (E, F : Expression) is
-   begin
-      null;
-   end Lemma_Find_Equiv;
 
    procedure Lemma_Find_Insert (E, R : Expression; Pos, V : Natural) with
      Ghost, Global => null,
@@ -45,17 +33,44 @@ package body Sumcheck_Expression is
        and then (for all J in Pos + 1 .. R.Length =>
                    R.Terms (J).V = E.Terms (J - 1).V),
      Post => Find (R, V) = Pos
-       and then (for all W in Natural =>
-                   (if W /= V then
-                      Find (R, W)
-                      = (if Find (E, W) = 0 then 0
-                         elsif Find (E, W) < Pos then Find (E, W)
-                         else Find (E, W) + 1)));
+       and then (for all J in 1 .. E.Length =>
+                   Find (R, E.Terms (J).V) = (if J < Pos then J else J + 1))
+       and then (for all J in 1 .. R.Length =>
+                   R.Terms (J).V = V or else Has (E, R.Terms (J).V));
 
    procedure Lemma_Find_Insert (E, R : Expression; Pos, V : Natural) is
    begin
       null;
    end Lemma_Find_Insert;
+
+   --  Two expressions with the same variables at the same positions:
+   --  Find agrees on every variable of E.
+   procedure Lemma_Find_Equiv (E, F : Expression) with
+     Ghost, Global => null,
+     Pre  => E.Length = F.Length
+       and then (for all I in 1 .. E.Length => E.Terms (I).V = F.Terms (I).V),
+     Post => (for all I in 1 .. E.Length => Find (F, E.Terms (I).V) = I)
+       and then (for all I in 1 .. E.Length => Find (E, E.Terms (I).V) = I);
+
+   procedure Lemma_Find_Equiv (E, F : Expression) is
+   begin
+      null;
+   end Lemma_Find_Equiv;
+
+   --  Combine leaves the coefficient of every other variable of E where
+   --  it was: read through Find for one variable W.
+   procedure Lemma_Coef_Kept (E, R : Expression; V, W : Natural) with
+     Ghost, Global => null,
+     Pre  => Has (E, W) and then W /= V
+       and then (for all I in 1 .. E.Length =>
+                   (if E.Terms (I).V /= V then
+                      Same (Coef (R, E.Terms (I).V), E.Terms (I).C))),
+     Post => Same (Coef (R, W), Coef (E, W));
+
+   procedure Lemma_Coef_Kept (E, R : Expression; V, W : Natural) is
+   begin
+      pragma Assert (E.Terms (Find (E, W)).V = W);
+   end Lemma_Coef_Kept;
 
    ----------------------------------------------------------------------
    --  Constructors
@@ -89,15 +104,20 @@ package body Sumcheck_Expression is
        and then Combine'Result.Length
                 = (if Has (E, V) then E.Length else E.Length + 1)
        and then Same (Combine'Result.Known, E.Known)
-       and then (for all W in Natural =>
-                   Has (Combine'Result, W) = (Has (E, W) or else W = V))
-       and then (for all W in Natural =>
-                   (if W /= V then
-                      Same (Coef (Combine'Result, W), Coef (E, W))))
+       and then Has (Combine'Result, V)
        and then (if Subtract then
                    Same (Coef (Combine'Result, V), Coef (E, V) - K)
                  else
-                   Same (Coef (Combine'Result, V), Coef (E, V) + K));
+                   Same (Coef (Combine'Result, V), Coef (E, V) + K))
+       and then (for all I in 1 .. E.Length =>
+                   Has (Combine'Result, E.Terms (I).V))
+       and then (for all I in 1 .. E.Length =>
+                   (if E.Terms (I).V /= V then
+                      Same (Coef (Combine'Result, E.Terms (I).V),
+                            E.Terms (I).C)))
+       and then (for all I in 1 .. Combine'Result.Length =>
+                   Combine'Result.Terms (I).V = V
+                   or else Has (E, Combine'Result.Terms (I).V));
 
    function Combine (E : Expression; V : Natural; K : Element;
                      Subtract : Boolean) return Expression
@@ -202,18 +222,24 @@ package body Sumcheck_Expression is
      Post => Fold'Result.Capacity = E.Capacity
        and then Fold'Result.Length = E.Length + New_Count (E, F, F.Length)
        and then Same (Fold'Result.Known, E.Known)
-       and then (for all W in Natural =>
-                   Has (Fold'Result, W) = (Has (E, W) or else Has (F, W)))
-       and then (for all W in Natural =>
-                   (if Has (F, W) then
-                      (if Subtract then
-                         Same (Coef (Fold'Result, W),
-                               Coef (E, W) - Coef (F, W))
-                       else
-                         Same (Coef (Fold'Result, W),
-                               Coef (E, W) + Coef (F, W)))
+       and then (for all I in 1 .. E.Length =>
+                   Has (Fold'Result, E.Terms (I).V))
+       and then (for all I in 1 .. F.Length =>
+                   Has (Fold'Result, F.Terms (I).V))
+       and then (for all I in 1 .. Fold'Result.Length =>
+                   Has (E, Fold'Result.Terms (I).V)
+                   or else Has (F, Fold'Result.Terms (I).V))
+       and then (for all I in 1 .. F.Length =>
+                   (if Subtract then
+                      Same (Coef (Fold'Result, F.Terms (I).V),
+                            Coef (E, F.Terms (I).V) - F.Terms (I).C)
                     else
-                      Same (Coef (Fold'Result, W), Coef (E, W))));
+                      Same (Coef (Fold'Result, F.Terms (I).V),
+                            Coef (E, F.Terms (I).V) + F.Terms (I).C)))
+       and then (for all I in 1 .. E.Length =>
+                   (if not Has (F, E.Terms (I).V) then
+                      Same (Coef (Fold'Result, E.Terms (I).V),
+                            E.Terms (I).C)));
 
    function Fold (E, F : Expression; Subtract : Boolean) return Expression
    is
@@ -221,24 +247,78 @@ package body Sumcheck_Expression is
         (GNATprove, Unhide_Info, "Expression_Function_Body", New_Count);
       R : Expression := E;
    begin
+      Lemma_Find_Equiv (E, E);
+      Lemma_Find_Equiv (F, F);
       for I in 1 .. F.Length loop
          pragma Loop_Invariant (R.Capacity = E.Capacity);
          pragma Loop_Invariant (R.Length = E.Length + New_Count (E, F, I - 1));
          pragma Loop_Invariant (Same (R.Known, E.Known));
          pragma Loop_Invariant
-           (for all W in Natural =>
-              Has (R, W) = (Has (E, W) or else Find (F, W) in 1 .. I - 1));
+           (for all J in 1 .. E.Length => Has (R, E.Terms (J).V));
          pragma Loop_Invariant
-           (for all W in Natural =>
-              (if Find (F, W) in 1 .. I - 1 then
-                 (if Subtract then
-                    Same (Coef (R, W), Coef (E, W) - Coef (F, W))
-                  else
-                    Same (Coef (R, W), Coef (E, W) + Coef (F, W)))
+           (for all J in 1 .. I - 1 => Has (R, F.Terms (J).V));
+         pragma Loop_Invariant
+           (for all J in 1 .. R.Length =>
+              Has (E, R.Terms (J).V)
+              or else Find (F, R.Terms (J).V) in 1 .. I - 1);
+         pragma Loop_Invariant
+           (for all J in 1 .. I - 1 =>
+              (if Subtract then
+                 Same (Coef (R, F.Terms (J).V),
+                       Coef (E, F.Terms (J).V) - F.Terms (J).C)
                else
-                 Same (Coef (R, W), Coef (E, W))));
+                 Same (Coef (R, F.Terms (J).V),
+                       Coef (E, F.Terms (J).V) + F.Terms (J).C)));
+         pragma Loop_Invariant
+           (for all J in 1 .. E.Length =>
+              (if Find (F, E.Terms (J).V) not in 1 .. I - 1 then
+                 Same (Coef (R, E.Terms (J).V), E.Terms (J).C)));
          pragma Assert (Find (F, F.Terms (I).V) = I);
-         R := Combine (R, F.Terms (I).V, F.Terms (I).C, Subtract);
+         pragma Assert
+           (if Has (R, F.Terms (I).V) then
+              R.Terms (Find (R, F.Terms (I).V)).V = F.Terms (I).V);
+         pragma Assert
+           (if Has (R, F.Terms (I).V) then Has (E, F.Terms (I).V));
+         pragma Assert
+           (if Has (E, F.Terms (I).V) then
+              E.Terms (Find (E, F.Terms (I).V)).V = F.Terms (I).V);
+         pragma Assert
+           (if Has (E, F.Terms (I).V) then Has (R, F.Terms (I).V));
+         declare
+            Prev : constant Expression := R with Ghost;
+         begin
+            R := Combine (R, F.Terms (I).V, F.Terms (I).C, Subtract);
+            --  The coefficients of the variables of F already folded, and
+            --  of the variables of E outside F, are untouched.
+            for J in 1 .. I - 1 loop
+               pragma Loop_Invariant
+                 (for all J2 in 1 .. J - 1 =>
+                    Same (Coef (R, F.Terms (J2).V),
+                          Coef (Prev, F.Terms (J2).V)));
+               Lemma_Coef_Kept (Prev, R, F.Terms (I).V, F.Terms (J).V);
+            end loop;
+            for J in 1 .. E.Length loop
+               pragma Loop_Invariant
+                 (for all J2 in 1 .. J - 1 =>
+                    (if E.Terms (J2).V /= F.Terms (I).V then
+                       Same (Coef (R, E.Terms (J2).V),
+                             Coef (Prev, E.Terms (J2).V))));
+               if E.Terms (J).V /= F.Terms (I).V then
+                  Lemma_Coef_Kept (Prev, R, F.Terms (I).V, E.Terms (J).V);
+               end if;
+            end loop;
+            --  Every variable of the new R is F.Terms (I).V or a variable
+            --  of the previous R, hence of E or of F at a position below I.
+            pragma Assert
+              (for all J in 1 .. R.Length =>
+                 R.Terms (J).V = F.Terms (I).V
+                 or else Has (Prev, R.Terms (J).V));
+            pragma Assert
+              (for all J in 1 .. R.Length =>
+                 (if Has (Prev, R.Terms (J).V) then
+                    Has (E, R.Terms (J).V)
+                    or else Find (F, R.Terms (J).V) in 1 .. I - 1));
+         end;
       end loop;
       return R;
    end Fold;
@@ -275,21 +355,14 @@ package body Sumcheck_Expression is
               T (J).V = E.Terms (J).V
               and then Same (T (J).C, E.Terms (J).C));
       end loop;
-      declare
-         R : constant Expression :=
-           (Capacity => E.Capacity, Length => E.Length,
-            Known => E.Known * S, Terms => T);
-      begin
-         Lemma_Find_Equiv (E, R);
-         return R;
-      end;
+      return (Capacity => E.Capacity, Length => E.Length,
+              Known => E.Known * S, Terms => T);
    end Scale;
 
    function Add_Constant (E : Expression; K : Element) return Expression is
       R : Expression := E;
    begin
       R.Known := E.Known + K;
-      Lemma_Find_Equiv (E, R);
       return R;
    end Add_Constant;
 
@@ -297,12 +370,44 @@ package body Sumcheck_Expression is
       R : Expression := E;
    begin
       R.Known := E.Known - K;
-      Lemma_Find_Equiv (E, R);
       return R;
    end Sub_Constant;
 
    ----------------------------------------------------------------------
-   --  Lemmas
+   --  Lemmas on Below
+   ----------------------------------------------------------------------
+
+   procedure Lemma_Has_Below (E : Expression; W, Bound : Natural) is
+   begin
+      pragma Assert (E.Terms (Find (E, W)).V = W);
+   end Lemma_Has_Below;
+
+   procedure Lemma_Below_Union (E, F, R : Expression; Bound : Natural) is
+   begin
+      for I in 1 .. R.Length loop
+         pragma Loop_Invariant
+           (for all J in 1 .. I - 1 => R.Terms (J).V < Bound);
+         if Has (E, R.Terms (I).V) then
+            Lemma_Has_Below (E, R.Terms (I).V, Bound);
+         else
+            Lemma_Has_Below (F, R.Terms (I).V, Bound);
+         end if;
+      end loop;
+   end Lemma_Below_Union;
+
+   procedure Lemma_Below_Insert (E, R : Expression; V, Bound : Natural) is
+   begin
+      for I in 1 .. R.Length loop
+         pragma Loop_Invariant
+           (for all J in 1 .. I - 1 => R.Terms (J).V < Bound);
+         if R.Terms (I).V /= V then
+            Lemma_Has_Below (E, R.Terms (I).V, Bound);
+         end if;
+      end loop;
+   end Lemma_Below_Insert;
+
+   ----------------------------------------------------------------------
+   --  Lemmas on New_Count
    ----------------------------------------------------------------------
 
    procedure Lemma_NC_Shared_Rec (E, F : Expression; V : Natural;

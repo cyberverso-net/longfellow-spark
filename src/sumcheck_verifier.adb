@@ -137,10 +137,26 @@ package body Sumcheck_Verifier is
         Scale (Add_Constant (Var (Pad1, Claim.Capacity), HP2),
                Lagrange_Basis (Chal) (2));
       S01 : constant Expression := Add (S0, S1);
+      P1  : constant Expression := Sub (Claim, P0);
    begin
       Lemma_New_Count_Shared (S0, S1, Pad0);
       pragma Assert (S01.Length <= Claim.Length + 1);
       pragma Assert (Add (S01, S2).Length <= Claim.Length + 2);
+      --  Variables, step by step: P0 names Pad0, P1 the claim's and Pad0,
+      --  S2 names Pad1; Scale keeps positions; Add and Sub unite.
+      pragma Assert (Below (P0, Pad1));
+      pragma Assert (Below (Claim, Pad1));
+      Lemma_Below_Union (Claim, P0, P1, Pad1);
+      pragma Assert (Below (S0, Pad1));
+      pragma Assert (Below (S1, Pad1));
+      Lemma_Below_Union (S0, S1, S01, Pad1);
+      pragma Assert (Below (S01, Pad1 + 1));
+      pragma Assert (Below (S2, Pad1 + 1));
+      declare
+         Next : constant Expression := Add (S01, S2);
+      begin
+         Lemma_Below_Union (S01, S2, Next, Pad1 + 1);
+      end;
    end Lemma_Round_Shape;
 
    ----------------------------------------------------------------------
@@ -191,9 +207,11 @@ package body Sumcheck_Verifier is
       declare
          Alpha : constant Element := Ch.Layer (CO);
          Beta  : constant Element := Ch.Layer (CO + 1);
-         Claim : Expression (Cap) :=
-           Add (State.Claim0, Scale (State.Claim1, Alpha));
+         SC1   : constant Expression := Scale (State.Claim1, Alpha);
+         Claim : Expression (Cap) := Add (State.Claim0, SC1);
       begin
+         pragma Assert (Below (SC1, PB));
+         Lemma_Below_Union (State.Claim0, SC1, Claim, PB);
          --  The 2 logw symbolic rounds: round K / 2, hand K mod 2.
          for K in 0 .. 2 * Logw - 1 loop
             pragma Loop_Invariant (Claim.Capacity = Cap);
@@ -277,7 +295,12 @@ package body Sumcheck_Verifier is
          pragma Loop_Invariant (Mle.Capacity = Cap);
          pragma Loop_Invariant (Mle.Length = W);
          pragma Loop_Invariant (Below (Mle, W));
-         Mle := Add_Term (Mle, W, Eq_Vec (NP + W));
+         declare
+            Prev : constant Expression := Mle with Ghost;
+         begin
+            Mle := Add_Term (Mle, W, Eq_Vec (NP + W));
+            Lemma_Below_Insert (Prev, Mle, W, W + 1);
+         end;
       end loop;
       declare
          Got : constant Expression :=
