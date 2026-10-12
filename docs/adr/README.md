@@ -25,9 +25,9 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md). Records
 | [0019](0019-proof-off-the-hosted-gate.md) | Proof off the hosted gate | Accepted, amended by 0021 | 2026-10-11 |
 | [0020](0020-prover-configuration-step-budget.md) | Prover configuration by step budget | Accepted | 2026-10-11 |
 | [0021](0021-proof-on-pull-requests.md) | Proof on pull requests to main | Accepted | 2026-10-11 |
-| [0022](0022-stage-3-scope-and-challenges-as-input.md) | Stage 3 scope: sumcheck algebra and symbolic verifier core, challenges as input | Proposed | 2026-10-12 |
-| [0023](0023-gold-perimeter-for-protocol-code.md) | Gold perimeter for protocol code | Proposed | 2026-10-12 |
-| [0024](0024-field-genericity-by-formal-package.md) | Field genericity by formal package | Proposed | 2026-10-12 |
-| [0025](0025-polynomials-and-lagrange-constants.md) | Polynomials and Lagrange constants | Proposed | 2026-10-12 |
-| [0026](0026-sparse-expression.md) | Sparse Expression | Proposed | 2026-10-12 |
-| [0027](0027-sumcheck-vectors-and-upstream-instrumentation.md) | Sumcheck vectors and upstream instrumentation | Proposed | 2026-10-12 |
+| [0022](0022-stage-3-scope-and-challenges-as-input.md) | Stage 3 scope: sumcheck algebra and symbolic verifier core, challenges as input | Accepted | 2026-10-12 |
+| [0023](0023-gold-perimeter-for-protocol-code.md) | Gold perimeter for protocol code | Accepted | 2026-10-12 |
+| [0024](0024-field-genericity-by-formal-package.md) | Field genericity by formal package | Accepted | 2026-10-12 |
+| [0025](0025-polynomials-and-lagrange-constants.md) | Polynomials and Lagrange constants | Accepted | 2026-10-12 |
+| [0026](0026-sparse-expression.md) | Sparse Expression | Accepted | 2026-10-12 |
+| [0027](0027-sumcheck-vectors-and-upstream-instrumentation.md) | Sumcheck vectors and upstream instrumentation | Accepted | 2026-10-12 |

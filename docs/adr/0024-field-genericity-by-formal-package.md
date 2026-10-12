@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-12, after block 2 of stage 3)
 
 ## Date
 
@@ -16,11 +16,11 @@ Ada generics are the SPARK way to write code once over several types. GNATprove 
 
 ## Decision
 
-- A signature package `Field_Signature`, generic with formal parameters: `type Element is private;` `Zero, One, P2 : Element;` the functions `"+"`, `"-"`, `"*" : (Element, Element) return Element;` `Neg : Element return Element;` and the three constants `L0_Den_Inv, L1_Den_Inv, L2_Den_Inv : Element`, the inverses of the Lagrange denominators of [ADR 0025](0025-polynomials-and-lagrange-constants.md). Equality is the predefined `"="` of the formal private type; no formal is needed for it.
-- Two thin instantiation packages, `GF2_128_Field` and `P256_Field_Signature` (names fixed when the code is written), each a single `package ... is new Field_Signature (...)` naming the operations of the concrete package and the constants of [ADR 0025](0025-polynomials-and-lagrange-constants.md).
+- A signature package `Field_Signature`, generic with formal parameters: `type Element is private;` `Zero, One, P2 : Element;` the functions `"+"`, `"-"`, `"*" : (Element, Element) return Element;` `Neg : Element return Element;` the three constants `L0_Den_Inv, L1_Den_Inv, L2_Den_Inv : Element`, the inverses of the Lagrange denominators of [ADR 0025](0025-polynomials-and-lagrange-constants.md); and a ghost function `Same (A, B : Element) return Boolean`, the logical equality of the type ([ADR 0023](0023-gold-perimeter-for-protocol-code.md)). The predefined `"="` of the formal private type is used for the semantic tests of the code.
+- Two thin wrapper packages, `Field_GF2_128` and `Field_P256`, each holding the constants, the `Same` function (annotated `Logical_Equal`, body outside SPARK returning the predefined `=`) and a single inner instance `Sig` of `Field_Signature` naming the operations of the concrete package.
 - The protocol packages, `Sumcheck_Algebra` first and the symbolic core after it, are generic over `with package F is new Field_Signature (<>)` and are instantiated once per field in the library: `Sumcheck_Algebra_GF2_128` and `Sumcheck_Algebra_P256`. Both instances are library units of `longfellow_spark.gpr`, so `make prove` proves both and the verification condition table counts both.
-- Prerequisites in GF2_128: a function `Neg (A : Element) return Element` with `Post => Neg'Result = A` (negation is the identity in characteristic 2, Gold trivially), and `Sub` as a declared function with `Post => Sub'Result = Add (A, B)` in place of the present expression function, so that the contract the instance relies on is stated where the generic reads it. P256_Field already has `Sub` and `Neg` with value-level postconditions.
-- The generic code uses only the formal operations and `"="`; it never names a concrete field, never calls `Inv`, and never relies on an identity that the formal operations do not give it ([ADR 0023](0023-gold-perimeter-for-protocol-code.md)).
+- Inside the generic the formal operations are reached through wrappers without postconditions ([ADR 0023](0023-gold-perimeter-for-protocol-code.md)); the generic code never names a concrete field, never calls `Inv`, and never relies on an identity that the formal operations do not give it.
+- Prerequisites in GF2_128: a function `Neg (A : Element) return Element` with `Post => Neg'Result = A` (negation is the identity in characteristic 2, Gold trivially), and `Sub` as a declared function with `Post => Sub'Result = Add (A, B)` in place of the former expression function. P256_Field already has `Sub` and `Neg` with value-level postconditions.
 
 ## Alternatives considered
 
@@ -38,9 +38,9 @@ Ada generics are the SPARK way to write code once over several types. GNATprove 
 
 ## Verification impact
 
-- Provable: the generic's contracts, per instance, under the actual contracts of `Add`, `Sub`, `Mul`, `Neg`; the structural Gold of [ADR 0023](0023-gold-perimeter-for-protocol-code.md) needs only that the actuals are functions (`Global => null`), which both packages give.
+- Provable: the generic's contracts, per instance; the structural Gold of [ADR 0023](0023-gold-perimeter-for-protocol-code.md) needs only that the actuals are functions (`Global => null`) and that `Same` is their logical equality; the actual contracts of `Add`, `Sub`, `Mul`, `Neg` are not used (they are hidden by the wrappers).
 - Tested: that the instantiation packages name the right operations and constants (a swapped `"+"` and `"-"` on P-256 would prove and fail the vectors); the constants of ADR 0025.
-- Trusted: nothing new; the field packages keep their own trust entries.
+- Trusted: that `Same` of each wrapper is the equality of its element type (body outside SPARK, ADR 0023); the field packages keep their own trust entries.
 - Constant time: no requirement ([ADR 0022](0022-stage-3-scope-and-challenges-as-input.md)); the generic code has no branch on element values except the test `k = Zero` on circuit constants, which are public.
 
 ## References

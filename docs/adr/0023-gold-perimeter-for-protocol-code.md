@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-12, after block 2 of stage 3)
 
 ## Date
 
@@ -31,6 +31,14 @@ Gold kernels and their references:
 - The `Expression` operations: every operation has a postcondition giving the coefficient of every variable and the constant term of the result ([ADR 0026](0026-sparse-expression.md)).
 - `Symbolic_Sumcheck_Round`: the next claim equals `P0 * L0 + P1 * L1 + P2 * L2` with `P0 = Var (pad0) + hp0`, `P2 = Var (pad1) + hp2`, `P1 = Claim - P0`, stated through the coefficient function of `Expression`.
 
+Three mechanisms make the structural proofs go through, found while proving block 2 and recorded here as part of the decision:
+
+- **Logical equality.** GNATprove encodes the predefined `=` of a record with an array component (both `Element` types) as a pointwise predicate, not as equality of terms: from `P = Eq_Ref (...)` the provers cannot conclude `P * R = Eq_Ref (...) * R`, and no structural proof survives without that congruence. `Field_Signature` therefore carries a ghost function `Same`, annotated `Logical_Equal` in each field wrapper, which the provers interpret as equality of terms; every "equals the reference" in the protocol contracts is stated with `Same`, while the semantic tests of the code (`k = Zero`, a product `= Zero`, an output `= Zero`) keep the predefined `=`. The body of `Same` is the predefined `=` and lies outside SPARK: it executes in the test build and is assumed, not checked, by the provers. What is proved with `Same` implies the predefined equality, so nothing proved is weaker than stated; the assumption is listed as trusted.
+- **Opaque field operations.** Inside the generic the operations are reached through wrappers `"+"`, `"-"`, `"*"`, `Neg` with `Global => null` and no postcondition, so the contracts of the concrete field (`Mul_Ref` unfolded over 128 bits on GF(2^128), the integer model on P-256) never enter a protocol proof. The verification conditions of the protocol code are then the same for every instance, and a proof is a congruence between the code and its reference and nothing else. The same applies to `Bit_Of`, a function without postcondition that `Eq` and `Eq_Ref` both call: that it reads bit b of x is tested.
+- **Hidden recursive bodies.** The recursive references `Acc_Ref`, `Z_Ref`, the offset function `Off` and the predicate `Layer_Holds` carry `Hide_Info` on their bodies and are unhidden only inside the lemmas that need them (`Unhide_Info`); without this the provers unfold the recursions without bound and exhaust the step budget on trivial goals. Powers of two are stated with a ghost `Big_Integer` function `Pow2`, as `Weight` in [ADR 0014](0014-p256-functional-specification-and-ghost-model.md), since `2 ** N` with a variable exponent is out of reach.
+
+For `Expression` ([ADR 0026](0026-sparse-expression.md)) the convention "absent variable means coefficient Zero" is stated with case-split postconditions (`if Has (E, W) then ... else ...`), because `Zero + K` and `K` are different terms; the identities `Zero + x = x` and `Zero * s = Zero` are field facts the provers do not have and the contracts do not need.
+
 Tested, not proved: every algebraic truth about the above (bindeq agrees with eq, the Lagrange basis interpolates, the constraints emitted for an honest proof are satisfied by the honest witness, soundness). Silver everywhere else: `Verify_Layer`, `Input_Constraint`, `Symbolic_Sumcheck_Verifier_Core`, with postconditions limited to sizes, index ranges and the count of emitted constraints.
 
 ## Alternatives considered
@@ -50,7 +58,7 @@ Tested, not proved: every algebraic truth about the above (bindeq agrees with eq
 
 - Provable: equality of each Gold kernel with its reference for all inputs; absence of run-time errors everywhere.
 - Tested: the references against the draft and the upstream reference (explicit circuits, structural and random cases, recorded runs), per [ADR 0027](0027-sumcheck-vectors-and-upstream-instrumentation.md).
-- Trusted: the field laws of the two instances (never stated to the prover); the soundness argument of the protocol.
+- Trusted: the field laws of the two instances (never stated to the prover); that `Same` of each wrapper is the equality of its element type (its body is outside SPARK); the soundness argument of the protocol.
 - Constant time: not required at this stage ([ADR 0022](0022-stage-3-scope-and-challenges-as-input.md)); ghost code is excluded from executable builds with assertions disabled, as before.
 
 ## References
@@ -58,3 +66,5 @@ Tested, not proved: every algebraic truth about the above (bindeq agrees with eq
 - [ADR 0003](0003-proof-policy-and-trust-model.md), [ADR 0005](0005-mul-ref-as-proof-target.md), [ADR 0014](0014-p256-functional-specification-and-ghost-model.md).
 - draft-google-cfrg-libzk-03, Sections 6.1, 6.2, 6.3.2, 6.3.3, 6.4, 6.7.
 - google/longfellow-zk at d5e6be7: `docs/specs/rust/src/sumcheck/common.rs` (`eq`, `eq2`, `eval_quad`, `eval_circuit`, `bind_g`, `eval_bound_quad`), `sumcheck/prover.rs` (`bind`, `vector_ref`), `zk/symbolic_sumcheck_verifier.rs` (`symbolic_sumcheck_round`).
+- SPARK User's Guide, appendix "Additional Annotate Pragmas": `Logical_Equal`, `Hide_Info` and `Unhide_Info`.
+- `src/sumcheck_algebra.ads` (header and the wrappers), `src/field_signature.ads` (`Same`).

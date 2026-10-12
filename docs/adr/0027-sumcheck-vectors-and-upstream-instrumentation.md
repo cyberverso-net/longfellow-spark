@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-12, after block 2 of stage 3)
 
 ## Date
 
@@ -24,7 +24,28 @@ Vectors for stage 3 come in three tiers, in the notation of ADR 0009 (plain text
 - **Tier 2, algebra.** `eq`, `eq2`, `bindeq`, `bind`, `lagrange_basis`: structural cases (challenges all zero, all one, a single one; the three evaluation points, where the basis must give the unit vectors) and seeded random cases, expected values from an independent Python reference written from the draft's definitions (bindeq by the recursive definition, eq by the product, the basis by division with the generator's own inverse), on both fields. The reference also checks `bindeq (C) (i) = eq (C, i, n)` on every case and the Lagrange constants of [ADR 0025](0025-polynomials-and-lagrange-constants.md) by `d * inv (d) = 1`, and aborts on any failure.
 - **Tier 3, recorded upstream runs.** For the two B.3 circuits, a run of the upstream reference instrumented to log, in the order the core consumes or produces them: the output-binding challenges g, per layer alpha and beta and the per-round, per-hand challenges, alpha_input; the padded proof (p0 and p2 per hand and round, the two claims per layer); the claim expression after each round and at emission; the emitted constraints (A as (constraint, variable, coefficient) triples, b, the quadratic triples). The harness feeds the circuit, the public inputs, the proof and the challenges to the core and compares the output per constraint as a set of (variable, coefficient) pairs, ignoring order within a constraint and zero coefficients ([ADR 0026](0026-sparse-expression.md)).
 
-  These files are produced outside this repository, by Paolo, from the upstream clone at d5e6be7 with an instrumentation patch against `docs/specs/rust/tests/unit_tests.rs` (or a test added beside it); the patch is kept under `tests/vectors/upstream/` with the commit hash, so that the recording is reproducible. The harness is designed to read the format, agreed before block 3; no tier 3 file is written by hand or synthesised in this repository.
+  These files are produced outside this repository, by Paolo, from the upstream clone at d5e6be7 with an instrumentation patch against `docs/specs/rust/tests/unit_tests.rs` (or a test added beside it); the patch is kept under `tests/vectors/upstream/` with the commit hash, so that the recording is reproducible. No tier 3 file is written by hand or synthesised in this repository.
+
+  Format of a tier 3 file (`sumcheck_core_<field>_<circuit>.txt`), in the line style of the other files, elements in hex as above, indices in decimal:
+
+  ```
+  field <gf2_128|p256>
+  circuit <name> <noutput> <ninput> <npublic> <nl>     then the layer and term lines of tier 1
+  public <w_0 .. w_npublic-1>
+  pad_base <index>                                     ninput - npublic
+  g <g_0 .. g_39>                                      the output-binding challenges, all 40
+  layer_challenges <j> <alpha> <beta> <c_0,0> <c_0,1> <c_1,0> ... <c_logw-1,1>
+                                                       round r, hand h, in consumption order
+  proof <j> <e_0 .. e_4logw-1> <claim_0> <claim_1>     e index 4 r + 2 h + k: hand h of round r,
+                                                       k = 0 the padded p (0), k = 1 the padded p (P2)
+  alpha_input <value>
+  claim <j> <r> <h> <known> <n> <var coeff> ...        the claim after round r, hand h of layer j
+  constraint <c> <b_c> <n> <var coeff> ...             constraint c: b and the sparse row of A
+  lqc <j> <x> <y> <z>
+  end
+  ```
+
+  The `claim` lines are optional and checked when present; the `constraint` lines are compared per constraint as sets of (variable, coefficient) pairs, zero coefficients ignored on both sides. The order of the evaluations in `proof` is the pad order of Section 6.5, which differs from the serialisation order of Section 7 (there, within a round, the two hands' p (0) precede the two hands' p (P2)).
 
 - The generator `gen_sumcheck_vectors.py` produces tiers 1 and 2 for both fields, deterministically, with a fixed seed; `make vectors` compares its output with the committed files, as for the other generators.
 - The harness `sumcheck_kat` runs both instances; it fails if any case fails or if no case ran, as the other harnesses do.
@@ -38,7 +59,7 @@ Vectors for stage 3 come in three tiers, in the notation of ADR 0009 (plain text
 
 ## Consequences
 
-- `tests/vectors/` gains `sumcheck_*.txt` files per field and tier, the generator, and `tests/vectors/upstream/` with the instrumentation patch and the recordings.
+- `tests/vectors/` gains `sumcheck_gf2_128.txt` and `sumcheck_p256.txt` (tiers 1 and 2, 208 cases together at block 2), the generator `gen_sumcheck_vectors.py`, and `tests/vectors/upstream/` with the instrumentation patch and the tier 3 recordings. The harness `sumcheck_kat` reads all of them and also re-checks the Lagrange constants and `bindeq (c) (i) = eq (c, i, n)` at run time.
 - The errata above are reported upstream in the draft's issue tracker; until a later draft fixes them, [ADR 0002](0002-pin-the-specification.md) applies: the pinned text is -03, the errata are listed here and in chapter 3.
 - The README trust model moves "the core agrees with the upstream verifier on the emitted constraints" from claimed to tested, with the files named.
 
