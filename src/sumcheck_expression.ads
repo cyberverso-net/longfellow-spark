@@ -126,9 +126,11 @@ package Sumcheck_Expression is
        and then Same (Var'Result.Terms (1).C, One);
 
    -------------------------------------------------------------------
-   --  Operations. Every result has the capacity of its first operand.
-   --  "Every variable of E is in the result and every variable of the
-   --  result comes from the operands" is stated over the positions.
+   --  Operations. Every result has the capacity of its first operand;
+   --  the second operand of Add and Sub is only read and may have any
+   --  capacity. "Every variable of E is in the result and every
+   --  variable of the result comes from the operands" is stated over
+   --  the positions.
    -------------------------------------------------------------------
 
    --  E + K * Var (V); the stored coefficient of V becomes
@@ -180,8 +182,7 @@ package Sumcheck_Expression is
    --  only in E keeps its coefficient.
    function Add (E, F : Expression) return Expression with
      Global => null,
-     Pre  => E.Capacity = F.Capacity
-       and then E.Length + F.Length <= E.Capacity,
+     Pre  => E.Length + F.Length <= E.Capacity,
      Post => Add'Result.Capacity = E.Capacity
        and then Add'Result.Length = E.Length + New_Count (E, F, F.Length)
        and then Same (Add'Result.Known, E.Known + F.Known)
@@ -200,8 +201,7 @@ package Sumcheck_Expression is
    --  E - F, likewise with Coef (E, W) - Coef (F, W).
    function Sub (E, F : Expression) return Expression with
      Global => null,
-     Pre  => E.Capacity = F.Capacity
-       and then E.Length + F.Length <= E.Capacity,
+     Pre  => E.Length + F.Length <= E.Capacity,
      Post => Sub'Result.Capacity = E.Capacity
        and then Sub'Result.Length = E.Length + New_Count (E, F, F.Length)
        and then Same (Sub'Result.Known, E.Known - F.Known)

@@ -26,6 +26,20 @@
 --  the same 4 r + 2 h + k for the round pads, then c0, c1, cr (Section
 --  6.5); Base is ninput - npublic (zk/verifier.rs).
 --
+--  Sizes and memory. The claim expressions of a layer hold at most
+--  4 logw + 5 variables (ADR 0026) and are allocated with
+--  Layer_Capacity = 4 * Max_Logw + 5 pairs each; the input constraint
+--  holds ninput - npublic + 2 and is allocated with Input_Capacity_Of.
+--  Expressions live on the stack, and Input_Constraint keeps three of
+--  the large kind alive at once (about 120 bytes per private input on
+--  P-256, 100 on GF(2^128)); Add_Term in its loop is quadratic in the
+--  number of inputs. The default 8 MiB stack of macOS therefore limits
+--  this unit to a few tens of thousands of private inputs, and a stack
+--  exhaustion is a Storage_Error, which is outside what the absence of
+--  run-time errors proof covers. Circuits of phase B size need a dense
+--  input constraint built outside the stack; that is a phase B change
+--  and is recorded in chapter 3.
+--
 --  Proof status (per instance). Symbolic_Round is Gold by definition:
 --  an expression function that is the formula next = p0 l0 + p1 l1 +
 --  p2 l2, p1 = claim - p0, written with the Gold operations of
@@ -157,9 +171,14 @@ package Sumcheck_Verifier is
 
    type Lqc_Array is array (Natural range <>) of Lqc_Triple;
 
-   --  Capacity of every expression of a run (ADR 0026).
-   function Capacity_Of (C : Circuit) return Capacity_Type is
-     (Natural'Max (C.Ninput - C.Npublic + 2, 4 * Max_Logw + 5))
+   --  Capacity of the claim expressions of a layer (ADR 0026): two
+   --  claim pads, four round pads per round, three claim pads.
+   Layer_Capacity : constant Capacity_Type := 4 * Max_Logw + 5;
+
+   --  Capacity of the input constraint: one variable per private input
+   --  and the two claim pads of the last layer.
+   function Input_Capacity_Of (C : Circuit) return Capacity_Type is
+     (C.Ninput - C.Npublic + 2)
    with Global => null;
 
    --  An upper bound on the Ligero terms emitted: 4 logw + 5 per layer
@@ -242,9 +261,9 @@ package Sumcheck_Verifier is
    --  The claims state between layers (Section 6.7, ClaimsState).
    -------------------------------------------------------------------
 
-   type Claims_State (Capacity : Capacity_Type) is record
+   type Claims_State is record
       Logv           : Logw_Type;
-      Claim0, Claim1 : Expression (Capacity);
+      Claim0, Claim1 : Expression (Layer_Capacity);
       HC0, HC1       : Challenge_Vector;
    end record;
 
@@ -277,7 +296,6 @@ package Sumcheck_Verifier is
        and then Base = C.Ninput - C.Npublic
        and then Ch.Last + 1 = Chal_Total (C)
        and then Proof.Last + 1 = Proof_Total (C)
-       and then State.Capacity = Capacity_Of (C)
        and then State.Claim0.Length <= 1 and then State.Claim1.Length <= 1
        and then Below (State.Claim0, Pad_Off (C, J, Base))
        and then Below (State.Claim1, Pad_Off (C, J, Base))
@@ -285,7 +303,6 @@ package Sumcheck_Verifier is
        and then B'First = 0 and then B_Count < B'Length,
      Post => A.Count <= A.Count'Old + 4 * Max_Logw + 5
        and then B_Count = B_Count'Old + 1
-       and then State.Capacity = Capacity_Of (C)
        and then State.Logv = C.Layers (J).Logw
        and then State.Claim0.Length = 1 and then State.Claim1.Length = 1
        and then Below (State.Claim0, Pad_Off (C, J + 1, Base))
@@ -308,7 +325,6 @@ package Sumcheck_Verifier is
    with
      Global => null,
      Pre  => Pub'First = 0 and then Pub'Length = C.Npublic
-       and then State.Capacity = Capacity_Of (C)
        and then State.Claim0.Length <= 1 and then State.Claim1.Length <= 1
        and then A.Max + 1 - A.Count >= C.Ninput + 2
        and then B'First = 0 and then B_Count < B'Length,
