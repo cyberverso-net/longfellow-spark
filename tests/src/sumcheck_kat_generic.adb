@@ -219,6 +219,24 @@ package body Sumcheck_KAT_Generic is
       then
          raise Parse_Error with "tier 3 block " & Name & " incomplete";
       end if;
+      --  Exactly the constraints 0 .. NL and the triples 0 .. NL - 1 must
+      --  be recorded: a recording that expects nothing proves nothing.
+      for Cidx in 0 .. C_NL loop
+         if not Exp_B_Given (Cidx) then
+            raise Parse_Error with "tier 3 block " & Name
+              & ": constraint" & Cidx'Image & " not recorded";
+         end if;
+      end loop;
+      for J in 0 .. C_NL - 1 loop
+         if not Exp_Lqc_Given (J) then
+            raise Parse_Error with "tier 3 block " & Name
+              & ": lqc of layer" & J'Image & " not recorded";
+         end if;
+      end loop;
+      if Exp_B_Count /= C_NL + 1 then
+         raise Parse_Error with "tier 3 block " & Name
+           & ": constraint index beyond NL";
+      end if;
       declare
          Raw : Raw_Circuit (Last_Layer => C_NL - 1, NT => N_Terms);
       begin
@@ -292,8 +310,9 @@ package body Sumcheck_KAT_Generic is
                               for L in 0 .. A.Count - 1 loop
                                  if A.Constraint (L) = Cidx
                                    and then A.Witness (L) = Exp_Var (K)
+                                   and then A.Coeff (L) = Exp_Coeff (K)
                                  then
-                                    Found := A.Coeff (L) = Exp_Coeff (K);
+                                    Found := True;
                                  end if;
                               end loop;
                               if not Found then
@@ -306,7 +325,8 @@ package body Sumcheck_KAT_Generic is
                            end;
                         end if;
                      end loop;
-                     --  every emitted non-zero term is recorded
+                     --  every emitted non-zero term is recorded with the
+                     --  same coefficient
                      for L in 0 .. A.Count - 1 loop
                         if A.Constraint (L) = Cidx and then A.Coeff (L) /= Zero
                         then
@@ -316,6 +336,7 @@ package body Sumcheck_KAT_Generic is
                               for K in 0 .. Exp_Terms - 1 loop
                                  if Exp_Cons (K) = Cidx
                                    and then Exp_Var (K) = A.Witness (L)
+                                   and then Exp_Coeff (K) = A.Coeff (L)
                                  then
                                     Found := True;
                                  end if;
@@ -619,8 +640,14 @@ package body Sumcheck_KAT_Generic is
                Cidx : constant Natural := Nat (F (2));
                NT   : constant Natural := Nat (F (4));
             begin
-               if Cidx > Max_Layers or else Count /= 4 + 2 * NT then
+               if not In_Circuit or else Cidx > C_NL
+                 or else Count /= 4 + 2 * NT
+               then
                   raise Parse_Error with "constraint line";
+               end if;
+               if Exp_B_Given (Cidx) then
+                  raise Parse_Error with "constraint" & Cidx'Image
+                    & " recorded twice";
                end if;
                Exp_B (Cidx) := E (3);
                Exp_B_Given (Cidx) := True;
@@ -637,8 +664,12 @@ package body Sumcheck_KAT_Generic is
             declare
                J : constant Natural := Nat (F (2));
             begin
-               if J >= Max_Layers then
+               if not In_Circuit or else J >= C_NL then
                   raise Parse_Error with "lqc layer";
+               end if;
+               if Exp_Lqc_Given (J) then
+                  raise Parse_Error with "lqc of layer" & J'Image
+                    & " recorded twice";
                end if;
                Exp_Lqc (J) :=
                  (X => Nat (F (3)), Y => Nat (F (4)), Z => Nat (F (5)));
