@@ -120,7 +120,7 @@ The Expression postconditions are stated with the "absent means Zero" convention
 
 ### 4.2 The verification condition table, per instance
 
-GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-prover-configuration-step-budget.md)), the whole project at the end of stage 3: 6835 checks, all proved, no justification, no `pragma Assume`, against 3694 at the end of stage 2. Maximum steps for a single successful proof unchanged at 429702 (a P-256 lemma); the stage 3 maximum is 171089 (a postcondition of `Add` on P-256) and the core stays below 62606.
+GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-prover-configuration-step-budget.md)), the whole project at the end of stage 3: 6811 checks, all proved, no justification, no `pragma Assume`, against 3694 at the end of stage 2. Maximum steps for a single successful proof unchanged at 429702 (a P-256 lemma); the stage 3 maximum is 171089 (a postcondition of `Add` on P-256) and the core stays below 62606; the review round of 2026-10-13 (two capacities) brought the total from 6835 to 6811.
 
 | Category | Checks | Discharged by |
 |----------|--------|---------------|
