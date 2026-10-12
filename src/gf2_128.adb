@@ -14,6 +14,16 @@ package body GF2_128 is
       return (Limbs => R);
    end Add;
 
+   function Sub (A, B : Element) return Element is
+   begin
+      return Add (A, B);
+   end Sub;
+
+   function Neg (A : Element) return Element is
+   begin
+      return A;
+   end Neg;
+
    function Xtime (E : Element) return Element is
       --  Outgoing coefficient of x^127: 0 or 1.
       Carry : constant Unsigned_64 := Shift_Right (E.Limbs (1), 63);

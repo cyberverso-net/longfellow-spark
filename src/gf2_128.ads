@@ -5,9 +5,9 @@
 --  implementation walked through, what is proved, tested and trusted).
 --  Decisions implemented here: ADR 0004 (element representation),
 --  0005 (Mul_Ref as proof target), 0006 (constant-time scope),
---  0007 (Square), 0008 (Inv), with 0002 (pinned spec), 0003 (proof
---  policy) and 0020 (prover configuration) as the frame; see
---  docs/adr/README.md.
+--  0007 (Square), 0008 (Inv), 0024 (Sub and Neg for the field
+--  signature), with 0002 (pinned spec), 0003 (proof policy) and 0020
+--  (prover configuration) as the frame; see docs/adr/README.md.
 --
 --  Proof status. SPARK assurance levels: Silver = absence of run-time
 --  errors, Gold = proved functional contracts. Stage 1 of Phase A is
@@ -18,6 +18,8 @@
 --  provers with a step budget; 41 checks).
 --
 --    Add     : Gold, functional Post proved (addition is limb-wise xor).
+--    Sub, Neg: Gold, Sub = Add and Neg = identity (characteristic 2),
+--              stated for the protocol code of stage 3 (ADR 0024).
 --    Xtime   : Gold, exact bit-level Post proved (multiplication by x
 --              with reduction).
 --    Mul     : Gold, Post proved against the ghost reference Mul_Ref
@@ -105,9 +107,17 @@ package GF2_128 is
        (for all I in Limb_Index =>
           Add'Result.Limbs (I) = (A.Limbs (I) xor B.Limbs (I)));
 
-   --  Convenience: subtraction equals addition in characteristic 2.
-   function Sub (A, B : Element) return Element is (Add (A, B)) with
-     Global => null;
+   --  Subtraction equals addition in characteristic 2 (every element is
+   --  its own additive inverse). Declared with the postcondition the
+   --  protocol code relies on through Field_Signature (ADR 0024).
+   function Sub (A, B : Element) return Element with
+     Global => null,
+     Post   => Sub'Result = Add (A, B);
+
+   --  Negation is the identity in characteristic 2.
+   function Neg (A : Element) return Element with
+     Global => null,
+     Post   => Neg'Result = A;
 
    --  Multiplication by x with reduction mod Q(x): shift left by one,
    --  fold the outgoing bit 127 onto Reduction_Low.
