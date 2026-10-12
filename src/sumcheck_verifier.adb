@@ -190,7 +190,7 @@ package body Sumcheck_Verifier is
       B_Count : in out Natural;
       Lqc     : out Lqc_Triple)
    is
-      Cap   : constant Capacity_Type := State.Capacity;
+      Cap   : constant Capacity_Type := Layer_Capacity;
       Logw  : constant Logw_Type := C.Layers (J).Logw;
       CO    : constant Natural := Chal_Off (C, J);
       PO    : constant Natural := Proof_Off (C, J);
@@ -214,7 +214,6 @@ package body Sumcheck_Verifier is
          Lemma_Below_Union (State.Claim0, SC1, Claim, PB);
          --  The 2 logw symbolic rounds: round K / 2, hand K mod 2.
          for K in 0 .. 2 * Logw - 1 loop
-            pragma Loop_Invariant (Claim.Capacity = Cap);
             pragma Loop_Invariant (Claim.Length <= 2 + 2 * K);
             pragma Loop_Invariant (Below (Claim, PB + 2 * K));
             declare
@@ -254,8 +253,7 @@ package body Sumcheck_Verifier is
             Claim := Sub (Claim, Prod);
             Constrain_To_Be_Zero (Claim, A, B, B_Count);
             Lqc := (X => C0, Y => C1, Z => CR);
-            State := (Capacity => Cap,
-                      Logv     => Logw,
+            State := (Logv     => Logw,
                       Claim0   => Add_Constant (Var (C0, Cap), Cl0),
                       Claim1   => Add_Constant (Var (C1, Cap), Cl1),
                       HC0      => HC0,
@@ -277,7 +275,7 @@ package body Sumcheck_Verifier is
       B       : in out Element_Array;
       B_Count : in out Natural)
    is
-      Cap    : constant Capacity_Type := State.Capacity;
+      Cap    : constant Capacity_Type := Input_Capacity_Of (C);
       N      : constant Wire_Count := C.Ninput;
       NP     : constant Wire_Count := C.Npublic;
       Eq_Vec : Element_Array (0 .. N - 1) := [others => Zero];
@@ -324,14 +322,12 @@ package body Sumcheck_Verifier is
       B       : out Element_Array;
       Lqc     : out Lqc_Array)
    is
-      Cap     : constant Capacity_Type := Capacity_Of (C);
       Base    : constant Natural := C.Ninput - C.Npublic;
       B_Count : Natural := 0;
-      State   : Claims_State (Cap) :=
-        (Capacity => Cap,
-         Logv     => Ceil_Lg2 (C.Noutput),
-         Claim0   => From_Constant (Zero, Cap),
-         Claim1   => From_Constant (Zero, Cap),
+      State   : Claims_State :=
+        (Logv     => Ceil_Lg2 (C.Noutput),
+         Claim0   => From_Constant (Zero, Layer_Capacity),
+         Claim1   => From_Constant (Zero, Layer_Capacity),
          HC0      => Ch.G,
          HC1      => Ch.G);
    begin
@@ -345,7 +341,6 @@ package body Sumcheck_Verifier is
       for J in 0 .. C.Last_Layer loop
          pragma Loop_Invariant (A.Count <= J * (4 * Max_Logw + 5));
          pragma Loop_Invariant (B_Count = J);
-         pragma Loop_Invariant (State.Capacity = Cap);
          pragma Loop_Invariant
            (State.Claim0.Length <= 1 and then State.Claim1.Length <= 1);
          pragma Loop_Invariant (Below (State.Claim0, Pad_Off (C, J, Base)));

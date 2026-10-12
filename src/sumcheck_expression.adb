@@ -217,8 +217,7 @@ package body Sumcheck_Expression is
    function Fold (E, F : Expression; Subtract : Boolean) return Expression
    with
      Global => null,
-     Pre  => E.Capacity = F.Capacity
-       and then E.Length + F.Length <= E.Capacity,
+     Pre  => E.Length + F.Length <= E.Capacity,
      Post => Fold'Result.Capacity = E.Capacity
        and then Fold'Result.Length = E.Length + New_Count (E, F, F.Length)
        and then Same (Fold'Result.Known, E.Known)

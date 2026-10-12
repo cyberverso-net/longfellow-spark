@@ -32,7 +32,11 @@ while read -r local_ref local_sha _remote_ref _remote_sha; do
       continue
    fi
    pushing=true
-   if [ "$local_sha" != "$head" ]; then
+   #  An annotated tag's sha is the tag object; compare the commit it
+   #  points to, so that a tag on HEAD is accepted.
+   local_commit=$(git rev-parse --verify --quiet "${local_sha}^{commit}" \
+                  || echo "$local_sha")
+   if [ "$local_commit" != "$head" ]; then
       echo "pre-push: $local_ref ($local_sha) is not HEAD ($head);" >&2
       echo "pre-push: the proof runs on the working tree, so push a branch" \
            "from its own checkout, or use --no-verify knowingly" >&2
