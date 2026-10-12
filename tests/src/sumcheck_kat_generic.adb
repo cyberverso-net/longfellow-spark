@@ -8,6 +8,7 @@ package body Sumcheck_KAT_Generic is
    package TIO renames Ada.Text_IO;
    use SA;
    use type SA.Element;
+   use type SV.Lqc_Triple;
 
    Line_No : Natural := 0;
    N_Pass  : Natural := 0;
@@ -99,6 +100,36 @@ package body Sumcheck_KAT_Generic is
    Expect_Ok  : Boolean;
    Have_Expect : Boolean;
 
+   --  Tier 3 state.
+   Max_Elems : constant := 8192;
+   type Elem_Buf is array (0 .. Max_Elems - 1) of Element;
+   type Nat_Buf is array (0 .. Max_Elems - 1) of Natural;
+   Tier3        : Boolean;
+   Pub_Buf      : Wire_Buf;
+   Have_Public  : Boolean;
+   Pad_Base_Val : Natural;
+   Have_Pad     : Boolean;
+   G_Buf        : Elem_Buf;
+   Have_G       : Boolean;
+   Chal_Buf     : Elem_Buf;      --  layer challenges, flat, in layer order
+   Chal_Count   : Natural;
+   Chal_Layers  : Natural;       --  layers whose challenges were read
+   Proof_Buf    : Elem_Buf;
+   Proof_Count  : Natural;
+   Proof_Layers : Natural;
+   Alpha_In     : Element;
+   Have_Alpha   : Boolean;
+   --  Expected constraints: entries (constraint, variable, coefficient).
+   Exp_Cons     : Nat_Buf;
+   Exp_Var      : Nat_Buf;
+   Exp_Coeff    : Elem_Buf;
+   Exp_Terms    : Natural;
+   Exp_B        : Elem_Buf;
+   Exp_B_Given  : array (0 .. Max_Layers) of Boolean;
+   Exp_B_Count  : Natural;
+   Exp_Lqc      : array (0 .. Max_Layers - 1) of SV.Lqc_Triple;
+   Exp_Lqc_Given : array (0 .. Max_Layers - 1) of Boolean;
+
    function Nat (S : String) return Natural is
    begin
       return Natural'Value (S);
@@ -176,6 +207,143 @@ package body Sumcheck_KAT_Generic is
          end;
       end;
    end Finish_Circuit;
+
+   --  Builds the circuit, runs the core with the recorded challenges and
+   --  compares the emitted constraints with the recorded ones.
+   procedure Finish_Tier3 is
+      Name : constant String := C_Name (1 .. C_Name_Len);
+   begin
+      if not (Have_Public and Have_Pad and Have_G and Have_Alpha)
+        or else Chal_Layers /= C_NL or else Proof_Layers /= C_NL
+        or else Cur_Layer /= C_NL - 1 or else Terms_Left /= 0
+      then
+         raise Parse_Error with "tier 3 block " & Name & " incomplete";
+      end if;
+      declare
+         Raw : Raw_Circuit (Last_Layer => C_NL - 1, NT => N_Terms);
+      begin
+         Raw.Noutput := C_Noutput;
+         Raw.Ninput  := C_Ninput;
+         Raw.Npublic := C_Npublic;
+         for J in 0 .. C_NL - 1 loop
+            Raw.Layers (J) := (Logw  => Layers (J).Logw,
+                               NW_In => Layers (J).NW_In,
+                               First => Layers (J).First,
+                               Last  => Layers (J).Last);
+         end loop;
+         for I in 1 .. N_Terms loop
+            Raw.Terms (I) := Terms (I);
+         end loop;
+         if not Well_Formed (Raw) then
+            Report_Failure ("tier 3 circuit " & Name & " not well formed");
+            return;
+         end if;
+         declare
+            C   : constant Circuit := Raw;
+            Pub : Element_Array (0 .. C_Npublic - 1);
+            Ch  : SV.Challenges (Last => Chal_Count - 1);
+            Prf : SV.Sumcheck_Proof (Last => Proof_Count - 1);
+            A   : SV.Ligero_Terms (Max => SV.A_Bound (C));
+            B   : Element_Array (0 .. C_NL);
+            Lqc : SV.Lqc_Array (0 .. C_NL - 1);
+         begin
+            for I in Pub'Range loop
+               Pub (I) := Pub_Buf (I);
+            end loop;
+            for I in 0 .. Max_Logw - 1 loop
+               Ch.G (I) := G_Buf (I);
+            end loop;
+            for I in 0 .. Chal_Count - 1 loop
+               Ch.Layer (I) := Chal_Buf (I);
+            end loop;
+            Ch.Alpha_Input := Alpha_In;
+            for I in 0 .. Proof_Count - 1 loop
+               Prf.Evals (I) := Proof_Buf (I);
+            end loop;
+            Check (Pad_Base_Val = C_Ninput - C_Npublic,
+                   "tier 3 " & Name & ": pad_base is not ninput - npublic");
+            Check (Chal_Count = SV.Chal_Total (C)
+                   and then Proof_Count = SV.Proof_Total (C),
+                   "tier 3 " & Name & ": challenge or proof count");
+            SV.Verifier_Core (C, Pub, Prf, Ch, A, B, Lqc);
+            --  b, per constraint.
+            for Cidx in 0 .. C_NL loop
+               if Exp_B_Given (Cidx) then
+                  Check (B (Cidx) = Exp_B (Cidx),
+                         "tier 3 " & Name & ": b of constraint" & Cidx'Image
+                         & " got " & Image (B (Cidx))
+                         & " expected " & Image (Exp_B (Cidx)));
+               end if;
+            end loop;
+            --  A, per constraint, as sets of (variable, coefficient) with
+            --  zero coefficients ignored on both sides.
+            for Cidx in 0 .. C_NL loop
+               if Exp_B_Given (Cidx) then
+                  declare
+                     Good : Boolean := True;
+                  begin
+                     --  every recorded non-zero term is emitted
+                     for K in 0 .. Exp_Terms - 1 loop
+                        if Exp_Cons (K) = Cidx and then Exp_Coeff (K) /= Zero
+                        then
+                           declare
+                              Found : Boolean := False;
+                           begin
+                              for L in 0 .. A.Count - 1 loop
+                                 if A.Constraint (L) = Cidx
+                                   and then A.Witness (L) = Exp_Var (K)
+                                 then
+                                    Found := A.Coeff (L) = Exp_Coeff (K);
+                                 end if;
+                              end loop;
+                              if not Found then
+                                 Good := False;
+                                 TIO.Put_Line
+                                   ("  constraint" & Cidx'Image & " variable"
+                                    & Exp_Var (K)'Image & ": expected "
+                                    & Image (Exp_Coeff (K)) & " not emitted");
+                              end if;
+                           end;
+                        end if;
+                     end loop;
+                     --  every emitted non-zero term is recorded
+                     for L in 0 .. A.Count - 1 loop
+                        if A.Constraint (L) = Cidx and then A.Coeff (L) /= Zero
+                        then
+                           declare
+                              Found : Boolean := False;
+                           begin
+                              for K in 0 .. Exp_Terms - 1 loop
+                                 if Exp_Cons (K) = Cidx
+                                   and then Exp_Var (K) = A.Witness (L)
+                                 then
+                                    Found := True;
+                                 end if;
+                              end loop;
+                              if not Found then
+                                 Good := False;
+                                 TIO.Put_Line
+                                   ("  constraint" & Cidx'Image & " variable"
+                                    & A.Witness (L)'Image & ": emitted "
+                                    & Image (A.Coeff (L)) & " not recorded");
+                              end if;
+                           end;
+                        end if;
+                     end loop;
+                     Check (Good,
+                            "tier 3 " & Name & ": constraint" & Cidx'Image);
+                  end;
+               end if;
+            end loop;
+            for J in 0 .. C_NL - 1 loop
+               if Exp_Lqc_Given (J) then
+                  Check (Lqc (J) = Exp_Lqc (J),
+                         "tier 3 " & Name & ": lqc of layer" & J'Image);
+               end if;
+            end loop;
+         end;
+      end;
+   end Finish_Tier3;
 
    procedure Check_Case (Line : String) is
       Fields : Field_Array;
@@ -316,6 +484,19 @@ package body Sumcheck_KAT_Generic is
             Have_Expect := False;
             N_Expected := 0;
             Segments := [others => (False, 0, 0)];
+            Tier3 := False;
+            Have_Public := False;
+            Have_Pad := False;
+            Have_G := False;
+            Chal_Count := 0;
+            Chal_Layers := 0;
+            Proof_Count := 0;
+            Proof_Layers := 0;
+            Have_Alpha := False;
+            Exp_Terms := 0;
+            Exp_B_Count := 0;
+            Exp_B_Given := [others => False];
+            Exp_Lqc_Given := [others => False];
          elsif Op = "layer" then
             if not In_Circuit or else Terms_Left /= 0
               or else Nat (F (2)) /= Cur_Layer + 1
@@ -360,6 +541,110 @@ package body Sumcheck_KAT_Generic is
                end loop;
                N_Expected := N_Expected + N;
             end;
+         elsif Op = "public" then
+            if not In_Circuit or else Count - 1 /= C_Npublic then
+               raise Parse_Error with "public length";
+            end if;
+            for I in 0 .. C_Npublic - 1 loop
+               Pub_Buf (I) := E (2 + I);
+            end loop;
+            Have_Public := True;
+            Tier3 := True;
+         elsif Op = "pad_base" then
+            Pad_Base_Val := Nat (F (2));
+            Have_Pad := True;
+            Tier3 := True;
+         elsif Op = "g" then
+            if Count - 1 /= Max_Logw then
+               raise Parse_Error with "g expects" & Max_Logw'Image & " values";
+            end if;
+            for I in 0 .. Max_Logw - 1 loop
+               G_Buf (I) := E (2 + I);
+            end loop;
+            Have_G := True;
+            Tier3 := True;
+         elsif Op = "layer_challenges" then
+            declare
+               J    : constant Natural := Nat (F (2));
+               Logw : Natural;
+            begin
+               if not In_Circuit or else J /= Chal_Layers
+                 or else J > Cur_Layer
+               then
+                  raise Parse_Error with "unexpected layer_challenges";
+               end if;
+               Logw := Layers (J).Logw;
+               if Count - 2 /= 2 * Logw + 2 then
+                  raise Parse_Error with "layer_challenges length";
+               end if;
+               for I in 0 .. 2 * Logw + 1 loop
+                  Chal_Buf (Chal_Count + I) := E (3 + I);
+               end loop;
+               Chal_Count := Chal_Count + 2 * Logw + 2;
+               Chal_Layers := Chal_Layers + 1;
+            end;
+            Tier3 := True;
+         elsif Op = "proof" then
+            declare
+               J    : constant Natural := Nat (F (2));
+               Logw : Natural;
+            begin
+               if not In_Circuit or else J /= Proof_Layers
+                 or else J > Cur_Layer
+               then
+                  raise Parse_Error with "unexpected proof";
+               end if;
+               Logw := Layers (J).Logw;
+               if Count - 2 /= 4 * Logw + 2 then
+                  raise Parse_Error with "proof length";
+               end if;
+               for I in 0 .. 4 * Logw + 1 loop
+                  Proof_Buf (Proof_Count + I) := E (3 + I);
+               end loop;
+               Proof_Count := Proof_Count + 4 * Logw + 2;
+               Proof_Layers := Proof_Layers + 1;
+            end;
+            Tier3 := True;
+         elsif Op = "alpha_input" then
+            Alpha_In := E (2);
+            Have_Alpha := True;
+            Tier3 := True;
+         elsif Op = "claim" then
+            --  Optional intermediate claims: parsed and accepted; the
+            --  comparison of intermediate claims is not implemented
+            --  (the emitted constraints cover the final values).
+            Tier3 := True;
+         elsif Op = "constraint" then
+            declare
+               Cidx : constant Natural := Nat (F (2));
+               NT   : constant Natural := Nat (F (4));
+            begin
+               if Cidx > Max_Layers or else Count /= 4 + 2 * NT then
+                  raise Parse_Error with "constraint line";
+               end if;
+               Exp_B (Cidx) := E (3);
+               Exp_B_Given (Cidx) := True;
+               Exp_B_Count := Natural'Max (Exp_B_Count, Cidx + 1);
+               for I in 0 .. NT - 1 loop
+                  Exp_Cons (Exp_Terms) := Cidx;
+                  Exp_Var (Exp_Terms) := Nat (F (5 + 2 * I));
+                  Exp_Coeff (Exp_Terms) := E (6 + 2 * I);
+                  Exp_Terms := Exp_Terms + 1;
+               end loop;
+            end;
+            Tier3 := True;
+         elsif Op = "lqc" then
+            declare
+               J : constant Natural := Nat (F (2));
+            begin
+               if J >= Max_Layers then
+                  raise Parse_Error with "lqc layer";
+               end if;
+               Exp_Lqc (J) :=
+                 (X => Nat (F (3)), Y => Nat (F (4)), Z => Nat (F (5)));
+               Exp_Lqc_Given (J) := True;
+            end;
+            Tier3 := True;
          elsif Op = "expect" then
             if not In_Circuit then
                raise Parse_Error with "unexpected expect";
@@ -377,7 +662,11 @@ package body Sumcheck_KAT_Generic is
                raise Parse_Error with "unexpected end";
             end if;
             In_Circuit := False;
-            Finish_Circuit;
+            if Tier3 then
+               Finish_Tier3;
+            else
+               Finish_Circuit;
+            end if;
          else
             raise Parse_Error with "unknown operation '" & Op & "'";
          end if;

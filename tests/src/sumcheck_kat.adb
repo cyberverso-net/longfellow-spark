@@ -2,8 +2,10 @@
 --  both fields (ADR 0027). Test code, outside the proof perimeter.
 --
 --  Reads the vector files given as arguments (default: sumcheck_gf2_128.txt
---  and sumcheck_p256.txt under tests/vectors/); the first non-comment
---  line of a file, "field <name>", selects the instance. Built with
+--  and sumcheck_p256.txt under tests/vectors/, plus every
+--  sumcheck_core_*.txt under tests/vectors/upstream/ when present); the
+--  first non-comment line of a file, "field <name>", selects the
+--  instance. Built with
 --  -gnata, so every contract and ghost reference of the library executes:
 --  in particular the Post of Eval_Circuit evaluates Acc_Ref on every wire.
 --
@@ -12,12 +14,17 @@
 pragma SPARK_Mode (Off);
 
 with Ada.Command_Line;
+with Ada.Directories;
 with Ada.Text_IO;
 with Interfaces; use Interfaces;
 with GF2_128;
 with P256_Field;
 with Sumcheck_Algebra_GF2_128;
 with Sumcheck_Algebra_P256;
+with Sumcheck_Expression_GF2_128;
+with Sumcheck_Expression_P256;
+with Sumcheck_Verifier_GF2_128;
+with Sumcheck_Verifier_P256;
 with Sumcheck_KAT_Generic;
 
 procedure Sumcheck_KAT is
@@ -101,11 +108,13 @@ procedure Sumcheck_KAT is
    end P_Image;
 
    package GF_KAT is new Sumcheck_KAT_Generic
-     (SA => Sumcheck_Algebra_GF2_128, Field_Name => "gf2_128",
+     (SA => Sumcheck_Algebra_GF2_128, SE => Sumcheck_Expression_GF2_128,
+      SV => Sumcheck_Verifier_GF2_128, Field_Name => "gf2_128",
       To_Element => GF_To_Element, Image => GF_Image);
 
    package P_KAT is new Sumcheck_KAT_Generic
-     (SA => Sumcheck_Algebra_P256, Field_Name => "p256",
+     (SA => Sumcheck_Algebra_P256, SE => Sumcheck_Expression_P256,
+      SV => Sumcheck_Verifier_P256, Field_Name => "p256",
       To_Element => P_To_Element, Image => P_Image);
 
    Passed : Natural := 0;
@@ -149,6 +158,23 @@ begin
    if Ada.Command_Line.Argument_Count = 0 then
       Run ("tests/vectors/sumcheck_gf2_128.txt");
       Run ("tests/vectors/sumcheck_p256.txt");
+      declare
+         use Ada.Directories;
+         Search : Search_Type;
+         Item   : Directory_Entry_Type;
+      begin
+         if Exists ("tests/vectors/upstream")
+           and then Kind ("tests/vectors/upstream") = Directory
+         then
+            Start_Search (Search, "tests/vectors/upstream",
+                          "sumcheck_core_*.txt");
+            while More_Entries (Search) loop
+               Get_Next_Entry (Search, Item);
+               Run (Full_Name (Item));
+            end loop;
+            End_Search (Search);
+         end if;
+      end;
    else
       for I in 1 .. Ada.Command_Line.Argument_Count loop
          Run (Ada.Command_Line.Argument (I));
