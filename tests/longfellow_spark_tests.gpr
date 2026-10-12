@@ -9,7 +9,8 @@
 --  measure or deploy binaries produced by this project.
 --
 --  Build:  alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
---  Run:    tests/bin/gf2_128_kat [vector files]; tests/bin/p256_kat [vector files]
+--  Run:    tests/bin/gf2_128_kat, tests/bin/p256_kat, tests/bin/sumcheck_kat
+--          [vector files]
 
 project Longfellow_Spark_Tests is
 
@@ -17,7 +18,7 @@ project Longfellow_Spark_Tests is
    for Object_Dir use "obj";
    for Exec_Dir use "bin";
    for Create_Missing_Dirs use "True";
-   for Main use ("gf2_128_kat.adb", "p256_kat.adb");
+   for Main use ("gf2_128_kat.adb", "p256_kat.adb", "sumcheck_kat.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use
