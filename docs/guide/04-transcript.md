@@ -48,9 +48,9 @@ The order of Section 7.3 against the pad order of Section 6.5; root and sumcheck
 
 `Unsigned_32` rotations and shifts, packed byte arrays, constant tables; the incremental context as an in-out record.
 
-### 3.2 Transcript: a record with state, and the ghost absorbed sequence
+### 3.2 Transcript: a package with state, and the ghost absorbed sequence
 
-In-out state records, ghost record components, functional sequences from SPARKlib on first use.
+Abstract state and refined state, a ghost global as the model, functional sequences from SPARKlib on first use; assertion levels, and why the model is proof-only (GNAT 16 has no ghost record components, SPARKlib's lemmas are never executable).
 
 ### 3.3 Field_Signature extended: Serialized_Size, To_Bytes, From_Bytes, Sampling_Rejects
 

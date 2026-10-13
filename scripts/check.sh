@@ -50,6 +50,8 @@ do_test() {
    tests/bin/p256_kat
    header "test: sumcheck_kat"
    tests/bin/sumcheck_kat
+   header "test: transcript_kat"
+   tests/bin/transcript_kat
 }
 
 do_vectors() {
@@ -65,6 +67,7 @@ do_vectors() {
    python3 -I tests/vectors/gen_gf2_128_vectors.py "$scratch"
    python3 -I tests/vectors/gen_p256_vectors.py "$scratch"
    python3 -I tests/vectors/gen_sumcheck_vectors.py "$scratch"
+   python3 -I tests/vectors/gen_transcript_vectors.py "$scratch"
    local name status=0
    for name in "$scratch"/*.txt; do
       name="$(basename "$name")"

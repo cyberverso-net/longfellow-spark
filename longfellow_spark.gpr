@@ -1,4 +1,5 @@
 with "config/longfellow_spark_config.gpr";
+with "sparklib";
 project Longfellow_Spark is
 
    for Library_Name use "Longfellow_Spark";

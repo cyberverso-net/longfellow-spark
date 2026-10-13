@@ -19,7 +19,7 @@ The constant-time discipline of [ADR 0006](0006-constant-time-discipline-and-sco
 - SHA-256 (FIPS 180-4) and AES-256 encryption (FIPS 197: key expansion and the forward cipher only) are written in SPARK in this repository, as packages `Sha256` and `Aes256`, proved Silver: absence of run-time errors for every input, every subprogram proved terminating.
 - Their functional correctness is not proved. It is anchored by known-answer vectors (FIPS 180-4 examples and CAVP short messages for SHA-256; FIPS 197 Appendix C.3 and SP 800-38A F.5.5, CTR-AES256, for AES-256; [ADR 0032](0032-transcript-vectors.md)). The package headers and the README trust model say so: what is proved is that the code does not fail; that it computes SHA-256 and AES is tested.
 - A table-based AES is acceptable: the S-box as a constant table indexed by data bytes, and the round as byte operations over it. The constant-time discipline of ADR 0006 is declared not applicable to `Transcript`, `Sha256` and `Aes256`, with the reason above recorded in each header, together with the instruction that these packages must never be used on secret data; a future use on secrets (none is planned: the prover's pads come from its own randomness, not from the transcript) is a new decision.
-- `Sha256` exposes an incremental interface (a context, `Update` over a byte array, `Digest` on a copy of the context so that the accumulator survives, as `get_hash` does in the reference) and carries the ghost absorbed-bytes model of [ADR 0031](0031-transcript-gold-perimeter.md). `Aes256` exposes the key schedule and single-block encryption; `FsPrf` in `Transcript` builds the counter mode over it.
+- `Sha256` exposes an incremental interface (a context, `Update` over a byte array, `Digest` as a function, so that the accumulator survives, as `get_hash` does in the reference). The ghost absorbed-bytes model of [ADR 0031](0031-transcript-gold-perimeter.md) does not live in the context: GNAT 16 has no ghost record components (found at block 1, 2026-10-13), so the model is state of `Transcript`, whose single call to `Update` is the point where the model is appended to. `Aes256` exposes the key schedule and single-block encryption; `FsPrf` in `Transcript` builds the counter mode over it.
 
 ## Alternatives considered
 
@@ -37,7 +37,7 @@ The constant-time discipline of [ADR 0006](0006-constant-time-discipline-and-sco
 
 ## Verification impact
 
-- Provable: absence of run-time errors and termination of both packages; the ghost absorbed-bytes model of `Sha256` (ADR 0031).
+- Provable: absence of run-time errors and termination of both packages.
 - Tested: that the digests and ciphertexts are those of FIPS 180-4, CAVP, FIPS 197 and SP 800-38A on the committed cases; the B.2 vectors of the draft exercise both through the transcript.
 - Trusted: that the code computes SHA-256 and AES-256 on inputs the vectors do not cover.
 - Constant time: exempt for `Transcript`, `Sha256` and `Aes256`, on the ground that they process public data only; the exemption is recorded in the headers and in the README.
