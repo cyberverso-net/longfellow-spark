@@ -3,6 +3,9 @@
   sha256.txt          sha256 <message> <digest>
   aes256.txt          aes256 <key> <block> <ciphertext>
   transcript_fs.txt   the Appendix B.2 steps, as a script (see below)
+  zk_proof_p256_b3_2.txt, zk_proof_gf2_128_b3_3.txt
+                      label, root, circuit identifier and sumcheck part
+                      of the two Appendix B.3 proofs
 
 Independent reference of the Fiat-Shamir transcript of IETF
 draft-google-cfrg-libzk-03, Sections 3.1 to 3.4: SHA-256 from hashlib,
@@ -26,7 +29,19 @@ chained). Any mismatch aborts. The vector file then carries the steps as
 a script the harness replays on the library's transcript, with the
 draft's values as printed (big-endian integers for the elements).
 
-The Appendix B.3 replay (ADR 0032) is added by a later block of stage 4.
+Appendix B.3 gives two complete proofs. Their root (the first 32 bytes)
+and sumcheck part (the next 4 logw + 2 elements per layer, Section 7.5
+and 7.3) are copied here from the "Complete Proof Serialization" blocks
+of B.3.2 and B.3.3, with the labels of the upstream unit tests and the
+all-zero circuit identifier they use. Before writing them out, the
+generator reads the sumcheck part into the pad order of Section 6.5 and
+compares it with the padded proof of the tier 3 recording of the same
+circuit (tests/vectors/upstream/, ADR 0027), then replays the transcript
+of zk/verifier.rs with its own transcript (label, root, statement,
+begin_circuit, per layer begin_layer, round_poly, end_layer, then
+alpha_input) and compares every challenge with the recording. Any
+mismatch aborts. The harness sumcheck_kat does the same with the
+library's reader and Replay_Challenges (ADR 0032).
 
 Usage: python3 -I gen_transcript_vectors.py [output-directory]
 Output is deterministic (no timestamps).
@@ -383,6 +398,240 @@ def b2_script():
 
 
 # ----------------------------------------------------------------------
+# Appendix B.3: the two proofs against the tier 3 recordings
+# ----------------------------------------------------------------------
+
+P256_P = 2**256 - 2**224 + 2**192 + 2**96 - 1
+MAX_LOGW = 40
+ZERO_CIRCUIT_ID = bytes(32)
+
+# label, root, sumcheck part (hex), field, recording file; the sumcheck
+# part is the 768 (384) bytes that follow the root in the complete
+# serialisation of B.3.2 (B.3.3).
+B3_PROOFS = [
+    {
+        "name": "b3_2_sgonal",
+        "field": "p256",
+        "label": b"sgonal_test_vector_p256",
+        "root": "803aba51698a4bc4dddaa74b1d9971b8ec7c49c4847a7ff18e41dd476edf9b04",
+        "sumcheck": (
+            "ed0282f97ed9c5be6ced2c1092a34579d9786d1de4dc5404c4d3435f84bbc1a0"
+            "ea352432ab6ad5b2e46e1b126c18103748824fb252ac17406898c6c27d70fb3b"
+            "87b96f0d4c7992b03e160e17b0c98efba101daca039575c793b6bedd4dd10541"
+            "e2d6701be3e75c019a63fa1595741b3e25c7e111014a4dd792bb47e6aec01aa3"
+            "9da1d23e9ac2386889efe3a024a6622bede3f862a41d8267dadbfb491901a6e6"
+            "845b0503dab880fc756684f4bf3e71acf1eacb596aa6bc9364eaa0e2c3093dfe"
+            "bde19129e45b77c16d27405766a2bd5db5203ab0c116a253127f666354b1cf97"
+            "c71fa6fc3f90016fa778aea298eaf379f34b043b5da3bd161fec2530eddbfb0e"
+            "247e4e615f4469abd04fa996ecf232e6fde51763eacb87dacc10b5b2aabf9979"
+            "0c745c33d07537d414be750e6c0dedc14b72b4e5e86be92a7aa87606ad2e8d01"
+            "d1b1306672a1ab21cd6f676272baadfac7b2fb453daef8415e2f38128f833f6c"
+            "7b8579a9a4c6f1cc6517bba16e904726ed462896a797dae48f817b81be630a95"
+            "629f60d183eedd9a4c433ef2f0a4a4294ad5690f2c07b3385e3f2e73fb2abbe3"
+            "e75148bc1051abd7ce21c46f42517911c2c790cc2101ee85fa50620b644f12b8"
+            "fc0c9f8522fecaee7c284b7e7006c88df35d1c4f6bae0268751507872f47780c"
+            "4bfe833a7a0b6f4f403d0d1b58bf891a48083a78ac5e473f7e012b388fe2f443"
+            "3099d256c6b153cfc422d6f48f6229a7107ca4d5dda7d7ffc033ef3ba2269179"
+            "089e4889f379d1f97f03b3f0b3206245781dd6841f820fd931ad42fd8a1f4407"
+            "7dbd42f7ea2d3c4d5ecc85e5688c2a5f67abe0a456390b85f9fc2d13a5ca8640"
+            "23e611c6b1ba75967bcbb2f2a8c142a7044e9c54b96a09981fe5b674815e9fd7"
+            "d8a8d76169e11800edceb9928ec62feb70f0e3593fed2ab0d545f29b1d2ea20c"
+            "fd8320f828609d5e45cf0dff488401e170d2945ed7559c49f5de2bc7f063f4d6"
+            "3d400922fd141c40d4a74abf045e1b7af4b50ea1fe5fb215cdd286e4ba0e9708"
+            "bde5320999b8682f9ef6c05744395290815697ca993103f0c0a7704730a05212"
+        ),
+        "recording": "upstream/sumcheck_core_p256_b3_2_sgonal.txt",
+    },
+    {
+        "name": "b3_3_quadratic",
+        "field": "gf2_128",
+        "label": b"sgonal_test_vector_gf2_128",
+        "root": "30dafd53c4f2441bb8457cd84fa69b3a822fbda58a46527d5cec8ce1903bc504",
+        "sumcheck": (
+            "6240c86a95637590efc064be3f0e9d28fc212291b18e5e3afed5099df504c647"
+            "8aaa530725347ed936fb115880fe03f394808f716d78e8dd8dde5b5bd3f2f489"
+            "a71c546509defd48dfb6650b3095fd6737451138f90326c07013cb02076ecab7"
+            "4c74af12fafa59cd8fdf6ae0315d1a5ee40de4c200b7d051bbfb98626e86ccdc"
+            "c4f2995317ebb77628e811cb190156e6b9cf8cfb4fc62b478e49e262e6f4453f"
+            "6e6c5298fc74b14cd2a9ef3ff9872f67452f9012a79e6517347af882d1e0bd70"
+            "113cb1307823bf2e57b45515cfce5e8b0c33e9a941524ba5355f0c444d961383"
+            "47da64051e89579e5ee002b8346d1b53c26c695f208d5f5b784f90e4ae33b7bb"
+            "e9e0d29e9e2ad103933ab99a684b7611ed1a15977f59e2d60d05a2cf24212ff2"
+            "0c59ea4f435404b9fa889934fd8d550807142c664890f7d0a9ba27ea040d03eb"
+            "fd4bf8ce06ff90509700bcde7042d213adb43c2fb1f46143226c273b09bd650b"
+            "ab9b3aec6cd5419edb1bcd616911c2b3898d07c5faf9fa121da18a01f5a1ea9b"
+        ),
+        "recording": "upstream/sumcheck_core_gf2_128_b3_3_quadratic.txt",
+    },
+]
+
+
+class FieldCodec:
+    """Serialisation of Section 7.2.1 and the sampler of Section 3.4.3
+    for the two fields, over Python integers (bit i = coefficient of x^i
+    for GF(2^128), the value for P-256)."""
+
+    def __init__(self, field):
+        self.field = field
+        self.size = 32 if field == "p256" else 16
+
+    def to_bytes(self, v):
+        return v.to_bytes(self.size, "little")
+
+    def from_bytes(self, b):
+        v = int.from_bytes(b, "little")
+        if self.field == "p256" and v >= P256_P:
+            raise ValueError("non-canonical P-256 element")
+        return v
+
+    def sample(self, t):
+        if self.field == "p256":
+            return t.field_elt(P256_P)
+        return int.from_bytes(t.bytes(16), "little")
+
+
+def read_recording(path):
+    """The tier 3 recording (ADR 0027): the circuit shape, the public
+    inputs, the challenges and the padded proof."""
+    rec = {"layers": [], "layer_challenges": [], "proof": []}
+    for line in path.read_text().splitlines():
+        if not line or line.startswith("#"):
+            continue
+        f = line.split()
+        op = f[0]
+        if op == "circuit":
+            rec["name"] = f[1]
+            rec["noutput"], rec["ninput"], rec["npublic"], rec["nl"] = map(
+                int, f[2:6])
+        elif op == "layer":
+            rec["layers"].append({"logw": int(f[2]), "nterms": int(f[4])})
+        elif op == "public":
+            rec["public"] = [int(x, 16) for x in f[1:]]
+        elif op == "g":
+            rec["g"] = [int(x, 16) for x in f[1:]]
+        elif op == "layer_challenges":
+            rec["layer_challenges"].append([int(x, 16) for x in f[2:]])
+        elif op == "proof":
+            rec["proof"].append([int(x, 16) for x in f[2:]])
+        elif op == "alpha_input":
+            rec["alpha_input"] = int(f[1], 16)
+    return rec
+
+
+def read_sumcheck_part(codec, data, rec):
+    """Section 7.3 into the pad order of Section 6.5, per layer: for
+    each round l (P0), r (P0), l (P2), r (P2) become 4 r + 0, + 2, + 1,
+    + 3; then the two claims."""
+    layers = []
+    pos = 0
+
+    def elt():
+        nonlocal pos
+        v = codec.from_bytes(data[pos:pos + codec.size])
+        pos += codec.size
+        return v
+
+    for layer in rec["layers"]:
+        logw = layer["logw"]
+        evals = [0] * (4 * logw + 2)
+        for r in range(logw):
+            evals[4 * r + 0] = elt()
+            evals[4 * r + 2] = elt()
+            evals[4 * r + 1] = elt()
+            evals[4 * r + 3] = elt()
+        evals[4 * logw] = elt()
+        evals[4 * logw + 1] = elt()
+        layers.append(evals)
+    if pos != len(data):
+        fail("sumcheck part has %d trailing bytes" % (len(data) - pos))
+    return layers
+
+
+def replay_challenges(codec, label, root, circuit_id, rec, proof):
+    """zk/verifier.rs: label, root, statement, then the core's draws."""
+    t = Transcript(label)
+    t.write_bytes(root)
+    t.write_bytes(circuit_id)
+    for x in rec["public"]:
+        t.write_elt(codec.to_bytes(x))
+    t.write_elt(codec.to_bytes(0))
+    t.write0(sum(layer["nterms"] for layer in rec["layers"]))
+    for _ in range(MAX_LOGW):
+        codec.sample(t)
+    g = [codec.sample(t) for _ in range(MAX_LOGW)]
+    layer_challenges = []
+    for layer, evals in zip(rec["layers"], proof):
+        alpha = codec.sample(t)
+        beta = codec.sample(t)
+        ch = [alpha, beta]
+        for r in range(layer["logw"]):
+            for h in range(2):
+                t.write_elt(codec.to_bytes(evals[4 * r + 2 * h]))
+                t.write_elt(codec.to_bytes(evals[4 * r + 2 * h + 1]))
+                ch.append(codec.sample(t))
+        t.write_slice([codec.to_bytes(evals[4 * layer["logw"]]),
+                       codec.to_bytes(evals[4 * layer["logw"] + 1])])
+        layer_challenges.append(ch)
+    alpha_input = codec.sample(t)
+    return g, layer_challenges, alpha_input
+
+
+def check_b3(here):
+    for proof in B3_PROOFS:
+        rec = read_recording(here / proof["recording"])
+        if rec["name"] != proof["name"]:
+            fail("recording %s is not %s" % (proof["recording"], proof["name"]))
+        codec = FieldCodec(proof["field"])
+        data = bytes.fromhex(proof["sumcheck"])
+        expected_len = sum(4 * l["logw"] + 2 for l in rec["layers"]) * codec.size
+        if len(data) != expected_len:
+            fail("%s: sumcheck part is %d bytes, the circuit needs %d"
+                 % (proof["name"], len(data), expected_len))
+        evals = read_sumcheck_part(codec, data, rec)
+        if evals != rec["proof"]:
+            fail("%s: the sumcheck part read from the draft differs from the"
+                 " recorded padded proof" % proof["name"])
+        g, lc, ai = replay_challenges(
+            codec, proof["label"], bytes.fromhex(proof["root"]),
+            ZERO_CIRCUIT_ID, rec, evals)
+        if g != rec["g"]:
+            fail("%s: replayed g differs from the recording" % proof["name"])
+        if lc != rec["layer_challenges"]:
+            fail("%s: replayed layer challenges differ from the recording"
+                 % proof["name"])
+        if ai != rec["alpha_input"]:
+            fail("%s: replayed alpha_input differs from the recording"
+                 % proof["name"])
+
+
+def write_zk_proofs(out):
+    for proof in B3_PROOFS:
+        lines = [
+            "# The Appendix B.3.%d proof of IETF draft-google-cfrg-libzk-03,"
+            % (2 if proof["field"] == "p256" else 3),
+            "# Longfellow ZK stage 4: label, root, circuit identifier and the",
+            "# sumcheck part of the complete proof serialisation (Sections 7.3",
+            "# and 7.5), for the replay of sumcheck_kat against the tier 3",
+            "# recording of the same circuit (ADR 0032).",
+            "# Generated by gen_transcript_vectors.py (this directory); do not"
+            " edit by hand.",
+            "# Lines:",
+            "#   zk_proof <circuit> <label> <root> <circuit identifier>",
+            "#   zk_sumcheck <circuit> <bytes>",
+            "# all byte strings as hex in memory order; the label is the",
+            "# ASCII string of the upstream unit test, the identifier its 32",
+            "# zero bytes.",
+            "#",
+            "field " + proof["field"],
+            "zk_proof %s %s %s %s" % (proof["name"], proof["label"].hex(),
+                                      proof["root"], ZERO_CIRCUIT_ID.hex()),
+            "zk_sumcheck %s %s" % (proof["name"], proof["sumcheck"]),
+        ]
+        (out / ("zk_proof_%s_%s.txt" % (proof["field"], proof["name"][:4]))
+         ).write_text("\n".join(lines) + "\n")
+
+
+# ----------------------------------------------------------------------
 # The cases: copied constants
 # ----------------------------------------------------------------------
 
@@ -537,9 +786,11 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     check_cases()
     script = b2_script()
+    check_b3(Path(__file__).parent)
     write_sha256(out / "sha256.txt")
     write_aes256(out / "aes256.txt")
     write_transcript_fs(out / "transcript_fs.txt", script)
+    write_zk_proofs(out)
     print(
         "gen_transcript_vectors: %d sha256, %d aes256 and %d B.2 cases"
         " written to %s"

@@ -97,10 +97,15 @@ package Bytes is
    --  S followed by N zero bytes, defined by recursion on N so that
    --  Add_Zeros (S, N + 1) = Add (Add_Zeros (S, N), 0) holds by
    --  definition: that is what the byte-by-byte loop of Write0 needs.
+   --  The body is hidden (Hide_Info): left visible, a term Add_Zeros
+   --  (S, N) in a caller's context lets the provers unfold it without
+   --  bound and run out of steps on unrelated checks; Write0 unhides
+   --  it for its loop.
    function Add_Zeros (S : Byte_Seq; N : Natural) return Byte_Seq is
      (if N = 0 then S else Byte_Seqs.Add (Add_Zeros (S, N - 1), 0))
    with
      Ghost              => SPARKlib_Full,
+     Annotate           => (GNATprove, Hide_Info, "Expression_Function_Body"),
      Subprogram_Variant => (Decreases => N);
 
 end Bytes;

@@ -89,6 +89,8 @@ is
    end Write_Bytes;
 
    procedure Write0 (N : Natural) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Add_Zeros);
       Base : Byte_Seq with Ghost => SPARKlib_Full;
    begin
       Live := False;
