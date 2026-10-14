@@ -36,3 +36,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md). Records
 | [0030](0030-literal-rejection-sampling.md) | Literal rejection sampling and declared non-termination | Accepted | 2026-10-13 |
 | [0031](0031-transcript-gold-perimeter.md) | Transcript Gold perimeter | Accepted | 2026-10-13 |
 | [0032](0032-transcript-vectors.md) | Transcript vectors: Appendix B.2, Appendix B.3 end to end, NIST | Accepted | 2026-10-13 |
+| [0033](0033-parallel-proof-partitions.md) | Parallel proof partitions on the hosted runner | Accepted | 2026-10-15 |

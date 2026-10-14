@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted; amended by [ADR 0033](0033-parallel-proof-partitions.md) on 2026-10-15 (the `prove` job is a matrix of partitions, one required check each)
 
 ## Date
 

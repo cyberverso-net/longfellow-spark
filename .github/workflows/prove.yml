@@ -1,12 +1,22 @@
-#  prove: the full proof on the hosted runner (ADR 0019, ADR 0021). It
-#  runs on every pull request to main as a required check, weekly as an
-#  independent record that the proof still holds on the pinned
-#  toolchain, and on demand before a release or after a toolchain
-#  change. Pushes to branches do not run it: the pre-push hook
-#  (.githooks/pre-push) proves them locally in about six minutes; the
-#  hosted runner took five on its first pull-request run. Scheduled
-#  workflows are suspended by GitHub after sixty days without activity
-#  on the repository; a manual run resumes them.
+#  prove: the full proof on the hosted runner (ADR 0019, ADR 0021, ADR
+#  0033). It runs on every pull request to main as a required check,
+#  weekly as an independent record that the proof still holds on the
+#  pinned toolchain, and on demand before a release or after a
+#  toolchain change. Pushes to branches do not run it: the pre-push
+#  hook (.githooks/pre-push) proves them locally in one run.
+#
+#  The proof is split into the partitions of scripts/prove-partitions.txt
+#  (ADR 0033), one job each, so that the wall time is that of the
+#  heaviest partition rather than of the whole project: a single job
+#  took over thirty minutes at stage 4 against a limit of forty-five.
+#  `scripts/check.sh partitions-check`, run by verify, by every job here
+#  and by make check, guarantees that the partitions cover every
+#  non-generic unit exactly once and that the matrix below names them;
+#  the union of the four jobs is the full proof. Branch protection
+#  requires one check per partition: prove (p256), prove (primitives),
+#  prove (sumcheck), prove (protocol).
+#  Scheduled workflows are suspended by GitHub after sixty days without
+#  activity on the repository; a manual run resumes them.
 
 name: prove
 
@@ -26,8 +36,13 @@ permissions:
 
 jobs:
   prove:
+    name: prove (${{ matrix.partition }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [p256, primitives, sumcheck, protocol]
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -45,12 +60,15 @@ jobs:
       - name: Build
         run: make build
 
-      - name: Prove
-        run: make prove
+      - name: Partitions cover the project
+        run: make partitions-check
+
+      - name: Prove the partition
+        run: make prove-partition PARTITION=${{ matrix.partition }}
 
       - name: Upload the GNATprove report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gnatprove-report
+          name: gnatprove-report-${{ matrix.partition }}
           path: obj/development/gnatprove/gnatprove.out

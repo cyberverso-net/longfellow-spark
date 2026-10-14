@@ -126,11 +126,24 @@ do_partitions_check() {
            "generic units are excluded, everything else is required" >&2
       status=1
    fi
+   #  The matrix of prove.yml names the same partitions, in the same
+   #  order; the workflow cannot read the file, so this keeps them equal.
+   local names matrix
+   names=$(grep -v '^[[:space:]]*#' "$partitions" | grep -v '^[[:space:]]*$' \
+           | cut -d' ' -f1 | tr '\n' ' ' | sed 's/ $//')
+   matrix=$(sed -n 's/^ *partition: \[\(.*\)\]$/\1/p' .github/workflows/prove.yml \
+            | tr -d ',' | sed 's/  */ /g')
+   if [ "$names" != "$matrix" ]; then
+      echo "partitions-check: prove.yml matrix [$matrix] differs from" \
+           "the partitions [$names]" >&2
+      status=1
+   fi
    if [ "$status" -ne 0 ]; then
       exit "$status"
    fi
    echo "partitions-check: $(echo "$listed" | wc -l | tr -d ' ') units in" \
-        "$(grep -cv '^[[:space:]]*#\|^[[:space:]]*$' "$partitions") partitions, complete"
+        "$(grep -cv '^[[:space:]]*#\|^[[:space:]]*$' "$partitions") partitions," \
+        "complete and matching the prove.yml matrix"
 }
 
 do_test() {
