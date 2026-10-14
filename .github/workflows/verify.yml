@@ -40,6 +40,9 @@ jobs:
       - name: Build
         run: make build
 
+      - name: Partitions cover the project
+        run: make partitions-check
+
       - name: Test
         run: make test
 
