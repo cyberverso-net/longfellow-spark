@@ -1,0 +1,17 @@
+#  Proof partitions for the hosted runner (ADR 0033). One partition per
+#  line: the name, then the library units it proves, as gnatprove -u
+#  takes them (the unit name, without extension). CI proves one
+#  partition per job (scripts/check.sh prove-partition <name>);
+#  `make prove` and the pre-push hook prove everything in one run.
+#
+#  Only analysable units are listed. Generic units (the specs that begin
+#  with `generic`: Field_Signature and the four Sumcheck generics) are
+#  proved through their instances and must not be listed: gnatprove
+#  analyses nothing in them and reports a warning that
+#  --checks-as-errors turns into a failure. `scripts/check.sh
+#  partitions-check` fails unless the union of these lines is exactly
+#  the set of non-generic units under src/, with no unit listed twice.
+p256       p256_field field_p256
+primitives gf2_128 field_gf2_128 bytes sha256 aes256 transcript fisher_yates
+sumcheck   sumcheck_algebra_gf2_128 sumcheck_algebra_p256 sumcheck_expression_gf2_128 sumcheck_expression_p256
+protocol   sumcheck_verifier_gf2_128 sumcheck_verifier_p256 sumcheck_transcript_gf2_128 sumcheck_transcript_p256

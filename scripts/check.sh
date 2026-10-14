@@ -5,12 +5,15 @@
 #  and on demand). Run from the repository root. Every step prints a header and the script stops at the first
 #  failure with a non-zero exit status.
 #
-#  Subcommands: build, prove, test, vectors, lint, all.
+#  Subcommands: build, prove, prove-partition <name>, partitions-check,
+#  test, vectors, lint, all. The proof partitions of the hosted runner
+#  are listed in scripts/prove-partitions.txt (ADR 0033).
 
 set -euo pipefail
 
 usage() {
-   echo "usage: scripts/check.sh {build|prove|test|vectors|lint|all}" >&2
+   echo "usage: scripts/check.sh {build|prove|prove-partition <name>|" \
+        "partitions-check|test|vectors|lint|all}" >&2
    exit 2
 }
 
@@ -31,14 +34,103 @@ do_build() {
    alr -n build
 }
 
+partitions=scripts/prove-partitions.txt
+
+#  The Why3 session under obj/ returns stale "unproved" results for
+#  unchanged checks without re-running them (false failures three times
+#  in stage 4); every proof starts from a clean session.
+clean_session() {
+   alr -n exec -- gnatprove -P longfellow_spark.gpr --clean >/dev/null
+}
+
+prove_summary() {
+   header "prove: summary (obj/development/gnatprove/gnatprove.out)"
+   sed -n '/^Summary of SPARK/,/^max steps/p' obj/development/gnatprove/gnatprove.out
+}
+
 do_prove() {
    #  The prover configuration (provers, step budget, safety timeout) lives
    #  in package Prove of longfellow_spark.gpr, so that a plain gnatprove -P
    #  run and this check prove the same thing.
    header "prove: gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on"
+   clean_session
    alr -n exec -- gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on
-   header "prove: summary (obj/development/gnatprove/gnatprove.out)"
-   sed -n '/^Summary of SPARK/,/^max steps/p' obj/development/gnatprove/gnatprove.out
+   prove_summary
+}
+
+#  The units of one partition, as the files gnatprove -u takes: the body
+#  when the unit has one, the spec otherwise (an instance, say).
+partition_files() {
+   local name="$1" line pname unit found=false
+   while read -r line; do
+      case "$line" in ''|'#'*) continue ;; esac
+      # shellcheck disable=SC2086
+      set -- $line
+      pname="$1"; shift
+      if [ "$pname" = "$name" ]; then
+         found=true
+         for unit in "$@"; do
+            if [ -f "src/$unit.adb" ]; then
+               echo "$unit.adb"
+            elif [ -f "src/$unit.ads" ]; then
+               echo "$unit.ads"
+            else
+               echo "check.sh: partition $name names $unit, not under src/" >&2
+               exit 2
+            fi
+         done
+      fi
+   done < "$partitions"
+   if [ "$found" = false ]; then
+      echo "check.sh: no partition named $name in $partitions" >&2
+      exit 2
+   fi
+}
+
+do_prove_partition() {
+   local name="${1:-}" files
+   if [ -z "$name" ]; then
+      usage
+   fi
+   files=$(partition_files "$name" | tr '\n' ' ')
+   header "prove-partition $name: gnatprove -u $files"
+   clean_session
+   # shellcheck disable=SC2086
+   alr -n exec -- gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on \
+      -u $files
+   prove_summary
+   header "prove-partition $name: units analysed"
+   grep '^Analyzed\|^in unit' obj/development/gnatprove/gnatprove.out
+}
+
+#  The partitions cover exactly the non-generic units under src/, each
+#  once; a new unit without a partition would otherwise be proved
+#  locally and never on the hosted runner.
+do_partitions_check() {
+   header "partitions-check: $partitions against src/"
+   local expected listed status=0
+   expected=$(for f in src/*.ads; do
+                 if ! grep -q '^generic' "$f"; then
+                    basename "$f" .ads
+                 fi
+              done | sort)
+   listed=$(grep -v '^[[:space:]]*#' "$partitions" | grep -v '^[[:space:]]*$' \
+            | cut -d' ' -f2- | tr ' ' '\n' | grep -v '^$' | sort)
+   if [ -n "$(echo "$listed" | uniq -d)" ]; then
+      echo "partitions-check: listed more than once:" >&2
+      echo "$listed" | uniq -d >&2
+      status=1
+   fi
+   if ! diff <(echo "$expected") <(echo "$listed" | uniq); then
+      echo "partitions-check: the partitions (>) differ from src/ (<);" \
+           "generic units are excluded, everything else is required" >&2
+      status=1
+   fi
+   if [ "$status" -ne 0 ]; then
+      exit "$status"
+   fi
+   echo "partitions-check: $(echo "$listed" | wc -l | tr -d ' ') units in" \
+        "$(grep -cv '^[[:space:]]*#\|^[[:space:]]*$' "$partitions") partitions, complete"
 }
 
 do_test() {
@@ -112,13 +204,16 @@ do_lint() {
 }
 
 case "${1:-}" in
-   build)   do_build ;;
-   prove)   do_prove ;;
-   test)    do_test ;;
-   vectors) do_vectors ;;
-   lint)    do_lint ;;
+   build)            do_build ;;
+   prove)            do_prove ;;
+   prove-partition)  do_prove_partition "${2:-}" ;;
+   partitions-check) do_partitions_check ;;
+   test)             do_test ;;
+   vectors)          do_vectors ;;
+   lint)             do_lint ;;
    all)
       do_build
+      do_partitions_check
       do_prove
       do_test
       do_vectors

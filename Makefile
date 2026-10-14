@@ -2,7 +2,7 @@
 #  project's checks. `make check` runs everything in order; `make hooks`
 #  installs the pre-push hook that runs the proof before every push.
 
-.PHONY: check build prove test vectors lint hooks
+.PHONY: check build prove prove-partition partitions-check test vectors lint hooks
 
 check:
 	scripts/check.sh all
@@ -12,6 +12,14 @@ build:
 
 prove:
 	scripts/check.sh prove
+
+#  One proof partition of the hosted runner (ADR 0033), for example
+#  `make prove-partition PARTITION=p256`; names in scripts/prove-partitions.txt.
+prove-partition:
+	scripts/check.sh prove-partition $(PARTITION)
+
+partitions-check:
+	scripts/check.sh partitions-check
 
 test:
 	scripts/check.sh test
