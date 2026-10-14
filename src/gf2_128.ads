@@ -41,6 +41,12 @@
 --              instead). Callers that must reject zero do so themselves.
 --    Bit, Mul_Ref : Ghost, specification vocabulary only; absent from
 --              the library when assertions are disabled.
+--    To_Bytes, From_Bytes : Gold (stage 4, ADR 0028): the 16-byte
+--              little-endian encoding of draft Section 7.2.1, every
+--              16-byte string accepted (Ok is always True); the value
+--              read is Limbs_Of_Bytes (B) and To_Bytes round-trips.
+--              The byte order is anchored on the draft by
+--              tests/vectors/gf2_128_bytes.txt.
 --
 --  Pinned spec: IETF draft-google-cfrg-libzk-03 (23 September 2026),
 --  Section 2.2.2: the field is GF(2)[x] / Q(x) with
@@ -68,6 +74,7 @@
 pragma SPARK_Mode (On);
 
 with Interfaces; use Interfaces;
+with Bytes;
 
 package GF2_128 is
 
@@ -163,5 +170,37 @@ package GF2_128 is
    --  E * Inv (E) = One is anchored by known-answer tests.
    function Inv (E : Element) return Element with
      Global => null;
+
+
+   --  Serialisation (draft-03 Section 7.2.1, stage 4): an element is
+   --  the 128-bit integer whose bit i is the coefficient of x^i,
+   --  written as 16 bytes least significant first, that is Limbs (0)
+   --  little-endian then Limbs (1). The byte type is the shared one
+   --  of package Bytes (ADR 0028). No encoding is rejected.
+
+   subtype Bytes_8  is Bytes.Bytes_8;
+   subtype Bytes_16 is Bytes.Bytes_16;
+
+   --  One limb from eight bytes, least significant first.
+   function Limb_Of_8 (B : Bytes_8) return Unsigned_64 with
+     Global => null;
+
+   function Limbs_Of_Bytes (B : Bytes_16) return Limb_Array with
+     Global => null;
+
+   function Bytes_Of_Limbs (L : Limb_Array) return Bytes_16 with
+     Global => null,
+     Post   => Limbs_Of_Bytes (Bytes_Of_Limbs'Result) = L;
+
+   --  Ok is always True: every 16-byte string is an element.
+   procedure From_Bytes (B : Bytes_16; E : out Element; Ok : out Boolean)
+   with
+     Global => null,
+     Post   => Ok and then E.Limbs = Limbs_Of_Bytes (B);
+
+   function To_Bytes (E : Element) return Bytes_16 is
+     (Bytes_Of_Limbs (E.Limbs))
+   with Global => null,
+        Post   => Limbs_Of_Bytes (To_Bytes'Result) = E.Limbs;
 
 end GF2_128;

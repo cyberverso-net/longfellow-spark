@@ -47,6 +47,10 @@ package Field_P256 is
       L0_Den_Inv => Half,
       L1_Den_Inv => Minus_One,
       L2_Den_Inv => Half,
-      Same       => Same);
+      Same       => Same,
+      Serialized_Size  => 32,
+      To_Bytes         => P256_Field.To_Bytes,
+      From_Bytes       => P256_Field.From_Bytes,
+      Sampling_Rejects => True);
 
 end Field_P256;

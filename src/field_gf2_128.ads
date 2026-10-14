@@ -53,6 +53,10 @@ package Field_GF2_128 is
       L0_Den_Inv => L0_Den_Inv,
       L1_Den_Inv => L1_Den_Inv,
       L2_Den_Inv => L2_Den_Inv,
-      Same       => Same);
+      Same       => Same,
+      Serialized_Size  => 16,
+      To_Bytes         => GF2_128.To_Bytes,
+      From_Bytes       => GF2_128.From_Bytes,
+      Sampling_Rejects => False);
 
 end Field_GF2_128;
