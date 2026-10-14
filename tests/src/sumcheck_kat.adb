@@ -25,6 +25,8 @@ with Sumcheck_Expression_GF2_128;
 with Sumcheck_Expression_P256;
 with Sumcheck_Verifier_GF2_128;
 with Sumcheck_Verifier_P256;
+with Sumcheck_Transcript_GF2_128;
+with Sumcheck_Transcript_P256;
 with Sumcheck_KAT_Generic;
 
 procedure Sumcheck_KAT is
@@ -109,12 +111,14 @@ procedure Sumcheck_KAT is
 
    package GF_KAT is new Sumcheck_KAT_Generic
      (SA => Sumcheck_Algebra_GF2_128, SE => Sumcheck_Expression_GF2_128,
-      SV => Sumcheck_Verifier_GF2_128, Field_Name => "gf2_128",
+      SV => Sumcheck_Verifier_GF2_128, ST => Sumcheck_Transcript_GF2_128,
+      Field_Name => "gf2_128",
       To_Element => GF_To_Element, Image => GF_Image);
 
    package P_KAT is new Sumcheck_KAT_Generic
      (SA => Sumcheck_Algebra_P256, SE => Sumcheck_Expression_P256,
-      SV => Sumcheck_Verifier_P256, Field_Name => "p256",
+      SV => Sumcheck_Verifier_P256, ST => Sumcheck_Transcript_P256,
+      Field_Name => "p256",
       To_Element => P_To_Element, Image => P_Image);
 
    Passed : Natural := 0;
@@ -163,6 +167,14 @@ begin
          Search : Search_Type;
          Item   : Directory_Entry_Type;
       begin
+         --  The zk_proof files first: each recording of tier 3 needs
+         --  the proof of its circuit (stage 4, ADR 0032).
+         Start_Search (Search, "tests/vectors", "zk_proof_*.txt");
+         while More_Entries (Search) loop
+            Get_Next_Entry (Search, Item);
+            Run (Full_Name (Item));
+         end loop;
+         End_Search (Search);
          if Exists ("tests/vectors/upstream")
            and then Kind ("tests/vectors/upstream") = Directory
          then

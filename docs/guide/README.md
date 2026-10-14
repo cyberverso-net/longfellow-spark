@@ -8,9 +8,10 @@ This guide explains the project to a reader who knows some cryptography and litt
 2. [Chapter 1, GF(2^128)](01-gf2_128.md): the binary field under the sumcheck and Ligero layers; the first complete stage.
 3. [Chapter 2, the P-256 base field](02-p256-field.md): prime-field arithmetic with carries, a ghost big-integer model, and the Solinas reduction proved as a polynomial identity.
 4. [Chapter 3, the sumcheck algebra and the symbolic verifier core](03-sumcheck.md): generics over a field, circuits as data, structural Gold through logical equality, sparse expressions and the constraint-emitting verifier core with challenges as input.
-5. The [architecture decision records](../adr/README.md), referenced from the chapters where a choice is explained.
+5. [Chapter 4, the Fiat-Shamir transcript and the challenge replay](04-transcript.md): the transcript of draft Section 3 over SHA-256 and AES-256, field serialisation and sampling, and the replay of the challenges of a proof into the record of chapter 3; the fourth complete stage.
+6. The [architecture decision records](../adr/README.md), referenced from the chapters where a choice is explained.
 
-Later chapters follow the roadmap: the Fiat-Shamir transcript, then the circuit loader and evaluator, the Ligero verifier, the prover, and the circuit compiler.
+Later chapters follow the roadmap: the circuit loader and evaluator, the Ligero verifier, the prover, and the circuit compiler.
 
 ## Building, proving and testing
 

@@ -53,6 +53,7 @@
 pragma SPARK_Mode (On);
 
 with Interfaces; use Interfaces;
+with Bytes;
 with Ada.Numerics.Big_Numbers.Big_Integers;
 use  Ada.Numerics.Big_Numbers.Big_Integers;
 
@@ -249,9 +250,11 @@ package P256_Field is
    --  byte first; limb I occupies bytes 8 I .. 8 I + 7.
    -------------------------------------------------------------------
 
-   type Byte_Array is array (Natural range <>) of Unsigned_8;
-   subtype Bytes_32 is Byte_Array (0 .. 31);
-   subtype Bytes_8  is Byte_Array (0 .. 7);
+   --  The byte type is the shared one of package Bytes (ADR 0028);
+   --  these subtypes keep the stage 2 contracts unchanged.
+   subtype Byte_Array is Bytes.Byte_Array;
+   subtype Bytes_32 is Bytes.Bytes_32;
+   subtype Bytes_8  is Bytes.Bytes_8;
 
    --  One limb from eight bytes, least significant first.
    function Limb_Of_8 (B : Bytes_8) return Unsigned_64 with

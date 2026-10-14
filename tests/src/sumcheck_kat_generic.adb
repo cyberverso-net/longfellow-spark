@@ -1,5 +1,7 @@
 pragma SPARK_Mode (Off);
 
+with Bytes;
+with Interfaces; use Interfaces;
 with Ada.Exceptions;
 with Ada.Text_IO;
 
@@ -119,6 +121,19 @@ package body Sumcheck_KAT_Generic is
    Proof_Layers : Natural;
    Alpha_In     : Element;
    Have_Alpha   : Boolean;
+   --  The zk_proof lines of the circuit (stage 4), kept until the
+   --  recording of the same circuit ends.
+   Max_Zk_Bytes   : constant := 65536;
+   Zk_Name        : String (1 .. 64);
+   Zk_Name_Len    : Natural := 0;
+   Zk_Label       : Bytes.Byte_Array (0 .. 255);
+   Zk_Label_Len   : Natural := 0;
+   Zk_Root        : Bytes.Bytes_32;
+   Zk_Id          : Bytes.Bytes_32;
+   Zk_Sumcheck    : Bytes.Byte_Array (0 .. Max_Zk_Bytes - 1);
+   Zk_Sumcheck_Len : Natural := 0;
+   Have_Zk        : Boolean := False;
+   Have_Zk_Sumcheck : Boolean := False;
    --  Expected constraints: entries (constraint, variable, coefficient).
    Exp_Cons     : Nat_Buf;
    Exp_Var      : Nat_Buf;
@@ -129,6 +144,39 @@ package body Sumcheck_KAT_Generic is
    Exp_B_Count  : Natural;
    Exp_Lqc      : array (0 .. Max_Layers - 1) of SV.Lqc_Triple;
    Exp_Lqc_Given : array (0 .. Max_Layers - 1) of Boolean;
+
+   --  Hex bytes in memory order into Dest (0 .. Len - 1).
+   procedure Hex_Into
+     (S : String; Dest : out Bytes.Byte_Array; Len : out Natural)
+   is
+      function Digit (C : Character) return Unsigned_8 is
+      begin
+         case C is
+            when '0' .. '9' =>
+               return Unsigned_8 (Character'Pos (C) - Character'Pos ('0'));
+            when 'a' .. 'f' =>
+               return Unsigned_8 (Character'Pos (C) - Character'Pos ('a') + 10);
+            when 'A' .. 'F' =>
+               return Unsigned_8 (Character'Pos (C) - Character'Pos ('A') + 10);
+            when others =>
+               raise Parse_Error with "bad hex digit '" & C & "'";
+         end case;
+      end Digit;
+   begin
+      if S'Length mod 2 /= 0 then
+         raise Parse_Error with "odd number of hex digits";
+      end if;
+      Len := S'Length / 2;
+      if Len > Dest'Length then
+         raise Parse_Error with "hex string too long";
+      end if;
+      Dest := [others => 0];
+      for I in 0 .. Len - 1 loop
+         Dest (Dest'First + I) :=
+           Shift_Left (Digit (S (S'First + 2 * I)), 4)
+           or Digit (S (S'First + 2 * I + 1));
+      end loop;
+   end Hex_Into;
 
    function Nat (S : String) return Natural is
    begin
@@ -210,6 +258,140 @@ package body Sumcheck_KAT_Generic is
 
    --  Builds the circuit, runs the core with the recorded challenges and
    --  compares the emitted constraints with the recorded ones.
+   --  Stage 4: the reader, the replay and the core on the replayed
+   --  record, against the recording (ADR 0032).
+   procedure Check_Replay
+     (Name : String;
+      C    : Circuit;
+      Pub  : Element_Array;
+      Prf  : SV.Sumcheck_Proof;
+      Ch   : SV.Challenges;
+      A    : SV.Ligero_Terms;
+      B    : Element_Array;
+      Lqc  : SV.Lqc_Array)
+   is
+      use type ST.Status;
+      use type SV.Lqc_Array;
+   begin
+      if not Have_Zk or else not Have_Zk_Sumcheck
+        or else Zk_Name (1 .. Zk_Name_Len) /= Name
+      then
+         Report_Failure ("tier 3 " & Name & ": no zk_proof lines for the replay");
+         return;
+      end if;
+      --  The reader: the sumcheck bytes of the draft into the recorded
+      --  padded proof.
+      declare
+         Prf2 : SV.Sumcheck_Proof (Last => Prf.Last);
+         Stat : ST.Status;
+         Same : Boolean := True;
+      begin
+         if Zk_Sumcheck_Len /= SV.Proof_Total (C) * ST.Size then
+            Report_Failure
+              ("tier 3 " & Name & ": sumcheck part is" & Zk_Sumcheck_Len'Image
+               & " bytes, the circuit needs"
+               & Natural'Image (SV.Proof_Total (C) * ST.Size));
+            return;
+         end if;
+         ST.Read_Sumcheck_Proof
+           (Zk_Sumcheck (0 .. Zk_Sumcheck_Len - 1), C, Prf2, Stat);
+         Check (Stat = ST.Ok,
+                "tier 3 " & Name & ": reader status " & Stat'Image);
+         for I in Prf2.Evals'Range loop
+            if Prf2.Evals (I) /= Prf.Evals (I) then
+               if Same then
+                  Report_Failure
+                    ("tier 3 " & Name & ": read proof differs at" & I'Image
+                     & ": got " & Image (Prf2.Evals (I))
+                     & " recorded " & Image (Prf.Evals (I)));
+               end if;
+               Same := False;
+            end if;
+         end loop;
+         Check (Same, "tier 3 " & Name & ": read proof");
+      end;
+      --  The replay: every challenge the recording holds.
+      declare
+         Ch2  : SV.Challenges (Last => Ch.Last);
+         Stat : ST.Status;
+         Same : Boolean := True;
+         A2   : SV.Ligero_Terms (Max => A.Max);
+         B2   : Element_Array (B'Range);
+         Lqc2 : SV.Lqc_Array (Lqc'Range);
+      begin
+         ST.Replay_Challenges
+           (Zk_Label (0 .. Zk_Label_Len - 1), Zk_Root, Zk_Id, C, Pub, Prf,
+            Ch2, Stat);
+         Check (Stat = ST.Ok,
+                "tier 3 " & Name & ": replay status " & Stat'Image);
+         for I in Ch2.G'Range loop
+            if Ch2.G (I) /= Ch.G (I) then
+               if Same then
+                  Report_Failure
+                    ("tier 3 " & Name & ": replayed g differs at" & I'Image
+                     & ": got " & Image (Ch2.G (I))
+                     & " recorded " & Image (Ch.G (I)));
+               end if;
+               Same := False;
+            end if;
+         end loop;
+         for I in Ch2.Layer'Range loop
+            if Ch2.Layer (I) /= Ch.Layer (I) then
+               if Same then
+                  Report_Failure
+                    ("tier 3 " & Name & ": replayed layer challenge differs at"
+                     & I'Image & ": got " & Image (Ch2.Layer (I))
+                     & " recorded " & Image (Ch.Layer (I)));
+               end if;
+               Same := False;
+            end if;
+         end loop;
+         if Ch2.Alpha_Input /= Ch.Alpha_Input then
+            if Same then
+               Report_Failure
+                 ("tier 3 " & Name & ": replayed alpha_input got "
+                  & Image (Ch2.Alpha_Input) & " recorded "
+                  & Image (Ch.Alpha_Input));
+            end if;
+            Same := False;
+         end if;
+         Check (Same, "tier 3 " & Name & ": replayed challenges");
+         --  Both ways: the core on the replayed record emits what it
+         --  emitted on the recorded one.
+         SV.Verifier_Core (C, Pub, Prf, Ch2, A2, B2, Lqc2);
+         Same := A2.Count = A.Count and then B2 = B and then Lqc2 = Lqc;
+         if Same then
+            for K in 0 .. A.Count - 1 loop
+               if A2.Coeff (K) /= A.Coeff (K)
+                 or else A2.Constraint (K) /= A.Constraint (K)
+                 or else A2.Witness (K) /= A.Witness (K)
+               then
+                  Same := False;
+               end if;
+            end loop;
+         end if;
+         Check (Same, "tier 3 " & Name & ": core on the replayed record");
+      end;
+      --  A proof with a non-canonical element must be refused, for the
+      --  fields that reject encodings: every byte of the first element
+      --  set, which is at or above p for P-256.
+      if SA.F.Sampling_Rejects then
+         declare
+            Bad  : Bytes.Byte_Array (0 .. Zk_Sumcheck_Len - 1) :=
+              Zk_Sumcheck (0 .. Zk_Sumcheck_Len - 1);
+            Prf3 : SV.Sumcheck_Proof (Last => Prf.Last);
+            Stat : ST.Status;
+         begin
+            Bad (0 .. ST.Size - 1) := [others => 16#FF#];
+            ST.Read_Sumcheck_Proof (Bad, C, Prf3, Stat);
+            Check (Stat = ST.Bad_Element,
+                   "tier 3 " & Name & ": non-canonical element not refused");
+         end;
+      end if;
+      Have_Zk := False;
+      Have_Zk_Sumcheck := False;
+   end Check_Replay;
+
    procedure Finish_Tier3 is
       Name : constant String := C_Name (1 .. C_Name_Len);
    begin
@@ -284,6 +466,7 @@ package body Sumcheck_KAT_Generic is
                    and then Proof_Count = SV.Proof_Total (C),
                    "tier 3 " & Name & ": challenge or proof count");
             SV.Verifier_Core (C, Pub, Prf, Ch, A, B, Lqc);
+            Check_Replay (Name, C, Pub, Prf, Ch, A, B, Lqc);
             --  b, per constraint.
             for Cidx in 0 .. C_NL loop
                if Exp_B_Given (Cidx) then
@@ -630,6 +813,38 @@ package body Sumcheck_KAT_Generic is
             Alpha_In := E (2);
             Have_Alpha := True;
             Tier3 := True;
+         elsif Op = "zk_proof" then
+            if Count /= 5 then
+               raise Parse_Error with "zk_proof expects 4 values";
+            end if;
+            if F (2)'Length > Zk_Name'Length then
+               raise Parse_Error with "zk_proof name too long";
+            end if;
+            Zk_Name_Len := F (2)'Length;
+            Zk_Name (1 .. Zk_Name_Len) := F (2);
+            Hex_Into (F (3), Zk_Label, Zk_Label_Len);
+            declare
+               Len : Natural;
+            begin
+               Hex_Into (F (4), Zk_Root, Len);
+               if Len /= 32 then
+                  raise Parse_Error with "zk_proof root must be 32 bytes";
+               end if;
+               Hex_Into (F (5), Zk_Id, Len);
+               if Len /= 32 then
+                  raise Parse_Error with "zk_proof identifier must be 32 bytes";
+               end if;
+            end;
+            Have_Zk := True;
+         elsif Op = "zk_sumcheck" then
+            if Count /= 3 then
+               raise Parse_Error with "zk_sumcheck expects 2 values";
+            end if;
+            if not Have_Zk or else Zk_Name (1 .. Zk_Name_Len) /= F (2) then
+               raise Parse_Error with "zk_sumcheck before its zk_proof line";
+            end if;
+            Hex_Into (F (3), Zk_Sumcheck, Zk_Sumcheck_Len);
+            Have_Zk_Sumcheck := True;
          elsif Op = "claim" then
             --  Optional intermediate claims: parsed and accepted; the
             --  comparison of intermediate claims is not implemented

@@ -24,6 +24,7 @@ with Ada.Command_Line;
 with Ada.Exceptions;
 with Ada.Text_IO;
 with Interfaces;  use Interfaces;
+with Bytes;       use type Bytes.Byte_Array;
 with P256_Field;  use P256_Field;
 
 procedure P256_KAT is

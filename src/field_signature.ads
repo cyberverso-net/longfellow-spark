@@ -30,6 +30,18 @@
 --  test build and is assumed, not checked, by the provers; what is
 --  proved with Same implies the predefined equality.
 --
+--  Serialisation and sampling (stage 4, ADR 0028). Serialized_Size is
+--  the byte length of an element (draft Section 7.2.1), To_Bytes its
+--  canonical little-endian encoding and From_Bytes the inverse: Ok
+--  exactly when the bytes are a canonical encoding (below p for P-256,
+--  always for GF(2^128)). Sampling_Rejects says whether the sampler of
+--  Section 3.4.3 can reject a draw: the generic glue of the transcript
+--  draws Serialized_Size bytes and repeats until From_Bytes accepts,
+--  and its termination is proved exactly when Sampling_Rejects is
+--  False (ADR 0030). The actuals take the field's fixed byte subtype
+--  (Bytes_32, Bytes_16); callers pass arrays of Serialized_Size bytes
+--  indexed from 0.
+--
 --  The three constants L0_Den_Inv, L1_Den_Inv and L2_Den_Inv are the
 --  inverses of the Lagrange denominators on the evaluation points
 --  0, 1, P2 (ADR 0025): d0 = (0 - 1) (0 - P2), d1 = (1 - 0) (1 - P2),
@@ -39,6 +51,8 @@
 --  calls Inv.
 
 pragma SPARK_Mode (On);
+
+with Bytes;
 
 --  A signature package references none of its formals itself.
 pragma Warnings (Off, "is not referenced");
@@ -52,5 +66,10 @@ generic
    with function Neg (A : Element) return Element;
    L0_Den_Inv, L1_Den_Inv, L2_Den_Inv : Element;
    with function Same (A, B : Element) return Boolean with Ghost;
+   Serialized_Size : Positive;
+   with function To_Bytes (E : Element) return Bytes.Byte_Array;
+   with procedure From_Bytes
+     (B : Bytes.Byte_Array; E : out Element; Ok : out Boolean);
+   Sampling_Rejects : Boolean;
 package Field_Signature is
 end Field_Signature;

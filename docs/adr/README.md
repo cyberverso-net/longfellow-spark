@@ -31,3 +31,8 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md). Records
 | [0025](0025-polynomials-and-lagrange-constants.md) | Polynomials and Lagrange constants | Accepted | 2026-10-12 |
 | [0026](0026-sparse-expression.md) | Sparse Expression | Accepted | 2026-10-12 |
 | [0027](0027-sumcheck-vectors-and-upstream-instrumentation.md) | Sumcheck vectors and upstream instrumentation | Accepted | 2026-10-12 |
+| [0028](0028-stage-4-scope-and-challenge-replay.md) | Stage 4 scope: Fiat-Shamir transcript and challenge replay | Accepted | 2026-10-13 |
+| [0029](0029-sha256-and-aes256-in-spark.md) | SHA-256 and AES-256 in SPARK: Silver with NIST vectors, constant-time exemption | Accepted | 2026-10-13 |
+| [0030](0030-literal-rejection-sampling.md) | Literal rejection sampling and declared non-termination | Accepted | 2026-10-13 |
+| [0031](0031-transcript-gold-perimeter.md) | Transcript Gold perimeter | Accepted | 2026-10-13 |
+| [0032](0032-transcript-vectors.md) | Transcript vectors: Appendix B.2, Appendix B.3 end to end, NIST | Accepted | 2026-10-13 |

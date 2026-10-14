@@ -97,4 +97,46 @@ package body GF2_128 is
       return Square (T127);
    end Inv;
 
+
+   ----------------------------------------------------------------------
+   --  Serialisation
+   ----------------------------------------------------------------------
+
+   function Limb_Of_8 (B : Bytes_8) return Unsigned_64 is
+     (Unsigned_64 (B (0))
+      or Shift_Left (Unsigned_64 (B (1)), 8)
+      or Shift_Left (Unsigned_64 (B (2)), 16)
+      or Shift_Left (Unsigned_64 (B (3)), 24)
+      or Shift_Left (Unsigned_64 (B (4)), 32)
+      or Shift_Left (Unsigned_64 (B (5)), 40)
+      or Shift_Left (Unsigned_64 (B (6)), 48)
+      or Shift_Left (Unsigned_64 (B (7)), 56));
+
+   function Byte_Of (L : Unsigned_64; K : Natural) return Unsigned_8 is
+     (Unsigned_8 (Shift_Right (L, 8 * K) and 16#FF#))
+   with Global => null, Pre => K <= 7;
+
+   function Bytes_Of_Limb (L : Unsigned_64) return Bytes_8 is
+     [Byte_Of (L, 0), Byte_Of (L, 1), Byte_Of (L, 2), Byte_Of (L, 3),
+      Byte_Of (L, 4), Byte_Of (L, 5), Byte_Of (L, 6), Byte_Of (L, 7)]
+   with Global => null, Post => Limb_Of_8 (Bytes_Of_Limb'Result) = L;
+
+   function Limbs_Of_Bytes (B : Bytes_16) return Limb_Array is
+     [Limb_Of_8 (B (0 .. 7)), Limb_Of_8 (B (8 .. 15))];
+
+   function Bytes_Of_Limbs (L : Limb_Array) return Bytes_16 is
+      R : Bytes_16 := [others => 0];
+   begin
+      R (0 .. 7)  := Bytes_Of_Limb (L (0));
+      R (8 .. 15) := Bytes_Of_Limb (L (1));
+      return R;
+   end Bytes_Of_Limbs;
+
+   procedure From_Bytes (B : Bytes_16; E : out Element; Ok : out Boolean)
+   is
+   begin
+      Ok := True;
+      E  := (Limbs => Limbs_Of_Bytes (B));
+   end From_Bytes;
+
 end GF2_128;

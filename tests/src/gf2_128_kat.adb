@@ -2,8 +2,8 @@
 --
 --  Test code, outside the proof perimeter: SPARK_Mode is Off. Reads the
 --  vector files given as arguments (default: gf2_128_mul.txt,
---  gf2_128_square.txt and gf2_128_inv.txt under tests/vectors/) and
---  checks every case against the library.
+--  gf2_128_square.txt, gf2_128_inv.txt and gf2_128_bytes.txt under
+--  tests/vectors/) and checks every case against the library.
 --  Built with -gnata, so the library's contracts execute at run time:
 --  in particular the Post of Mul evaluates the ghost reference Mul_Ref
 --  on every call, and a contract violation surfaces here as a failure
@@ -14,9 +14,11 @@
 --    mul <a> <b> <expected>
 --    square <a> <expected>
 --    inv <a> <expected>        (also checks a * Inv (a) = One for a /= 0)
---  with each value written as 32 big-endian hex digits of the 128-bit
+--    bytes <a> <encoding>      To_Bytes (a) = encoding, From_Bytes back
+--  with each element written as 32 big-endian hex digits of the 128-bit
 --  integer whose bit i is the coefficient of x^i (the first 16 digits
---  are Limbs (1), the last 16 are Limbs (0)).
+--  are Limbs (1), the last 16 are Limbs (0)), and the encoding as the
+--  16 bytes in memory order (Section 7.2.1, little-endian).
 --
 --  Exit status: success only if at least one case ran and none failed.
 
@@ -26,6 +28,7 @@ with Ada.Command_Line;
 with Ada.Exceptions;
 with Ada.Text_IO;
 with Interfaces; use Interfaces;
+with Bytes;      use type Bytes.Byte_Array;
 with GF2_128;    use GF2_128;
 
 procedure GF2_128_KAT is
@@ -35,6 +38,7 @@ procedure GF2_128_KAT is
    Default_Mul    : constant String := "tests/vectors/gf2_128_mul.txt";
    Default_Square : constant String := "tests/vectors/gf2_128_square.txt";
    Default_Inv    : constant String := "tests/vectors/gf2_128_inv.txt";
+   Default_Bytes  : constant String := "tests/vectors/gf2_128_bytes.txt";
 
    Passed  : Natural := 0;
    Failed  : Natural := 0;
@@ -71,6 +75,33 @@ procedure GF2_128_KAT is
       end loop;
       return R;
    end To_Element;
+
+   --  16 bytes as 32 hex digits in memory order.
+   function To_Bytes_16 (S : String) return Bytes_16 is
+      R : Bytes_16;
+   begin
+      if S'Length /= 32 then
+         raise Parse_Error with "expected 32 hex digits, got '" & S & "'";
+      end if;
+      for I in R'Range loop
+         R (I) :=
+           Unsigned_8
+             (Shift_Left (Hex_Digit (S (S'First + 2 * I)), 4)
+              or Hex_Digit (S (S'First + 2 * I + 1)));
+      end loop;
+      return R;
+   end To_Bytes_16;
+
+   function Image (B : Bytes_16) return String is
+      Hex : constant String := "0123456789abcdef";
+      S   : String (1 .. 32);
+   begin
+      for I in B'Range loop
+         S (2 * I + 1) := Hex (Integer (Shift_Right (B (I), 4)) + 1);
+         S (2 * I + 2) := Hex (Integer (B (I) and 15) + 1);
+      end loop;
+      return S;
+   end Image;
 
    function Image (E : Element) return String is
       Hex : constant String := "0123456789abcdef";
@@ -197,6 +228,32 @@ procedure GF2_128_KAT is
                   Passed := Passed + 1;
                end if;
             end;
+         elsif Op = "bytes" then
+            if Count /= 3 then
+               raise Parse_Error with "bytes expects 2 values";
+            end if;
+            declare
+               A    : constant Element :=
+                 To_Element (Line (Fields (2).Lo .. Fields (2).Hi));
+               Want : constant Bytes_16 :=
+                 To_Bytes_16 (Line (Fields (3).Lo .. Fields (3).Hi));
+               Got  : constant Bytes_16 := To_Bytes (A);
+               Back : Element;
+               Ok   : Boolean;
+            begin
+               From_Bytes (Want, Back, Ok);
+               if Got /= Want then
+                  Report_Failure
+                    ("bytes " & Image (A) & " expected " & Image (Want)
+                     & " got " & Image (Got));
+               elsif not Ok or else Back /= A then
+                  Report_Failure
+                    ("bytes " & Image (Want) & " read back as "
+                     & Image (Back));
+               else
+                  Passed := Passed + 1;
+               end if;
+            end;
          else
             raise Parse_Error with "unknown operation '" & Op & "'";
          end if;
@@ -234,6 +291,7 @@ begin
       Run_File (Default_Mul);
       Run_File (Default_Square);
       Run_File (Default_Inv);
+      Run_File (Default_Bytes);
    else
       for I in 1 .. Ada.Command_Line.Argument_Count loop
          Run_File (Ada.Command_Line.Argument (I));

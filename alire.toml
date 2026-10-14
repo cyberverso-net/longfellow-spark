@@ -10,3 +10,13 @@ tags = []
 
 [[depends-on]]
 gnatprove = "=16.1.0"
+
+[[depends-on]]
+sparklib = "=16.1.0"
+
+#  SPARKlib's ghost entities must have the same assertion policy as the
+#  ghost code of this project that refers to them; the test project
+#  builds with assertions on (ADR 0010), so the library is built with
+#  assertions too (ghost-only use, ADR 0031).
+[gpr-set-externals]
+SPARKLIB_BUILD = "Assertions"
