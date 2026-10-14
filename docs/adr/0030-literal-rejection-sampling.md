@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-14, at the close of stage 4)
 
 ## Date
 
