@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-15, before block 2 of stage 5)
 
 ## Date
 
