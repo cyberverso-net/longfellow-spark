@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted; amended by [ADR 0034](0034-proof-as-information-harnesses-in-parallel.md) on 2026-10-15 (the four partition checks are not required for merging)
 
 ## Date
 

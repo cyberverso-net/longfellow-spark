@@ -146,17 +146,34 @@ do_partitions_check() {
         "complete and matching the prove.yml matrix"
 }
 
+#  The harnesses are independent and each takes minutes with assertions
+#  on, so they run concurrently (ADR 0034) and the step lasts as long as
+#  the slowest, sumcheck_kat. Each writes its own log, printed in a
+#  fixed order once all have finished, so that the output reads as
+#  before and a failure is attributed to its harness.
 do_test() {
    header "test: build the harnesses (assertions on)"
    alr -n exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
-   header "test: gf2_128_kat"
-   tests/bin/gf2_128_kat
-   header "test: p256_kat"
-   tests/bin/p256_kat
-   header "test: sumcheck_kat"
-   tests/bin/sumcheck_kat
-   header "test: transcript_kat"
-   tests/bin/transcript_kat
+   local harnesses="gf2_128_kat p256_kat sumcheck_kat transcript_kat"
+   local logs status=0 h
+   logs="$(mktemp -d)"
+   header "test: $harnesses, concurrently"
+   for h in $harnesses; do
+      ( tests/bin/"$h" > "$logs/$h.log" 2>&1; echo $? > "$logs/$h.status" ) &
+   done
+   wait
+   for h in $harnesses; do
+      header "test: $h"
+      cat "$logs/$h.log"
+      if [ "$(cat "$logs/$h.status")" -ne 0 ]; then
+         echo "test: $h failed" >&2
+         status=1
+      fi
+   done
+   rm -rf "$logs"
+   if [ "$status" -ne 0 ]; then
+      exit "$status"
+   fi
 }
 
 do_vectors() {

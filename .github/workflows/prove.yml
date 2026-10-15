@@ -1,9 +1,10 @@
 #  prove: the full proof on the hosted runner (ADR 0019, ADR 0021, ADR
-#  0033). It runs on every pull request to main as a required check,
-#  weekly as an independent record that the proof still holds on the
-#  pinned toolchain, and on demand before a release or after a
-#  toolchain change. Pushes to branches do not run it: the pre-push
-#  hook (.githooks/pre-push) proves them locally in one run.
+#  0033, ADR 0034). It runs on every pull request to main, weekly as an
+#  independent record that the proof still holds on the pinned
+#  toolchain, and on demand before a release or after a toolchain
+#  change; its checks are information, not required for merging: the
+#  proof that gates a change is the one the pre-push hook
+#  (.githooks/pre-push) runs locally before every push (ADR 0034).
 #
 #  The proof is split into the partitions of scripts/prove-partitions.txt
 #  (ADR 0033), one job each, so that the wall time is that of the
@@ -12,9 +13,9 @@
 #  `scripts/check.sh partitions-check`, run by verify, by every job here
 #  and by make check, guarantees that the partitions cover every
 #  non-generic unit exactly once and that the matrix below names them;
-#  the union of the four jobs is the full proof. Branch protection
-#  requires one check per partition: prove (p256), prove (primitives),
-#  prove (sumcheck), prove (protocol).
+#  the union of the four jobs is the full proof. Measured on the hosted
+#  runner at the close of stage 4: p256 7 min, primitives 6, sumcheck
+#  and protocol 12, of which five to six are the fixed cost of a job.
 #  Scheduled workflows are suspended by GitHub after sixty days without
 #  activity on the repository; a manual run resumes them.
 
