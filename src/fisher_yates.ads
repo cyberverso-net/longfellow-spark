@@ -11,7 +11,9 @@
 --  docs/adr/README.md.
 --
 --  Proof status. Choose : Gold, the results are distinct and below n,
---  for every input satisfying the precondition. Silver everywhere.
+--  for every input satisfying the precondition, through a ghost
+--  inverse of the array (a linear invariant, see the body). Silver
+--  everywhere.
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0029
 --  (public data: the transcript's draws).
