@@ -44,3 +44,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md). Records
 | [0038](0038-gold-perimeter-for-merkle-and-ligero.md) | Gold perimeter for Merkle and Ligero | Accepted | 2026-10-15 |
 | [0039](0039-sizes-allocation-and-status.md) | Sizes, allocation and the status enumeration | Accepted | 2026-10-15 |
 | [0040](0040-ligero-vectors-and-upstream-instrumentation.md) | Ligero vectors and upstream instrumentation | Accepted | 2026-10-15 |
+| [0041](0041-verification-cadence.md) | Verification cadence: the proof by hand, the slow harness cases weekly | Accepted | 2026-10-16 |

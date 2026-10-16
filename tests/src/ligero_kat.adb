@@ -1,13 +1,15 @@
 --  LIGERO_KAT: known-answer test harness for stage 5 (ADR 0040): the
 --  Merkle tree (tier 1 from Appendix B.1.1, tier 2 from the generator's
---  independent reference, negative cases), the geometry and the
---  Lagrange code at the queried columns on both fields; the Ligero
---  proof and verifier cases come with the later blocks.
+--  independent reference, negative cases), the geometry, the Lagrange
+--  code at the queried columns and the Ligero proof reader of Section
+--  7.4 on both fields; the verifier on the Appendix B.3 proofs runs in
+--  sumcheck_kat, where the constraints of the core are.
 --
 --  Test code, outside the proof perimeter: SPARK_Mode is Off. Reads
 --  the vector files given as arguments (default: merkle.txt,
---  ligero_geometry.txt, lagrange_gf2_128.txt and lagrange_p256.txt
---  under tests/vectors/) and checks every case against the library.
+--  ligero_geometry.txt, lagrange_gf2_128.txt, lagrange_p256.txt and
+--  ligero_proof.txt under tests/vectors/) and checks every case
+--  against the library.
 --  Built with -gnata, so the library's executable contracts run; a
 --  contract violation surfaces here as a failure with the offending
 --  line.
@@ -28,6 +30,11 @@
 --        Lagrange.Build gives these inverses and entries
 --    eval <k> <m> <m columns> <k coeffs> <c> <expected>
 --        Lagrange.Evaluate at column c of the table
+--    read <rate_inv> <nreq> <ncol> <nw> <nq> <status> <bytes>
+--        [<n> <n elements> <nreq nonces> <m> <m path digests>]
+--        Ligero_Proof.Read gives this status (ok, encoding); when ok
+--        it consumes every byte and finds these polynomials and opened
+--        columns (in order), nonces and path
 --
 --  Exit status: success only if at least one case ran and none failed.
 
@@ -45,6 +52,10 @@ with Ligero_Geometry;
 with Lagrange;
 with Lagrange_GF2_128;
 with Lagrange_P256;
+with Verifier_Status;
+with Ligero_Proof;
+with Ligero_Proof_GF2_128;
+with Ligero_Proof_P256;
 
 procedure Ligero_KAT is
 
@@ -54,6 +65,7 @@ procedure Ligero_KAT is
    Default_Geometry : constant String := "tests/vectors/ligero_geometry.txt";
    Default_Lag_GF   : constant String := "tests/vectors/lagrange_gf2_128.txt";
    Default_Lag_P    : constant String := "tests/vectors/lagrange_p256.txt";
+   Default_Read     : constant String := "tests/vectors/ligero_proof.txt";
 
    --  The field of the element lines of the current file.
    type Field_Kind is (None, GF, P);
@@ -334,6 +346,137 @@ procedure Ligero_KAT is
    procedure Check_P is new Check_Lagrange_Line
      (Lagrange_P256, P_To_Element, P_Image, P_Cache.Build_Cached);
 
+   --  The read lines, for one proof instance.
+   generic
+      with package LPK is new Ligero_Proof (<>);
+      with function To_Element (S : String) return LPK.Element;
+      with function Image (E : LPK.Element) return String;
+   procedure Check_Read_Line
+     (Fld : access function (K : Positive) return String; Count : Natural);
+
+   procedure Check_Read_Line
+     (Fld : access function (K : Positive) return String; Count : Natural)
+   is
+      use Ligero_Geometry;
+      use Verifier_Status;
+      use type LPK.Element;
+      Cfg : constant Config :=
+        (Rate_Inv    => Natural'Value (Fld (2)),
+         Num_Queries => Natural'Value (Fld (3)),
+         Encoded_Len => Natural'Value (Fld (4)));
+      NW      : constant Natural := Natural'Value (Fld (5));
+      NQ      : constant Natural := Natural'Value (Fld (6));
+      Want_Ok : constant Boolean := Fld (7) = "ok";
+      Hex     : constant String  := Fld (8);
+      B       : Byte_Array (0 .. Hex'Length / 2 - 1);
+   begin
+      if Fld (7) /= "ok" and then Fld (7) /= "encoding" then
+         raise Parse_Error with "read: status must be ok or encoding";
+      end if;
+      if not Valid (Cfg) then
+         raise Parse_Error with "read: the configuration is not valid";
+      end if;
+      for I in B'Range loop
+         B (I) := Shift_Left (Hex_Digit (Hex (Hex'First + 2 * I)), 4)
+                  or Hex_Digit (Hex (Hex'First + 2 * I + 1));
+      end loop;
+      declare
+         G    : constant Valid_Geometry := Make (Cfg, NW, NQ);
+         P    : LPK.Proof
+           (Ldt_Last    => G.Block_Len - 1,
+            Linear_Last => G.Dblock_Len - 1,
+            Low_Last    => G.Num_Queries - 1,
+            High_Last   => G.Dblock_Len - G.Block_Len - 1,
+            Nonce_Last  => G.Num_Queries - 1,
+            Col_Last    => LPK.Opened (G) - 1,
+            Path_Last   => 2 * Num_Leaves (G) - 1);
+         Next : Natural;
+         St   : Status;
+         Pos  : Natural := 9;
+         N    : Natural;
+         M    : Natural;
+
+         function Elt (K : Natural) return LPK.Element is
+           (To_Element (Fld (Pos + K)));
+
+         procedure Compare (What : String; Es : LPK.SA.Element_Array) is
+         begin
+            for I in Es'Range loop
+               if Es (I) /= Elt (I - Es'First) then
+                  raise Parse_Error
+                    with "read: " & What & " differs at" & I'Image & ": got "
+                         & Image (Es (I));
+               end if;
+            end loop;
+            Pos := Pos + Es'Length;
+         end Compare;
+      begin
+         LPK.Read (B, 0, G, P, Next, St);
+         if not Want_Ok then
+            if St = Proof_Encoding then
+               Passed := Passed + 1;
+            else
+               Report_Failure ("read: expected Proof_Encoding, got "
+                               & St'Image);
+            end if;
+            return;
+         end if;
+         if St /= Ok then
+            Report_Failure ("read: expected Ok, got " & St'Image);
+            return;
+         end if;
+         if Next /= B'Length then
+            Report_Failure ("read: consumed" & Next'Image & " of"
+                            & B'Length'Image & " bytes");
+            return;
+         end if;
+         N := Natural'Value (Fld (Pos));
+         Pos := Pos + 1;
+         if N /= LPK.Opened (G) + 2 * G.Dblock_Len + G.Num_Queries then
+            raise Parse_Error with "read: element count";
+         end if;
+         Compare ("ldt_poly", P.Ldt_Poly);
+         Compare ("linear_poly", P.Linear_Poly);
+         Compare ("quad_poly_low", P.Quad_Low);
+         Compare ("quad_poly_high", P.Quad_High);
+         Compare ("queried_columns", P.Columns);
+         N := Natural'Value (Fld (Pos));
+         Pos := Pos + 1;
+         if N /= G.Num_Queries then
+            raise Parse_Error with "read: nonce count";
+         end if;
+         for K in P.Nonces'Range loop
+            if P.Nonces (K) /= To_Digest (Fld (Pos + K)) then
+               raise Parse_Error with "read: nonce" & K'Image & " differs";
+            end if;
+         end loop;
+         Pos := Pos + N;
+         M := Natural'Value (Fld (Pos));
+         Pos := Pos + 1;
+         if P.Path_Count /= M then
+            Report_Failure ("read: path count" & P.Path_Count'Image
+                            & ", expected" & M'Image);
+            return;
+         end if;
+         for K in 0 .. M - 1 loop
+            if P.Path (K) /= To_Digest (Fld (Pos + K)) then
+               raise Parse_Error with "read: path digest" & K'Image
+                                      & " differs";
+            end if;
+         end loop;
+         Pos := Pos + M;
+         if Count /= Pos - 1 then
+            raise Parse_Error with "read: field count";
+         end if;
+         Passed := Passed + 1;
+      end;
+   end Check_Read_Line;
+
+   procedure Read_GF is new Check_Read_Line
+     (Ligero_Proof_GF2_128, GF_To_Element, GF_Image);
+   procedure Read_P is new Check_Read_Line
+     (Ligero_Proof_P256, P_To_Element, P_Image);
+
    procedure Check_Case (Line : String) is
       Fields : Field_Array;
       Count  : Natural;
@@ -478,6 +621,12 @@ procedure Ligero_KAT is
                when P    => Check_P (Op, F'Access, Count);
                when None => raise Parse_Error with "no field line";
             end case;
+         elsif Op = "read" then
+            case Current_Field is
+               when GF   => Read_GF (F'Access, Count);
+               when P    => Read_P (F'Access, Count);
+               when None => raise Parse_Error with "no field line";
+            end case;
          else
             raise Parse_Error with "unknown operation '" & Op & "'";
          end if;
@@ -516,6 +665,7 @@ begin
       Run_File (Default_Geometry);
       Run_File (Default_Lag_GF);
       Run_File (Default_Lag_P);
+      Run_File (Default_Read);
    else
       for I in 1 .. Ada.Command_Line.Argument_Count loop
          Run_File (Ada.Command_Line.Argument (I));

@@ -2,12 +2,13 @@
 #  Runs build, test, vectors and lint from scripts/check.sh, one workflow
 #  step each so that the failing one is visible, with the same
 #  Alire-provisioned toolchain as the local development environment.
-#  The proof is not part of this gate: it runs locally before every push
-#  (.githooks/pre-push) and on the hosted runner on pull requests, weekly
-#  and on demand, as information rather than as a required check (ADR
-#  0034, prove.yml). The harnesses run concurrently (scripts/check.sh
-#  test); the limit below is the measured sixteen minutes of the
-#  sequential run plus margin.
+#  The proof is not part of this gate: it runs locally before every
+#  commit (make check, ADR 0041) and on the hosted runner on pull
+#  requests, weekly and on demand, as information rather than as a
+#  required check (ADR 0034, prove.yml). The harnesses run concurrently
+#  (scripts/check.sh test) without their slow set, which full.yml runs
+#  weekly (ADR 0041); the limit below is the measured sixteen minutes of
+#  the sequential run at stage 4 plus margin.
 
 name: verify
 

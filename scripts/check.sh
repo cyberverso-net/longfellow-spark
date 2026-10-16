@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 #  check.sh: the single definition of the project's checks, used locally
-#  (make check), by the pre-push hook (prove) and in continuous
-#  integration (build, test, vectors, lint on every push; prove weekly
-#  and on demand). Run from the repository root. Every step prints a header and the script stops at the first
-#  failure with a non-zero exit status.
+#  (make check before every commit, make check-full before a pull
+#  request) and in continuous integration (build, test, vectors, lint on
+#  every push; prove on pull requests, weekly and on demand; the slow
+#  harness cases weekly, ADR 0041). Run from the repository root. Every
+#  step prints a header and the script stops at the first failure with a
+#  non-zero exit status.
 #
 #  Subcommands: build, prove, prove-partition <name>, partitions-check,
-#  test, vectors, lint, all. The proof partitions of the hosted runner
-#  are listed in scripts/prove-partitions.txt (ADR 0033).
+#  test, test-slow, vectors, lint, all, full. The proof partitions of the
+#  hosted runner are listed in scripts/prove-partitions.txt (ADR 0033).
 
 set -euo pipefail
 
 usage() {
    echo "usage: scripts/check.sh {build|prove|prove-partition <name>|" \
-        "partitions-check|test|vectors|lint|all}" >&2
+        "partitions-check|test|test-slow|vectors|lint|all|full}" >&2
    exit 2
 }
 
@@ -151,15 +153,26 @@ do_partitions_check() {
 #  the slowest, sumcheck_kat. Each writes its own log, printed in a
 #  fixed order once all have finished, so that the output reads as
 #  before and a failure is attributed to its harness.
+#  With the argument slow, sumcheck_kat also runs its slow cases (ADR
+#  0041: the P-256 Ligero verifier end to end, about twelve minutes).
 do_test() {
+   local mode="${1:-}" flag=""
+   if [ "$mode" = slow ]; then
+      flag="--slow"
+   fi
    header "test: build the harnesses (assertions on)"
    alr -n exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
    local harnesses="gf2_128_kat p256_kat sumcheck_kat transcript_kat ligero_kat"
    local logs status=0 h
    logs="$(mktemp -d)"
-   header "test: $harnesses, concurrently"
+   header "test${mode:+-$mode}: $harnesses, concurrently"
    for h in $harnesses; do
-      ( tests/bin/"$h" > "$logs/$h.log" 2>&1; echo $? > "$logs/$h.status" ) &
+      if [ "$h" = sumcheck_kat ]; then
+         # shellcheck disable=SC2086
+         ( tests/bin/"$h" $flag > "$logs/$h.log" 2>&1; echo $? > "$logs/$h.status" ) &
+      else
+         ( tests/bin/"$h" > "$logs/$h.log" 2>&1; echo $? > "$logs/$h.status" ) &
+      fi
    done
    wait
    for h in $harnesses; do
@@ -240,6 +253,7 @@ case "${1:-}" in
    prove-partition)  do_prove_partition "${2:-}" ;;
    partitions-check) do_partitions_check ;;
    test)             do_test ;;
+   test-slow)        do_test slow ;;
    vectors)          do_vectors ;;
    lint)             do_lint ;;
    all)
@@ -250,6 +264,15 @@ case "${1:-}" in
       do_vectors
       do_lint
       header "all checks passed"
+      ;;
+   full)
+      do_build
+      do_partitions_check
+      do_prove
+      do_test slow
+      do_vectors
+      do_lint
+      header "all checks passed, slow cases included"
       ;;
    *) usage ;;
 esac

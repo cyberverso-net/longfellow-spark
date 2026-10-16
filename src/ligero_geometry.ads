@@ -86,7 +86,19 @@ package Ligero_Geometry is
                  / G.Witnesses_Per_Row
       and then G.Num_Quad_Rows <= Max_Quads
       and then G.Total_Rows
-               = 3 + G.Num_Witness_Rows + 3 * G.Num_Quad_Rows);
+               = 3 + G.Num_Witness_Rows + 3 * G.Num_Quad_Rows
+      --  The rows cover the witnesses and the triples with less than
+      --  one row to spare (the ceilings above), in 64 bits so that the
+      --  predicate itself cannot overflow: the slot counts of the
+      --  verifier are then Naturals.
+      and then Long_Long_Integer (G.Num_Witness_Rows)
+               * Long_Long_Integer (G.Witnesses_Per_Row)
+               <= Long_Long_Integer (G.Num_Witnesses)
+                  + Long_Long_Integer (G.Witnesses_Per_Row) - 1
+      and then Long_Long_Integer (G.Num_Quad_Rows)
+               * Long_Long_Integer (G.Witnesses_Per_Row)
+               <= Long_Long_Integer (Max_Quads)
+                  + Long_Long_Integer (G.Witnesses_Per_Row) - 1);
 
    subtype Valid_Geometry is Geometry with
      Dynamic_Predicate => Consistent (Valid_Geometry);

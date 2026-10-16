@@ -404,6 +404,140 @@ def lagrange_lines(fld, rng):
     return lines
 
 
+
+# ----------------------------------------------------------------------
+# The Ligero proof reader (Section 7.4): write_ligero_proof transcribed
+# ----------------------------------------------------------------------
+
+# A small geometry for the reader: BLOCK 4, DBLOCK 7, WR 2, NWROW 3,
+# NQT 1, NROW 9, 18 opened elements, 9 leaves.
+READER_GEOMETRY = (2, 2, 16, 5, 1)
+
+
+def elt_bytes(fld, v):
+    """Section 7.2.1: little-endian, 16 or 32 bytes."""
+    return v.to_bytes(32 if fld.name == "p256" else 16, "little")
+
+
+def sub_bytes(fld, v, x):
+    """Section 7.2.2: the two coordinate bytes on the basis for
+    GF(2^128) (x the coordinates of v), the field's encoding for
+    P-256, whose subfield is the field."""
+    if fld.name == "p256":
+        return elt_bytes(fld, v)
+    return x.to_bytes(2, "little")
+
+
+def write_ligero_proof(fld, polys, nonces, cols, path):
+    """write_ligero_proof of Section 7.4: the polynomials, the nonces,
+    the opened columns in alternating runs, full field first, each a
+    4-byte little-endian count then its elements, then the path with
+    its count. cols is a list of (value, x): x the subfield
+    coordinates when the encoder sees the element in the subfield
+    (contains_subfield), None otherwise; on P-256 every element is."""
+    out = b"".join(elt_bytes(fld, v) for poly in polys for v in poly)
+    out += b"".join(nonces)
+    i = 0
+    subfield_run = False
+    total = len(cols)
+    while i < total:
+        runlen = 0
+        while (i + runlen < total
+               and (cols[i + runlen][1] is not None) == subfield_run):
+            runlen += 1
+        out += runlen.to_bytes(4, "little")
+        for j in range(i, i + runlen):
+            v, x = cols[j]
+            out += sub_bytes(fld, v, x) if subfield_run else elt_bytes(fld, v)
+        i += runlen
+        subfield_run = not subfield_run
+    out += len(path).to_bytes(4, "little") + b"".join(path)
+    return out
+
+
+def reader_lines(fld, rng):
+    """read cases: the geometry, the status the reader must give, the
+    bytes, and for an accepted proof its content."""
+    rate_inv, nreq, ncol, nw, nq = READER_GEOMETRY
+    g = geometry(rate_inv, nreq, ncol, nw, nq)
+    assert g == {"block": 4, "dblock": 7, "wr": 2, "nwrow": 3, "nqt": 1,
+                 "nrow": 9}
+    total = g["nrow"] * nreq
+    polys = [[fld.rand(rng) for _ in range(n)]
+             for n in (g["block"], g["dblock"], nreq,
+                       g["dblock"] - g["block"])]
+    nonces = [rng.randbytes(32) for _ in range(nreq)]
+    path = [rng.randbytes(32) for _ in range(5)]
+
+    def sub_elt():
+        x = rng.getrandbits(16)
+        return (fld.point(x), x)
+
+    def full_elt():
+        if fld.name == "p256":
+            v = fld.rand(rng)
+            return (v, v)
+        return (fld.rand(rng), None)
+
+    def line(status, data, cols=None):
+        s = "read %d %d %d %d %d %s %s" % (rate_inv, nreq, ncol, nw, nq,
+                                           status, data.hex())
+        if cols is not None:
+            elts = [v for poly in polys for v in poly] + [v for v, _ in cols]
+            s += " %d %s %d %s %d %s" % (
+                len(elts), " ".join(fld.hx(v) for v in elts),
+                len(nonces), " ".join(n.hex() for n in nonces),
+                len(path), " ".join(d.hex() for d in path))
+        return s
+
+    lines = ["field " + fld.name]
+    if fld.name == "p256":
+        # Every element is in the subfield: a zero-length full-field
+        # run, then one subfield run of all, as Appendix B.3.2.
+        good = [full_elt() for _ in range(total)]
+        sets = [("all in the subfield", good)]
+    else:
+        sets = [
+            ("all full field", [full_elt() for _ in range(total)]),
+            ("subfield, full, subfield", [sub_elt() for _ in range(5)]
+             + [full_elt() for _ in range(7)] + [sub_elt() for _ in range(6)]),
+            ("all subfield", [sub_elt() for _ in range(total)]),
+        ]
+        good = sets[1][1]
+    for what, cols in sets:
+        lines.append("# " + what)
+        lines.append(line("ok", write_ligero_proof(fld, polys, nonces, cols,
+                                                   path), cols))
+    data = write_ligero_proof(fld, polys, nonces, good, path)
+    fixed = sum(len(p) for p in polys) * (32 if fld.name == "p256" else 16) \
+        + 32 * nreq
+    head = data[:fixed]
+    zero = (0).to_bytes(4, "little")
+    lines.append("# a second zero-length run")
+    lines.append(line("encoding", head + zero + data[fixed:]))
+    lines.append("# a zero-length run that is not the first")
+    first_sub = [c for c in good if c[1] is not None][:5]
+    body = zero + (5).to_bytes(4, "little") \
+        + b"".join(sub_bytes(fld, v, x) for v, x in first_sub) + zero
+    lines.append(line("encoding", head + body + data[fixed:]))
+    lines.append("# a run beyond the total")
+    extra = [full_elt() for _ in range(total + 1)]
+    body = (total + 1).to_bytes(4, "little") \
+        + b"".join(elt_bytes(fld, v) for v, _ in extra)
+    lines.append(line("encoding", head + body + data[-4 - 32 * 5:]))
+    lines.append("# a run beyond 2^25")
+    lines.append(line("encoding", head + (2**25 + 1).to_bytes(4, "little")))
+    lines.append("# bytes missing")
+    lines.append(line("encoding", data[:-16]))
+    lines.append("# a path count beyond the tree")
+    long_path = [rng.randbytes(32) for _ in range(19)]
+    lines.append(line("encoding", write_ligero_proof(fld, polys, nonces, good,
+                                                     long_path)))
+    if fld.name == "p256":
+        lines.append("# a non-canonical element")
+        lines.append(line("encoding", b"\xff" * 32 + data[32:]))
+    return lines
+
 # ----------------------------------------------------------------------
 # Output
 # ----------------------------------------------------------------------
@@ -570,6 +704,30 @@ def main():
             "\n".join(llines) + "\n")
         print("gen_ligero_vectors: lagrange_%s.txt with %d cases; interpolation"
               " checked" % (fld.name, len(LAGRANGE_CASES) * 5))
+
+    # ---- the reader
+    rlines = [
+        "# Known-answer vectors for the Ligero proof reader of draft Section",
+        "# 7.4, Longfellow ZK stage 5. Generated by gen_ligero_vectors.py; do",
+        "# not edit by hand. write_ligero_proof of the reference transcribed",
+        "# on a small geometry, with the rules of the section violated one at",
+        "# a time (ADR 0039, 0040). Bytes and digests as hex in memory order,",
+        "# elements as big-endian hex integers after a field line.",
+        "# Format:",
+        "#   read <rate_inv> <nreq> <ncol> <nw> <nq> <status> <bytes>",
+        "#        [<n> <n elements> <nreq nonces> <m> <m path digests>]",
+        "#   status ok: the reader accepts, consumes every byte and gives the",
+        "#   polynomials then the opened columns (n elements), the nonces and",
+        "#   the path; status encoding: Proof_Encoding.",
+        "#",
+    ]
+    n_read = 0
+    for fld in (GF2128(), P256()):
+        fl = reader_lines(fld, rng)
+        rlines += fl
+        n_read += sum(1 for l in fl if l.startswith("read "))
+    (out / "ligero_proof.txt").write_text("\n".join(rlines) + "\n")
+    print("gen_ligero_vectors: ligero_proof.txt with %d reader cases" % n_read)
 
 
 if __name__ == "__main__":

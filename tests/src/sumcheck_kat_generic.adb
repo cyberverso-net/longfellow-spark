@@ -2,8 +2,12 @@ pragma SPARK_Mode (Off);
 
 with Bytes;
 with Interfaces; use Interfaces;
+with Ada.Directories;
 with Ada.Exceptions;
 with Ada.Text_IO;
+with Transcript;
+with Ligero_Geometry;
+with Verifier_Status;
 
 package body Sumcheck_KAT_Generic is
 
@@ -11,6 +15,7 @@ package body Sumcheck_KAT_Generic is
    use SA;
    use type SA.Element;
    use type SV.Lqc_Triple;
+   use type Bytes.Byte_Array;
 
    Line_No : Natural := 0;
    N_Pass  : Natural := 0;
@@ -134,6 +139,19 @@ package body Sumcheck_KAT_Generic is
    Zk_Sumcheck_Len : Natural := 0;
    Have_Zk        : Boolean := False;
    Have_Zk_Sumcheck : Boolean := False;
+   --  Stage 5: the Ligero part and the configuration (zk_ligero), the
+   --  nonces of B.3.1 (zk_nonce).
+   Zk_Ligero      : Bytes.Byte_Array (0 .. Max_Zk_Bytes - 1);
+   Zk_Ligero_Len  : Natural := 0;
+   Zk_Rate, Zk_Nreq, Zk_Ncol : Natural := 0;
+   Have_Zk_Ligero : Boolean := False;
+   Max_Nonces     : constant := 256;
+   Zk_Nonces      : array (0 .. Max_Nonces - 1) of Bytes.Bytes_32;
+   Zk_Nonce_Given : array (0 .. Max_Nonces - 1) of Boolean :=
+     [others => False];
+   --  DEFAULT_STATEMENT_HASH of zk/common.rs: 0xdeadbeef then zeros.
+   Default_Statement_Hash : constant Bytes.Bytes_32 :=
+     [16#de#, 16#ad#, 16#be#, 16#ef#, others => 0];
    --  Expected constraints: entries (constraint, variable, coefficient).
    Exp_Cons     : Nat_Buf;
    Exp_Var      : Nat_Buf;
@@ -260,6 +278,308 @@ package body Sumcheck_KAT_Generic is
    --  compares the emitted constraints with the recorded ones.
    --  Stage 4: the reader, the replay and the core on the replayed
    --  record, against the recording (ADR 0032).
+   --  Stage 5 (ADR 0040): the Ligero part of the proof read (Section
+   --  7.4), its nonces against B.3.1, then the Ligero verifier on the
+   --  constraints of the core, in the transcript state the replay left.
+   --  With a tier 3 recording of the upstream Ligero verifier
+   --  (tests/vectors/upstream/ligero_<field>_<circuit>.txt) the steps
+   --  run one by one and every intermediate value is compared; without
+   --  it, Verify runs composed and must accept.
+   procedure Check_Ligero
+     (Name : String;
+      C    : Circuit;
+      A    : SV.Ligero_Terms;
+      B    : Element_Array;
+      Lqc  : SV.Lqc_Array)
+   is
+      use Ligero_Geometry;
+      use Verifier_Status;
+      Rec_Path : constant String :=
+        "tests/vectors/upstream/ligero_" & Field_Name & "_" & Name & ".txt";
+      NW  : Natural := C.Ninput - C.Npublic;
+      Cfg : Ligero_Geometry.Config;
+   begin
+      if not Have_Zk_Ligero then
+         Report_Failure ("tier 3 " & Name & ": no zk_ligero line");
+         return;
+      end if;
+      if Field_Name = "p256" and then not Run_Slow then
+         TIO.Put_Line ("skipped (slow): Ligero verifier on " & Name
+                       & " over " & Field_Name & "; run with --slow");
+         return;
+      end if;
+      for J in 0 .. C.Last_Layer loop
+         NW := NW + 4 * C.Layers (J).Logw + 3;
+      end loop;
+      Cfg := (Rate_Inv => Zk_Rate, Num_Queries => Zk_Nreq,
+              Encoded_Len => Zk_Ncol);
+      if not Valid (Cfg) then
+         Report_Failure ("tier 3 " & Name & ": configuration not valid");
+         return;
+      end if;
+      declare
+         G    : constant Valid_Geometry := Make (Cfg, NW, Lqc'Length);
+         P    : LP.Proof
+           (Ldt_Last    => G.Block_Len - 1,
+            Linear_Last => G.Dblock_Len - 1,
+            Low_Last    => G.Num_Queries - 1,
+            High_Last   => G.Dblock_Len - G.Block_Len - 1,
+            Nonce_Last  => G.Num_Queries - 1,
+            Col_Last    => LP.Opened (G) - 1,
+            Path_Last   => 2 * Num_Leaves (G) - 1);
+         Next : Natural;
+         St   : Verifier_Status.Status;
+      begin
+         LP.Read (Zk_Ligero (0 .. Zk_Ligero_Len - 1), 0, G, P, Next, St);
+         if St /= Ok then
+            Report_Failure ("tier 3 " & Name & ": Ligero reader status "
+                            & St'Image);
+            return;
+         end if;
+         Check (Next = Zk_Ligero_Len,
+                "tier 3 " & Name & ": Ligero part consumed" & Next'Image
+                & " of" & Zk_Ligero_Len'Image & " bytes");
+         --  Tier 1: the nonces of Appendix B.3.1.
+         for K in P.Nonces'Range loop
+            if K < Max_Nonces and then Zk_Nonce_Given (K) then
+               Check (P.Nonces (K) = Zk_Nonces (K),
+                      "tier 3 " & Name & ": nonce" & K'Image
+                      & " differs from B.3.1");
+            end if;
+         end loop;
+         if not Ada.Directories.Exists (Rec_Path) then
+            LV.Verify (Cfg, NW, B, Zk_Root, P, A, Default_Statement_Hash,
+                       Lqc, St);
+            Check (St = Ok, "tier 3 " & Name & ": Ligero verdict "
+                   & St'Image);
+            return;
+         end if;
+         --  The recording: one line per item, in the verifier's order.
+         declare
+            R_Uldt, R_Alphal, R_Alphaq, R_Uquad : Elem_Buf;
+            N_Uldt, N_Alphal, N_Alphaq, N_Uquad : Natural := 0;
+            R_Idx    : Nat_Buf;
+            N_Idx    : Natural := 0;
+            R_Ldt, R_Dot, R_Quad : Elem_Buf;   --  nreq yc then nreq yp
+            N_Ldt, N_Dot, N_Quad : Natural := 0;
+            R_Want, R_Proof : Element;
+            Have_Sum : Boolean := False;
+            Verdict  : Boolean := False;
+            Ended    : Boolean := False;
+            File     : TIO.File_Type;
+
+            procedure Fill
+              (Buf : in out Elem_Buf; N : in out Natural; S : String;
+               From : Positive; Count : Natural)
+            is
+               Fields : Field_Array;
+               Cnt    : Natural;
+            begin
+               Split (S, Fields, Cnt);
+               if Cnt < From + Count - 1 then
+                  raise Parse_Error with "recording line too short";
+               end if;
+               for I in 0 .. Count - 1 loop
+                  Buf (N + I) :=
+                    To_Element (S (Fields (From + I).Lo
+                                   .. Fields (From + I).Hi));
+               end loop;
+               N := N + Count;
+            end Fill;
+
+            procedure Compare
+              (What : String; Got : Element_Array; Buf : Elem_Buf;
+               Off : Natural)
+            is
+               Same : Boolean := True;
+            begin
+               for I in Got'Range loop
+                  if Got (I) /= Buf (Off + I - Got'First) then
+                     Same := False;
+                     TIO.Put_Line ("  " & What & I'Image & ": got "
+                                   & Image (Got (I)) & " recorded "
+                                   & Image (Buf (Off + I - Got'First)));
+                  end if;
+               end loop;
+               Check (Same, "tier 3 " & Name & ": " & What);
+            end Compare;
+         begin
+            TIO.Open (File, TIO.In_File, Rec_Path);
+            while not TIO.End_Of_File (File) loop
+               declare
+                  S      : constant String := TIO.Get_Line (File);
+                  Fields : Field_Array;
+                  Cnt    : Natural;
+               begin
+                  if S'Length > 0 and then S (S'First) /= '#' then
+                     Split (S, Fields, Cnt);
+                     declare
+                        Op : constant String :=
+                          S (Fields (1).Lo .. Fields (1).Hi);
+                     begin
+                        if Op = "field" then
+                           if S (Fields (2).Lo .. Fields (2).Hi)
+                             /= Field_Name
+                           then
+                              raise Parse_Error with "recording field";
+                           end if;
+                        elsif Op = "ligero" then
+                           if Cnt /= 5
+                             or else S (Fields (2).Lo .. Fields (2).Hi) /= Name
+                             or else Nat (S (Fields (3).Lo .. Fields (3).Hi))
+                                     /= Zk_Rate
+                             or else Nat (S (Fields (4).Lo .. Fields (4).Hi))
+                                     /= Zk_Nreq
+                             or else Nat (S (Fields (5).Lo .. Fields (5).Hi))
+                                     /= Zk_Ncol
+                           then
+                              raise Parse_Error
+                                with "recording: ligero line differs";
+                           end if;
+                        elsif Op = "geometry" then
+                           Check
+                             (Cnt = 9
+                              and then Nat (S (Fields (2).Lo .. Fields (2).Hi))
+                                       = G.Block_Len
+                              and then Nat (S (Fields (3).Lo .. Fields (3).Hi))
+                                       = G.Dblock_Len
+                              and then Nat (S (Fields (4).Lo .. Fields (4).Hi))
+                                       = G.Witnesses_Per_Row
+                              and then Nat (S (Fields (5).Lo .. Fields (5).Hi))
+                                       = NW
+                              and then Nat (S (Fields (6).Lo .. Fields (6).Hi))
+                                       = Lqc'Length
+                              and then Nat (S (Fields (7).Lo .. Fields (7).Hi))
+                                       = G.Num_Witness_Rows
+                              and then Nat (S (Fields (8).Lo .. Fields (8).Hi))
+                                       = G.Num_Quad_Rows
+                              and then Nat (S (Fields (9).Lo .. Fields (9).Hi))
+                                       = G.Total_Rows,
+                              "tier 3 " & Name & ": recorded geometry");
+                        elsif Op = "u_ldt" then
+                           Fill (R_Uldt, N_Uldt, S, 2, Cnt - 1);
+                        elsif Op = "alphal" then
+                           Fill (R_Alphal, N_Alphal, S, 2, Cnt - 1);
+                        elsif Op = "alphaq" then
+                           if Cnt /= 5
+                             or else Nat (S (Fields (2).Lo .. Fields (2).Hi))
+                                     /= N_Alphaq / 3
+                           then
+                              raise Parse_Error with "recording: alphaq";
+                           end if;
+                           Fill (R_Alphaq, N_Alphaq, S, 3, 3);
+                        elsif Op = "u_quad" then
+                           Fill (R_Uquad, N_Uquad, S, 2, Cnt - 1);
+                        elsif Op = "idx" then
+                           for I in 2 .. Cnt loop
+                              R_Idx (N_Idx) :=
+                                Nat (S (Fields (I).Lo .. Fields (I).Hi));
+                              N_Idx := N_Idx + 1;
+                           end loop;
+                        elsif Op = "ldt" then
+                           Fill (R_Ldt, N_Ldt, S, 2, Cnt - 1);
+                        elsif Op = "dot" then
+                           Fill (R_Dot, N_Dot, S, 2, Cnt - 1);
+                        elsif Op = "dot_sum" then
+                           R_Want  := To_Element
+                             (S (Fields (2).Lo .. Fields (2).Hi));
+                           R_Proof := To_Element
+                             (S (Fields (3).Lo .. Fields (3).Hi));
+                           Have_Sum := True;
+                        elsif Op = "quad" then
+                           Fill (R_Quad, N_Quad, S, 2, Cnt - 1);
+                        elsif Op = "verdict" then
+                           Verdict := S (Fields (2).Lo .. Fields (2).Hi) = "ok";
+                        elsif Op = "end" then
+                           Ended := True;
+                        else
+                           raise Parse_Error
+                             with "recording: unknown line " & Op;
+                        end if;
+                     end;
+                  end if;
+               end;
+            end loop;
+            TIO.Close (File);
+            if not Ended or else not Have_Sum or else not Verdict
+              or else N_Uldt /= Num_Wq_Rows (G) or else N_Alphal /= B'Length
+              or else N_Alphaq /= 3 * Lqc'Length
+              or else N_Uquad /= G.Num_Quad_Rows
+              or else N_Idx /= G.Num_Queries
+              or else N_Ldt /= 2 * G.Num_Queries
+              or else N_Dot /= 2 * G.Num_Queries
+              or else N_Quad /= 2 * G.Num_Queries
+            then
+               raise Parse_Error with "recording " & Rec_Path & " incomplete";
+            end if;
+            --  The steps of LigeroVerifier::verify, each compared.
+            Transcript.Write_Bytes (Default_Statement_Hash);
+            declare
+               NQ   : constant Natural := G.Num_Queries;
+               Ch   : LV.Challenges
+                 (Ldt_Last    => Num_Wq_Rows (G) - 1,
+                  Alphal_Last => B'Length - 1,
+                  Alphaq_Last => 3 * Lqc'Length - 1,
+                  Quad_Last   => G.Num_Quad_Rows - 1);
+               Idx  : LV.Column_Indices (0 .. NQ - 1);
+               Good : Boolean;
+               Same : Boolean;
+            begin
+               LV.Draw_Challenges (G, B'Length, Lqc'Length, Ch);
+               Compare ("u_ldt", Ch.U_Ldt, R_Uldt, 0);
+               Compare ("alphal", Ch.Alphal, R_Alphal, 0);
+               Compare ("alphaq", Ch.Alphaq, R_Alphaq, 0);
+               Compare ("u_quad", Ch.U_Quad, R_Uquad, 0);
+               LV.Absorb_Polynomials (G, P);
+               LV.Choose_Columns (G, Idx);
+               Same := True;
+               for K in Idx'Range loop
+                  if Idx (K) /= R_Idx (K) then
+                     Same := False;
+                     TIO.Put_Line ("  idx" & K'Image & ": got" & Idx (K)'Image
+                                   & " recorded" & R_Idx (K)'Image);
+                  end if;
+               end loop;
+               Check (Same, "tier 3 " & Name & ": idx");
+               Check (not Transcript.Is_Exhausted,
+                      "tier 3 " & Name & ": generator exhausted");
+               LV.Verify_Merkle (G, Zk_Root, P, Idx, Good);
+               Check (Good, "tier 3 " & Name & ": verify_merkle");
+               declare
+                  T_Block  : L.Table (0 .. G.Block_Len - 1, 0 .. NQ - 1);
+                  T_Dblock : L.Table (0 .. G.Dblock_Len - 1, 0 .. NQ - 1);
+                  Yc, Yp   : Element_Array (0 .. NQ - 1);
+                  A_Full   : Element_Array (0 .. LV.Vector_Len (G) - 1);
+                  Want, Pd : Element;
+                  St_Dot   : Verifier_Status.Status;
+               begin
+                  LV.Build_Tables (G, Idx, T_Block, T_Dblock, Good);
+                  Check (Good, "tier 3 " & Name & ": tables (Matrix_Failed)");
+                  LV.Verify_LDT (G, P, Ch.U_Ldt, T_Block, Yc, Yp, Good);
+                  Compare ("ldt yc", Yc, R_Ldt, 0);
+                  Compare ("ldt yp", Yp, R_Ldt, NQ);
+                  Check (Good, "tier 3 " & Name & ": verify_ldt");
+                  LV.Build_A_Full (G, A, Lqc, Ch.Alphal, Ch.Alphaq, A_Full);
+                  LV.Verify_Dot (G, B, P, A_Full, Ch.Alphal, T_Block,
+                                 T_Dblock, Yc, Yp, Want, Pd, St_Dot);
+                  Compare ("dot yc", Yc, R_Dot, 0);
+                  Compare ("dot yp", Yp, R_Dot, NQ);
+                  Check (Want = R_Want, "tier 3 " & Name & ": want_dot got "
+                         & Image (Want));
+                  Check (Pd = R_Proof, "tier 3 " & Name & ": proof_dot got "
+                         & Image (Pd));
+                  Check (St_Dot = Ok, "tier 3 " & Name & ": verify_dot "
+                         & St_Dot'Image);
+                  LV.Verify_Quad (G, P, Ch.U_Quad, T_Dblock, Yc, Yp, Good);
+                  Compare ("quad yc", Yc, R_Quad, 0);
+                  Compare ("quad yp", Yp, R_Quad, NQ);
+                  Check (Good, "tier 3 " & Name & ": verify_quad");
+               end;
+            end;
+         end;
+      end;
+   end Check_Ligero;
+
    procedure Check_Replay
      (Name : String;
       C    : Circuit;
@@ -371,6 +691,10 @@ package body Sumcheck_KAT_Generic is
             end loop;
          end if;
          Check (Same, "tier 3 " & Name & ": core on the replayed record");
+         --  Stage 5: the Ligero verifier continues on this transcript.
+         if Same then
+            Check_Ligero (Name, C, A2, B2, Lqc2);
+         end if;
       end;
       --  A proof with a non-canonical element must be refused, for the
       --  fields that reject encodings: every byte of the first element
@@ -390,6 +714,8 @@ package body Sumcheck_KAT_Generic is
       end if;
       Have_Zk := False;
       Have_Zk_Sumcheck := False;
+      Have_Zk_Ligero := False;
+      Zk_Nonce_Given := [others => False];
    end Check_Replay;
 
    procedure Finish_Tier3 is
@@ -845,6 +1171,38 @@ package body Sumcheck_KAT_Generic is
             end if;
             Hex_Into (F (3), Zk_Sumcheck, Zk_Sumcheck_Len);
             Have_Zk_Sumcheck := True;
+         elsif Op = "zk_ligero" then
+            if Count /= 6 then
+               raise Parse_Error with "zk_ligero expects 5 values";
+            end if;
+            if not Have_Zk or else Zk_Name (1 .. Zk_Name_Len) /= F (2) then
+               raise Parse_Error with "zk_ligero before its zk_proof line";
+            end if;
+            Zk_Rate := Nat (F (3));
+            Zk_Nreq := Nat (F (4));
+            Zk_Ncol := Nat (F (5));
+            Hex_Into (F (6), Zk_Ligero, Zk_Ligero_Len);
+            Have_Zk_Ligero := True;
+         elsif Op = "zk_nonce" then
+            if Count /= 4 then
+               raise Parse_Error with "zk_nonce expects 3 values";
+            end if;
+            if not Have_Zk or else Zk_Name (1 .. Zk_Name_Len) /= F (2) then
+               raise Parse_Error with "zk_nonce before its zk_proof line";
+            end if;
+            declare
+               K   : constant Natural := Nat (F (3));
+               Len : Natural;
+            begin
+               if K >= Max_Nonces then
+                  raise Parse_Error with "zk_nonce index too large";
+               end if;
+               Hex_Into (F (4), Zk_Nonces (K), Len);
+               if Len /= 32 then
+                  raise Parse_Error with "zk_nonce must be 32 bytes";
+               end if;
+               Zk_Nonce_Given (K) := True;
+            end;
          elsif Op = "claim" then
             --  Optional intermediate claims: parsed and accepted; the
             --  comparison of intermediate claims is not implemented

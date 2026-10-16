@@ -407,7 +407,10 @@ ZERO_CIRCUIT_ID = bytes(32)
 
 # label, root, sumcheck part (hex), field, recording file; the sumcheck
 # part is the 768 (384) bytes that follow the root in the complete
-# serialisation of B.3.2 (B.3.3).
+# serialisation of B.3.2 (B.3.3). Stage 5 (ADR 0040): the configuration
+# (RATE_INV, NREQ, NCOL), the Merkle nonces listed in B.3.1 and the
+# Ligero part, the 4652 (2632) bytes that follow the sumcheck part to
+# the end of the serialisation (Section 7.4).
 B3_PROOFS = [
     {
         "name": "b3_2_sgonal",
@@ -441,6 +444,163 @@ B3_PROOFS = [
             "bde5320999b8682f9ef6c05744395290815697ca993103f0c0a7704730a05212"
         ),
         "recording": "upstream/sumcheck_core_p256_b3_2_sgonal.txt",
+        "config": (4, 6, 64),
+        "nonces": [
+            "d406ef8c46fd239545520a5363d67d61bad1750d37b087c1e3611a12d47e477f",
+            "5fe986cae604828cae4bfbbc7415d64cd5e755848755a0d9d3120ad46eea8d86",
+            "0fa8593d45fef897767ce05ec5feac76d8f21910bc0ada856aeaa777629048ef",
+            "63619b9a06c668a2414e46f859a2fdb1ba63e8718fa6ce4bf532b2fb0b8ff4ef",
+            "c9e35514c0ff4b62cb9730116947bef69325f3a4c1c6553b7bd161754f8008d8",
+            "057ec47e747c61954419b634dec16eb6adfeafb1a0e9fafbb2a9c85fcf9bced4",
+        ],
+        "ligero": (
+            "76b5b1ff2c0f08b364e0c90463874b7a76aead588a0578abd97995a7acc018fa"
+            "a3616f94202b67601ace16cfa22118b6d3c358a9602db7b4c41cf3cad18f0c45"
+            "016e975539c3308d01c6398983c249a7d7ef16b56c075d2e5768ce4548dcc4e8"
+            "9a69487862c72b530ad0c86d0254b5324e20a9fbbe424505cf354e3e8ef74eca"
+            "ca42ce218f8ebddeaf17a46e31016bff10c73496d511ca71d3ee15fdbb7a3904"
+            "bfae54b1581beb69cc2b0c890fbb74baa431eec4cef4ad02df96f82bd5ac46c4"
+            "e26c97007a5377b096adaf4679a39b6322eefeaf4d2a596964457f7e40d658af"
+            "1a489d73d0f0d9aebd01703f10423f096f352b2eceba178e81e9917eaa5f1df0"
+            "fc7b7dff769848968a09789ab02a54b6c1176e34a9a8f1da2cf19ae2c37d05a5"
+            "42407401e53e23a3c2f1c0427578f71933f335ef419a3804338629c5b05220ff"
+            "077d527eeb62fa14e6410ddd2bfd704eabf68ae2eff1c3df789acd0b651dddfa"
+            "7569c524daad94e3b0c16c5bfe9ae509c138e1c6164c18b17047b6aa08d4b490"
+            "b227ebe71d884fd6b6c64b3aedf6a184e8f2364ce58365210b22f9be3527f219"
+            "e97845a53f0d975f26e97125bb2125223f9a86202ac62ca3c4e650295d2eda82"
+            "4aaee83318308714b3c37ba11b7f4c92c1a53eb9279c473610e2ce9dacf55993"
+            "f1cb794852fe80c1be4f203c82422826a72eb7ce93a806f709d998504f785cbf"
+            "cce45c56c3ee3154074e99a3c2e53fea547119ea179ec7d0bfe784556b25d7d6"
+            "e56fe095b33f2d05e5ac1b8c3fd581811c57648bbef03dad260649070a2446c8"
+            "592f3e7693a2f1e9ee86473788840517e38d6bc99e2919b3994a6b6a35efb0b6"
+            "a37225353d4663a61636cfcd81ae2164027586165b804d3ff9e818774b6dce75"
+            "b32aa849cc964bdaef98457cf2abf90544087d3eaf9dff4897285934cfb6ce49"
+            "298d4479739de6f80581c0398ba30cffed7b093c3bc2074b558059a7db87ade7"
+            "6ad0348c4ec12499b8d0d3e03a354d27eb901485cea2b58edf01e0859e694c70"
+            "4bb12f2d28227166b476d676f009e4e302fda4ca5ec0692dede769ae800be3e6"
+            "14f3f5ff2552fc2528c94b24fcf74f8b61e0ea76903dca73afb62b35b9fac7dc"
+            "0bcaad0c17267683aac5e823cd6dbd796f3210dea30491d5bd2d8dd6daabda79"
+            "213dc3956200cacee1dc8319a3de252f3fb8df6079cc2f4be51c873be5f66681"
+            "03c9d8a4a5c505bcdd14174eeb1f3c82c156d2d3bc57f68501b9d5ba5af10372"
+            "797b1a93d738c013c0625833861ffdfaf7a9b0e00f8a33a41f87d72100f75b4b"
+            "70e8ded7b9a0f44f954915faf6bfc721b367698abcc6b33be195e2a99a326997"
+            "af0568a9f0e5b65984ec416b715d9f2b2b9ad742eb051fd7c29d0f1c955050b5"
+            "c38dd1c85c09b1e080ff0dc9c8f10de0d86d07ddbb98267f3c3bf27ae62bac92"
+            "2a62ecbe8c8e1a78b1c19ab25dbf95c52ac077a2610063ac19382d149a18e54a"
+            "b3b7a843250a186d8540184df41bd5a6be7e3660ef28bba8bb9f4407dbd3b638"
+            "a30e4a18c7f60404ec06872065179fc55a1195ced24ef2b3798a28acbfbc320a"
+            "c4d8b1850e6bfb3d3a5730d29bd3f93d6530cccc5f669a058bf14590ce383f60"
+            "93a386a01cfa72cc429a3d127939fbb73778a8ce92202c29ccdb61fedef35cb7"
+            "d6cbc98d559f81afd81a472dc8cfbf47074731f18ee4b8871ec5c7508328ad16"
+            "319c11de3dd35de85e9000a8c8dd77947a60221cc16b8278d4b03bf6858c252c"
+            "1c19b7fbb432c39fe6db2f04bc7e7ffbda7afef966eaffc1a10e271f688c6f5f"
+            "c95328f94196dff3a42b5e7c4960b5e457aa322afeaddf2dd4cc756e7379bf32"
+            "66faf76c4153d4bfbef3fcd2fad88b1e7e7d78246cbfa96b7f9edbedf02d210d"
+            "c247ed0fd14218243eb3c6cd0866cd2cd49f84a567c780b1d15ad44e5ecb916b"
+            "0819bb8d57ac002a7b007a35c4fdd3fa48694131a637482f781666a3d69c5010"
+            "d406ef8c46fd239545520a5363d67d61bad1750d37b087c1e3611a12d47e477f"
+            "5fe986cae604828cae4bfbbc7415d64cd5e755848755a0d9d3120ad46eea8d86"
+            "0fa8593d45fef897767ce05ec5feac76d8f21910bc0ada856aeaa777629048ef"
+            "63619b9a06c668a2414e46f859a2fdb1ba63e8718fa6ce4bf532b2fb0b8ff4ef"
+            "c9e35514c0ff4b62cb9730116947bef69325f3a4c1c6553b7bd161754f8008d8"
+            "057ec47e747c61954419b634dec16eb6adfeafb1a0e9fafbb2a9c85fcf9bced4"
+            "00000000540000002b520d64d1a48758b4e6b56b93cda7b71767e41aa21bc5a4"
+            "02f968032a5d990b35d916cce85bc34911ea5f3413ae54313eb9ac0de227c114"
+            "4dfc0835d6ac56fb37cda5179524c5390e72928bf48c4d7f2c6ead37d9cbf9b5"
+            "3f4219ed6ba49b8620a6a6ea318ea301b442a8be1c6198b0950ff8e748772dd2"
+            "08758a9b6d4ada5bb54472abd5aef2cf83f64227b8e8528f6883130523388ac2"
+            "49501c5678fce39ee6098cf92e675f98ca0fd7f16d83f18879a6a54196a2bf0c"
+            "c8222d791e9870ab8444ab45f7abf52736bd00b8e1583f31faf872d474aab750"
+            "3100adaa4eabed15dd194b4ce7576b58e33ca6c044b104545764d9af7b7708cb"
+            "8a9d7d2eb82564c24b9ec487aca878ac6f243cf89dccff327fa5c61698a0f14f"
+            "33ddfadccd7748482c72c5234b5a2663256ac36644692aaeab1038b87c40be58"
+            "2d28d495f9042be70a724e89c5462323ca1dca74273a6f2bd8f8b1f51c7da4f0"
+            "f66732d4040d29c916ac01b6e1f7cd411a8783caf37f0b8fc60c330c6fe1377f"
+            "956273ebd37c6aa2acb55ed76b7589c4e4ab006085057f301369f9b4407745ec"
+            "25420dad03bc2c134efe1ad4dd9ef9f03a617f79c69a4d90e44c2ccf48ac1ea1"
+            "f7450fe7b1603ec96e70400ec7ed1d645e13161a9c42a7aee7922a3910d9c7a4"
+            "a2375849375f8c408d7ce8eedc7fd61082f91483d4ae597530423109fae058b9"
+            "0f43f63f397e1afe4ad76b9d73be712c9ce50c5feaa4ccff48f9053f130a04ce"
+            "e5121781f4ca524e9bc381bf627dcac1aabb1cb6781b4510874f60a8e1c18801"
+            "6e6b49f67827c9512b3f2b3d412b35b3e371e6f40014d975f54c54e0f404d6cb"
+            "999196504009a891b0f2710df5054a387cdc5cb7bb147f154e1d335197824102"
+            "34e6e1f001e511e3896b61ac9e75d111da33a0c3c91414f37ba8b169809e7354"
+            "53e9698f643af6f1b76feb3f50f8e65f42e8803d2f128e36928c021a8a8e8411"
+            "a9f02d36efc09a1f71cee349a36dc6162254eb04210eb08cae8e955a5720891f"
+            "d89f5b7bd61c0e0bf62471a70e8f8ca8addde0aba195388d60452fa98ec72d5a"
+            "a4751a3a820db5e869cc80f2f9a62d18f7367d1c1ad339dfd5760dc9c11b244a"
+            "52d7275349a721d80939f2143bed6891a68b950946453c7efb8c885974e6e250"
+            "9b63aa59278e30b78659f736c5a6f84e9c0e5cfb04de3a06a35e3be04e7d9bf8"
+            "5ee025cf5b4ed1a5038ab30e6d304245c6d5573a3ead0da8de3375985a8c32ca"
+            "06658532f827ca216d8d24c4ce16ae39361b877bf4cd0994394144bb8e52737e"
+            "d70732eea60cf5aec5f474bed7baa5124ec1e454c818da069aee55b9e36b4680"
+            "7b460d5ee2684d650c3ebbe7d5425186e6a63ef2497b4e9028976991850310fa"
+            "ab526bf6a3f0c9800c655aa5bff7cabc560f82d4e885c496d3111025215121ad"
+            "ff4a55487783399b76d3a0e7376fede3865e3558f219d82fc60207d921549c85"
+            "8dfc8c08fddb61e51c776e9650ef8c757f9d52c64793e3b30c87e18bdf0de670"
+            "ddfdfe3785026ea7acabc069bca44ee228d707a03d78d0ef64a1a5c9bf5a66d9"
+            "a5fcc8168954fb699cd74f4568007e9d7d147ea2cabe9e85e00425f60dc89530"
+            "9529d6251a295d883cae2f92cc200a5bcd6616d8125517d95366ce99e151d51a"
+            "3b43784537c55ca470dc003aa92f72a706d9558711fe3cce3603f40d90d041cf"
+            "58b8f3b93d2079b55104ccf9694dcc2dc7b38cd7b3395db8a0b6e570c6f7fbad"
+            "44d44111ef8cbc38c66a26571835f13d66eabd68de56a707508e850b1d8057d3"
+            "bb0389833dd4b0060c0437a75418bcea0ad4d0907c22ebac99ea69f04015635f"
+            "fd217672b5531e2d6484572c4093462c7464f9af152fabe10b8515a160750e24"
+            "6302e640d837778443985dabcab9a19e9ebfbabb1d511f8fbd1ce7d163c6bc85"
+            "513a3954876f064d855de13479202a87c513db6f43efcf3fe734c740606c1aa4"
+            "3d5c42a3807a8c06e25c4952bbb951b4d58269d67016e301b8660cae3bf4ebe5"
+            "56cbc7ba99b0b020cb52faffffc9ba2f9cd6d88e91cabbed8f9c325785b98851"
+            "13198b52bd28324c1f332b82accf2055642c4af0cae07c1bf46f9cafecd81d1a"
+            "efe8e3b777f19ecdd3a6e921faae6e1d8e20764e12dc1d02917ae0dfeb1cdad1"
+            "07c1744b980c9405d8d3ff53869e77c1e299d419216ad68894fcee7e4328b3b3"
+            "47abd813f9a833f32cf932591570bebfe056b5b98ffb614e576192a4d4af8b74"
+            "0216d833d7334eb9eab0334c635f86c681d6c9c9327f179963b6982b1853eb50"
+            "e7d57b760c190735ccd5835d669b10fb5ac684d3086abb77b5252aff7d2b7f80"
+            "8561a7a54af2573e605ecf373e1f3d5525b83dc45bf33a8cc79fd3114c1d4d94"
+            "395f0e9611ae3021839f6f81c072ef6b6044e735c5f269a23686f9d566a26782"
+            "c12bf5db4660330f123a54d70aa6e55d6293da388a73ecf15f6693cd86dd8352"
+            "5003b1cdd22bf5af0bb25ea5ded5c5bff67a06284c9236883eb6aa4b8ea0d94c"
+            "588a777b54da4bade065be29ce4d1c1a91d24624562f20cd7e6b4ec25fc0699c"
+            "2cc4c815b8c3bd973bb93d0811afd518e7db3c94ef99331a0eab493f88c47f14"
+            "c47dde5b647628baa1743fffba43b69fa5a7004ed8b061d0bf599cd7a880d204"
+            "85b51c51bd3de82f01123357546eddfdd002223cfb33f23e97b9df42a04379be"
+            "4447b2a6c30eaa849e9179e334561b05c83d9a489cc5b4e4ee00c5668a89631c"
+            "6cd1b5add22e5fdf680b4755841fb5e1e806b7cc6709d94e3d9fe184388f17f2"
+            "6a947d58a95881c73bf7ec078cb3c6c8bee6b48e898da3dade41a871977e54a1"
+            "047038edb550b7eadd781888e15d7796940d0999c3104bdebbfbbe716c584f3b"
+            "d31326de132ec74bcbd1294f9b6ab57eba429b36c242ef34d36bbaec8d428828"
+            "69f26949568a7bbee76b77f54f40002eaa717071e002a8a29dd7fd6ebd7df381"
+            "1e090ac3117df4e30e8868b26d4cf4c3437b1a53f14bf515798fe3a5001a7bfc"
+            "0a8caeef488175e9d8836a28ba65461462c16ab66c0a8d8148f3b84c0a6a4cba"
+            "fa900bc09c4f319f578644ff618d50496d2b2d1e63f8232b263308bb55afcb77"
+            "232f210c1677d84df6d9309fc40e551b15458c635b5c3edbf88aceb4973d9fdb"
+            "c2750b1fff5f96ac8c54dc83bdbdec3dc01d34e510509377e69eff08ad3d5b12"
+            "0c72e8a432e627982b11b6dec534a3423bb529c527637171825bc1990501ee48"
+            "0b23711803a4a3c48372fb266759c496ad4d6a56299f7b379a783d07aa30cc45"
+            "b1f0094995a5aa0791f4b5309f43295fbb71a20e0bc4addb75589d8e577650b1"
+            "109b969f8ffe6f26b957c263f38419bb67e4e651adba049a41fa861772f036c1"
+            "72ecf3d8742590996ee4951e608b384c1e6764c1618de6548d239a6325fbed92"
+            "33f6e0da4e1775d718a1e5f744b2858f67c585a54c912e7ea58dfb58d1ed2ebb"
+            "7149f6f1019e0ec86e64c3e70fba3f0b8462a5401655ecf7386e9f7040098995"
+            "fd83be5336c1c9b063458f3a327bd5d5753e73a96fc2f86a2610f18e3fb51731"
+            "09c65bb95bb2232785241f472597ba75969369ee893dfeaeee6307256db5a8fd"
+            "3294cee178863db9c8dbe711aef2f709da7cc9be00aba6e43266acc4870b69b4"
+            "74f3639e5d04c3064ee652fc5ea5afee2d5f7d7e2d1a3a95868c9f2524934ba5"
+            "3673cd1e76ea8390f07b9d73bedf84a753b37d8c5d3e64652c9fe6bd238e5433"
+            "eaac08ff61ea34c3cfcfb6882485766a2658338a60dac5d934899cad1a05688b"
+            "8244e51b29ecfb1c0b000000ed0aea43f9d6715158ff3048e550629bada9ff6c"
+            "99b48d9af59f83236ea427401c22d30673117dfd8c17e7caa1c432f72a661c5e"
+            "cdac243925674d3b168d33b9f29bda3f42a9180c278f91064af6b79e4a251721"
+            "7e457d488e88111c19eaf1aa239215789d94305bd5a975e397af5b5419443803"
+            "bb8a7f63c9450c80a96bffcde555370e8c6bb3a0f2d2ffa3e41d00c6ee362d64"
+            "fa8afa3ffeea6bd8a964cab8911b768452b297bb3bc7930eb61c5ad38dc7aa31"
+            "0c8368131733f4ce4bea67f4ad5b85bbedc01b9fc28afdee1d52d8204d6b3fb8"
+            "323b3836a858fdc1cf9e7e7ad6fd1e4e8bf95277824ab90310ae2402c4665cf7"
+            "6a478a4726ab63e0ff55ef853e6ed3030d04b66028e7e2b56d12c0fc42aef74d"
+            "0a19ca21bc77143b589e5bc8dffeb34ffa0084c67395ec2f3aea8e4c1c1f9644"
+            "482f364e8471931422be6eb6562d371f966b11e9e0d2c850537f83992f43de66"
+            "9d091b472a5a242731a0156c"
+        ),
     },
     {
         "name": "b3_3_quadratic",
@@ -462,6 +622,100 @@ B3_PROOFS = [
             "ab9b3aec6cd5419edb1bcd616911c2b3898d07c5faf9fa121da18a01f5a1ea9b"
         ),
         "recording": "upstream/sumcheck_core_gf2_128_b3_3_quadratic.txt",
+        "config": (4, 6, 64),
+        "nonces": [
+            "7ef857289b65bef3539deca0df3f44c67bd0f86b02afddd2eaf2df6b9ba36497",
+            "33946263e6da1ec940a9047547a6296f465821313eeb867d988aed265b82eb53",
+            "87b402da5412750ec00175350a9579b1f458b668155ba582d31b5d71331f2d41",
+            "978ee556b7e529dea3e0fbbde3d83fcb11871c478dd3ddb15fc27e628487950e",
+            "1c320449d0bed51ad492d371d066d55c4db059a1c59c267094ae3087746b1e61",
+            "c809ce332b7354d1e4b593f335d980dc1f0579e171a0bd092761a12006f3b544",
+        ],
+        "ligero": (
+            "3edfb458a51019d7ab9d3f0890c1c216c1e4e2b2c087cea41515e0dbe8ae74b8"
+            "923bc6f7ec3396c391e422f440d9b9f85a2e47a8c43682f41bea847fac6ddaa2"
+            "46dab1978ee40772bb75fa4571a773bb3a7e1947eeec8d74b7c42a800a0de3c8"
+            "463fcf42223b5204c34bb261d8708e96695648bbb4bd534dd3a852032a5a23c6"
+            "41e66955d62f95d2bf6acdc16e401aeb355b55f6c7df1fa5493e152633dd67b0"
+            "5451e156baed83c4b6b154e44779cd30d382b43cfb918db00d0f7e6ed000ede9"
+            "1460ec372a93c7263f54666cdf2d558e0a56f62914e46eaee62b19e1b5ba179b"
+            "b96044de94a5964acc4ff7c175f25be4fed23d1096414f307104eaf47e9c756a"
+            "54fbf66e974c607946b689560486601c6d351ce7925a6ffe3d960ace99b9b5fd"
+            "bbb2ca9d8b56736af217f21ed813e517fe4f3c78fcafa0b47a01307fef9dc4d2"
+            "c9fe979532e97d1452034d904db212ffea8c152cdab17bafd8037d519dabe985"
+            "091844be5d630ebba0ba17765839c35543e40162c66ae7b73f9d018c463aaa60"
+            "34545321a445e83fb706b03f4971bc2c28d529d36c5440c2942e9c22908e5a2f"
+            "2347e19b793e15e0852686e29a2029977b3ba6c346ecf3bceca062b5130ac652"
+            "925cbca1da5f99528742bfd37d32710296363d2d2dda271eafe8ffdab7f2c378"
+            "fb56de4804e8dfb0887e504f5b3c0a1c040a91e4ed07a35a487be0f1c1221d2d"
+            "3950c7db515c5e4c557d2508fc8d13c70efc9f99e667f8a0995b9d2b3f15a3b2"
+            "9493a370aa72bece76d5c1614ccac7f8a4427a0cbcf38d7b46249e13ff8a38de"
+            "34baf543b88990809ff36271f33a9c62c4d79ddfb271ec6554430c7eff2ddb38"
+            "0a11f45d772d5f61d051f6c9a4bf188fad665105add63a91c89f9847ea498fd4"
+            "d148fcb439d216593fd6cda35cdd541b70dc213c9ac9f172336743b5d9b9f009"
+            "2358436be52d50ba60e7d7c9c4d75415527f4c04647f433b02b7955421a405ed"
+            "7ef857289b65bef3539deca0df3f44c67bd0f86b02afddd2eaf2df6b9ba36497"
+            "33946263e6da1ec940a9047547a6296f465821313eeb867d988aed265b82eb53"
+            "87b402da5412750ec00175350a9579b1f458b668155ba582d31b5d71331f2d41"
+            "978ee556b7e529dea3e0fbbde3d83fcb11871c478dd3ddb15fc27e628487950e"
+            "1c320449d0bed51ad492d371d066d55c4db059a1c59c267094ae3087746b1e61"
+            "c809ce332b7354d1e4b593f335d980dc1f0579e171a0bd092761a12006f3b544"
+            "5400000084517983aa1a7acab37c5181b97ddb5d183e7a30b7e9884798a1ad13"
+            "33c2c14c61fd3a7d917c0e4537af67339705ac87e322061e9a147d45067342f4"
+            "18a655334b4588edccadd095e883e9aaecffd81c02e951c856dc5ec383fb28cc"
+            "228ccc269c71ba2bf849a9d61bae28f935d474eb5b163f1bee4bbe0dee075869"
+            "b0335e5fe98780182348b1ba71767cc88958065a0403e65c7f95d6de372aced9"
+            "4abd8bbd885d0f6d38451210d7fddbb8523ad24204fbd51152f5ac27a948e9e3"
+            "788f14e7179ad246b576448614fecb01c2d4dd83ee2f5adbaf7750e986c03086"
+            "a13f5be9a5e12e9ff31e8450b0c7623113a70837c5310991f2344e058687333d"
+            "18893813a17939ad8bac01008f045c5711e2bfff6b16d4ed928a078e4a55eb72"
+            "c65500f6f4ef4d02b4363836cdf4e9c82b761e1824c54d7285c1a5f0b3996af3"
+            "088c52df6b9e746c73043aa4262717e733d508761dcac98315686357b39624b9"
+            "912a2bb18e692e87b31ad3f26bd3b3246a678f6b9be9272611c21b6fbb1962e1"
+            "473c76089d9b039fd9b32adb3a614f9644edd80a7e7d9348c675feee9fdc7231"
+            "c50bf481d4b74328bdee990dc0af51f0a9ce68a34340cbf6067d65a1bc5b6406"
+            "9e11b8b1a3bbc72f3c5d517befd88b288ca28f8a2adcb8308eda9e97fb4ab325"
+            "b567524999b568c401c0d94ea358434d786b2349ad878b197df169e78bbbdb20"
+            "08611c7b0ee75ac194c86517ff4e592debce41c3972344dfadc6af0a1c84c1ae"
+            "dd5b6b3c0ab3500a12677c73f8c6aaf7f9526ee5020bb01874d32ee0449c6dd8"
+            "35282a15dea4fabad0dcf06dea8e7b9e55c9a70686756f1f6db32f01b4509685"
+            "21e67614b361c51a3673fb5cf4b313d35b041599d95a54d17de65204a289c04b"
+            "33a33f3d15a58a90b90fe9c0d05894f75c48000e8892866e516f605c58466c06"
+            "52df4df4245cf61ecb43ce23ac6d64259d89a0c02a156957159feef112d16398"
+            "51e0b1b2e97aa138b6b7657ade0eb2df303cba9e4a729e79061ccd89116c56f3"
+            "13a082edb0e311185b2820bec856acf95497f23b04be15e7059206f93db9a683"
+            "7071bff558f8d7ec8ff91c089b7c3baabbf8a8770741d353cb0541383867b0a9"
+            "6dce09199b453bcfeddb8f633797bca30f720faf649c4a67a488ecf4388c5e73"
+            "83cf508114629bf0d2bc0692bcb364748b6a728b2607125c74568624affa5174"
+            "e400c0c17235340b2e9f56010abaf23e594942196c7ff4d4856d264f5bcb330a"
+            "d31030347df134b7f40d68080358488029de0f12d707a15fa0737b04f1c9b3f1"
+            "bf8227cf67201ce2b347f47eb14d1377666c472b1a5fd34dc22002183103944f"
+            "1e277def38512a4c5dabd0b535d2bd02033df67499240c94b625212b1b57b26d"
+            "d82a6b126a9f9d6b92cad7920fa68e4dc4f74ffe46f31c05f2c2b675f6050fd3"
+            "3c865c8a03724f9ff9789500b4ddf43ffe7eda857f7670288c27641fb9dc7c63"
+            "c8a916920cc7c76f6eb3dc9b083444cfb1d77470290f3b671967030db402ffdb"
+            "49fd38f424639cf0aaff985144f29040a3ad1359bddaae36dbba740ee4f0c97b"
+            "194dc7d1742827db2f33965e30fa4f37c8217eaddfc34082526df5755b4338db"
+            "89e4221b919409fad65d1abf4810ef67183ee40a916de209eead26fa5156116f"
+            "9b72440eafde88be86e28a0a04e88fe29e4472b9ccd3a192ae00f6f52baee054"
+            "0251869ec728cd03bb2201bcffcf5bc3d9c345d2b14b4f544363cacaf0c088c5"
+            "6cb8dc0dc8f126136e1b82c0b7577c8a22b1448c1f588c9f34a1fc5a76986f4b"
+            "98a6c4f25a832f48feab33f45e0f48bc9e5a058a0d447d5e0d996b8930d0f824"
+            "8a98542f6e74cc99630b559b7c4c1ccc08e0f1b1bc053347822ea65b7a62c871"
+            "90fcace20c00000090481e0835d39fd8a96a8621f6b07090b791b96bc168be8b"
+            "925875f9651cef09b13b3d19fa1108a15833209497ce19b540a98823b2b717a3"
+            "2336eab1c03722b620c9edc47b837e7e9dbcdeacf6e21e6b7c32bb3667017684"
+            "860a0f3df8e24aeabb3ccd2f56fa81bf67f1cb75f09fa40b53d4f15f0392430a"
+            "00430902b3d88062d100629620fa4365b48a8b1a70d7bfc59766bb8f66746774"
+            "cf468ce1c10d2a494e4309fcf32119b14aaf3bb94b30d100410551a0de356601"
+            "da0289d1573931745b3d015b150bdf91ed0fa201b77bf13f928b7da499f4b9d8"
+            "4ca44d988515ca586768192b8340d3438938f37cd9e78206164622646df66ee8"
+            "e9da522c387dbd783dcead20c990b95f5ca3a75a2fded5094377f65585e0b39f"
+            "d656856db6f3bbcd74ac6c094e80ac1e7b437b0a45249f7f795e969b2f850669"
+            "70895e4bf70c168b2239ed30178e7cde0bb7b317d15f3e632e665cf53e883b8c"
+            "d1301635d74c479c1cea5be7574af47527b3fc7fa49563b3a4d1a19eb5935076"
+            "25b8ba55cbd4ff01"
+        ),
     },
 ]
 
@@ -488,6 +742,108 @@ class FieldCodec:
         if self.field == "p256":
             return t.field_elt(P256_P)
         return int.from_bytes(t.bytes(16), "little")
+
+    # Section 7.2.2: the subfield encoding, 2 bytes on the basis for
+    # GF(2^128), the field's own for P-256.
+    @property
+    def sub_size(self):
+        return 32 if self.field == "p256" else 2
+
+    def from_subfield_bytes(self, b):
+        if self.field == "p256":
+            return self.from_bytes(b)
+        x = int.from_bytes(b, "little")
+        r = 0
+        for i in range(16):
+            if (x >> i) & 1:
+                r ^= GF2_128_BASIS[i]
+        return r
+
+
+# The subfield basis of GF(2^128) (gen_gf2_128_vectors.py,
+# UPSTREAM_SUBFIELD_BASIS), for the subfield runs of Section 7.4.
+GF2_128_BASIS = [
+    0x1,
+    0x5c5971877501d4b8f1871e01b64fda4c,
+    0x8bb99658eaf2cae0a6e310fb6e176ea8,
+    0xb61e08da12f9665c3f8de8a2f9ff7eed,
+    0xa76c2e634c6483ae9ba3282087a3f827,
+    0x54944ff4a5269cedf7af4e93629f689e,
+    0x5439ecfd75a950d8d0765f1873309b88,
+    0x49ecdfbe06777b02e566f9fc3d9b58a2,
+    0x97a401b733e66a9319af205497f8e2d0,
+    0x789fd7793ce7523860e4dbdce9777814,
+    0xaa440b2d4b546256c0f157187adbc05b,
+    0x79f2cadb70b6115d222f207d0d8ad9f9,
+    0xae72af7894ce037df6d1f84fb66c52b8,
+    0xd6f226d783d454db4af94ef056d28a30,
+    0x057d918d494925fc0f37a0a4d91b4220,
+    0x18d4bbb6833c5ae8b683012350e55753,
+]
+
+
+def ligero_geometry(rate_inv, nreq, ncol, nw, nq):
+    """LigeroGeometry::new (Section 4.2), as gen_ligero_vectors.py."""
+    block = (ncol + 1) // (2 + rate_inv)
+    dblock = 2 * block - 1
+    wr = block - nreq
+    nwrow = (nw + wr - 1) // wr
+    nqt = (nq + wr - 1) // wr
+    return {"block": block, "dblock": dblock, "wr": wr, "nwrow": nwrow,
+            "nqt": nqt, "nrow": 3 + nwrow + 3 * nqt, "leaves": ncol - dblock}
+
+
+def read_ligero_part(codec, data, geom):
+    """Section 7.4, read_ligero_proof of ligero/proof.rs transcribed:
+    the four polynomials, the nonces, the run-length coded columns with
+    the rules of the section, the path. Returns (polys, nonces,
+    columns, path)."""
+    pos = 0
+
+    def take(n):
+        nonlocal pos
+        if pos + n > len(data):
+            fail("Ligero part: bytes missing at %d" % pos)
+        v = data[pos:pos + n]
+        pos += n
+        return v
+
+    nreq = geom["nreq"]
+    polys = []
+    for n in (geom["block"], geom["dblock"], nreq,
+              geom["dblock"] - geom["block"]):
+        polys.append([codec.from_bytes(take(codec.size)) for _ in range(n)])
+    nonces = [take(32) for _ in range(nreq)]
+    total = geom["nrow"] * nreq
+    cols = []
+    subfield_run = False
+    zero_runs = 0
+    while len(cols) < total:
+        runlen = int.from_bytes(take(4), "little")
+        if runlen == 0:
+            if cols:
+                fail("Ligero part: zero-length run not first")
+            zero_runs += 1
+            if zero_runs > 1:
+                fail("Ligero part: repeated zero-length run")
+        else:
+            zero_runs = 0
+        if runlen > 2**25:
+            fail("Ligero part: run beyond 2^25")
+        for _ in range(runlen):
+            if subfield_run:
+                cols.append(codec.from_subfield_bytes(take(codec.sub_size)))
+            else:
+                cols.append(codec.from_bytes(take(codec.size)))
+        subfield_run = not subfield_run
+    if len(cols) != total:
+        fail("Ligero part: %d opened elements, %d expected"
+             % (len(cols), total))
+    npath = int.from_bytes(take(4), "little")
+    path = [take(32) for _ in range(npath)]
+    if pos != len(data):
+        fail("Ligero part has %d trailing bytes" % (len(data) - pos))
+    return polys, nonces, cols, path
 
 
 def read_recording(path):
@@ -602,6 +958,19 @@ def check_b3(here):
         if ai != rec["alpha_input"]:
             fail("%s: replayed alpha_input differs from the recording"
                  % proof["name"])
+        # Stage 5: the Ligero part parses by the rules of Section 7.4
+        # for the geometry of the circuit, with the nonces of B.3.1.
+        rate_inv, nreq, ncol = proof["config"]
+        nw = (rec["ninput"] - rec["npublic"]
+              + sum(4 * l["logw"] + 3 for l in rec["layers"]))
+        geom = ligero_geometry(rate_inv, nreq, ncol, nw, len(rec["layers"]))
+        geom["nreq"] = nreq
+        polys, nonces, cols, path = read_ligero_part(
+            codec, bytes.fromhex(proof["ligero"]), geom)
+        if [n.hex() for n in nonces] != proof["nonces"]:
+            fail("%s: the nonces read differ from B.3.1" % proof["name"])
+        if len(path) > 2 * geom["leaves"]:
+            fail("%s: path longer than the tree" % proof["name"])
 
 
 def write_zk_proofs(out):
@@ -615,9 +984,14 @@ def write_zk_proofs(out):
             "# recording of the same circuit (ADR 0032).",
             "# Generated by gen_transcript_vectors.py (this directory); do not"
             " edit by hand.",
+            "# Stage 5 (ADR 0040): the configuration and the Ligero part",
+            "# (Section 7.4), the bytes that follow the sumcheck part, and",
+            "# the Merkle nonces listed in Appendix B.3.1.",
             "# Lines:",
             "#   zk_proof <circuit> <label> <root> <circuit identifier>",
             "#   zk_sumcheck <circuit> <bytes>",
+            "#   zk_ligero <circuit> <rate_inv> <nreq> <ncol> <bytes>",
+            "#   zk_nonce <circuit> <k> <32 bytes>",
             "# all byte strings as hex in memory order; the label is the",
             "# ASCII string of the upstream unit test, the identifier its 32",
             "# zero bytes.",
@@ -626,7 +1000,10 @@ def write_zk_proofs(out):
             "zk_proof %s %s %s %s" % (proof["name"], proof["label"].hex(),
                                       proof["root"], ZERO_CIRCUIT_ID.hex()),
             "zk_sumcheck %s %s" % (proof["name"], proof["sumcheck"]),
-        ]
+            "zk_ligero %s %d %d %d %s" % ((proof["name"],) + proof["config"]
+                                           + (proof["ligero"],)),
+        ] + ["zk_nonce %s %d %s" % (proof["name"], k, n)
+             for k, n in enumerate(proof["nonces"])]
         (out / ("zk_proof_%s_%s.txt" % (proof["field"], proof["name"][:4]))
          ).write_text("\n".join(lines) + "\n")
 

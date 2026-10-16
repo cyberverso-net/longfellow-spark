@@ -32,16 +32,27 @@ with Sumcheck_Algebra;
 with Sumcheck_Expression;
 with Sumcheck_Verifier;
 with Sumcheck_Transcript;
+with Ligero_Proof;
+with Lagrange;
+with Ligero_Verifier;
 
 generic
    with package SA is new Sumcheck_Algebra (<>);
    with package SE is new Sumcheck_Expression (SA => SA);
    with package SV is new Sumcheck_Verifier (SA => SA, SE => SE);
    with package ST is new Sumcheck_Transcript (SA => SA, SE => SE, SV => SV);
+   with package LP is new Ligero_Proof (SA => SA);
+   with package L is new Lagrange (F => SA.F);
+   with package LV is new Ligero_Verifier (ST => ST, LP => LP, L => L);
    Field_Name : String;
    with function To_Element (S : String) return SA.Element;
    with function Image (E : SA.Element) return String;
 package Sumcheck_KAT_Generic is
+
+   --  The slow cases (ADR 0041): the P-256 Ligero verifier end to end,
+   --  about twelve minutes with assertions on. Run only when set; the
+   --  main sets it on the --slow argument.
+   Run_Slow : Boolean := False;
 
    --  Runs every case of the file; counts are accumulated.
    procedure Run_File (Path : String; Passed, Failed : in out Natural);

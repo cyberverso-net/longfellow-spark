@@ -12,3 +12,6 @@ lib/
 # test harness build
 /tests/obj/
 /tests/bin/
+
+# Python caches of the vector generators
+__pycache__/
