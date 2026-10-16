@@ -15,10 +15,14 @@
 
 pragma SPARK_Mode (On);
 
+with Interfaces; use Interfaces;
+with Bytes;
 with GF2_128;
 with Field_Signature;
 
 package Field_GF2_128 is
+
+   use type GF2_128.Element;
 
    --  Logical equality for contracts (see Field_Signature). The body
    --  is the predefined "=", outside SPARK; the provers treat Same as
@@ -41,6 +45,27 @@ package Field_GF2_128 is
    L2_Den_Inv : constant GF2_128.Element :=
      (Limbs => [0 => 16#BBA8CCEB20D1E478#, 1 => 16#719369BF51AE3A8E#]);
 
+   --  Inv checked at run time (ADR 0037): Ok exactly when R * D = One,
+   --  which the body computes and compares; nothing is assumed of Inv.
+   procedure Checked_Inv
+     (D : GF2_128.Element; R : out GF2_128.Element; Ok : out Boolean)
+   with Global => null,
+        Post   => (if Ok then GF2_128.Mul (R, D) = GF2_128.One);
+
+   --  reed_solomon_eval_point of the reference: the injection of x
+   --  through the subfield basis.
+   function Eval_Point (X : Natural) return GF2_128.Element is
+     (GF2_128.Inject (X))
+   with Pre => X < 2**16;
+
+   --  Section 7.2.2: two bytes little-endian, the coordinates on the
+   --  basis. Every string is an element.
+   procedure From_Subfield_Bytes
+     (B : Bytes.Byte_Array; E : out GF2_128.Element; Ok : out Boolean)
+   with Global => null,
+        Pre    => B'Length = 2,
+        Post   => Ok;
+
    package Sig is new Field_Signature
      (Element    => GF2_128.Element,
       Zero       => GF2_128.Zero,
@@ -57,6 +82,11 @@ package Field_GF2_128 is
       Serialized_Size  => 16,
       To_Bytes         => GF2_128.To_Bytes,
       From_Bytes       => GF2_128.From_Bytes,
-      Sampling_Rejects => False);
+      Sampling_Rejects => False,
+      Checked_Inv      => Checked_Inv,
+      Eval_Point       => Eval_Point,
+      Max_Eval_Point   => 2**16 - 1,
+      Subfield_Size    => 2,
+      From_Subfield_Bytes => From_Subfield_Bytes);
 
 end Field_GF2_128;

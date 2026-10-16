@@ -12,10 +12,13 @@
 
 pragma SPARK_Mode (On);
 
+with Bytes;
 with P256_Field;
 with Field_Signature;
 
 package Field_P256 is
+
+   use type P256_Field.Element;
 
    --  Logical equality for contracts (see Field_Signature). The body
    --  is the predefined "=", outside SPARK; the provers treat Same as
@@ -35,6 +38,23 @@ package Field_P256 is
      (Limbs => [16#FFFFFFFFFFFFFFFE#, 16#00000000FFFFFFFF#,
                 16#0000000000000000#, 16#FFFFFFFF00000001#]);
 
+   --  Inv checked at run time (ADR 0037): Ok exactly when R * D = One,
+   --  which the body computes and compares; nothing is assumed of Inv.
+   procedure Checked_Inv
+     (D : P256_Field.Element; R : out P256_Field.Element; Ok : out Boolean)
+   with Global => null,
+        Post   => (if Ok then P256_Field.Mul (R, D) = P256_Field.One);
+
+   --  reed_solomon_eval_point of the reference: the integer x.
+   function Eval_Point (X : Natural) return P256_Field.Element is
+     (P256_Field.Of_Natural (X));
+
+   --  The subfield of P-256 is P-256 itself: the encoding of 7.2.1.
+   procedure From_Subfield_Bytes
+     (B : Bytes.Byte_Array; E : out P256_Field.Element; Ok : out Boolean)
+   with Global => null,
+        Pre    => B'Length = 32;
+
    package Sig is new Field_Signature
      (Element    => P256_Field.Element,
       Zero       => P256_Field.Zero,
@@ -51,6 +71,11 @@ package Field_P256 is
       Serialized_Size  => 32,
       To_Bytes         => P256_Field.To_Bytes,
       From_Bytes       => P256_Field.From_Bytes,
-      Sampling_Rejects => True);
+      Sampling_Rejects => True,
+      Checked_Inv      => Checked_Inv,
+      Eval_Point       => Eval_Point,
+      Max_Eval_Point   => Natural'Last - 1,
+      Subfield_Size    => 32,
+      From_Subfield_Bytes => From_Subfield_Bytes);
 
 end Field_P256;

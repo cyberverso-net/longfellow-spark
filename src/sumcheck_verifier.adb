@@ -62,17 +62,71 @@ package body Sumcheck_Verifier is
       end if;
    end Lemma_Proof_Mono;
 
-   procedure Lemma_Pad_Step (C : Circuit; J : Natural; Base : Natural) with
-     Ghost, Global => null,
-     Pre  => J <= C.Last_Layer and then Base <= Max_Wires,
-     Post => Pad_Off (C, J + 1, Base) = Pad_Off (C, J, Base) + Pad_Size (C, J);
-
    procedure Lemma_Pad_Step (C : Circuit; J : Natural; Base : Natural) is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Pad_Off);
    begin
       null;
    end Lemma_Pad_Step;
+
+   procedure Lemma_Pad_Mono (C : Circuit; I, J : Natural; Base : Natural) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Pad_Off);
+   begin
+      if J > I then
+         Lemma_Pad_Mono (C, I, J - 1, Base);
+      end if;
+   end Lemma_Pad_Mono;
+
+   --  The terms Constrain_To_Be_Zero appended from an expression below
+   --  Bound are below Bound: the instantiation from the term index K to
+   --  the expression index K - Start + 1, made once here.
+   procedure Lemma_Terms_Below
+     (A     : Ligero_Terms;
+      Start : Natural;
+      E     : Expression;
+      Bound : Natural;
+      Cst   : Natural)
+   with
+     Ghost, Global => null,
+     Pre  => Below (E, Bound)
+       and then A.Count >= E.Length and then Start = A.Count - E.Length
+       and then (for all I in 1 .. E.Length =>
+                   A.Witness (Start + I - 1) = E.Terms (I).V)
+       and then (for all I in 1 .. E.Length =>
+                   A.Constraint (Start + I - 1) = Cst),
+     Post => (for all K in Start .. A.Count - 1 =>
+                A.Witness (K) < Bound and then A.Constraint (K) = Cst);
+
+   procedure Lemma_Terms_Below
+     (A     : Ligero_Terms;
+      Start : Natural;
+      E     : Expression;
+      Bound : Natural;
+      Cst   : Natural)
+   is
+   begin
+      for K in Start .. A.Count - 1 loop
+         pragma Loop_Invariant
+           (for all K2 in Start .. K - 1 =>
+              A.Witness (K2) < Bound and then A.Constraint (K2) = Cst);
+         pragma Assert (A.Witness (K) = E.Terms (K - Start + 1).V);
+         pragma Assert (A.Constraint (K) = Cst);
+      end loop;
+   end Lemma_Terms_Below;
+
+   procedure Lemma_Pads_Below (C : Circuit) is
+      Base : constant Natural := C.Ninput - C.Npublic;
+   begin
+      for J in 0 .. C.Last_Layer loop
+         pragma Loop_Invariant
+           (for all J2 in 0 .. J - 1 =>
+              Pad_Off (C, J2, Base) + 4 * C.Layers (J2).Logw + 3
+              <= Witness_Count (C));
+         Lemma_Pad_Step (C, J, Base);
+         Lemma_Pad_Mono (C, J + 1, C.Last_Layer + 1, Base);
+      end loop;
+   end Lemma_Pads_Below;
 
    ----------------------------------------------------------------------
    --  Constrain_To_Be_Zero
@@ -242,16 +296,35 @@ package body Sumcheck_Verifier is
             CR   : constant Natural := C0 + 2;
             Cl0  : constant Element := Proof.Evals (PO + 4 * Logw);
             Cl1  : constant Element := Proof.Evals (PO + 4 * Logw + 1);
-            --  (Var c0 * cl1 + Var c1 * cl0 + Var cr + cl0 cl1) * eqq
+            --  (Var c0 * cl1 + Var c1 * cl0 + Var cr + cl0 cl1) * eqq,
+            --  piece by piece so that its variables are seen below
+            --  the next layer's pad offset (the Post on the terms).
+            V0   : constant Expression := Scale (Var (C0, Cap), Cl1);
+            V1   : constant Expression := Scale (Var (C1, Cap), Cl0);
+            V01  : constant Expression := Add (V0, V1);
+            V2   : constant Expression := Var (CR, Cap);
+            V012 : constant Expression := Add (V01, V2);
             Prod : constant Expression :=
-              Scale (Add_Constant (Add (Add (Scale (Var (C0, Cap), Cl1),
-                                             Scale (Var (C1, Cap), Cl0)),
-                                        Var (CR, Cap)),
-                                   Cl0 * Cl1),
-                     EQQ);
+              Scale (Add_Constant (V012, Cl0 * Cl1), EQQ);
+            Before : constant Expression := Claim with Ghost;
          begin
+            pragma Assert (Below (V0, CR + 1));
+            pragma Assert (Below (V1, CR + 1));
+            Lemma_Below_Union (V0, V1, V01, CR + 1);
+            pragma Assert (Below (V2, CR + 1));
+            Lemma_Below_Union (V01, V2, V012, CR + 1);
+            pragma Assert (Below (Prod, CR + 1));
+            pragma Assert (Below (Before, CR + 1));
             Claim := Sub (Claim, Prod);
-            Constrain_To_Be_Zero (Claim, A, B, B_Count);
+            Lemma_Below_Union (Before, Prod, Claim, CR + 1);
+            pragma Assert (CR + 1 = Pad_Off (C, J + 1, Base));
+            declare
+               Start : constant Natural := A.Count with Ghost;
+               Cst   : constant Natural := B_Count with Ghost;
+            begin
+               Constrain_To_Be_Zero (Claim, A, B, B_Count);
+               Lemma_Terms_Below (A, Start, Claim, CR + 1, Cst);
+            end;
             Lqc := (X => C0, Y => C1, Z => CR);
             State := (Logv     => Logw,
                       Claim0   => Add_Constant (Var (C0, Cap), Cl0),
@@ -301,12 +374,24 @@ package body Sumcheck_Verifier is
          end;
       end loop;
       declare
-         Got : constant Expression :=
-           Add (State.Claim0, Scale (State.Claim1, Alpha));
+         WC   : constant Natural := Witness_Count (C);
+         SC1  : constant Expression := Scale (State.Claim1, Alpha);
+         Got  : constant Expression := Add (State.Claim0, SC1);
+         Prev : constant Expression := Mle with Ghost;
       begin
+         pragma Assert (Below (Mle, WC));
+         pragma Assert (Below (SC1, WC));
+         Lemma_Below_Union (State.Claim0, SC1, Got, WC);
          Mle := Sub (Mle, Got);
+         Lemma_Below_Union (Prev, Got, Mle, WC);
+         declare
+            Start : constant Natural := A.Count with Ghost;
+            Cst   : constant Natural := B_Count with Ghost;
+         begin
+            Constrain_To_Be_Zero (Mle, A, B, B_Count);
+            Lemma_Terms_Below (A, Start, Mle, WC, Cst);
+         end;
       end;
-      Constrain_To_Be_Zero (Mle, A, B, B_Count);
    end Input_Constraint;
 
    ----------------------------------------------------------------------
@@ -346,12 +431,17 @@ package body Sumcheck_Verifier is
          pragma Loop_Invariant (Below (State.Claim0, Pad_Off (C, J, Base)));
          pragma Loop_Invariant (Below (State.Claim1, Pad_Off (C, J, Base)));
          pragma Loop_Invariant
+           (for all K in 0 .. A.Count - 1 =>
+              A.Witness (K) < Pad_Off (C, J, Base)
+              and then A.Constraint (K) < J);
+         pragma Loop_Invariant
            (for all J2 in 0 .. J - 1 =>
               Lqc (J2) = (X => Pad_Off (C, J2, Base) + 4 * C.Layers (J2).Logw,
                           Y => Pad_Off (C, J2, Base) + 4 * C.Layers (J2).Logw
                                  + 1,
                           Z => Pad_Off (C, J2, Base) + 4 * C.Layers (J2).Logw
                                  + 2));
+         Lemma_Pad_Step (C, J, Base);
          Verify_Layer (C, J, Proof, Ch, Base, State, A, B, B_Count, Lqc (J));
       end loop;
       Input_Constraint (C, Pub, State, Ch.Alpha_Input, A, B, B_Count);

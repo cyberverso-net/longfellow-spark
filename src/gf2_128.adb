@@ -139,4 +139,17 @@ package body GF2_128 is
       E  := (Limbs => Limbs_Of_Bytes (B));
    end From_Bytes;
 
+
+   function Inject (X : Subfield_Value) return Element is
+      R : Element := Zero;
+   begin
+      for I in Basis_Index loop
+         if (X / 2 ** I) mod 2 = 1 then
+            R := Add (R, Subfield_Basis (I));
+         end if;
+         pragma Loop_Invariant (R = Inject_Ref (X, I + 1));
+      end loop;
+      return R;
+   end Inject;
+
 end GF2_128;

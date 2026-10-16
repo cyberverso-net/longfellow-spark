@@ -84,20 +84,6 @@ package body Sumcheck_Transcript is
    --  Serialisation
    ----------------------------------------------------------------------
 
-   function Serialise (Es : Element_Array) return Byte_Array is
-      R : Byte_Array (0 .. Es'Length * Size - 1) := [others => 0];
-   begin
-      for I in 0 .. Es'Length - 1 loop
-         R (I * Size .. I * Size + Size - 1) :=
-           SA.F.To_Bytes (Es (Es'First + I));
-         pragma Loop_Invariant
-           (for all K in 0 .. I =>
-              R (K * Size .. K * Size + Size - 1)
-              = SA.F.To_Bytes (Es (Es'First + K)));
-      end loop;
-      return R;
-   end Serialise;
-
    ----------------------------------------------------------------------
    --  The sampler
    ----------------------------------------------------------------------
@@ -131,8 +117,22 @@ package body Sumcheck_Transcript is
    end Write_Element;
 
    procedure Write_Element_Slice (Es : Element_Array) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Elements_Frame);
+      Ex0  : constant Boolean := Transcript.Is_Exhausted with Ghost;
+      Base : Byte_Seq with Ghost => SPARKlib_Full;
    begin
-      Transcript.Write_Slice (Es'Length, Serialise (Es));
+      Transcript.Begin_Slice (Es'Length);
+      Base := Transcript.Absorbed;
+      for I in Es'Range loop
+         Transcript.Slice_Element (SA.F.To_Bytes (Es (I)));
+         pragma Loop_Invariant
+           (SPARKlib_Full =>
+              Ex0 <= Transcript.Is_Exhausted
+              and then Byte_Seqs.Logical_Eq
+                (Transcript.Absorbed,
+                 Elements_Frame (Base, Es, I - Es'First + 1)));
+      end loop;
    end Write_Element_Slice;
 
    procedure Write_Sumcheck_Statement

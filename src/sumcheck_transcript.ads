@@ -22,7 +22,9 @@
 --    Write_Sumcheck_Statement : Gold, structural (ADR 0023): the frames
 --                       appended to Transcript.Absorbed, stated with the
 --                       ghost frame functions, proof-only as in
---                       Transcript. Serialise is Gold on its layout.
+--                       Transcript; Write_Element_Slice one element at
+--                       a time, its frame by recursion (Elements_Frame,
+--                       ADR 0039).
 --    Begin_Circuit, Begin_Layer, Replay_Challenges : Silver with the
 --                       Exhausted flag sticky; Replay_Challenges fills
 --                       a record whose shape the preconditions fix and
@@ -70,21 +72,22 @@ package Sumcheck_Transcript is
 
    type Status is (Ok, Exhausted, Bad_Element);
 
-   --  At most this many elements in one slice frame; End_Layer writes
-   --  two.
-   Max_Slice : constant := 4096;
-
-   --  The elements, serialised, concatenated in order.
-   function Serialise (Es : Element_Array) return Byte_Array with
-     Global => null,
-     Pre    => Es'Length <= Max_Slice,
-     Post   =>
-       Serialise'Result'First = 0
-       and then Serialise'Result'Length = Es'Length * Size
-       and then
-         (for all I in 0 .. Es'Length - 1 =>
-            Serialise'Result (I * Size .. I * Size + Size - 1)
-            = SA.F.To_Bytes (Es (Es'First + I)));
+   --  S followed by the serialised elements Es (Es'First .. Es'First +
+   --  N - 1), in order (ghost, proof-only). Recursive, hence hidden
+   --  (see Bytes.Add_Zeros); Write_Element_Slice unhides it. A slice
+   --  frame of Es is Elements_Frame over the head of the frame (ADR
+   --  0039: absorbed one element at a time, no serialised copy).
+   function Elements_Frame
+     (S : Byte_Seq; Es : Element_Array; N : Natural) return Byte_Seq
+   is
+     (if N = 0 then S
+      else Append (Elements_Frame (S, Es, N - 1),
+                   SA.F.To_Bytes (Es (Es'First + N - 1))))
+   with
+     Ghost              => SPARKlib_Full,
+     Annotate           => (GNATprove, Hide_Info, "Expression_Function_Body"),
+     Pre                => N <= Es'Length,
+     Subprogram_Variant => (Decreases => N);
 
    ----------------------------------------------------------------------
    --  Section 3.4.3: the sampler
@@ -114,14 +117,14 @@ package Sumcheck_Transcript is
 
    procedure Write_Element_Slice (Es : Element_Array) with
      Global => (In_Out => (Transcript.State, Transcript.Absorbed)),
-     Pre    => Es'Length <= Max_Slice,
      Post   =>
        (SPARKlib_Full =>
           Transcript.Is_Exhausted'Old <= Transcript.Is_Exhausted
           and then Byte_Seqs.Logical_Eq
             (Transcript.Absorbed,
-             Transcript.Slice_Frame
-               (Transcript.Absorbed'Old, Es'Length, Serialise (Es))));
+             Elements_Frame
+               (Transcript.Slice_Header (Transcript.Absorbed'Old, Es'Length),
+                Es, Es'Length)));
 
    --  S followed by the element frames of Pub (Pub'First .. Pub'First
    --  + N - 1), in order (ghost, proof-only). Recursive, hence hidden
@@ -214,9 +217,9 @@ package Sumcheck_Transcript is
           Transcript.Is_Exhausted'Old <= Transcript.Is_Exhausted
           and then Byte_Seqs.Logical_Eq
             (Transcript.Absorbed,
-             Transcript.Slice_Frame
-               (Transcript.Absorbed'Old, 2,
-                Serialise (Claims_Pair (Claim0, Claim1)))));
+             Elements_Frame
+               (Transcript.Slice_Header (Transcript.Absorbed'Old, 2),
+                Claims_Pair (Claim0, Claim1), 2)));
 
    ----------------------------------------------------------------------
    --  The replay and the reader

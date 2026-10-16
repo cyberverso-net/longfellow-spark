@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Amended by [ADR 0041](0041-verification-cadence.md) (2026-10-16): the pre-push hook is withdrawn, the proof gate is `make check` by hand; the harnesses have a slow set run weekly.
 
 ## Date
 

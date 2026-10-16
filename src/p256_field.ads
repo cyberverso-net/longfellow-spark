@@ -280,4 +280,11 @@ package P256_Field is
    with Global => null,
         Post   => Limbs_Of_Bytes (To_Bytes'Result) = E.Limbs;
 
+
+   --  The element X for a natural X (stage 5: the Reed-Solomon
+   --  evaluation point x of the Ligero code, reed_solomon_eval_point).
+   function Of_Natural (X : Natural) return Element with
+     Global => null,
+     Post   => Of_Natural'Result.Limbs = [Unsigned_64 (X), 0, 0, 0];
+
 end P256_Field;

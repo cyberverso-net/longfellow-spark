@@ -71,5 +71,15 @@ generic
    with procedure From_Bytes
      (B : Bytes.Byte_Array; E : out Element; Ok : out Boolean);
    Sampling_Rejects : Boolean;
+   --  Stage 5 (ADR 0036, 0037): a checked inverse, the Reed-Solomon
+   --  evaluation point of column X, and the decoding of a subfield
+   --  element of Subfield_Size bytes (draft Section 7.2.2; the field
+   --  itself for P-256, 2 bytes on the basis for GF(2^128)).
+   with procedure Checked_Inv (D : Element; R : out Element; Ok : out Boolean);
+   with function Eval_Point (X : Natural) return Element;
+   Max_Eval_Point : Natural;
+   Subfield_Size : Positive;
+   with procedure From_Subfield_Bytes
+     (B : Bytes.Byte_Array; E : out Element; Ok : out Boolean);
 package Field_Signature is
 end Field_Signature;

@@ -38,3 +38,10 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md). Records
 | [0032](0032-transcript-vectors.md) | Transcript vectors: Appendix B.2, Appendix B.3 end to end, NIST | Accepted | 2026-10-13 |
 | [0033](0033-parallel-proof-partitions.md) | Parallel proof partitions on the hosted runner | Accepted | 2026-10-15 |
 | [0034](0034-proof-as-information-harnesses-in-parallel.md) | Proof on pull requests as information; harnesses in parallel | Accepted | 2026-10-15 |
+| [0035](0035-stage-5-scope-ligero-and-the-complete-verifier.md) | Stage 5 scope: Ligero and the complete verifier | Accepted | 2026-10-15 |
+| [0036](0036-lagrange-interpolation-instead-of-additive-fft.md) | Reed-Solomon by Lagrange interpolation, not the additive FFT | Accepted | 2026-10-15 |
+| [0037](0037-checked-inv-and-public-data-scope.md) | Checked_Inv, and the public-data scope of the Ligero units | Accepted | 2026-10-15 |
+| [0038](0038-gold-perimeter-for-merkle-and-ligero.md) | Gold perimeter for Merkle and Ligero | Accepted | 2026-10-15 |
+| [0039](0039-sizes-allocation-and-status.md) | Sizes, allocation and the status enumeration | Accepted | 2026-10-15 |
+| [0040](0040-ligero-vectors-and-upstream-instrumentation.md) | Ligero vectors and upstream instrumentation | Accepted | 2026-10-15 |
+| [0041](0041-verification-cadence.md) | Verification cadence: the proof by hand, the slow harness cases weekly | Accepted | 2026-10-16 |

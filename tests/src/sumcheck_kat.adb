@@ -3,11 +3,17 @@
 --
 --  Reads the vector files given as arguments (default: sumcheck_gf2_128.txt
 --  and sumcheck_p256.txt under tests/vectors/, plus every
---  sumcheck_core_*.txt under tests/vectors/upstream/ when present); the
+--  sumcheck_core_*.txt under tests/vectors/upstream/ when present, each
+--  followed by the Ligero verifier on the proof of its circuit, against
+--  ligero_<field>_<circuit>.txt there when present); the
 --  first non-comment line of a file, "field <name>", selects the
 --  instance. Built with
 --  -gnata, so every contract and ghost reference of the library executes:
 --  in particular the Post of Eval_Circuit evaluates Acc_Ref on every wire.
+--
+--  The argument --slow (ADR 0041) also runs the slow cases: the P-256
+--  Ligero verifier end to end, about twelve minutes with assertions
+--  on; without it they are reported as skipped.
 --
 --  Exit status: success only if at least one case ran and none failed.
 
@@ -27,6 +33,14 @@ with Sumcheck_Verifier_GF2_128;
 with Sumcheck_Verifier_P256;
 with Sumcheck_Transcript_GF2_128;
 with Sumcheck_Transcript_P256;
+with Ligero_Proof_GF2_128;
+with Ligero_Proof_P256;
+with Lagrange_GF2_128;
+with Lagrange_P256;
+with Ligero_Verifier_GF2_128;
+with Ligero_Verifier_P256;
+with Zk_Verifier_GF2_128;
+with Zk_Verifier_P256;
 with Sumcheck_KAT_Generic;
 
 procedure Sumcheck_KAT is
@@ -112,12 +126,16 @@ procedure Sumcheck_KAT is
    package GF_KAT is new Sumcheck_KAT_Generic
      (SA => Sumcheck_Algebra_GF2_128, SE => Sumcheck_Expression_GF2_128,
       SV => Sumcheck_Verifier_GF2_128, ST => Sumcheck_Transcript_GF2_128,
+      LP => Ligero_Proof_GF2_128, L => Lagrange_GF2_128,
+      LV => Ligero_Verifier_GF2_128, ZK => Zk_Verifier_GF2_128,
       Field_Name => "gf2_128",
       To_Element => GF_To_Element, Image => GF_Image);
 
    package P_KAT is new Sumcheck_KAT_Generic
      (SA => Sumcheck_Algebra_P256, SE => Sumcheck_Expression_P256,
       SV => Sumcheck_Verifier_P256, ST => Sumcheck_Transcript_P256,
+      LP => Ligero_Proof_P256, L => Lagrange_P256,
+      LV => Ligero_Verifier_P256, ZK => Zk_Verifier_P256,
       Field_Name => "p256",
       To_Element => P_To_Element, Image => P_Image);
 
@@ -158,8 +176,18 @@ procedure Sumcheck_KAT is
       end if;
    end Run;
 
+   Files : Natural := 0;
+
 begin
-   if Ada.Command_Line.Argument_Count = 0 then
+   for I in 1 .. Ada.Command_Line.Argument_Count loop
+      if Ada.Command_Line.Argument (I) = "--slow" then
+         GF_KAT.Run_Slow := True;
+         P_KAT.Run_Slow  := True;
+      else
+         Files := Files + 1;
+      end if;
+   end loop;
+   if Files = 0 then
       Run ("tests/vectors/sumcheck_gf2_128.txt");
       Run ("tests/vectors/sumcheck_p256.txt");
       declare
@@ -189,7 +217,9 @@ begin
       end;
    else
       for I in 1 .. Ada.Command_Line.Argument_Count loop
-         Run (Ada.Command_Line.Argument (I));
+         if Ada.Command_Line.Argument (I) /= "--slow" then
+            Run (Ada.Command_Line.Argument (I));
+         end if;
       end loop;
    end if;
 
