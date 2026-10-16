@@ -21,4 +21,9 @@ package body Ligero_Geometry is
               Total_Rows        => 3 + NWROW + 3 * NQT);
    end Make;
 
+   procedure Lemma_Rows_Cover (G : Valid_Geometry) is
+   begin
+      null;
+   end Lemma_Rows_Cover;
+
 end Ligero_Geometry;

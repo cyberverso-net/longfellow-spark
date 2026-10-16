@@ -82,10 +82,9 @@ package Ligero_Verifier is
    subtype Element_Array is ST.SA.Element_Array;
    subtype Index is ST.SA.Index;
 
-   --  Of the field and the transcript glue, named here because the
-   --  status parameter St of the verifier hides the package ST.
+   --  Of the field, named here because the status parameter St of the
+   --  verifier hides the package ST.
    Max_Eval_Point : constant Natural := ST.SA.F.Max_Eval_Point;
-   Max_Slice      : constant := ST.Max_Slice;
    subtype Proof is LP.Proof;
    subtype Terms is ST.SV.Ligero_Terms;
    subtype Lqc_Array is ST.SV.Lqc_Array;
@@ -100,6 +99,11 @@ package Ligero_Verifier is
    --  per witness slot of the NQW rows.
    function Vector_Len (G : Valid_Geometry) return Natural is
      (Num_Wq_Rows (G) * G.Witnesses_Per_Row);
+
+   --  The constraint vector has a slot for every witness.
+   procedure Lemma_Vector_Len_Covers (G : Valid_Geometry) with
+     Ghost, Global => null,
+     Post => Vector_Len (G) >= G.Num_Witnesses;
 
    function Vec_Shape (V : Element_Array; N : Natural) return Boolean is
      (V'First = 0 and then V'Length = N);
@@ -225,25 +229,28 @@ package Ligero_Verifier is
      Post              =>
        Transcript.Is_Exhausted'Old <= Transcript.Is_Exhausted;
 
-   --  The four polynomials, each as one element slice frame.
+   --  The four polynomials, each as one element slice frame (the
+   --  slice head then the elements, ST.Elements_Frame).
+   function Poly_Frame (S : Byte_Seq; Es : Element_Array) return Byte_Seq is
+     (ST.Elements_Frame
+        (Transcript.Slice_Header (S, Es'Length), Es, Es'Length))
+   with Ghost => SPARKlib_Full;
+
    procedure Absorb_Polynomials (G : Valid_Geometry; P : Proof) with
      Global => (In_Out => (Transcript.State, Transcript.Absorbed)),
-     Pre    => Fits (G) and then Shape (P, G)
-               and then G.Dblock_Len <= Max_Slice,
+     Pre    => Fits (G) and then Shape (P, G),
      Post   =>
        (SPARKlib_Full =>
           Transcript.Is_Exhausted'Old <= Transcript.Is_Exhausted
           and then Byte_Seqs.Logical_Eq
             (Transcript.Absorbed,
-             Transcript.Slice_Frame
-               (Transcript.Slice_Frame
-                  (Transcript.Slice_Frame
-                     (Transcript.Slice_Frame
-                        (Transcript.Absorbed'Old,
-                         P.Ldt_Poly'Length, ST.Serialise (P.Ldt_Poly)),
-                      P.Linear_Poly'Length, ST.Serialise (P.Linear_Poly)),
-                   P.Quad_Low'Length, ST.Serialise (P.Quad_Low)),
-                P.Quad_High'Length, ST.Serialise (P.Quad_High))));
+             Poly_Frame
+               (Poly_Frame
+                  (Poly_Frame
+                     (Poly_Frame (Transcript.Absorbed'Old, P.Ldt_Poly),
+                      P.Linear_Poly),
+                   P.Quad_Low),
+                P.Quad_High)));
 
    --  choose (NCOL - DBLOCK, NREQ).
    procedure Choose_Columns (G : Valid_Geometry; Idx : out Column_Indices)
@@ -607,7 +614,6 @@ package Ligero_Verifier is
        and then Statement_Hash'Length <= Transcript.Max_Payload
        and then not Transcript.Is_Exhausted
        and then Fits (Make (Cfg, NW, Lqc'Last + 1))
-       and then Make (Cfg, NW, Lqc'Last + 1).Dblock_Len <= Max_Slice
        and then Terms_In_Range
                   (A, Vector_Len (Make (Cfg, NW, Lqc'Last + 1)), B'Length)
        and then Lqc_In_Range
@@ -619,6 +625,8 @@ package Ligero_Verifier is
        and then (if St = Exhausted then Transcript.Is_Exhausted)
        and then (if St in Ok | Merkle_Failed | Matrix_Failed | LDT_Failed
                        | Linear_Failed | Linear_Sum_Failed | Quadratic_Failed
-                 then not Transcript.Is_Exhausted);
+                 then not Transcript.Is_Exhausted)
+       and then (if St in Queried_Columns_Length | Polynomial_Lengths
+                 then not Shape (P, Make (Cfg, NW, Lqc'Last + 1)));
 
 end Ligero_Verifier;

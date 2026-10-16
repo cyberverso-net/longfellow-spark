@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-15, before block 2 of stage 5). Amended 2026-10-16, block 4: the enumeration gains `Exhausted`, the generator of the transcript past its bound (ADR 0028 has the replay report it as a status, and the Ligero verifier draws challenges too); `Verify` gives it only when the generator ran out during its draws.
+Accepted (2026-10-15, before block 2 of stage 5). Amended 2026-10-16, block 4: the enumeration gains `Exhausted`, the generator of the transcript past its bound (ADR 0028 has the replay report it as a status, and the Ligero verifier draws challenges too); `Verify` gives it only when the generator ran out during its draws. Block 5: `Write_Element_Slice` has its streaming form (`Transcript.Begin_Slice`, `Slice_Element`, the frame stated by recursion as `Elements_Frame`), the bound of 4096 elements is gone; `Fisher_Yates.Max_N` is not raised: the only `choose` of the verifier draws below NCOL - DBLOCK < NCOL <= 2^16 = `Max_N`.
 
 ## Date
 

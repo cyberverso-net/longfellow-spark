@@ -574,11 +574,199 @@ package body Sumcheck_KAT_Generic is
                   Compare ("quad yc", Yc, R_Quad, 0);
                   Compare ("quad yp", Yp, R_Quad, NQ);
                   Check (Good, "tier 3 " & Name & ": verify_quad");
+                  --  The negative cases of the tests, on the same tables
+                  --  and challenges (ADR 0040): one response polynomial
+                  --  altered after the columns were chosen, and the
+                  --  constant vector altered for the sum check.
+                  declare
+                     P2 : LP.Proof := P;
+                     B2 : Element_Array := B;
+                  begin
+                     P2.Ldt_Poly (0) := P2.Ldt_Poly (0) + One;
+                     LV.Verify_LDT (G, P2, Ch.U_Ldt, T_Block, Yc, Yp, Good);
+                     Check (not Good, "tier 3 " & Name
+                            & ": altered ldt_poly not refused (LDT_Failed)");
+                     P2 := P;
+                     P2.Linear_Poly (0) := P2.Linear_Poly (0) + One;
+                     LV.Verify_Dot (G, B, P2, A_Full, Ch.Alphal, T_Block,
+                                    T_Dblock, Yc, Yp, Want, Pd, St_Dot);
+                     Check (St_Dot = Linear_Failed, "tier 3 " & Name
+                            & ": altered linear_poly gave " & St_Dot'Image);
+                     B2 (0) := B2 (0) + One;
+                     LV.Verify_Dot (G, B2, P, A_Full, Ch.Alphal, T_Block,
+                                    T_Dblock, Yc, Yp, Want, Pd, St_Dot);
+                     Check (St_Dot = Linear_Sum_Failed, "tier 3 " & Name
+                            & ": altered b gave " & St_Dot'Image);
+                     P2 := P;
+                     P2.Quad_Low (0) := P2.Quad_Low (0) + One;
+                     LV.Verify_Quad (G, P2, Ch.U_Quad, T_Dblock, Yc, Yp, Good);
+                     Check (not Good, "tier 3 " & Name
+                            & ": altered quad_poly_low not refused");
+                     P2 := P;
+                     P2.Quad_High (0) := P2.Quad_High (0) + One;
+                     LV.Verify_Quad (G, P2, Ch.U_Quad, T_Dblock, Yc, Yp, Good);
+                     Check (not Good, "tier 3 " & Name
+                            & ": altered quad_poly_high not refused");
+                  end;
                end;
             end;
          end;
       end;
    end Check_Ligero;
+
+   --  Stage 5 (ADR 0040): the complete verifier on the proof string of
+   --  the circuit (root, sumcheck part, Ligero part concatenated), which
+   --  must accept, then the negative cases built from those bytes with
+   --  the status each must produce. On P-256 every run of the verifier
+   --  is a slow case (the core and the Ligero tests under assertions);
+   --  the public input count is checked first and costs nothing.
+   procedure Check_Zk (Name : String; C : Circuit; Pub : Element_Array) is
+      use Ligero_Geometry;
+      use Verifier_Status;
+      Cfg   : constant Config :=
+        (Rate_Inv => Zk_Rate, Num_Queries => Zk_Nreq, Encoded_Len => Zk_Ncol);
+      SL    : constant Natural := Zk_Sumcheck_Len;
+      LL    : constant Natural := Zk_Ligero_Len;
+      LO    : constant Natural := 32 + SL;
+      Len   : constant Natural := LO + LL;
+      Full  : Bytes.Byte_Array (0 .. Len - 1);
+      Label : constant Bytes.Byte_Array := Zk_Label (0 .. Zk_Label_Len - 1);
+      Slow  : constant Boolean := Field_Name = "p256";
+
+      function LE32 (B : Bytes.Byte_Array; Off : Natural) return Natural is
+        (Natural (B (Off)) + 256 * Natural (B (Off + 1))
+         + 65536 * Natural (B (Off + 2)) + 16777216 * Natural (B (Off + 3)));
+
+      function Size4 (N : Natural) return Bytes.Byte_Array is
+        ([0 => Unsigned_8 (N mod 256), 1 => Unsigned_8 (N / 256 mod 256),
+          2 => Unsigned_8 (N / 65536 mod 256),
+          3 => Unsigned_8 (N / 16777216 mod 256)]);
+
+      --  Full with bit 0 of byte Off flipped.
+      function Flip (Off : Natural) return Bytes.Byte_Array is
+         R : Bytes.Byte_Array := Full;
+      begin
+         R (Off) := R (Off) xor 1;
+         return R;
+      end Flip;
+
+      procedure Expect
+        (What : String; B : Bytes.Byte_Array; P : Element_Array;
+         Want : Status; Is_Slow : Boolean)
+      is
+         St : Status;
+      begin
+         if Is_Slow and then not Run_Slow then
+            TIO.Put_Line ("skipped (slow): end to end, " & What & " on "
+                          & Name & " over " & Field_Name & "; run with --slow");
+            return;
+         end if;
+         ZK.Verify (Label, Zk_Id, Cfg, C, P, B, St);
+         Check (St = Want, "tier 3 " & Name & ": end to end, " & What
+                & ": got " & St'Image & ", expected " & Want'Image);
+      end Expect;
+   begin
+      if not (Have_Zk and Have_Zk_Sumcheck and Have_Zk_Ligero) then
+         Report_Failure ("tier 3 " & Name & ": no complete proof string");
+         return;
+      end if;
+      Full (0 .. 31)         := Zk_Root;
+      Full (32 .. LO - 1)    := Zk_Sumcheck (0 .. SL - 1);
+      Full (LO .. Len - 1)   := Zk_Ligero (0 .. LL - 1);
+      Expect ("the Appendix B.3 proof", Full, Pub, Ok, Slow);
+      Expect ("a public input too many", Full, Pub & Zero,
+              Public_Input_Length, False);
+      if not Valid (Cfg) then
+         return;
+      end if;
+      declare
+         G      : constant Valid_Geometry :=
+           Make (Cfg, ZK.Witness_Count (C), C.Last_Layer + 1);
+         Size   : constant Natural := LP.Size;
+         Sub    : constant Natural := LP.Sub_Size;
+         Total  : constant Natural := LP.Opened (G);
+         Nonces : constant Natural := LO + (2 * G.Dblock_Len + G.Num_Queries) * Size;
+         Cols   : constant Natural := Nonces + 32 * G.Num_Queries;
+         R0     : constant Natural := LE32 (Full, Cols);
+         --  The first run that has elements: its header, its width.
+         Head   : constant Natural := (if R0 > 0 then Cols else Cols + 4);
+         Width  : constant Natural := (if R0 > 0 then Size else Sub);
+         Run    : constant Natural := LE32 (Full, Head);
+         Elt    : constant Natural := Head + 4;
+         P      : LP.Proof
+           (Ldt_Last    => G.Block_Len - 1,
+            Linear_Last => G.Dblock_Len - 1,
+            Low_Last    => G.Num_Queries - 1,
+            High_Last   => G.Dblock_Len - G.Block_Len - 1,
+            Nonce_Last  => G.Num_Queries - 1,
+            Col_Last    => Total - 1,
+            Path_Last   => 2 * Num_Leaves (G) - 1);
+         Next   : Natural;
+         St     : Status;
+      begin
+         LP.Read (Zk_Ligero (0 .. LL - 1), 0, G, P, Next, St);
+         if St /= Ok then
+            Report_Failure ("tier 3 " & Name & ": Ligero part unreadable");
+            return;
+         end if;
+         declare
+            Count_Off : constant Natural := Len - 4 - 32 * P.Path_Count;
+            Path_Off  : constant Natural := Count_Off + 4;
+         begin
+            Expect ("an altered opened column element", Flip (Elt), Pub,
+                    Merkle_Failed, Slow);
+            Expect ("an altered nonce", Flip (Nonces), Pub, Merkle_Failed, Slow);
+            if P.Path_Count > 0 then
+               Expect ("an altered path digest", Flip (Path_Off), Pub,
+                       Merkle_Failed, Slow);
+            end if;
+            --  The response polynomials are absorbed before the columns
+            --  are chosen: an altered polynomial moves the queried
+            --  columns and the Merkle check fails first, as upstream.
+            --  The test statuses are exercised at the step level, in
+            --  Check_Ligero (ADR 0040 amended, block 5).
+            Expect ("an altered element of ldt_poly", Flip (LO), Pub,
+                    Merkle_Failed, Slow);
+            Expect ("an altered element of linear_poly",
+                    Flip (LO + G.Block_Len * Size), Pub, Merkle_Failed, Slow);
+            Expect ("an altered element of quad_poly_low",
+                    Flip (LO + (G.Block_Len + G.Dblock_Len) * Size), Pub,
+                    Merkle_Failed, Slow);
+            Expect ("an altered element of quad_poly_high",
+                    Flip (LO + (G.Block_Len + G.Dblock_Len + G.Num_Queries)
+                              * Size),
+                    Pub, Merkle_Failed, Slow);
+            Expect ("a path one digest too long",
+                    Full (0 .. Count_Off - 1) & Size4 (P.Path_Count + 1)
+                    & Full (Path_Off .. Len - 1) & Full (Path_Off .. Path_Off + 31),
+                    Pub, Merkle_Failed, Slow);
+            if P.Path_Count > 0 then
+               Expect ("a path one digest too short",
+                       Full (0 .. Count_Off - 1) & Size4 (P.Path_Count - 1)
+                       & Full (Path_Off .. Len - 33),
+                       Pub, Merkle_Failed, Slow);
+            end if;
+            Expect ("a second zero-length run",
+                    Full (0 .. Cols - 1)
+                    & (if R0 > 0 then Size4 (0) & Size4 (0) else Size4 (0))
+                    & Full (Cols .. Len - 1),
+                    Pub, Proof_Encoding, Slow);
+            if Run > 40 then
+               Expect ("a zero-length run that is not the first",
+                       Full (0 .. Head - 1) & Size4 (40)
+                       & Full (Elt .. Elt + 40 * Width - 1) & Size4 (0)
+                       & Full (Elt + 40 * Width .. Len - 1),
+                       Pub, Proof_Encoding, Slow);
+            end if;
+            Expect ("a run beyond the total",
+                    Full (0 .. Head - 1) & Size4 (Total + 1)
+                    & Full (Elt .. Len - 1),
+                    Pub, Proof_Encoding, Slow);
+            Expect ("trailing bytes", Full & Bytes.Byte_Array'[0 => 0], Pub,
+                    Proof_Encoding, Slow);
+         end;
+      end;
+   end Check_Zk;
 
    procedure Check_Replay
      (Name : String;
@@ -691,9 +879,11 @@ package body Sumcheck_KAT_Generic is
             end loop;
          end if;
          Check (Same, "tier 3 " & Name & ": core on the replayed record");
-         --  Stage 5: the Ligero verifier continues on this transcript.
+         --  Stage 5: the Ligero verifier continues on this transcript;
+         --  then the complete verifier from the proof string.
          if Same then
             Check_Ligero (Name, C, A2, B2, Lqc2);
+            Check_Zk (Name, C, Pub);
          end if;
       end;
       --  A proof with a non-canonical element must be refused, for the

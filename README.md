@@ -50,8 +50,9 @@ The test harness lives under `tests/` and is test code outside the proof perimet
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
 tests/bin/gf2_128_kat        # default: the gf2_128_*.txt files under tests/vectors/
 tests/bin/p256_kat           # default: the p256_*.txt files (about three minutes with assertions on)
-tests/bin/sumcheck_kat       # default: sumcheck_*.txt, zk_proof_*.txt, then tests/vectors/upstream/sumcheck_core_*.txt
-                             # with the Ligero verifier on each recorded circuit; --slow adds the P-256 run (twelve minutes)
+tests/bin/sumcheck_kat       # default: sumcheck_*.txt, zk_proof_*.txt, then tests/vectors/upstream/sumcheck_core_*.txt,
+                             # with the Ligero verifier and the complete verifier on each recorded circuit, negatives
+                             # included; --slow adds the P-256 runs (ADR 0041, over an hour)
 tests/bin/transcript_kat     # default: sha256.txt, aes256.txt and transcript_fs.txt (Appendix B.2)
 tests/bin/ligero_kat         # default: merkle.txt, ligero_geometry.txt, lagrange_*.txt, ligero_proof.txt
 ```

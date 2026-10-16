@@ -5,6 +5,13 @@ with SPARK.Lemmas.Integer_Arithmetic;
 
 package body Ligero_Verifier is
 
+   procedure Lemma_Vector_Len_Covers (G : Valid_Geometry) is
+   begin
+      Lemma_Rows_Cover (G);
+      SPARK.Lemmas.Integer_Arithmetic.Lemma_Mult_Is_Monotonic
+        (G.Num_Witness_Rows, Num_Wq_Rows (G), G.Witnesses_Per_Row);
+   end Lemma_Vector_Len_Covers;
+
    function Slot_Off (G : Valid_Geometry; I : Natural) return Natural is
    begin
       SPARK.Lemmas.Integer_Arithmetic.Lemma_Mult_Is_Monotonic

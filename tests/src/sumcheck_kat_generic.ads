@@ -35,6 +35,7 @@ with Sumcheck_Transcript;
 with Ligero_Proof;
 with Lagrange;
 with Ligero_Verifier;
+with Zk_Verifier;
 
 generic
    with package SA is new Sumcheck_Algebra (<>);
@@ -44,14 +45,16 @@ generic
    with package LP is new Ligero_Proof (SA => SA);
    with package L is new Lagrange (F => SA.F);
    with package LV is new Ligero_Verifier (ST => ST, LP => LP, L => L);
+   with package ZK is new Zk_Verifier (LV => LV);
    Field_Name : String;
    with function To_Element (S : String) return SA.Element;
    with function Image (E : SA.Element) return String;
 package Sumcheck_KAT_Generic is
 
-   --  The slow cases (ADR 0041): the P-256 Ligero verifier end to end,
-   --  about twelve minutes with assertions on. Run only when set; the
-   --  main sets it on the --slow argument.
+   --  The slow cases (ADR 0041): on P-256 the Ligero verifier and the
+   --  complete verifier end to end with the negative cases, each
+   --  minutes with assertions on. Run only when set; the main sets it
+   --  on the --slow argument.
    Run_Slow : Boolean := False;
 
    --  Runs every case of the file; counts are accumulated.

@@ -95,7 +95,8 @@ package Sumcheck_Verifier is
    with Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
         Pre  => J <= C.Last_Layer + 1,
-        Post => Chal_Off'Result <= J * Max_Chal_Size,
+        Post => Chal_Off'Result <= J * Max_Chal_Size
+                and then Chal_Off'Result >= 2 * J,
         Subprogram_Variant => (Decreases => J);
 
    function Proof_Off (C : Circuit; J : Natural) return Natural is
@@ -103,7 +104,8 @@ package Sumcheck_Verifier is
    with Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
         Pre  => J <= C.Last_Layer + 1,
-        Post => Proof_Off'Result <= J * Max_Proof_Size,
+        Post => Proof_Off'Result <= J * Max_Proof_Size
+                and then Proof_Off'Result >= 2 * J,
         Subprogram_Variant => (Decreases => J);
 
    --  Pad variables are numbered from Base (ninput - npublic).
@@ -114,8 +116,21 @@ package Sumcheck_Verifier is
    with Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
         Pre  => J <= C.Last_Layer + 1 and then Base <= Max_Wires,
-        Post => Pad_Off'Result <= Base + J * Max_Pad_Size,
+        Post => Pad_Off'Result <= Base + J * Max_Pad_Size
+                and then Pad_Off'Result >= Base + 3 * J,
         Subprogram_Variant => (Decreases => J);
+
+   --  One step and monotonicity of Pad_Off, from the hidden recursion.
+   procedure Lemma_Pad_Step (C : Circuit; J : Natural; Base : Natural) with
+     Ghost, Global => null,
+     Pre  => J <= C.Last_Layer and then Base <= Max_Wires,
+     Post => Pad_Off (C, J + 1, Base) = Pad_Off (C, J, Base) + Pad_Size (C, J);
+
+   procedure Lemma_Pad_Mono (C : Circuit; I, J : Natural; Base : Natural) with
+     Ghost, Global => null,
+     Pre  => I <= J and then J <= C.Last_Layer + 1 and then Base <= Max_Wires,
+     Post => Pad_Off (C, I, Base) <= Pad_Off (C, J, Base),
+     Subprogram_Variant => (Decreases => J);
 
    function Chal_Total (C : Circuit) return Natural is
      (Chal_Off (C, C.Last_Layer + 1))
@@ -124,6 +139,26 @@ package Sumcheck_Verifier is
    function Proof_Total (C : Circuit) return Natural is
      (Proof_Off (C, C.Last_Layer + 1))
    with Global => null;
+
+   --  The number of witnesses the commitment holds (nw of zk/verifier.rs
+   --  and of Section 7.4: the private inputs then the pads of every
+   --  layer, 4 logw + 3 each), the bound on every witness index the
+   --  core emits.
+   function Witness_Count (C : Circuit) return Natural is
+     (Pad_Off (C, C.Last_Layer + 1, C.Ninput - C.Npublic))
+   with Global => null,
+        Post   => Witness_Count'Result >= C.Ninput - C.Npublic + 3
+                  and then Witness_Count'Result
+                           <= C.Ninput + (C.Last_Layer + 1) * Max_Pad_Size;
+
+   --  Every quadratic triple of the core lies below Witness_Count: the
+   --  pads of layer J end at Pad_Off (C, J + 1, Base).
+   procedure Lemma_Pads_Below (C : Circuit) with
+     Ghost, Global => null,
+     Post =>
+       (for all J in 0 .. C.Last_Layer =>
+          Pad_Off (C, J, C.Ninput - C.Npublic) + 4 * C.Layers (J).Logw + 3
+          <= Witness_Count (C));
 
    -------------------------------------------------------------------
    --  Inputs.
@@ -303,6 +338,12 @@ package Sumcheck_Verifier is
        and then B'First = 0 and then B_Count < B'Length,
      Post => A.Count <= A.Count'Old + 4 * Max_Logw + 5
        and then B_Count = B_Count'Old + 1
+       and then (for all K in 0 .. A.Count'Old - 1 =>
+                   A.Witness (K) = A.Witness'Old (K)
+                   and then A.Constraint (K) = A.Constraint'Old (K))
+       and then (for all K in A.Count'Old .. A.Count - 1 =>
+                   A.Witness (K) < Pad_Off (C, J + 1, Base)
+                   and then A.Constraint (K) = B_Count'Old)
        and then State.Logv = C.Layers (J).Logw
        and then State.Claim0.Length = 1 and then State.Claim1.Length = 1
        and then Below (State.Claim0, Pad_Off (C, J + 1, Base))
@@ -326,10 +367,18 @@ package Sumcheck_Verifier is
      Global => null,
      Pre  => Pub'First = 0 and then Pub'Length = C.Npublic
        and then State.Claim0.Length <= 1 and then State.Claim1.Length <= 1
+       and then Below (State.Claim0, Witness_Count (C))
+       and then Below (State.Claim1, Witness_Count (C))
        and then A.Max + 1 - A.Count >= C.Ninput + 2
        and then B'First = 0 and then B_Count < B'Length,
      Post => A.Count <= A.Count'Old + C.Ninput + 2
-       and then B_Count = B_Count'Old + 1;
+       and then B_Count = B_Count'Old + 1
+       and then (for all K in 0 .. A.Count'Old - 1 =>
+                   A.Witness (K) = A.Witness'Old (K)
+                   and then A.Constraint (K) = A.Constraint'Old (K))
+       and then (for all K in A.Count'Old .. A.Count - 1 =>
+                   A.Witness (K) < Witness_Count (C)
+                   and then A.Constraint (K) = B_Count'Old);
 
    --  The whole core (Section 6.7, symbolic_sumcheck_verifier_core).
    procedure Verifier_Core
@@ -349,6 +398,9 @@ package Sumcheck_Verifier is
        and then B'First = 0 and then B'Length = C.Last_Layer + 2
        and then Lqc'First = 0 and then Lqc'Last = C.Last_Layer,
      Post => A.Count <= A_Bound (C)
+       and then (for all K in 0 .. A.Count - 1 =>
+                   A.Witness (K) < Witness_Count (C)
+                   and then A.Constraint (K) <= C.Last_Layer + 1)
        and then (for all J in 0 .. C.Last_Layer =>
                    Lqc (J) = (X => Pad_Off (C, J, C.Ninput - C.Npublic)
                                      + 4 * C.Layers (J).Logw,

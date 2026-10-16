@@ -123,14 +123,16 @@ is
      (Append (Byte_Seqs.Add (S, 1), E))
    with Ghost => SPARKlib_Full;
 
-   --  Field element array: tag 0x02, the eight count bytes, the
-   --  serialised elements with no per-element tag.
+   --  Field element array: tag 0x02, the eight count bytes (the head),
+   --  then the serialised elements with no per-element tag.
+   function Slice_Header (S : Byte_Seq; Count : Natural) return Byte_Seq is
+     (Append (Byte_Seqs.Add (S, 2), Length_Bytes (Unsigned_64 (Count))))
+   with Ghost => SPARKlib_Full;
+
    function Slice_Frame
      (S : Byte_Seq; Count : Natural; E : Byte_Array) return Byte_Seq
    is
-     (Append (Append (Byte_Seqs.Add (S, 2),
-                      Length_Bytes (Unsigned_64 (Count))),
-              E))
+     (Append (Slice_Header (S, Count), E))
    with Ghost => SPARKlib_Full;
 
    ----------------------------------------------------------------------
@@ -186,6 +188,28 @@ is
           Is_Exhausted'Old <= Is_Exhausted
           and then Byte_Seqs.Logical_Eq
             (Absorbed, Slice_Frame (Absorbed'Old, Count, E))
+          and then not Generator_Live);
+
+   --  The same frame one element at a time (ADR 0039), for slices too
+   --  long to serialise in one array: Begin_Slice absorbs the head,
+   --  then Slice_Element each serialised element; Count calls absorb
+   --  exactly what Write_Slice absorbs for their concatenation.
+   procedure Begin_Slice (Count : Natural) with
+     Global => (In_Out => (State, Absorbed)),
+     Post   =>
+       (SPARKlib_Full =>
+          Is_Exhausted'Old <= Is_Exhausted
+          and then Byte_Seqs.Logical_Eq
+            (Absorbed, Slice_Header (Absorbed'Old, Count))
+          and then not Generator_Live);
+
+   procedure Slice_Element (E : Byte_Array) with
+     Global => (In_Out => (State, Absorbed)),
+     Pre    => E'Length <= Max_Payload,
+     Post   =>
+       (SPARKlib_Full =>
+          Is_Exhausted'Old <= Is_Exhausted
+          and then Byte_Seqs.Logical_Eq (Absorbed, Append (Absorbed'Old, E))
           and then not Generator_Live);
 
    ----------------------------------------------------------------------

@@ -141,4 +141,10 @@ package Ligero_Geometry is
    function Num_Wq_Rows (G : Valid_Geometry) return Natural is
      (G.Num_Witness_Rows + 3 * G.Num_Quad_Rows);
 
+   --  The witness rows hold every witness: NWROW * WR >= NW (the
+   --  ceiling of Consistent, read the other way).
+   procedure Lemma_Rows_Cover (G : Valid_Geometry) with
+     Ghost, Global => null,
+     Post => G.Num_Witness_Rows * G.Witnesses_Per_Row >= G.Num_Witnesses;
+
 end Ligero_Geometry;

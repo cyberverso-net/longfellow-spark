@@ -122,6 +122,19 @@ is
       Absorb (E);
    end Write_Slice;
 
+   procedure Begin_Slice (Count : Natural) is
+   begin
+      Live := False;
+      Absorb_Byte (2);
+      Absorb (Length_Bytes (Unsigned_64 (Count)));
+   end Begin_Slice;
+
+   procedure Slice_Element (E : Byte_Array) is
+   begin
+      Live := False;
+      Absorb (E);
+   end Slice_Element;
+
    ----------------------------------------------------------------------
    --  Squeeze
    ----------------------------------------------------------------------
