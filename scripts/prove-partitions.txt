@@ -12,6 +12,7 @@
 #  partitions-check` fails unless the union of these lines is exactly
 #  the set of non-generic units under src/, with no unit listed twice.
 p256       p256_field field_p256
-primitives gf2_128 field_gf2_128 bytes sha256 aes256 transcript fisher_yates merkle
+primitives gf2_128 field_gf2_128 bytes sha256 aes256 transcript fisher_yates merkle proof_levels
 sumcheck   sumcheck_algebra_gf2_128 sumcheck_algebra_p256 sumcheck_expression_gf2_128 sumcheck_expression_p256
 protocol   sumcheck_verifier_gf2_128 sumcheck_verifier_p256 sumcheck_transcript_gf2_128 sumcheck_transcript_p256
+ligero     ligero_geometry lagrange_gf2_128 lagrange_p256

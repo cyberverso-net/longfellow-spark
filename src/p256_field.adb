@@ -1722,4 +1722,10 @@ package body P256_Field is
       E  := (Limbs => Select_Limbs ([others => 0], L, Mask));
    end From_Bytes;
 
+
+   function Of_Natural (X : Natural) return Element is
+   begin
+      return (Limbs => [Unsigned_64 (X), 0, 0, 0]);
+   end Of_Natural;
+
 end P256_Field;

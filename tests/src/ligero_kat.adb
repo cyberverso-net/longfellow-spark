@@ -1,21 +1,33 @@
---  LIGERO_KAT: known-answer test harness for stage 5. At block 2 it
---  covers the Merkle tree (ADR 0040, tier 1 from Appendix B.1.1, tier 2
---  from the generator's independent reference, negative cases); the
---  geometry, Lagrange and Ligero cases come with the later blocks.
+--  LIGERO_KAT: known-answer test harness for stage 5 (ADR 0040): the
+--  Merkle tree (tier 1 from Appendix B.1.1, tier 2 from the generator's
+--  independent reference, negative cases), the geometry and the
+--  Lagrange code at the queried columns on both fields; the Ligero
+--  proof and verifier cases come with the later blocks.
 --
 --  Test code, outside the proof perimeter: SPARK_Mode is Off. Reads
---  the vector files given as arguments (default: merkle.txt under
---  tests/vectors/) and checks every case against the library. Built
---  with -gnata, so the library's executable contracts run; a contract
---  violation surfaces here as a failure with the offending line.
+--  the vector files given as arguments (default: merkle.txt,
+--  ligero_geometry.txt, lagrange_gf2_128.txt and lagrange_p256.txt
+--  under tests/vectors/) and checks every case against the library.
+--  Built with -gnata, so the library's executable contracts run; a
+--  contract violation surfaces here as a failure with the offending
+--  line.
 --
 --  File format: '#' comments and blank lines are skipped; otherwise
 --  one case per line, fields separated by blanks, digests as 64 hex
---  digits in memory order:
+--  digits in memory order, field elements as big-endian hex integers
+--  (32 digits for GF(2^128), 64 for P-256), a "field" line naming the
+--  field of the element lines that follow:
 --    build <n> <n leaves> <root>
 --        Merkle.Build of the leaves has this root
 --    verify <n> <root> <k> <k indices> <k leaves> <m> <m path> <ok>
 --        Merkle.Verify succeeds (ok = 1) or fails (ok = 0)
+--    geometry <rate_inv> <nreq> <ncol> <nw> <nq> <valid> [<block>
+--        <dblock> <wr> <nwrow> <nqt> <nrow>]
+--        Ligero_Geometry.Valid, then Make has these fields
+--    table <k> <m> <m columns> <k inv_d> <k*m entries>
+--        Lagrange.Build gives these inverses and entries
+--    eval <k> <m> <m columns> <k coeffs> <c> <expected>
+--        Lagrange.Evaluate at column c of the table
 --
 --  Exit status: success only if at least one case ran and none failed.
 
@@ -27,12 +39,25 @@ with Ada.Text_IO;
 with Interfaces; use Interfaces;
 with Bytes;      use Bytes;
 with Merkle;     use Merkle;
+with GF2_128;
+with P256_Field;
+with Ligero_Geometry;
+with Lagrange;
+with Lagrange_GF2_128;
+with Lagrange_P256;
 
 procedure Ligero_KAT is
 
    package TIO renames Ada.Text_IO;
 
-   Default_Merkle : constant String := "tests/vectors/merkle.txt";
+   Default_Merkle   : constant String := "tests/vectors/merkle.txt";
+   Default_Geometry : constant String := "tests/vectors/ligero_geometry.txt";
+   Default_Lag_GF   : constant String := "tests/vectors/lagrange_gf2_128.txt";
+   Default_Lag_P    : constant String := "tests/vectors/lagrange_p256.txt";
+
+   --  The field of the element lines of the current file.
+   type Field_Kind is (None, GF, P);
+   Current_Field : Field_Kind := None;
 
    Passed  : Natural := 0;
    Failed  : Natural := 0;
@@ -67,6 +92,66 @@ procedure Ligero_KAT is
       end loop;
       return R;
    end To_Digest;
+
+   --  GF(2^128): 32 big-endian hex digits; the first 16 form Limbs (1).
+   function GF_To_Element (S : String) return GF2_128.Element is
+      R : GF2_128.Element := GF2_128.Zero;
+      L : GF2_128.Limb_Index;
+   begin
+      if S'Length /= 32 then
+         raise Parse_Error with "expected 32 hex digits, got '" & S & "'";
+      end if;
+      for I in 0 .. 31 loop
+         L := (if I < 16 then 1 else 0);
+         R.Limbs (L) :=
+           Shift_Left (R.Limbs (L), 4) or Unsigned_64 (Hex_Digit (S (S'First + I)));
+      end loop;
+      return R;
+   end GF_To_Element;
+
+   function GF_Image (E : GF2_128.Element) return String is
+      Hex : constant String := "0123456789abcdef";
+      S   : String (1 .. 32);
+      V   : Unsigned_64;
+   begin
+      for I in 0 .. 31 loop
+         V := E.Limbs ((if I < 16 then 1 else 0));
+         S (I + 1) :=
+           Hex (Integer (Shift_Right (V, 60 - 4 * (I mod 16)) and 15) + 1);
+      end loop;
+      return S;
+   end GF_Image;
+
+   --  P-256: 64 big-endian hex digits; the first 16 form Limbs (3).
+   function P_To_Element (S : String) return P256_Field.Element is
+      R : P256_Field.Limb_Array := [others => 0];
+      L : P256_Field.Limb_Index;
+   begin
+      if S'Length /= 64 then
+         raise Parse_Error with "expected 64 hex digits, got '" & S & "'";
+      end if;
+      for I in 0 .. 63 loop
+         L := P256_Field.Limb_Index (3 - I / 16);
+         R (L) := Shift_Left (R (L), 4) or Unsigned_64 (Hex_Digit (S (S'First + I)));
+      end loop;
+      if not P256_Field.Is_Canonical (R) then
+         raise Parse_Error with "value not below p: " & S;
+      end if;
+      return (Limbs => R);
+   end P_To_Element;
+
+   function P_Image (E : P256_Field.Element) return String is
+      Hex : constant String := "0123456789abcdef";
+      S   : String (1 .. 64);
+      V   : Unsigned_64;
+   begin
+      for I in 0 .. 63 loop
+         V := E.Limbs (P256_Field.Limb_Index (3 - I / 16));
+         S (I + 1) :=
+           Hex (Integer (Shift_Right (V, 60 - 4 * (I mod 16)) and 15) + 1);
+      end loop;
+      return S;
+   end P_Image;
 
    function Image (D : Digest) return String is
       Hex : constant String := "0123456789abcdef";
@@ -117,6 +202,137 @@ procedure Ligero_KAT is
       Failed := Failed + 1;
       TIO.Put_Line ("FAIL line" & Line_No'Image & ": " & Msg);
    end Report_Failure;
+
+   --  The table and eval lines, for one Lagrange instance.
+   generic
+      with package LG is new Lagrange (<>);
+      with function To_Element (S : String) return LG.Element;
+      with function Image (E : LG.Element) return String;
+      --  Build, or the last table built for the same k and columns: with
+      --  assertions on, a P-256 inverse costs seconds, and the lines of
+      --  one case share a table.
+      with procedure Build_Cached
+        (K : Positive; Cols : LG.Column_Array; T : out LG.Table;
+         Inv : out LG.Element_Array; Ok : out Boolean);
+   procedure Check_Lagrange_Line (Op : String; Fld : access function (K : Positive) return String; Count : Natural);
+
+   procedure Check_Lagrange_Line (Op : String; Fld : access function (K : Positive) return String; Count : Natural) is
+      use type LG.Element;
+      K    : constant Positive := Positive'Value (Fld (2));
+      M    : constant Positive := Positive'Value (Fld (3));
+      Cols : LG.Column_Array (0 .. M - 1);
+      T    : LG.Table (0 .. K - 1, 0 .. M - 1);
+      Inv  : LG.Element_Array (0 .. K - 1);
+      Ok   : Boolean;
+      Pos  : Natural := 4;
+   begin
+      for C in 0 .. M - 1 loop
+         Cols (C) := Natural'Value (Fld (Pos + C));
+      end loop;
+      Pos := Pos + M;
+      Build_Cached (K, Cols, T, Inv, Ok);
+      if not Ok then
+         Report_Failure (Op & ": Build failed (Matrix_Failed)");
+         return;
+      end if;
+      if Op = "table" then
+         if Count /= Pos + K + K * M - 1 then
+            raise Parse_Error with "table: field count";
+         end if;
+         for I in 0 .. K - 1 loop
+            if Inv (I) /= To_Element (Fld (Pos + I)) then
+               Report_Failure
+                 ("table k" & K'Image & ": inv_d" & I'Image & " got "
+                  & Image (Inv (I)));
+               return;
+            end if;
+         end loop;
+         Pos := Pos + K;
+         for I in 0 .. K - 1 loop
+            for C in 0 .. M - 1 loop
+               if T (I, C) /= To_Element (Fld (Pos + I * M + C)) then
+                  Report_Failure
+                    ("table k" & K'Image & ": entry" & I'Image & C'Image
+                     & " got " & Image (T (I, C)));
+                  return;
+               end if;
+            end loop;
+         end loop;
+         Passed := Passed + 1;
+      else
+         declare
+            Coeffs : LG.Element_Array (0 .. K - 1);
+            C      : Natural;
+            Want   : LG.Element;
+            Got    : LG.Element;
+         begin
+            if Count /= Pos + K + 1 then
+               raise Parse_Error with "eval: field count";
+            end if;
+            for I in 0 .. K - 1 loop
+               Coeffs (I) := To_Element (Fld (Pos + I));
+            end loop;
+            Pos := Pos + K;
+            C    := Natural'Value (Fld (Pos));
+            Want := To_Element (Fld (Pos + 1));
+            Got  := LG.Evaluate (Coeffs, T, C);
+            if Got = Want then
+               Passed := Passed + 1;
+            else
+               Report_Failure
+                 ("eval k" & K'Image & " column" & C'Image & " expected "
+                  & Image (Want) & " got " & Image (Got));
+            end if;
+         end;
+      end if;
+   end Check_Lagrange_Line;
+
+   generic
+      with package LG is new Lagrange (<>);
+   package Table_Cache is
+      procedure Build_Cached
+        (K : Positive; Cols : LG.Column_Array; T : out LG.Table;
+         Inv : out LG.Element_Array; Ok : out Boolean);
+   end Table_Cache;
+
+   package body Table_Cache is
+      type Entry_Type (Last_K, Last_M : Natural) is record
+         Cols : LG.Column_Array (0 .. Last_M);
+         T    : LG.Table (0 .. Last_K, 0 .. Last_M);
+         Inv  : LG.Element_Array (0 .. Last_K);
+      end record;
+      type Entry_Access is access Entry_Type;
+      Last : Entry_Access := null;
+
+      procedure Build_Cached
+        (K : Positive; Cols : LG.Column_Array; T : out LG.Table;
+         Inv : out LG.Element_Array; Ok : out Boolean)
+      is
+         use type LG.Column_Array;
+      begin
+         if Last /= null and then Last.Last_K = K - 1
+           and then Last.Cols = Cols
+         then
+            T   := Last.T;
+            Inv := Last.Inv;
+            Ok  := True;
+            return;
+         end if;
+         LG.Build (K, Cols, T, Inv, Ok);
+         if Ok then
+            Last := new Entry_Type'(Last_K => K - 1, Last_M => Cols'Last,
+                                    Cols => Cols, T => T, Inv => Inv);
+         end if;
+      end Build_Cached;
+   end Table_Cache;
+
+   package GF_Cache is new Table_Cache (Lagrange_GF2_128);
+   package P_Cache is new Table_Cache (Lagrange_P256);
+
+   procedure Check_GF is new Check_Lagrange_Line
+     (Lagrange_GF2_128, GF_To_Element, GF_Image, GF_Cache.Build_Cached);
+   procedure Check_P is new Check_Lagrange_Line
+     (Lagrange_P256, P_To_Element, P_Image, P_Cache.Build_Cached);
 
    procedure Check_Case (Line : String) is
       Fields : Field_Array;
@@ -208,6 +424,60 @@ procedure Ligero_KAT is
                   end if;
                end;
             end;
+         elsif Op = "field" then
+            if F (2) = "gf2_128" then
+               Current_Field := GF;
+            elsif F (2) = "p256" then
+               Current_Field := P;
+            else
+               raise Parse_Error with "unknown field " & F (2);
+            end if;
+         elsif Op = "geometry" then
+            declare
+               use Ligero_Geometry;
+               C     : constant Config :=
+                 (Rate_Inv => Nat (2), Num_Queries => Nat (3),
+                  Encoded_Len => Nat (4));
+               NW    : constant Natural := Nat (5);
+               NQ    : constant Natural := Nat (6);
+               Valid_Want : constant Boolean := Nat (7) = 1;
+            begin
+               if Valid (C) /= Valid_Want then
+                  Report_Failure ("geometry: Valid got " & Valid (C)'Image);
+               elsif not Valid_Want then
+                  Passed := Passed + 1;
+               else
+                  declare
+                     G : constant Valid_Geometry := Make (C, NW, NQ);
+                  begin
+                     if Count /= 13 then
+                        raise Parse_Error with "geometry: field count";
+                     end if;
+                     if G.Block_Len = Nat (8) and then G.Dblock_Len = Nat (9)
+                       and then G.Witnesses_Per_Row = Nat (10)
+                       and then G.Num_Witness_Rows = Nat (11)
+                       and then G.Num_Quad_Rows = Nat (12)
+                       and then G.Total_Rows = Nat (13)
+                     then
+                        Passed := Passed + 1;
+                     else
+                        Report_Failure
+                          ("geometry: got block" & G.Block_Len'Image
+                           & " dblock" & G.Dblock_Len'Image & " wr"
+                           & G.Witnesses_Per_Row'Image & " nwrow"
+                           & G.Num_Witness_Rows'Image & " nqt"
+                           & G.Num_Quad_Rows'Image & " nrow"
+                           & G.Total_Rows'Image);
+                     end if;
+                  end;
+               end if;
+            end;
+         elsif Op = "table" or else Op = "eval" then
+            case Current_Field is
+               when GF   => Check_GF (Op, F'Access, Count);
+               when P    => Check_P (Op, F'Access, Count);
+               when None => raise Parse_Error with "no field line";
+            end case;
          else
             raise Parse_Error with "unknown operation '" & Op & "'";
          end if;
@@ -243,6 +513,9 @@ procedure Ligero_KAT is
 begin
    if Ada.Command_Line.Argument_Count = 0 then
       Run_File (Default_Merkle);
+      Run_File (Default_Geometry);
+      Run_File (Default_Lag_GF);
+      Run_File (Default_Lag_P);
    else
       for I in 1 .. Ada.Command_Line.Argument_Count loop
          Run_File (Ada.Command_Line.Argument (I));

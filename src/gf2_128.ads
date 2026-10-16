@@ -203,4 +203,53 @@ package GF2_128 is
    with Global => null,
         Post   => Limbs_Of_Bytes (To_Bytes'Result) = E.Limbs;
 
+
+   --  The subfield GF(2^16) (draft-03 Section 2.2.2, stage 5): basis
+   --  beta_i = g^i, g = x^((2^128 - 1) / (2^16 - 1)), the sixteen
+   --  constants of the upstream reference (docs/specs/rust/src/algebra/
+   --  gf2_128.rs, SUBFIELD_BASIS at d5e6be7), anchored by the stage 1
+   --  vectors (ADR 0009). Inject (X) is the element with coordinates
+   --  the bits of X on that basis: the Reed-Solomon evaluation point x
+   --  of the Ligero code (reed_solomon_eval_point) and the decoding of
+   --  a 2-byte subfield element (Section 7.2.2). Gold, structural:
+   --  Inject is the xor of the basis elements at the set bits of X,
+   --  taken in order from bit 0 (Inject_Ref).
+
+   subtype Basis_Index is Natural range 0 .. 15;
+   type Basis_Array is array (Basis_Index) of Element;
+
+   Subfield_Basis : constant Basis_Array :=
+     [0 => (Limbs => [0 => 16#0000000000000001#, 1 => 16#0000000000000000#]),
+      1 => (Limbs => [0 => 16#F1871E01B64FDA4C#, 1 => 16#5C5971877501D4B8#]),
+      2 => (Limbs => [0 => 16#A6E310FB6E176EA8#, 1 => 16#8BB99658EAF2CAE0#]),
+      3 => (Limbs => [0 => 16#3F8DE8A2F9FF7EED#, 1 => 16#B61E08DA12F9665C#]),
+      4 => (Limbs => [0 => 16#9BA3282087A3F827#, 1 => 16#A76C2E634C6483AE#]),
+      5 => (Limbs => [0 => 16#F7AF4E93629F689E#, 1 => 16#54944FF4A5269CED#]),
+      6 => (Limbs => [0 => 16#D0765F1873309B88#, 1 => 16#5439ECFD75A950D8#]),
+      7 => (Limbs => [0 => 16#E566F9FC3D9B58A2#, 1 => 16#49ECDFBE06777B02#]),
+      8 => (Limbs => [0 => 16#19AF205497F8E2D0#, 1 => 16#97A401B733E66A93#]),
+      9 => (Limbs => [0 => 16#60E4DBDCE9777814#, 1 => 16#789FD7793CE75238#]),
+     10 => (Limbs => [0 => 16#C0F157187ADBC05B#, 1 => 16#AA440B2D4B546256#]),
+     11 => (Limbs => [0 => 16#222F207D0D8AD9F9#, 1 => 16#79F2CADB70B6115D#]),
+     12 => (Limbs => [0 => 16#F6D1F84FB66C52B8#, 1 => 16#AE72AF7894CE037D#]),
+     13 => (Limbs => [0 => 16#4AF94EF056D28A30#, 1 => 16#D6F226D783D454DB#]),
+     14 => (Limbs => [0 => 16#0F37A0A4D91B4220#, 1 => 16#057D918D494925FC#]),
+     15 => (Limbs => [0 => 16#B683012350E55753#, 1 => 16#18D4BBB6833C5AE8#])];
+
+   subtype Subfield_Value is Natural range 0 .. 2**16 - 1;
+
+   --  The xor of Subfield_Basis (I) over the set bits I < N of X.
+   function Inject_Ref (X : Subfield_Value; N : Natural) return Element is
+     (if N = 0 then Zero
+      elsif (X / 2 ** (N - 1)) mod 2 = 1
+      then Add (Inject_Ref (X, N - 1), Subfield_Basis (N - 1))
+      else Inject_Ref (X, N - 1))
+   with Ghost,
+        Pre => N <= 16,
+        Subprogram_Variant => (Decreases => N);
+
+   function Inject (X : Subfield_Value) return Element with
+     Global => null,
+     Post   => Inject'Result = Inject_Ref (X, 16);
+
 end GF2_128;

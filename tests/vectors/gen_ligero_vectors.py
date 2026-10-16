@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Generator for the stage 5 (Ligero) known-answer vectors:
-  merkle.txt   build <n> <leaves...> <root>
-               verify <n> <root> <k> <indices...> <leaves...> <m> <path...> <ok>
+  merkle.txt            build <n> <leaves...> <root>
+                        verify <n> <root> <k> <indices...> <leaves...>
+                               <m> <path...> <ok>
+  ligero_geometry.txt   geometry <rate_inv> <nreq> <ncol> <nw> <nq> <valid>
+                               [<block> <dblock> <wr> <nwrow> <nqt> <nrow>]
+  lagrange_<field>.txt  table <k> <m> <m columns> <k inv_d> <k*m entries>
+                        eval <k> <m> <m columns> <k coeffs> <c> <expected>
 
 Independent Python reference of the Merkle tree of IETF
 draft-google-cfrg-libzk-03, Section 4.1, written from the draft's text:
@@ -19,17 +24,44 @@ Negative cases, each expected to fail: an altered path digest, a path
 one digest too long and one too short, a duplicate index, an index at
 or above n, no index, an altered leaf, an altered root.
 
-The geometry, Lagrange and Ligero vectors of ADR 0040 are added by the
-later blocks of stage 5.
+Geometry: LigeroGeometry::new of the reference transcribed (the
+constraints of 4.2.1 and the row counts), on the configuration of the
+Appendix B.3 vectors, whose derived numbers the draft prints (BLOCK 10,
+DBLOCK 19, WR 4, NW 29, NQ 2, NWROW 8, NQT 1, NROW 14: checked, the
+generator aborts otherwise), on a range of other configurations, and on
+configurations that violate 4.2.1 (valid 0).
+
+Lagrange: lagrange_matrix of the reference transcribed over both fields
+(GF(2^128) with the arithmetic of gen_gf2_128_vectors.py and the
+evaluation points inj(x) on the subfield basis; P-256 with integers
+modulo p and the points x), checked against an independent evaluation
+(the interpolating polynomial found by solving the Vandermonde system
+and evaluated directly) before anything is written; the files hold the
+entries at a few queried columns and encode_row at those columns.
+
+The Ligero proof and verifier vectors of ADR 0040 come with blocks 4
+and 5.
 
 Usage: python3 -I gen_ligero_vectors.py [output-directory]
 Output is deterministic (no timestamps).
 """
 
 import hashlib
+import importlib.util
 import itertools
+import random
 import sys
 from pathlib import Path
+
+HERE = Path(__file__).parent
+
+
+def load_sibling(name):
+    """A sibling generator as a module, for its field arithmetic."""
+    spec = importlib.util.spec_from_file_location(name, HERE / (name + ".py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def sha256(data):
@@ -151,6 +183,228 @@ def check_b11():
 
 
 # ----------------------------------------------------------------------
+# Section 4.2: the geometry, LigeroGeometry::new transcribed
+# ----------------------------------------------------------------------
+
+MAX_ENCODED_LEN = 2**16
+MAX_QUERIES = 2**12
+
+
+def geometry(rate_inv, nreq, ncol, nw, nq):
+    """The fields of LigeroGeometry, or None when 4.2.1 is violated."""
+    if ncol > MAX_ENCODED_LEN or nreq > MAX_QUERIES or nreq < 1:
+        return None
+    block = (ncol + 1) // (2 + rate_inv)
+    if block == 0:
+        return None
+    dblock = 2 * block - 1
+    if ncol < dblock or ncol - dblock < nreq or block <= nreq:
+        return None
+    wr = block - nreq
+    nwrow = (nw + wr - 1) // wr
+    nqt = (nq + wr - 1) // wr
+    return {"block": block, "dblock": dblock, "wr": wr, "nwrow": nwrow,
+            "nqt": nqt, "nrow": 3 + nwrow + 3 * nqt}
+
+
+# Appendix B.3.2: "Derived geometry: BLOCK = 10, DBLOCK = 19, WR = 4,
+# NW = 29, NQ = 2, NWROW = 8, NQT = 1, NROW = 14" for RATE_INV 4, NREQ 6,
+# NCOL 64.
+B32_GEOMETRY = {"block": 10, "dblock": 19, "wr": 4, "nwrow": 8, "nqt": 1,
+                "nrow": 14}
+
+
+def check_geometry():
+    if geometry(4, 6, 64, 29, 2) != B32_GEOMETRY:
+        fail("B.3.2 geometry: got %s" % geometry(4, 6, 64, 29, 2))
+
+
+GEOMETRY_CASES = [
+    (4, 6, 64, 29, 2), (4, 6, 64, 1, 0), (4, 6, 64, 4, 1), (4, 6, 64, 5, 5),
+    (4, 16, 256, 1000, 50), (7, 132, 2048, 10000, 300), (7, 132, 65536, 1, 1),
+    (3, 2, 16, 7, 3), (1, 1, 8, 3, 1),
+    # violations of 4.2.1
+    (4, 6, 5, 1, 1), (4, 10, 64, 1, 1), (4, 16, 70, 1, 1), (4, 6, 65537, 1, 1),
+    (4, 5000, 65536, 1, 1),
+]
+
+
+# ----------------------------------------------------------------------
+# Lagrange interpolation, algebra/interpolation.rs transcribed
+# ----------------------------------------------------------------------
+
+
+class GF2128:
+    """GF(2^128) through the sibling generator; inj on the basis."""
+
+    name = "gf2_128"
+
+    def __init__(self):
+        g = load_sibling("gen_gf2_128_vectors")
+        self.g = g
+        self.basis = list(g.UPSTREAM_SUBFIELD_BASIS)
+
+    def add(self, a, b):
+        return a ^ b
+
+    sub = add
+
+    def mul(self, a, b):
+        return self.g.mul(a, b)
+
+    def inv(self, a):
+        return self.g.inv_euclid(a)
+
+    def point(self, x):
+        r = 0
+        for i in range(16):
+            if (x >> i) & 1:
+                r ^= self.basis[i]
+        return r
+
+    def rand(self, rng):
+        return rng.getrandbits(128)
+
+    def hx(self, v):
+        return "%032x" % v
+
+
+class P256:
+    """The P-256 base field as integers modulo p; the points x."""
+
+    name = "p256"
+    p = 2**256 - 2**224 + 2**192 + 2**96 - 1
+
+    def add(self, a, b):
+        return (a + b) % self.p
+
+    def sub(self, a, b):
+        return (a - b) % self.p
+
+    def mul(self, a, b):
+        return (a * b) % self.p
+
+    def inv(self, a):
+        return pow(a, self.p - 2, self.p)
+
+    def point(self, x):
+        return x % self.p
+
+    def rand(self, rng):
+        return rng.getrandbits(256) % self.p
+
+    def hx(self, v):
+        return "%064x" % v
+
+
+def lagrange_matrix(fld, pts, k, n):
+    """algebra/interpolation.rs: k rows of n entries, row-major."""
+    inv_d = []
+    for i in range(k):
+        d = 1
+        for j in range(k):
+            if i != j:
+                d = fld.mul(d, fld.sub(pts[i], pts[j]))
+        inv_d.append(fld.inv(d))
+    l = [0] * (k * n)
+    for i in range(k):
+        for x in range(n):
+            if x < k:
+                l[i * n + x] = 1 if x == i else 0
+            else:
+                num = 1
+                for j in range(k):
+                    if j != i:
+                        num = fld.mul(num, fld.sub(pts[x], pts[j]))
+                l[i * n + x] = fld.mul(num, inv_d[i])
+    return inv_d, l
+
+
+def encode_row(fld, l, k, n, row):
+    """ligero/reed_solomon.rs: for each column, the sum over i."""
+    out = []
+    for x in range(n):
+        s = 0
+        for i in range(k):
+            s = fld.add(s, fld.mul(row[i], l[i * n + x]))
+        out.append(s)
+    return out
+
+
+def solve_vandermonde(fld, pts, values):
+    """The coefficients of the polynomial of degree below k through the
+    points, by Gaussian elimination: an evaluation independent of the
+    Lagrange formula."""
+    k = len(values)
+    m = [[1] * k for _ in range(k)]
+    for r in range(k):
+        v = 1
+        for c in range(k):
+            m[r][c] = v
+            v = fld.mul(v, pts[r])
+    rhs = list(values)
+    for c in range(k):
+        piv = next(r for r in range(c, k) if m[r][c] != 0)
+        m[c], m[piv] = m[piv], m[c]
+        rhs[c], rhs[piv] = rhs[piv], rhs[c]
+        inv = fld.inv(m[c][c])
+        m[c] = [fld.mul(x, inv) for x in m[c]]
+        rhs[c] = fld.mul(rhs[c], inv)
+        for r in range(k):
+            if r != c and m[r][c] != 0:
+                f = m[r][c]
+                m[r] = [fld.sub(a, fld.mul(f, b)) for a, b in zip(m[r], m[c])]
+                rhs[r] = fld.sub(rhs[r], fld.mul(f, rhs[c]))
+    return rhs
+
+
+def poly_eval(fld, coeffs, x):
+    r = 0
+    for c in reversed(coeffs):
+        r = fld.add(fld.mul(r, x), c)
+    return r
+
+
+# Small dimensions on purpose: under assertions every P-256
+# multiplication executes its big-integer contract and each inverse of
+# Build is 256 of them, about five seconds per row of the table. The
+# mathematics is carried by the reference above; dimension 19 of the
+# Appendix B.3 vectors is exercised end to end by the verifier.
+LAGRANGE_CASES = [(3, 8, [3, 5]), (5, 16, [5, 15]), (10, 64, [19, 63])]
+
+
+def lagrange_lines(fld, rng):
+    lines = ["field " + fld.name]
+    for k, n, cols in LAGRANGE_CASES:
+        pts = [fld.point(x) for x in range(n)]
+        inv_d, l = lagrange_matrix(fld, pts, k, n)
+        for _ in range(2):
+            row = [fld.rand(rng) for _ in range(k)]
+            enc = encode_row(fld, l, k, n, row)
+            if enc[:k] != row:
+                fail("interpolation property fails for k=%d" % k)
+            coeffs = solve_vandermonde(fld, pts[:k], row)
+            for x in range(n):
+                if poly_eval(fld, coeffs, pts[x]) != enc[x]:
+                    fail("Lagrange encoding differs from the interpolating"
+                         " polynomial at x=%d, k=%d (%s)" % (x, k, fld.name))
+            lines.append("eval %d %d %s %s %d %s"
+                         % (k, len(cols), " ".join(str(c) for c in cols),
+                            " ".join(fld.hx(v) for v in row), 0,
+                            fld.hx(enc[cols[0]])))
+            lines.append("eval %d %d %s %s %d %s"
+                         % (k, len(cols), " ".join(str(c) for c in cols),
+                            " ".join(fld.hx(v) for v in row), len(cols) - 1,
+                            fld.hx(enc[cols[-1]])))
+        entries = [l[i * n + x] for i in range(k) for x in cols]
+        lines.append("table %d %d %s %s %s"
+                     % (k, len(cols), " ".join(str(c) for c in cols),
+                        " ".join(fld.hx(v) for v in inv_d),
+                        " ".join(fld.hx(v) for v in entries)))
+    return lines
+
+
+# ----------------------------------------------------------------------
 # Output
 # ----------------------------------------------------------------------
 
@@ -263,6 +517,59 @@ def main():
     print("gen_ligero_vectors: merkle.txt with %d build, %d verify and %d"
           " negative cases; B.1.1 reproduced" % (n_build + 1, n_verify + 2,
                                                  len(cases)))
+
+    # ---- geometry
+    check_geometry()
+    glines = [
+        "# Known-answer vectors for the Ligero geometry of draft Section 4.2,",
+        "# Longfellow ZK stage 5. Generated by gen_ligero_vectors.py; do not"
+        " edit by hand.",
+        "# LigeroGeometry::new of the reference transcribed; the first case is",
+        "# the configuration of Appendix B.3 with the numbers the draft prints.",
+        "# Format: geometry <rate_inv> <nreq> <ncol> <nw> <nq> <valid>",
+        "#   then, when valid is 1: <block> <dblock> <wr> <nwrow> <nqt> <nrow>",
+        "#",
+    ]
+    for rate_inv, nreq, ncol, nw, nq in GEOMETRY_CASES:
+        g = geometry(rate_inv, nreq, ncol, nw, nq)
+        if g is None:
+            glines.append("geometry %d %d %d %d %d 0" % (rate_inv, nreq, ncol,
+                                                         nw, nq))
+        else:
+            glines.append("geometry %d %d %d %d %d 1 %d %d %d %d %d %d"
+                          % (rate_inv, nreq, ncol, nw, nq, g["block"],
+                             g["dblock"], g["wr"], g["nwrow"], g["nqt"],
+                             g["nrow"]))
+    (out / "ligero_geometry.txt").write_text("\n".join(glines) + "\n")
+    print("gen_ligero_vectors: ligero_geometry.txt with %d cases; B.3.2"
+          " geometry reproduced" % len(GEOMETRY_CASES))
+
+    # ---- Lagrange
+    rng = random.Random(20261015)
+    for fld in (GF2128(), P256()):
+        llines = [
+            "# Known-answer vectors for the Lagrange code of ADR 0036 over "
+            + fld.name + ",",
+            "# Longfellow ZK stage 5. Generated by gen_ligero_vectors.py; do"
+            " not edit by hand.",
+            "# lagrange_matrix and encode_row of the reference transcribed,"
+            " checked",
+            "# against the interpolating polynomial found independently"
+            " (Vandermonde).",
+            "# Elements as big-endian hex integers (the notation of the other"
+            " files),",
+            "# columns as decimal positions x of the code of length n.",
+            "# Format:",
+            "#   table <k> <m> <m columns> <k inv_d> <k*m entries, row i then"
+            " column c>",
+            "#   eval <k> <m> <m columns> <k coeffs> <c> <encode_row at column"
+            " c>",
+            "#",
+        ] + lagrange_lines(fld, rng)
+        (out / ("lagrange_%s.txt" % fld.name)).write_text(
+            "\n".join(llines) + "\n")
+        print("gen_ligero_vectors: lagrange_%s.txt with %d cases; interpolation"
+              " checked" % (fld.name, len(LAGRANGE_CASES) * 5))
 
 
 if __name__ == "__main__":
