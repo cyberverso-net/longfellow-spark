@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Amended 2026-10-16 by [ADR 0041](0041-verification-cadence.md): the pre-push hook is withdrawn, the proof gate is `make check` by hand, and the harnesses have a slow set run weekly.
+Accepted. Amended 2026-10-16 by [ADR 0041](0041-verification-cadence.md): the pre-push hook is withdrawn, the proof gate is `make check` by hand, and the harnesses have a slow set run weekly. Amended 2026-10-16 by [ADR 0045](0045-proof-gate-restored-through-partitions.md): the six partition checks of `prove` are required for merging again.
 
 ## Date
 

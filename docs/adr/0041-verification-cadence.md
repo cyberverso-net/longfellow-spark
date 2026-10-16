@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-16, after block 4 of stage 5). Amended 2026-10-16 by [ADR 0044](0044-field-contracts-at-proof-only-level.md): the slow set is folded into the default harness run; `make check-full`, `test-slow` and the workflow `full` are removed.
+Accepted (2026-10-16, after block 4 of stage 5). Amended 2026-10-16 by [ADR 0044](0044-field-contracts-at-proof-only-level.md): the slow set is folded into the default harness run; `make check-full`, `test-slow` and the workflow `full` are removed. Amended 2026-10-16 by [ADR 0045](0045-proof-gate-restored-through-partitions.md): the hosted proof is a required check again, per partition; the hook stays withdrawn.
 
 ## Date
 
