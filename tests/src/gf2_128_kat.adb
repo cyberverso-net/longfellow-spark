@@ -4,10 +4,11 @@
 --  vector files given as arguments (default: gf2_128_mul.txt,
 --  gf2_128_square.txt, gf2_128_inv.txt and gf2_128_bytes.txt under
 --  tests/vectors/) and checks every case against the library.
---  Built with -gnata, so the library's contracts execute at run time:
---  in particular the Post of Mul evaluates the ghost reference Mul_Ref
---  on every call, and a contract violation surfaces here as a failure
---  with the offending line. This build is not the constant-time build.
+--  Built with -gnata, so the library's executable contracts run; a
+--  contract violation surfaces here as a failure with the offending
+--  line. The Post of Mul against Mul_Ref is proof-only (ADR 0044) and
+--  does not run: what this harness checks of Mul is its result. This
+--  build is not the constant-time build.
 --
 --  File format: '#' comments and blank lines are skipped; otherwise
 --  one case per line, fields separated by blanks:

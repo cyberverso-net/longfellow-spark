@@ -39,8 +39,12 @@
 --              chain yields with no extra branch and matches the
 --              upstream C++ (the upstream Rust reference asserts
 --              instead). Callers that must reject zero do so themselves.
---    Bit, Mul_Ref : Ghost, specification vocabulary only; absent from
---              the library when assertions are disabled.
+--    Bit, Mul_Ref, Inject_Ref : Ghost, specification vocabulary only,
+--              at the assertion level Proof_Only (ADR 0044) with the
+--              postconditions of Xtime, Mul, Square and Inject and the
+--              loop invariants that state them: proved for all inputs,
+--              never compiled in any build. What the test build checks
+--              of these operations is their result against the vectors.
 --    To_Bytes, From_Bytes : Gold (stage 4, ADR 0028): the 16-byte
 --              little-endian encoding of draft Section 7.2.1, every
 --              16-byte string accepted (Ok is always True); the value
@@ -64,17 +68,20 @@
 --  in any executable statement of this package. Conditional xors are
 --  realised with arithmetic masks (0 - bit); if-expressions appear only
 --  in contracts and ghost code. SCOPE OF THE GUARANTEE (independent
---  review, P2): contracts and ghost code are compiled and EXECUTED when
---  assertions are enabled (-gnata / Alire validation profile), and
---  Mul_Ref then branches on the bits of B at run time. The constant-time
---  property therefore holds ONLY for builds with assertions disabled
---  (Assertion_Policy Ignore, e.g. the release profile). Never benchmark,
---  measure, or deploy this code with assertions enabled.
+--  review, P2): the executable contracts are compiled and EXECUTED when
+--  assertions are enabled (-gnata / Alire validation profile); Mul_Ref,
+--  which branches on the bits of B, is proof-only since ADR 0044 and
+--  never compiled, but the limb-wise postconditions still run. The
+--  constant-time property therefore holds ONLY for builds with
+--  assertions disabled (Assertion_Policy Ignore, e.g. the release
+--  profile). Never benchmark, measure, or deploy this code with
+--  assertions enabled.
 
 pragma SPARK_Mode (On);
 
 with Interfaces; use Interfaces;
 with Bytes;
+with Proof_Levels;
 
 package GF2_128 is
 
@@ -104,7 +111,7 @@ package GF2_128 is
    --  branches on a bit of an element (its body compiles to a branch).
    function Bit (E : Element; I : Bit_Index_128) return Boolean is
      ((Shift_Right (E.Limbs (Limb_Index (I / 64)), I mod 64) and 1) = 1)
-   with Ghost, Global => null;
+   with Ghost => Proof_Only, Global => null;
 
    --  Field addition. In characteristic 2 this is exact xor and is its
    --  own inverse; no reduction is involved, so it is polynomial-agnostic.
@@ -131,12 +138,13 @@ package GF2_128 is
    function Xtime (E : Element) return Element with
      Global => null,
      Post   =>
-       Xtime'Result.Limbs (1) =
-         (Shift_Left (E.Limbs (1), 1) or Shift_Right (E.Limbs (0), 63))
-       and then
-       Xtime'Result.Limbs (0) =
-         (Shift_Left (E.Limbs (0), 1)
-            xor (if Bit (E, 127) then Reduction_Low else 0));
+       (Proof_Only =>
+          Xtime'Result.Limbs (1) =
+            (Shift_Left (E.Limbs (1), 1) or Shift_Right (E.Limbs (0), 63))
+          and then
+          Xtime'Result.Limbs (0) =
+            (Shift_Left (E.Limbs (0), 1)
+               xor (if Bit (E, 127) then Reduction_Low else 0)));
 
    --  Ghost reference for multiplication: MSB-first Horner over the top
    --  N bits of B. Mul_Ref (A, B, 128) is the definitional product
@@ -149,19 +157,19 @@ package GF2_128 is
       else
         Xtime (Mul_Ref (A, B, N - 1)))
    with
-     Ghost,
+     Ghost => Proof_Only,
      Global => null,
      Subprogram_Variant => (Decreases => N);
 
    --  Field multiplication, A * B mod Q(x).
    function Mul (A, B : Element) return Element with
      Global => null,
-     Post   => Mul'Result = Mul_Ref (A, B, 128);
+     Post   => (Proof_Only => Mul'Result = Mul_Ref (A, B, 128));
 
    --  Field squaring, E * E mod Q(x). Thin wrapper over Mul for now.
    function Square (E : Element) return Element with
      Global => null,
-     Post   => Square'Result = Mul_Ref (E, E, 128);
+     Post   => (Proof_Only => Square'Result = Mul_Ref (E, E, 128));
 
    --  Multiplicative inverse by Fermat: E^(2^128 - 2), computed with a
    --  fixed addition chain (no data-dependent control flow), so it is
@@ -244,12 +252,12 @@ package GF2_128 is
       elsif (X / 2 ** (N - 1)) mod 2 = 1
       then Add (Inject_Ref (X, N - 1), Subfield_Basis (N - 1))
       else Inject_Ref (X, N - 1))
-   with Ghost,
+   with Ghost => Proof_Only,
         Pre => N <= 16,
         Subprogram_Variant => (Decreases => N);
 
    function Inject (X : Subfield_Value) return Element with
      Global => null,
-     Post   => Inject'Result = Inject_Ref (X, 16);
+     Post   => (Proof_Only => Inject'Result = Inject_Ref (X, 16));
 
 end GF2_128;

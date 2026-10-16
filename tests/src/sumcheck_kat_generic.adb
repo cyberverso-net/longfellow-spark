@@ -303,11 +303,6 @@ package body Sumcheck_KAT_Generic is
          Report_Failure ("tier 3 " & Name & ": no zk_ligero line");
          return;
       end if;
-      if Field_Name = "p256" and then not Run_Slow then
-         TIO.Put_Line ("skipped (slow): Ligero verifier on " & Name
-                       & " over " & Field_Name & "; run with --slow");
-         return;
-      end if;
       for J in 0 .. C.Last_Layer loop
          NW := NW + 4 * C.Layers (J).Logw + 3;
       end loop;
@@ -617,9 +612,7 @@ package body Sumcheck_KAT_Generic is
    --  Stage 5 (ADR 0040): the complete verifier on the proof string of
    --  the circuit (root, sumcheck part, Ligero part concatenated), which
    --  must accept, then the negative cases built from those bytes with
-   --  the status each must produce. On P-256 every run of the verifier
-   --  is a slow case (the core and the Ligero tests under assertions);
-   --  the public input count is checked first and costs nothing.
+   --  the status each must produce, on both fields (ADR 0044).
    procedure Check_Zk (Name : String; C : Circuit; Pub : Element_Array) is
       use Ligero_Geometry;
       use Verifier_Status;
@@ -631,7 +624,6 @@ package body Sumcheck_KAT_Generic is
       Len   : constant Natural := LO + LL;
       Full  : Bytes.Byte_Array (0 .. Len - 1);
       Label : constant Bytes.Byte_Array := Zk_Label (0 .. Zk_Label_Len - 1);
-      Slow  : constant Boolean := Field_Name = "p256";
 
       function LE32 (B : Bytes.Byte_Array; Off : Natural) return Natural is
         (Natural (B (Off)) + 256 * Natural (B (Off + 1))
@@ -652,15 +644,10 @@ package body Sumcheck_KAT_Generic is
 
       procedure Expect
         (What : String; B : Bytes.Byte_Array; P : Element_Array;
-         Want : Status; Is_Slow : Boolean)
+         Want : Status)
       is
          St : Status;
       begin
-         if Is_Slow and then not Run_Slow then
-            TIO.Put_Line ("skipped (slow): end to end, " & What & " on "
-                          & Name & " over " & Field_Name & "; run with --slow");
-            return;
-         end if;
          ZK.Verify (Label, Zk_Id, Cfg, C, P, B, St);
          Check (St = Want, "tier 3 " & Name & ": end to end, " & What
                 & ": got " & St'Image & ", expected " & Want'Image);
@@ -673,9 +660,9 @@ package body Sumcheck_KAT_Generic is
       Full (0 .. 31)         := Zk_Root;
       Full (32 .. LO - 1)    := Zk_Sumcheck (0 .. SL - 1);
       Full (LO .. Len - 1)   := Zk_Ligero (0 .. LL - 1);
-      Expect ("the Appendix B.3 proof", Full, Pub, Ok, Slow);
+      Expect ("the Appendix B.3 proof", Full, Pub, Ok);
       Expect ("a public input too many", Full, Pub & Zero,
-              Public_Input_Length, False);
+              Public_Input_Length);
       if not Valid (Cfg) then
          return;
       end if;
@@ -714,11 +701,11 @@ package body Sumcheck_KAT_Generic is
             Path_Off  : constant Natural := Count_Off + 4;
          begin
             Expect ("an altered opened column element", Flip (Elt), Pub,
-                    Merkle_Failed, Slow);
-            Expect ("an altered nonce", Flip (Nonces), Pub, Merkle_Failed, Slow);
+                    Merkle_Failed);
+            Expect ("an altered nonce", Flip (Nonces), Pub, Merkle_Failed);
             if P.Path_Count > 0 then
                Expect ("an altered path digest", Flip (Path_Off), Pub,
-                       Merkle_Failed, Slow);
+                       Merkle_Failed);
             end if;
             --  The response polynomials are absorbed before the columns
             --  are chosen: an altered polynomial moves the queried
@@ -726,44 +713,44 @@ package body Sumcheck_KAT_Generic is
             --  The test statuses are exercised at the step level, in
             --  Check_Ligero (ADR 0040 amended, block 5).
             Expect ("an altered element of ldt_poly", Flip (LO), Pub,
-                    Merkle_Failed, Slow);
+                    Merkle_Failed);
             Expect ("an altered element of linear_poly",
-                    Flip (LO + G.Block_Len * Size), Pub, Merkle_Failed, Slow);
+                    Flip (LO + G.Block_Len * Size), Pub, Merkle_Failed);
             Expect ("an altered element of quad_poly_low",
                     Flip (LO + (G.Block_Len + G.Dblock_Len) * Size), Pub,
-                    Merkle_Failed, Slow);
+                    Merkle_Failed);
             Expect ("an altered element of quad_poly_high",
                     Flip (LO + (G.Block_Len + G.Dblock_Len + G.Num_Queries)
                               * Size),
-                    Pub, Merkle_Failed, Slow);
+                    Pub, Merkle_Failed);
             Expect ("a path one digest too long",
                     Full (0 .. Count_Off - 1) & Size4 (P.Path_Count + 1)
                     & Full (Path_Off .. Len - 1) & Full (Path_Off .. Path_Off + 31),
-                    Pub, Merkle_Failed, Slow);
+                    Pub, Merkle_Failed);
             if P.Path_Count > 0 then
                Expect ("a path one digest too short",
                        Full (0 .. Count_Off - 1) & Size4 (P.Path_Count - 1)
                        & Full (Path_Off .. Len - 33),
-                       Pub, Merkle_Failed, Slow);
+                       Pub, Merkle_Failed);
             end if;
             Expect ("a second zero-length run",
                     Full (0 .. Cols - 1)
                     & (if R0 > 0 then Size4 (0) & Size4 (0) else Size4 (0))
                     & Full (Cols .. Len - 1),
-                    Pub, Proof_Encoding, Slow);
+                    Pub, Proof_Encoding);
             if Run > 40 then
                Expect ("a zero-length run that is not the first",
                        Full (0 .. Head - 1) & Size4 (40)
                        & Full (Elt .. Elt + 40 * Width - 1) & Size4 (0)
                        & Full (Elt + 40 * Width .. Len - 1),
-                       Pub, Proof_Encoding, Slow);
+                       Pub, Proof_Encoding);
             end if;
             Expect ("a run beyond the total",
                     Full (0 .. Head - 1) & Size4 (Total + 1)
                     & Full (Elt .. Len - 1),
-                    Pub, Proof_Encoding, Slow);
+                    Pub, Proof_Encoding);
             Expect ("trailing bytes", Full & Bytes.Byte_Array'[0 => 0], Pub,
-                    Proof_Encoding, Slow);
+                    Proof_Encoding);
          end;
       end;
    end Check_Zk;

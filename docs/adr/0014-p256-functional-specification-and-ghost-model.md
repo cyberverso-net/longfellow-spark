@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-09, after review)
+Accepted (2026-10-09, after review). Amended 2026-10-16 by [ADR 0044](0044-field-contracts-at-proof-only-level.md): the ghost model, the lemmas and the functional contracts are at the assertion level Proof_Only, never compiled.
 
 ## Date
 

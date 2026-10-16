@@ -51,12 +51,6 @@ generic
    with function Image (E : SA.Element) return String;
 package Sumcheck_KAT_Generic is
 
-   --  The slow cases (ADR 0041): on P-256 the Ligero verifier and the
-   --  complete verifier end to end with the negative cases, each
-   --  minutes with assertions on. Run only when set; the main sets it
-   --  on the --slow argument.
-   Run_Slow : Boolean := False;
-
    --  Runs every case of the file; counts are accumulated.
    procedure Run_File (Path : String; Passed, Failed : in out Natural);
 

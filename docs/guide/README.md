@@ -22,7 +22,7 @@ Requirements: [Alire](https://alire.ada.dev) with a GNAT toolchain selected (`al
 alr build                                                     # the library
 alr exec -- gnatprove -P longfellow_spark.gpr
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p   # the test harness, assertions on
-make test                                                     # the five harnesses, concurrently (make test-slow adds the slow cases, ADR 0041)
+make test                                                     # the five harnesses, concurrently
 python3 -I tests/vectors/gen_gf2_128_vectors.py               # regenerate vectors (optional)
 python3 -I tests/vectors/gen_p256_vectors.py
 python3 -I tests/vectors/gen_sumcheck_vectors.py
@@ -30,7 +30,7 @@ python3 -I tests/vectors/gen_transcript_vectors.py
 python3 -I tests/vectors/gen_ligero_vectors.py
 ```
 
-`make check` runs everything in order and is the definition of done for a commit; `make check-full` adds the slow harness cases.
+`make check` runs everything in order and is the definition of done for a commit and for a pull request.
 
 The proof summary is written to `obj/development/gnatprove/gnatprove.out`. The expected outcome at every commit is "all checks proved" and a harness run with zero failures; the chapters quote the counts of the commit they describe.
 

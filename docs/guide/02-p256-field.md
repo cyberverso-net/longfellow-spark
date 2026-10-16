@@ -286,10 +286,10 @@ Reproduce with:
 
 ```bash
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
-tests/bin/p256_kat           # expected: passed 467, failed 0 (about three minutes with assertions on)
+tests/bin/p256_kat           # expected: passed 467, failed 0
 ```
 
-The test build is slow because every `Mul` evaluates its postcondition with `Big_Integer` arithmetic, and `Inv` performs 267 multiplications per case.
+Until the consolidation after Phase A the test build was slow (about three minutes for these cases) because every `Mul` evaluated its postcondition with `Big_Integer` arithmetic and `Inv` performs 267 multiplications per case; since [ADR 0044](../adr/0044-field-contracts-at-proof-only-level.md) the model, the lemmas and the contracts that mention them are at the proof-only assertion level, proved for all inputs and never compiled, and the 467 cases take under a second. The type predicate of `Element` stays executable.
 
 ## 6. What stays trusted, and the limits
 

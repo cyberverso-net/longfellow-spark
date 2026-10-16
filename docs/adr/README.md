@@ -13,11 +13,11 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0007](0007-square-as-wrapper-over-mul.md) | Square as a wrapper over Mul | Accepted | 2026-10-08 |
 | [0008](0008-inv-fixed-chain-total-function.md) | Inv as a fixed Itoh-Tsujii chain, total on zero | Accepted | 2026-10-08 |
 | [0009](0009-known-answer-vectors.md) | Known-answer vectors: notation, tiers, anchors | Accepted | 2026-10-08 |
-| [0010](0010-assertion-enabled-test-project.md) | Test project compiling the library with assertions | Accepted | 2026-10-08 |
+| [0010](0010-assertion-enabled-test-project.md) | Test project compiling the library with assertions | Accepted, amended by 0044 | 2026-10-08 |
 | [0011](0011-circuits-as-data.md) | Circuits are data | Accepted | 2026-10-06 |
 | [0012](0012-p256-limb-representation.md) | P-256 base field: limb representation | Accepted | 2026-10-09 |
 | [0013](0013-p256-reduction-strategy.md) | P-256 base field: reduction strategy | Accepted | 2026-10-09 |
-| [0014](0014-p256-functional-specification-and-ghost-model.md) | P-256 base field: functional specification and ghost model | Accepted | 2026-10-09 |
+| [0014](0014-p256-functional-specification-and-ghost-model.md) | P-256 base field: functional specification and ghost model | Accepted, amended by 0044 | 2026-10-09 |
 | [0015](0015-p256-canonical-form-and-conditional-subtraction.md) | P-256 base field: canonical form and conditional subtraction | Accepted | 2026-10-09 |
 | [0016](0016-p256-inversion.md) | P-256 base field: inversion | Accepted | 2026-10-09 |
 | [0017](0017-p256-test-anchors.md) | P-256 base field: test anchors | Accepted | 2026-10-09 |
@@ -44,6 +44,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0038](0038-gold-perimeter-for-merkle-and-ligero.md) | Gold perimeter for Merkle and Ligero | Accepted | 2026-10-15 |
 | [0039](0039-sizes-allocation-and-status.md) | Sizes, allocation and the status enumeration | Accepted, amended by 0043 | 2026-10-15 |
 | [0040](0040-ligero-vectors-and-upstream-instrumentation.md) | Ligero vectors and upstream instrumentation | Accepted | 2026-10-15 |
-| [0041](0041-verification-cadence.md) | Verification cadence: the proof by hand, the slow harness cases weekly | Accepted | 2026-10-16 |
+| [0041](0041-verification-cadence.md) | Verification cadence: the proof by hand, the slow harness cases weekly | Accepted, amended by 0044 | 2026-10-16 |
 | [0042](0042-status-amendments.md) | Status amendments | Accepted | 2026-10-16 |
 | [0043](0043-exhausted-status-and-streaming-slice.md) | Exhausted status and streaming slice | Accepted | 2026-10-16 |
+| [0044](0044-field-contracts-at-proof-only-level.md) | Field contracts at proof-only level | Accepted | 2026-10-16 |

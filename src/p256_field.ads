@@ -43,17 +43,27 @@
 --  Partial sums are formed in Unsigned_128 so that no step wraps; the
 --  ghost model To_Int maps word arrays to the integer they denote.
 --
+--  Assertion level (ADR 0044): the ghost model, the lemmas, the
+--  assertions and loop invariants of the body and every contract that
+--  mentions the model are at the level Proof_Only (Proof_Levels):
+--  proved for all inputs by GNATprove, never compiled in any build.
+--  The type predicate (Is_Canonical, a four-limb subtraction) and the
+--  contracts that do not mention the model stay executable. What the
+--  test build checks of the arithmetic is its result against the
+--  vectors (tests/vectors/p256_*.txt).
+--
 --  Constant-time discipline (ADR 0006): no secret-dependent branching
 --  or indexing in executable code; selections use arithmetic masks;
 --  if-expressions appear only in contracts and ghost code; loop bounds
 --  and table indices are compile-time constants. The guarantee is
---  scoped to builds with assertions disabled; the ghost model executes
---  Big_Integer arithmetic when assertions are enabled.
+--  scoped to builds with assertions disabled, where the remaining
+--  executable contracts and the type predicate do not run.
 
 pragma SPARK_Mode (On);
 
 with Interfaces; use Interfaces;
 with Bytes;
+with Proof_Levels;
 with Ada.Numerics.Big_Numbers.Big_Integers;
 use  Ada.Numerics.Big_Numbers.Big_Integers;
 
@@ -85,19 +95,21 @@ package P256_Field is
 
    function Conv (X : Unsigned_64) return Big_Integer is
      (U64_Conv.To_Big_Integer (X))
-   with Ghost, Global => null;
+   with Ghost => Proof_Only, Global => null;
 
    function Conv128 (X : Unsigned_128) return Big_Integer is
      (U128_Conv.To_Big_Integer (X))
-   with Ghost, Global => null;
+   with Ghost => Proof_Only, Global => null;
 
-   Two_32 : constant Big_Integer := Conv (16#1_0000_0000#) with Ghost;
-   Two_64 : constant Big_Integer := Conv (Unsigned_64'Last) + 1 with Ghost;
+   Two_32 : constant Big_Integer := Conv (16#1_0000_0000#)
+     with Ghost => Proof_Only;
+   Two_64 : constant Big_Integer := Conv (Unsigned_64'Last) + 1
+     with Ghost => Proof_Only;
 
    --  2^(64 N) for N in 0 .. 8.
    function Weight (N : Natural) return Big_Integer is
      (if N = 0 then To_Big_Integer (1) else Two_64 * Weight (N - 1))
-   with Ghost, Global => null,
+   with Ghost => Proof_Only, Global => null,
         Pre => N <= Max_Words,
         Subprogram_Variant => (Decreases => N);
 
@@ -105,7 +117,7 @@ package P256_Field is
    function Partial (L : Word_Array; N : Natural) return Big_Integer is
      (if N = 0 then To_Big_Integer (0)
       else Partial (L, N - 1) + Conv (L (N - 1)) * Weight (N - 1))
-   with Ghost, Global => null,
+   with Ghost => Proof_Only, Global => null,
         Pre => L'First = 0
           and then (N = 0 or else N - 1 <= L'Last)
           and then N <= Max_Words,
@@ -113,15 +125,15 @@ package P256_Field is
 
    function To_Int (L : Word_Array) return Big_Integer is
      (Partial (L, L'Length))
-   with Ghost, Global => null,
+   with Ghost => Proof_Only, Global => null,
         Pre => L'First = 0 and then L'Length <= Max_Words;
 
-   Two_256 : constant Big_Integer := Weight (4) with Ghost;
-   P       : constant Big_Integer := To_Int (P_Limbs) with Ghost;
+   Two_256 : constant Big_Integer := Weight (4) with Ghost => Proof_Only;
+   P       : constant Big_Integer := To_Int (P_Limbs) with Ghost => Proof_Only;
 
    --  Every word array denotes a value in 0 .. 2^(64 Length) - 1.
    procedure Lemma_To_Int_Bounds (L : Word_Array) with
-     Ghost, Global => null,
+     Ghost => Proof_Only, Global => null,
      Pre  => L'First = 0 and then L'Length <= Max_Words,
      Post => To_Int (L) >= 0 and then To_Int (L) < Weight (L'Length);
 
@@ -139,7 +151,7 @@ package P256_Field is
 
    --  A 128-bit value is its halves weighted by 2^64.
    procedure Lemma_Split (X : Unsigned_128) with
-     Ghost, Global => null,
+     Ghost => Proof_Only, Global => null,
      Post => Conv128 (X) = Conv (Lo (X)) + Conv (Hi (X)) * Two_64;
 
    --  A + B word by word; Carry is the bit of weight 2^(64 Length).
@@ -150,9 +162,9 @@ package P256_Field is
      Pre  => A'First = 0 and then B'First = 0 and then R'First = 0
        and then A'Length = B'Length and then R'Length = A'Length
        and then A'Length in 1 .. Max_Words,
-     Post => Carry <= 1
+     Post => (Proof_Only => Carry <= 1
        and then To_Int (R) + Conv (Carry) * Weight (A'Length)
-                = To_Int (A) + To_Int (B);
+                = To_Int (A) + To_Int (B));
 
    --  A - B word by word; Borrow is 1 iff A < B, and the words denote
    --  A - B + Borrow * 2^(64 Length).
@@ -163,10 +175,10 @@ package P256_Field is
      Pre  => A'First = 0 and then B'First = 0 and then R'First = 0
        and then A'Length = B'Length and then R'Length = A'Length
        and then A'Length in 1 .. Max_Words,
-     Post => Borrow <= 1
+     Post => (Proof_Only => Borrow <= 1
        and then To_Int (R)
                 = To_Int (A) - To_Int (B) + Conv (Borrow) * Weight (A'Length)
-       and then (Borrow = 1) = (To_Int (A) < To_Int (B));
+       and then (Borrow = 1) = (To_Int (A) < To_Int (B)));
 
    type Limbs_With_Carry is record
       Limbs : Limb_Array;
@@ -175,18 +187,18 @@ package P256_Field is
 
    function Add_Limbs (A, B : Limb_Array) return Limbs_With_Carry with
      Global => null,
-     Post   => Add_Limbs'Result.Carry <= 1
+     Post   => (Proof_Only => Add_Limbs'Result.Carry <= 1
        and then To_Int (Add_Limbs'Result.Limbs)
                   + Conv (Add_Limbs'Result.Carry) * Two_256
-                = To_Int (A) + To_Int (B);
+                = To_Int (A) + To_Int (B));
 
    function Sub_Limbs (A, B : Limb_Array) return Limbs_With_Carry with
      Global => null,
-     Post   => Sub_Limbs'Result.Carry <= 1
+     Post   => (Proof_Only => Sub_Limbs'Result.Carry <= 1
        and then To_Int (Sub_Limbs'Result.Limbs)
                 = To_Int (A) - To_Int (B)
                   + Conv (Sub_Limbs'Result.Carry) * Two_256
-       and then (Sub_Limbs'Result.Carry = 1) = (To_Int (A) < To_Int (B));
+       and then (Sub_Limbs'Result.Carry = 1) = (To_Int (A) < To_Int (B)));
 
    --  Limb-wise selection: B where Mask is all ones, A where it is zero.
    function Select_Limbs (A, B : Limb_Array; Mask : Unsigned_64)
@@ -203,7 +215,7 @@ package P256_Field is
    function Is_Canonical (L : Limb_Array) return Boolean is
      (Sub_Limbs (L, P_Limbs).Carry = 1)
    with Global => null,
-        Post => Is_Canonical'Result = (To_Int (L) < P);
+        Post => (Proof_Only => Is_Canonical'Result = (To_Int (L) < P));
 
    type Element is record
       Limbs : Limb_Array;
@@ -215,27 +227,29 @@ package P256_Field is
 
    function Add (A, B : Element) return Element with
      Global => null,
-     Post   => To_Int (Add'Result.Limbs)
-               = (To_Int (A.Limbs) + To_Int (B.Limbs)) mod P;
+     Post   => (Proof_Only => To_Int (Add'Result.Limbs)
+               = (To_Int (A.Limbs) + To_Int (B.Limbs)) mod P);
 
    function Sub (A, B : Element) return Element with
      Global => null,
-     Post   => To_Int (Sub'Result.Limbs)
-               = (To_Int (A.Limbs) - To_Int (B.Limbs)) mod P;
+     Post   => (Proof_Only => To_Int (Sub'Result.Limbs)
+               = (To_Int (A.Limbs) - To_Int (B.Limbs)) mod P);
 
    function Neg (A : Element) return Element is (Sub (Zero, A)) with
      Global => null,
-     Post   => To_Int (Neg'Result.Limbs) = (-To_Int (A.Limbs)) mod P;
+     Post   =>
+       (Proof_Only =>
+          To_Int (Neg'Result.Limbs) = (-To_Int (A.Limbs)) mod P);
 
    function Mul (A, B : Element) return Element with
      Global => null,
-     Post   => To_Int (Mul'Result.Limbs)
-               = (To_Int (A.Limbs) * To_Int (B.Limbs)) mod P;
+     Post   => (Proof_Only => To_Int (Mul'Result.Limbs)
+               = (To_Int (A.Limbs) * To_Int (B.Limbs)) mod P);
 
    function Square (E : Element) return Element is (Mul (E, E)) with
      Global => null,
-     Post   => To_Int (Square'Result.Limbs)
-               = (To_Int (E.Limbs) * To_Int (E.Limbs)) mod P;
+     Post   => (Proof_Only => To_Int (Square'Result.Limbs)
+               = (To_Int (E.Limbs) * To_Int (E.Limbs)) mod P);
 
    --  Multiplicative inverse by Fermat: E^(p - 2), computed with a
    --  fixed addition chain (255 squarings, 12 multiplications, no
