@@ -34,12 +34,12 @@
 --  The structural contracts are proof-only: they sit at the project's
 --  assertion level Proof_Only (Proof_Levels), proved for all inputs
 --  and never compiled, because the assertion-enabled test build could
---  not afford them (every P-256 multiplication executes its big-
---  integer postcondition, and a recursive reference in a loop
---  invariant is recomputed at every iteration: a table of dimension
---  10 on P-256 took over ten minutes). What the test build checks of
---  this package is its output against the vectors. Preconditions stay
---  executable.
+--  not afford them (at the time every P-256 multiplication executed
+--  its big-integer postcondition, since moved to the same level by
+--  ADR 0044, and a recursive reference in a loop invariant is
+--  recomputed at every iteration: a table of dimension 10 on P-256
+--  took over ten minutes). What the test build checks of this package
+--  is its output against the vectors. Preconditions stay executable.
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037.
 

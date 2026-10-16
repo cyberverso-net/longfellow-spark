@@ -220,9 +220,9 @@ procedure Ligero_KAT is
       with package LG is new Lagrange (<>);
       with function To_Element (S : String) return LG.Element;
       with function Image (E : LG.Element) return String;
-      --  Build, or the last table built for the same k and columns: with
-      --  assertions on, a P-256 inverse costs seconds, and the lines of
-      --  one case share a table.
+      --  Build, or the last table built for the same k and columns: the
+      --  lines of one case share a table (with the field contracts
+      --  executed, before ADR 0044, a P-256 inverse cost seconds).
       with procedure Build_Cached
         (K : Positive; Cols : LG.Column_Array; T : out LG.Table;
          Inv : out LG.Element_Array; Ok : out Boolean);

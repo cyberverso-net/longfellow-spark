@@ -8,12 +8,10 @@
 --  ligero_<field>_<circuit>.txt there when present); the
 --  first non-comment line of a file, "field <name>", selects the
 --  instance. Built with
---  -gnata, so every contract and ghost reference of the library executes:
---  in particular the Post of Eval_Circuit evaluates Acc_Ref on every wire.
---
---  The argument --slow (ADR 0041) also runs the slow cases: the P-256
---  Ligero verifier end to end, about twelve minutes with assertions
---  on; without it they are reported as skipped.
+--  -gnata, so every executable contract and ghost reference of the
+--  library runs: in particular the Post of Eval_Circuit evaluates
+--  Acc_Ref on every wire. The field contracts are proof-only (ADR
+--  0044), so the P-256 cases cost seconds and run with the rest.
 --
 --  Exit status: success only if at least one case ran and none failed.
 
@@ -176,18 +174,8 @@ procedure Sumcheck_KAT is
       end if;
    end Run;
 
-   Files : Natural := 0;
-
 begin
-   for I in 1 .. Ada.Command_Line.Argument_Count loop
-      if Ada.Command_Line.Argument (I) = "--slow" then
-         GF_KAT.Run_Slow := True;
-         P_KAT.Run_Slow  := True;
-      else
-         Files := Files + 1;
-      end if;
-   end loop;
-   if Files = 0 then
+   if Ada.Command_Line.Argument_Count = 0 then
       Run ("tests/vectors/sumcheck_gf2_128.txt");
       Run ("tests/vectors/sumcheck_p256.txt");
       declare
@@ -217,9 +205,7 @@ begin
       end;
    else
       for I in 1 .. Ada.Command_Line.Argument_Count loop
-         if Ada.Command_Line.Argument (I) /= "--slow" then
-            Run (Ada.Command_Line.Argument (I));
-         end if;
+         Run (Ada.Command_Line.Argument (I));
       end loop;
    end if;
 

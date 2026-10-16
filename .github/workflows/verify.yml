@@ -2,13 +2,13 @@
 #  Runs build, test, vectors and lint from scripts/check.sh, one workflow
 #  step each so that the failing one is visible, with the same
 #  Alire-provisioned toolchain as the local development environment.
-#  The proof is not part of this gate: it runs locally before every
+#  The proof is not part of this job: it runs locally before every
 #  commit (make check, ADR 0041) and on the hosted runner on pull
-#  requests, weekly and on demand, as information rather than as a
-#  required check (ADR 0034, prove.yml). The harnesses run concurrently
-#  (scripts/check.sh test) without their slow set, which full.yml runs
-#  weekly (ADR 0041); the limit below is the measured sixteen minutes of
-#  the sequential run at stage 4 plus margin.
+#  requests, weekly and on demand, as the six required checks of
+#  prove.yml (ADR 0045). The harnesses run concurrently
+#  (scripts/check.sh test), every case of both fields: since ADR 0044
+#  the field contracts are proof-only and the step takes seconds; the
+#  limit below keeps the margin of the earlier, slower runs.
 
 name: verify
 

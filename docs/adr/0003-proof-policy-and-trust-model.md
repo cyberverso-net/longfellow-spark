@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted; prover configuration superseded by [ADR 0020](0020-prover-configuration-step-budget.md) on 2026-10-11
+Accepted. Amended 2026-10-11 by [ADR 0020](0020-prover-configuration-step-budget.md): the prover configuration is the step budget of that record.
 
 ## Date
 

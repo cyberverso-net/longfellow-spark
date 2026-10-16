@@ -50,7 +50,7 @@ package body GF2_128 is
                      and 1);
          R.Limbs (0) := R.Limbs (0) xor (M and A.Limbs (0));
          R.Limbs (1) := R.Limbs (1) xor (M and A.Limbs (1));
-         pragma Loop_Invariant (R = Mul_Ref (A, B, K));
+         pragma Loop_Invariant (Proof_Only => R = Mul_Ref (A, B, K));
       end loop;
       return R;
    end Mul;
@@ -147,7 +147,7 @@ package body GF2_128 is
          if (X / 2 ** I) mod 2 = 1 then
             R := Add (R, Subfield_Basis (I));
          end if;
-         pragma Loop_Invariant (R = Inject_Ref (X, I + 1));
+         pragma Loop_Invariant (Proof_Only => R = Inject_Ref (X, I + 1));
       end loop;
       return R;
    end Inject;

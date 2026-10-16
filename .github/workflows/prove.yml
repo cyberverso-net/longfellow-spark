@@ -1,10 +1,10 @@
 #  prove: the full proof on the hosted runner (ADR 0019, ADR 0021, ADR
-#  0033, ADR 0034). It runs on every pull request to main, weekly as an
-#  independent record that the proof still holds on the pinned
-#  toolchain, and on demand before a release or after a toolchain
-#  change; its checks are information, not required for merging: the
-#  proof that gates a change is the one the developer runs locally with
-#  make check before every commit (ADR 0034, ADR 0041).
+#  0033, ADR 0034, ADR 0045). It runs on every pull request to main,
+#  weekly as an independent record that the proof still holds on the
+#  pinned toolchain, and on demand before a release or after a
+#  toolchain change. Its six checks, one per partition, are required
+#  for merging (ADR 0045); the proof that gates a commit is the one the
+#  developer runs locally with make check (ADR 0041).
 #
 #  The proof is split into the partitions of scripts/prove-partitions.txt
 #  (ADR 0033), one job each, so that the wall time is that of the
@@ -13,7 +13,7 @@
 #  `scripts/check.sh partitions-check`, run by verify, by every job here
 #  and by make check, guarantees that the partitions cover every
 #  non-generic unit exactly once and that the matrix below names them;
-#  the union of the five jobs is the full proof. Measured on the hosted
+#  the union of the six jobs is the full proof. Measured on the hosted
 #  runner at the close of stage 4: p256 7 min, primitives 6, sumcheck
 #  and protocol 12, of which five to six are the fixed cost of a job;
 #  ligero (stage 5) takes 11 min locally with ten provers.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Amended 2026-10-16 by [ADR 0042](0042-status-amendments.md): an Accepted record's Status line may carry dated amendment notes of a fixed form.
 
 ## Date
 

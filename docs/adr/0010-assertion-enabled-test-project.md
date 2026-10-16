@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Amended 2026-10-16 by [ADR 0044](0044-field-contracts-at-proof-only-level.md): the functional contracts and the ghost models of the two field packages are proof-only and no longer execute in the test build.
 
 ## Date
 

@@ -3,8 +3,10 @@
 --  Test code, outside the proof perimeter: SPARK_Mode is Off. Reads the
 --  vector files given as arguments (default: the p256_*.txt files under
 --  tests/vectors/) and checks every case against the library. Built
---  with -gnata, so the library's contracts, including the ghost
---  big-integer model, execute at run time. Not the constant-time build.
+--  with -gnata, so the library's executable contracts run; the ghost
+--  big-integer model and the contracts on it are proof-only (ADR 0044)
+--  and do not: what this harness checks is the result of each operation
+--  against the vectors. Not the constant-time build.
 --
 --  File format: '#' comments and blank lines are skipped; otherwise one
 --  case per line, fields separated by blanks, values as 64 hex digits of

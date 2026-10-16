@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-15, before block 2 of stage 5). Amended 2026-10-16, block 5: end to end, an altered response polynomial produces `Merkle_Failed`, not the status of its test, because the four polynomials are absorbed before the columns are chosen (Section 4.5) and the queried columns move with them, as in the upstream verifier; `LDT_Failed`, `Linear_Failed`, `Linear_Sum_Failed` and `Quadratic_Failed` are exercised at the step level, in the tier 3 run of `sumcheck_kat`, with one polynomial (or, for the sum check, the constant vector b) altered after the columns were chosen. `Matrix_Failed` and `Exhausted` have no negative case: neither is reachable on a correct field within the generator's bound.
+Accepted (2026-10-15, before block 2 of stage 5). Amended 2026-10-16 (block 5 of stage 5; a finding of the harness, with no amending record, ADR 0042): end to end, an altered response polynomial produces `Merkle_Failed`, not the status of its test, because the four polynomials are absorbed before the columns are chosen (Section 4.5) and the queried columns move with them, as in the upstream verifier. `LDT_Failed`, `Linear_Failed`, `Linear_Sum_Failed` and `Quadratic_Failed` are therefore exercised at the step level in the tier 3 run of `sumcheck_kat`, with one polynomial (or the vector b, for the sum check) altered after the columns were chosen, while `Matrix_Failed` and `Exhausted` have no negative case, neither being reachable on a correct field within the generator's bound.
 
 ## Date
 
