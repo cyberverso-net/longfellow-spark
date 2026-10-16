@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted; amended by [ADR 0021](0021-proof-on-pull-requests.md) on 2026-10-11 (the proof is again a required check on pull requests to `main`) and by [ADR 0033](0033-parallel-proof-partitions.md) on 2026-10-15 (the hosted proof runs as a matrix of partitions). Amended by [ADR 0041](0041-verification-cadence.md) (2026-10-16): the pre-push hook is withdrawn; the proof gate is `make check` by hand.
+Accepted. Amended 2026-10-11 by [ADR 0021](0021-proof-on-pull-requests.md): the proof is again a required check on pull requests to `main`. Amended 2026-10-15 by [ADR 0033](0033-parallel-proof-partitions.md): the hosted proof runs as a matrix of partitions. Amended 2026-10-16 by [ADR 0041](0041-verification-cadence.md): the pre-push hook is withdrawn and the proof gate is `make check` by hand.
 
 ## Date
 

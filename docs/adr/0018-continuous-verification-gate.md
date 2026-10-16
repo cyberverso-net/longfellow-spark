@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted; superseded in part by [ADR 0019](0019-proof-off-the-hosted-gate.md) and [ADR 0020](0020-prover-configuration-step-budget.md) on 2026-10-11
+Accepted. Amended 2026-10-11 by [ADR 0019](0019-proof-off-the-hosted-gate.md): the proof leaves the hosted gate. Amended 2026-10-11 by [ADR 0020](0020-prover-configuration-step-budget.md): the prover configuration is the step budget of that record.
 
 ## Date
 

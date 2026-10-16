@@ -1,12 +1,12 @@
 # Architecture decision records
 
-Format and lifecycle: see [0001](0001-record-architecture-decisions.md). Records 0002 to 0011 were written retroactively on 2026-10-09 from the package headers, the README, the git history and the project notes; their Date is the date the decision was taken (the first commit that records it), and they say where rationale was not recorded at the time.
+Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for the amendment notes of a Status line, [0042](0042-status-amendments.md). Records 0002 to 0011 were written retroactively on 2026-10-09 from the package headers, the README, the git history and the project notes; their Date is the date the decision was taken (the first commit that records it), and they say where rationale was not recorded at the time.
 
 | Number | Title | Status | Date |
 |--------|-------|--------|------|
-| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted | 2026-10-09 |
+| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted, amended by 0042 | 2026-10-09 |
 | [0002](0002-pin-the-specification.md) | Pin the specification to draft-google-cfrg-libzk-03 | Accepted | 2026-10-06 |
-| [0003](0003-proof-policy-and-trust-model.md) | Proof policy and trust model | Accepted, prover configuration superseded by 0020 | 2026-10-06 |
+| [0003](0003-proof-policy-and-trust-model.md) | Proof policy and trust model | Accepted, amended by 0020 | 2026-10-06 |
 | [0004](0004-gf2-128-element-representation.md) | GF(2^128) element representation | Accepted | 2026-10-06 |
 | [0005](0005-mul-ref-as-proof-target.md) | Ghost reference Mul_Ref as the proof target of Mul | Accepted | 2026-10-06 |
 | [0006](0006-constant-time-discipline-and-scope.md) | Constant-time discipline and its scope | Accepted | 2026-10-06 |
@@ -21,10 +21,10 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md). Records
 | [0015](0015-p256-canonical-form-and-conditional-subtraction.md) | P-256 base field: canonical form and conditional subtraction | Accepted | 2026-10-09 |
 | [0016](0016-p256-inversion.md) | P-256 base field: inversion | Accepted | 2026-10-09 |
 | [0017](0017-p256-test-anchors.md) | P-256 base field: test anchors | Accepted | 2026-10-09 |
-| [0018](0018-continuous-verification-gate.md) | Continuous verification gate | Accepted, superseded in part by 0019 and 0020 | 2026-10-09 |
-| [0019](0019-proof-off-the-hosted-gate.md) | Proof off the hosted gate | Accepted, amended by 0021 | 2026-10-11 |
+| [0018](0018-continuous-verification-gate.md) | Continuous verification gate | Accepted, amended by 0019 and 0020 | 2026-10-09 |
+| [0019](0019-proof-off-the-hosted-gate.md) | Proof off the hosted gate | Accepted, amended by 0021, 0033 and 0041 | 2026-10-11 |
 | [0020](0020-prover-configuration-step-budget.md) | Prover configuration by step budget | Accepted | 2026-10-11 |
-| [0021](0021-proof-on-pull-requests.md) | Proof on pull requests to main | Accepted | 2026-10-11 |
+| [0021](0021-proof-on-pull-requests.md) | Proof on pull requests to main | Accepted, amended by 0033, 0034 and 0041 | 2026-10-11 |
 | [0022](0022-stage-3-scope-and-challenges-as-input.md) | Stage 3 scope: sumcheck algebra and symbolic verifier core, challenges as input | Accepted | 2026-10-12 |
 | [0023](0023-gold-perimeter-for-protocol-code.md) | Gold perimeter for protocol code | Accepted | 2026-10-12 |
 | [0024](0024-field-genericity-by-formal-package.md) | Field genericity by formal package | Accepted | 2026-10-12 |
@@ -36,12 +36,14 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md). Records
 | [0030](0030-literal-rejection-sampling.md) | Literal rejection sampling and declared non-termination | Accepted | 2026-10-13 |
 | [0031](0031-transcript-gold-perimeter.md) | Transcript Gold perimeter | Accepted | 2026-10-13 |
 | [0032](0032-transcript-vectors.md) | Transcript vectors: Appendix B.2, Appendix B.3 end to end, NIST | Accepted | 2026-10-13 |
-| [0033](0033-parallel-proof-partitions.md) | Parallel proof partitions on the hosted runner | Accepted | 2026-10-15 |
-| [0034](0034-proof-as-information-harnesses-in-parallel.md) | Proof on pull requests as information; harnesses in parallel | Accepted | 2026-10-15 |
+| [0033](0033-parallel-proof-partitions.md) | Parallel proof partitions on the hosted runner | Accepted, amended by 0034 | 2026-10-15 |
+| [0034](0034-proof-as-information-harnesses-in-parallel.md) | Proof on pull requests as information; harnesses in parallel | Accepted, amended by 0041 | 2026-10-15 |
 | [0035](0035-stage-5-scope-ligero-and-the-complete-verifier.md) | Stage 5 scope: Ligero and the complete verifier | Accepted | 2026-10-15 |
 | [0036](0036-lagrange-interpolation-instead-of-additive-fft.md) | Reed-Solomon by Lagrange interpolation, not the additive FFT | Accepted | 2026-10-15 |
 | [0037](0037-checked-inv-and-public-data-scope.md) | Checked_Inv, and the public-data scope of the Ligero units | Accepted | 2026-10-15 |
 | [0038](0038-gold-perimeter-for-merkle-and-ligero.md) | Gold perimeter for Merkle and Ligero | Accepted | 2026-10-15 |
-| [0039](0039-sizes-allocation-and-status.md) | Sizes, allocation and the status enumeration | Accepted | 2026-10-15 |
+| [0039](0039-sizes-allocation-and-status.md) | Sizes, allocation and the status enumeration | Accepted, amended by 0043 | 2026-10-15 |
 | [0040](0040-ligero-vectors-and-upstream-instrumentation.md) | Ligero vectors and upstream instrumentation | Accepted | 2026-10-15 |
 | [0041](0041-verification-cadence.md) | Verification cadence: the proof by hand, the slow harness cases weekly | Accepted | 2026-10-16 |
+| [0042](0042-status-amendments.md) | Status amendments | Accepted | 2026-10-16 |
+| [0043](0043-exhausted-status-and-streaming-slice.md) | Exhausted status and streaming slice | Accepted | 2026-10-16 |
