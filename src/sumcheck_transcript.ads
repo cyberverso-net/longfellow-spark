@@ -22,7 +22,9 @@
 --    Write_Sumcheck_Statement : Gold, structural (ADR 0023): the frames
 --                       appended to Transcript.Absorbed, stated with the
 --                       ghost frame functions, proof-only as in
---                       Transcript. Serialise is Gold on its layout.
+--                       Transcript; Write_Element_Slice one element at
+--                       a time, its frame by recursion (Elements_Frame,
+--                       ADR 0039).
 --    Begin_Circuit, Begin_Layer, Replay_Challenges : Silver with the
 --                       Exhausted flag sticky; Replay_Challenges fills
 --                       a record whose shape the preconditions fix and

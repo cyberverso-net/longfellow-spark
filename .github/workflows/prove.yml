@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        partition: [p256, primitives, sumcheck, protocol, ligero]
+        partition: [p256, primitives, sumcheck, protocol, ligero, verifier]
     steps:
       - name: Check out
         uses: actions/checkout@v4
