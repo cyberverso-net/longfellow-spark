@@ -18,3 +18,7 @@ __pycache__/
 
 # macOS Finder metadata
 .DS_Store
+
+# command-line verifier build
+/cli/obj/
+/cli/bin/

@@ -30,9 +30,12 @@
 --  witness index below Witness_Count) and the geometry's rows covering
 --  the witnesses. Soundness is the paper's theorem, out of scope.
 --
---  Sizes (ADR 0039): the proof, the challenges, the constraints and the
---  Ligero working set are locals sized by the circuit and the geometry;
---  the supported scale on a default stack is stated in chapter 5.
+--  Sizes (ADR 0039, ADR 0047): the proof, the challenges, the
+--  constraints and the quadratic triples form one record sized by the
+--  circuit and the geometry, allocated on the heap for the duration of
+--  Verify under SPARK's ownership rules and freed on every path; the
+--  Ligero verifier does the same for its own working set. The
+--  supported scale is the available memory (chapter 6).
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037.
 --  Public data only.
