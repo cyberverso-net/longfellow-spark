@@ -49,3 +49,6 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0043](0043-exhausted-status-and-streaming-slice.md) | Exhausted status and streaming slice | Accepted | 2026-10-16 |
 | [0044](0044-field-contracts-at-proof-only-level.md) | Field contracts at proof-only level | Accepted | 2026-10-16 |
 | [0045](0045-proof-gate-restored-through-partitions.md) | Proof gate restored through partitions | Accepted | 2026-10-16 |
+| [0046](0046-phase-b-scope-lfc2-loader-and-interop.md) | Phase B scope: the LFC2 circuit loader and the interop exit criterion | Proposed | 2026-10-16 |
+| [0047](0047-heap-allocation-by-ownership.md) | Heap allocation by ownership for the circuit and the working set | Proposed | 2026-10-16 |
+| [0048](0048-circuit-vectors-and-interop-proofs.md) | Circuit vectors and the upstream interop proofs | Proposed | 2026-10-16 |
