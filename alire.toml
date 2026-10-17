@@ -1,6 +1,6 @@
 name = "longfellow_spark"
 description = "Formally verified Ada/SPARK reimplementation of Longfellow ZK (libzk)"
-version = "0.1.0"
+version = "0.2.0"
 
 authors = ["Paolo De Rosa"]
 maintainers = ["Paolo De Rosa <paolo.de.rosa@linux.com>"]
