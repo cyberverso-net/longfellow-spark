@@ -16,6 +16,9 @@
 --    square <a> <expected>
 --    inv <a> <expected>        (also checks a * Inv (a) = One for a /= 0)
 --    bytes <a> <encoding>      To_Bytes (a) = encoding, From_Bytes back
+--    mask <i> <mask>           Subfield_Mask (i) = mask (Phase C)
+--    coords <a> <x|none>       Subfield_Coords (a) = x and Inject (x) = a,
+--                              or a is not in the subfield
 --  with each element written as 32 big-endian hex digits of the 128-bit
 --  integer whose bit i is the coefficient of x^i (the first 16 digits
 --  are Limbs (1), the last 16 are Limbs (0)), and the encoding as the
@@ -253,6 +256,64 @@ procedure GF2_128_KAT is
                      & Image (Back));
                else
                   Passed := Passed + 1;
+               end if;
+            end;
+         elsif Op = "mask" then
+            if Count /= 3 then
+               raise Parse_Error with "mask expects 2 values";
+            end if;
+            declare
+               I    : constant Natural :=
+                 Natural'Value (Line (Fields (2).Lo .. Fields (2).Hi));
+               Want : constant Element :=
+                 To_Element (Line (Fields (3).Lo .. Fields (3).Hi));
+            begin
+               if I > 15 then
+                  raise Parse_Error with "mask index out of range";
+               end if;
+               if Want.Limbs (1) /= 0
+                 or else Want.Limbs (0) /= Subfield_Mask (I)
+               then
+                  Report_Failure ("mask" & I'Image & " differs from"
+                                  & " Subfield_Mask");
+               else
+                  Passed := Passed + 1;
+               end if;
+            end;
+         elsif Op = "coords" then
+            if Count /= 3 then
+               raise Parse_Error with "coords expects 2 values";
+            end if;
+            declare
+               A    : constant Element :=
+                 To_Element (Line (Fields (2).Lo .. Fields (2).Hi));
+               Arg  : constant String := Line (Fields (3).Lo .. Fields (3).Hi);
+            begin
+               if Arg = "none" then
+                  if In_Subfield (A) then
+                     Report_Failure ("coords " & Image (A)
+                                     & " reported in the subfield");
+                  else
+                     Passed := Passed + 1;
+                  end if;
+               else
+                  declare
+                     X : constant Natural := Natural'Value (Arg);
+                  begin
+                     if X > 2**16 - 1 then
+                        raise Parse_Error with "coordinates out of range";
+                     end if;
+                     if Subfield_Coords (A) /= X then
+                        Report_Failure ("coords " & Image (A) & " gave"
+                                        & Subfield_Coords (A)'Image
+                                        & ", expected" & X'Image);
+                     elsif Inject (X) /= A or else not In_Subfield (A) then
+                        Report_Failure ("coords " & Image (A)
+                                        & ": Inject or In_Subfield disagree");
+                     else
+                        Passed := Passed + 1;
+                     end if;
+                  end;
                end if;
             end;
          else

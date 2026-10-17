@@ -152,4 +152,28 @@ package body GF2_128 is
       return R;
    end Inject;
 
+   function Parity (V : Unsigned_64) return Unsigned_64 is
+      X : Unsigned_64 := V;
+   begin
+      X := X xor Shift_Right (X, 32);
+      X := X xor Shift_Right (X, 16);
+      X := X xor Shift_Right (X, 8);
+      X := X xor Shift_Right (X, 4);
+      X := X xor Shift_Right (X, 2);
+      X := X xor Shift_Right (X, 1);
+      return X and 1;
+   end Parity;
+
+   function Subfield_Coords (E : Element) return Subfield_Value is
+      R : Unsigned_16 := 0;
+   begin
+      --  Coordinate 15 first, so that each step shifts the previous
+      --  ones up: modular arithmetic, no overflow to prove.
+      for I in reverse Mask_Index loop
+         R := Shift_Left (R, 1)
+              or Unsigned_16 (Parity (E.Limbs (0) and Subfield_Mask (I)));
+      end loop;
+      return Subfield_Value (R);
+   end Subfield_Coords;
+
 end GF2_128;

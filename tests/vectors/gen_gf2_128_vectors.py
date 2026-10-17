@@ -335,9 +335,89 @@ def main() -> None:
     w("#   all-ones.")
     for a in bytes_b:
         w(f"bytes {hx(a)} {le16(a)}")
+    # ---- Section C: the fixed projection to subfield coordinates (Phase
+    # C, ADR 0051). A left inverse of the 128 x 16 basis matrix over
+    # GF(2): sixteen 128-bit masks with parity(e and mask_i) = c_i for
+    # every e = inject(c). Derived here by Gaussian elimination, checked on
+    # every subfield element, and compared with GF2_128.Subfield_Mask by
+    # the harness.
+    def rank_rows(rows):
+        m = [r[:] for r in rows]
+        rank = 0
+        for c in range(16):
+            p = next((i for i in range(rank, len(m)) if m[i][c]), None)
+            if p is None:
+                continue
+            m[rank], m[p] = m[p], m[rank]
+            for i in range(len(m)):
+                if i != rank and m[i][c]:
+                    m[i] = [a ^ b for a, b in zip(m[i], m[rank])]
+            rank += 1
+        return rank
+
+    bit_rows = [[(beta[j] >> r) & 1 for j in range(16)] for r in range(128)]
+    sel = []
+    for r in range(128):
+        if rank_rows([bit_rows[s] for s in sel] + [bit_rows[r]]) == len(sel) + 1:
+            sel.append(r)
+        if len(sel) == 16:
+            break
+    if len(sel) != 16:
+        fail("the subfield basis is not independent")
+    aug = [[(beta[j] >> sel[i]) & 1 for j in range(16)]
+           + [1 if k == i else 0 for k in range(16)] for i in range(16)]
+    for c in range(16):
+        p = next(i for i in range(c, 16) if aug[i][c])
+        aug[c], aug[p] = aug[p], aug[c]
+        for i in range(16):
+            if i != c and aug[i][c]:
+                aug[i] = [a ^ b for a, b in zip(aug[i], aug[c])]
+    masks = []
+    for i in range(16):
+        m = 0
+        for k in range(16):
+            if aug[i][16 + k]:
+                m |= 1 << sel[k]
+        masks.append(m)
+
+    def inject(c):
+        e = 0
+        for i in range(16):
+            if (c >> i) & 1:
+                e ^= beta[i]
+        return e
+
+    def coords(e):
+        return sum(((bin(e & masks[i]).count("1") & 1) << i) for i in range(16))
+
+    for c in range(1 << 16):
+        if coords(inject(c)) != c:
+            fail(f"projection does not invert inject on {c}")
+    w("#")
+    w("# Section C: the fixed projection to the subfield coordinates (Phase")
+    w("#   C, ADR 0051): mask <i> <mask> is the i-th of sixteen 128-bit masks")
+    w("#   (a left inverse of the basis matrix, derived here, checked on every")
+    w("#   subfield element); coords <element> <x> says Subfield_Coords")
+    w("#   (element) = x and Inject (x) = element; coords <element> none says")
+    w("#   the element is not in the subfield.")
+    for i, m in enumerate(masks):
+        w(f"mask {i} {m:032x}")
+    coord_cases = list(range(16)) + [0, 1, 0xFFFF, 0x8000, 0x0101]
+    coord_cases = [1 << i for i in range(16)] + [0, 0xFFFF, 0x8000, 0x0101]
+    rng_c = random.Random(SEED + 7)
+    coord_cases += [rng_c.randrange(1 << 16) for _ in range(512)]
+    for c in coord_cases:
+        w(f"coords {hx(inject(c))} {c}")
+    outside = 0
+    while outside < 64:
+        e = rng_c.randrange(1 << 128)
+        if inject(coords(e)) != e:
+            w(f"coords {hx(e)} none")
+            outside += 1
     bytes_path = out_dir / "gf2_128_bytes.txt"
     bytes_path.write_text("\n".join(lines) + "\n")
-    print(f"wrote {bytes_path}: {len(bytes_a)} anchor, {len(bytes_b)} structural cases")
+    print(f"wrote {bytes_path}: {len(bytes_a)} anchor, {len(bytes_b)} structural"
+          f" cases, 16 masks, {len(coord_cases) + outside} coordinate cases")
 
     # ---- Inversion -----------------------------------------------------
     def inv_checked(a: int) -> int:

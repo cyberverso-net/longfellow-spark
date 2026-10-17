@@ -18,3 +18,4 @@ protocol   sumcheck_verifier_gf2_128 sumcheck_verifier_p256 sumcheck_transcript_
 ligero     ligero_geometry lagrange_gf2_128 lagrange_p256 verifier_status ligero_proof_gf2_128 ligero_proof_p256
 verifier   ligero_verifier_gf2_128 ligero_verifier_p256 zk_verifier_gf2_128 zk_verifier_p256
 circuits   uleb128 circuit_status circuit_reader_gf2_128 circuit_reader_p256
+prover     proof_writer_gf2_128 proof_writer_p256

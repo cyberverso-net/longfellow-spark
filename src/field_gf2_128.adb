@@ -34,4 +34,11 @@ package body Field_GF2_128 is
       Ok := True;
    end From_Subfield_Bytes;
 
+   function To_Subfield_Bytes (E : GF2_128.Element) return Bytes.Byte_Array
+   is
+      V : constant GF2_128.Subfield_Value := GF2_128.Subfield_Coords (E);
+   begin
+      return [0 => Unsigned_8 (V mod 256), 1 => Unsigned_8 (V / 256)];
+   end To_Subfield_Bytes;
+
 end Field_GF2_128;

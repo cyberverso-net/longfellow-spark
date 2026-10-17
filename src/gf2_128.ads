@@ -45,6 +45,11 @@
 --              loop invariants that state them: proved for all inputs,
 --              never compiled in any build. What the test build checks
 --              of these operations is their result against the vectors.
+--    Subfield_Coords, In_Subfield : Silver (Phase C, ADR 0051): the
+--              fixed projection to the subfield coordinates; that it
+--              inverts Inject on the subfield is tested on the masks
+--              and on coordinates against the generator's independent
+--              derivation (gf2_128_bytes.txt), not proved.
 --    To_Bytes, From_Bytes : Gold (stage 4, ADR 0028): the 16-byte
 --              little-endian encoding of draft Section 7.2.1, every
 --              16-byte string accepted (Ok is always True); the value
@@ -259,5 +264,37 @@ package GF2_128 is
    function Inject (X : Subfield_Value) return Element with
      Global => null,
      Post   => (Proof_Only => Inject'Result = Inject_Ref (X, 16));
+
+   --  The inverse of Inject on the subfield, as a fixed linear map
+   --  (Phase C, ADR 0051): coordinate I of an element is the parity of
+   --  the element's low limb masked by Subfield_Mask (I). The sixteen
+   --  masks are a left inverse of the basis matrix on the bit positions
+   --  0 .. 12 and 14 .. 16, computed from the basis by Gaussian
+   --  elimination in tests/vectors/gen_gf2_128_vectors.py, which also
+   --  checks Subfield_Coords (Inject (X)) = X on subfield elements and
+   --  In_Subfield on elements outside it (gf2_128_bytes.txt). No linear
+   --  system is solved at run time and the control flow does not
+   --  depend on the element: the prover applies it to witnesses.
+   subtype Mask_Index is Natural range 0 .. 15;
+   type Mask_Array is array (Mask_Index) of Unsigned_64;
+
+   Subfield_Mask : constant Mask_Array :=
+     [16#09013#, 16#114B4#, 16#118EE#, 16#1D590#,
+      16#19062#, 16#059A6#, 16#1472A#, 16#09372#,
+      16#01484#, 16#108E4#, 16#193CA#, 16#18F54#,
+      16#0DBD0#, 16#14BE6#, 16#1D12C#, 16#0C97E#];
+
+   --  The parity of the set bits of V, by xor folding.
+   function Parity (V : Unsigned_64) return Unsigned_64 with
+     Global => null,
+     Post   => Parity'Result <= 1;
+
+   function Subfield_Coords (E : Element) return Subfield_Value with
+     Global => null;
+
+   --  E lies in GF(2^16): it is the injection of its coordinates.
+   function In_Subfield (E : Element) return Boolean is
+     (Inject (Subfield_Coords (E)) = E)
+   with Global => null;
 
 end GF2_128;

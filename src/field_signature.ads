@@ -81,5 +81,11 @@ generic
    Subfield_Size : Positive;
    with procedure From_Subfield_Bytes
      (B : Bytes.Byte_Array; E : out Element; Ok : out Boolean);
+   --  The Subfield_Size bytes of an element of the subfield (Section
+   --  7.2.2), the inverse of From_Subfield_Bytes there; the prover's
+   --  writer uses it on the subfield rows of the tableau (Phase C, ADR
+   --  0051). On an element outside the subfield the result is
+   --  unspecified; the prover checks membership first.
+   with function To_Subfield_Bytes (E : Element) return Bytes.Byte_Array;
 package Field_Signature is
 end Field_Signature;
