@@ -2,7 +2,7 @@
 
 All notable changes to this project are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project does not yet follow semantic versioning in the strict sense, since its interface is the pinned specification rather than an API. Every entry names the decision records (`docs/adr/`) and the guide chapter (`docs/guide/`) that describe it; the trust model that says what is proved, tested and trusted is in the README.
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-10-17
 
 Phase B: the verifier takes the circuits the upstream compiler produces and accepts the proofs the upstream prover made for them, from their files, on both fields.
 
@@ -39,5 +39,5 @@ Phase A complete: a verifier of Longfellow ZK (libzk) in Ada/SPARK, from the pro
 
 What is proved, tested and trusted is listed in the README, section "Trust model", entry by entry, with the record that justifies each entry. Upstream-generated circuit files remain a declared trusted input until Phase D; the soundness and zero-knowledge theorems of the protocol are out of scope for proofs.
 
-[0.2.0]: https://github.com/cyberverso-net/longfellow-spark/compare/v0.1.0...phase-b-loader
+[0.2.0]: https://github.com/cyberverso-net/longfellow-spark/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/cyberverso-net/longfellow-spark/releases/tag/v0.1.0
