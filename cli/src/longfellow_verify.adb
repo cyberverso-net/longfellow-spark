@@ -13,7 +13,8 @@
 --  hex integers (32 digits on GF(2^128), 64 on P-256), and prints the
 --  status. Exit status: 0 when the proof is accepted, 1 when it is
 --  refused or the circuit is not accepted (the status is printed), 2
---  on a usage or file error.
+--  on a usage or file error. Documentation: docs/guide/06-circuits.md,
+--  README "Verifying a proof".
 
 pragma SPARK_Mode (Off);
 

@@ -13,7 +13,7 @@
 --  delivers, and the executable contracts of stage 3, which the
 --  assertion-enabled build of tests/ runs on the Appendix B.3 circuits,
 --  would take the better part of an hour on a circuit of thousands of
---  inputs (ADR 0048).
+--  inputs (ADR 0048). Documentation: docs/guide/06-circuits.md.
 --
 --  File format: '#' comments and blank lines are skipped; otherwise
 --    interop <name> <field> <circuit> <proof> <label> <rate_inv> <nreq>
