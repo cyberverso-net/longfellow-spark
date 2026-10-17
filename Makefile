@@ -3,7 +3,7 @@
 #  definition of done for every commit and every pull request (ADR
 #  0041, ADR 0044).
 
-.PHONY: check build prove prove-partition partitions-check test vectors lint
+.PHONY: check build prove prove-partition partitions-check test cli vectors lint
 
 check:
 	scripts/check.sh all
@@ -24,6 +24,10 @@ partitions-check:
 
 test:
 	scripts/check.sh test
+
+#  The command-line verifier on the upstream proofs (ADR 0046, 0048).
+cli:
+	scripts/check.sh cli
 
 vectors:
 	scripts/check.sh vectors

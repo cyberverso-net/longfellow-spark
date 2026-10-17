@@ -1,5 +1,6 @@
 pragma SPARK_Mode (On);
 
+with Ada.Unchecked_Deallocation;
 with Sha256;
 with SPARK.Lemmas.Integer_Arithmetic;
 
@@ -632,6 +633,33 @@ package body Ligero_Verifier is
    --  verify
    ----------------------------------------------------------------------
 
+   -------------------------------------------------------------------
+   --  The working set of one verification, in one allocation on the
+   --  heap (ADR 0047): the challenges, the chosen columns, the two
+   --  Lagrange tables, the two evaluation vectors of the tests and the
+   --  constraint vector of the linear test.
+   -------------------------------------------------------------------
+
+   type Work
+     (Ldt_Last, Alphal_Last, Alphaq_Last, Quad_Last : Index;
+      Q_Last      : Index;
+      Block_Last  : Index;
+      Dblock_Last : Index;
+      Full_Last   : Index)
+   is record
+      Ch       : Challenges (Ldt_Last, Alphal_Last, Alphaq_Last, Quad_Last);
+      Idx      : Column_Indices (0 .. Q_Last);
+      T_Block  : L.Table (0 .. Block_Last, 0 .. Q_Last);
+      T_Dblock : L.Table (0 .. Dblock_Last, 0 .. Q_Last);
+      Yc, Yp   : Element_Array (0 .. Q_Last);
+      A_Full   : Element_Array (0 .. Full_Last);
+   end record;
+
+   type Work_Access is access Work;
+
+   procedure Free_Work is
+     new Ada.Unchecked_Deallocation (Work, Work_Access);
+
    procedure Verify
      (Cfg            : Config;
       NW             : Natural;
@@ -660,64 +688,83 @@ package body Ligero_Verifier is
          St := Polynomial_Lengths;
          return;
       end if;
+      --  The working set, in one allocation on the heap (ADR 0047).
       declare
-         Ch  : Challenges (Ldt_Last    => Num_Wq_Rows (G) - 1,
-                           Alphal_Last => B'Length - 1,
-                           Alphaq_Last => 3 * Lqc'Last + 2,
-                           Quad_Last   => G.Num_Quad_Rows - 1);
-         Idx  : Column_Indices (0 .. G.Num_Queries - 1);
-         Good : Boolean;
+         Good      : Boolean;
+         Want_Dot  : Element;
+         Proof_Dot : Element;
+         St_Dot    : Status;
+         W : Work_Access := new Work'
+           (Ldt_Last    => Num_Wq_Rows (G) - 1,
+            Alphal_Last => B'Length - 1,
+            Alphaq_Last => 3 * Lqc'Last + 2,
+            Quad_Last   => G.Num_Quad_Rows - 1,
+            Q_Last      => G.Num_Queries - 1,
+            Block_Last  => G.Block_Len - 1,
+            Dblock_Last => G.Dblock_Len - 1,
+            Full_Last   => Vector_Len (G) - 1,
+            Ch          => (Ldt_Last    => Num_Wq_Rows (G) - 1,
+                            Alphal_Last => B'Length - 1,
+                            Alphaq_Last => 3 * Lqc'Last + 2,
+                            Quad_Last   => G.Num_Quad_Rows - 1,
+                            U_Ldt       => [others => Zero],
+                            Alphal      => [others => Zero],
+                            Alphaq      => [others => Zero],
+                            U_Quad      => [others => Zero]),
+            Idx         => [others => 0],
+            T_Block     => [others => [others => Zero]],
+            T_Dblock    => [others => [others => Zero]],
+            Yc          => [others => Zero],
+            Yp          => [others => Zero],
+            A_Full      => [others => Zero]);
       begin
-         Draw_Challenges (G, B'Length, Lqc'Last + 1, Ch);
+         Draw_Challenges (G, B'Length, Lqc'Last + 1, W.Ch);
          Absorb_Polynomials (G, P);
-         Choose_Columns (G, Idx);
+         Choose_Columns (G, W.Idx);
          if Transcript.Is_Exhausted then
             St := Exhausted;
+            Free_Work (W);
             return;
          end if;
-         Verify_Merkle (G, Root, P, Idx, Good);
+         Verify_Merkle (G, Root, P, W.Idx, Good);
          if not Good then
             St := Merkle_Failed;
+            Free_Work (W);
             return;
          end if;
          if G.Encoded_Len - 1 > Max_Eval_Point then
             St := Matrix_Failed;
+            Free_Work (W);
             return;
          end if;
-         declare
-            T_Block   : L.Table (0 .. G.Block_Len - 1, 0 .. G.Num_Queries - 1);
-            T_Dblock  : L.Table (0 .. G.Dblock_Len - 1,
-                                 0 .. G.Num_Queries - 1);
-            Yc, Yp    : Element_Array (0 .. G.Num_Queries - 1);
-            A_Full    : Element_Array (0 .. Vector_Len (G) - 1);
-            Want_Dot  : Element;
-            Proof_Dot : Element;
-            St_Dot    : Status;
-         begin
-            Build_Tables (G, Idx, T_Block, T_Dblock, Good);
-            if not Good then
-               St := Matrix_Failed;
-               return;
-            end if;
-            Verify_LDT (G, P, Ch.U_Ldt, T_Block, Yc, Yp, Good);
-            if not Good then
-               St := LDT_Failed;
-               return;
-            end if;
-            Build_A_Full (G, A, Lqc, Ch.Alphal, Ch.Alphaq, A_Full);
-            Verify_Dot (G, B, P, A_Full, Ch.Alphal, T_Block, T_Dblock,
-                        Yc, Yp, Want_Dot, Proof_Dot, St_Dot);
-            if St_Dot /= Ok then
-               St := St_Dot;
-               return;
-            end if;
-            Verify_Quad (G, P, Ch.U_Quad, T_Dblock, Yc, Yp, Good);
-            if not Good then
-               St := Quadratic_Failed;
-               return;
-            end if;
-            St := Ok;
-         end;
+         Build_Tables (G, W.Idx, W.T_Block, W.T_Dblock, Good);
+         if not Good then
+            St := Matrix_Failed;
+            Free_Work (W);
+            return;
+         end if;
+         Verify_LDT (G, P, W.Ch.U_Ldt, W.T_Block, W.Yc, W.Yp, Good);
+         if not Good then
+            St := LDT_Failed;
+            Free_Work (W);
+            return;
+         end if;
+         Build_A_Full (G, A, Lqc, W.Ch.Alphal, W.Ch.Alphaq, W.A_Full);
+         Verify_Dot (G, B, P, W.A_Full, W.Ch.Alphal, W.T_Block, W.T_Dblock,
+                     W.Yc, W.Yp, Want_Dot, Proof_Dot, St_Dot);
+         if St_Dot /= Ok then
+            St := St_Dot;
+            Free_Work (W);
+            return;
+         end if;
+         Verify_Quad (G, P, W.Ch.U_Quad, W.T_Dblock, W.Yc, W.Yp, Good);
+         if not Good then
+            St := Quadratic_Failed;
+            Free_Work (W);
+            return;
+         end if;
+         Free_Work (W);
+         St := Ok;
       end;
    end Verify;
 

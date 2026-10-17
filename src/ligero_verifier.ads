@@ -50,6 +50,12 @@
 --                       generator ran out.
 --  Soundness is the paper's theorem, out of scope (ADR 0035).
 --
+--  Sizes (ADR 0047): the working set of Verify (the challenges, the
+--  chosen columns, the two Lagrange tables, the evaluation vectors of
+--  the tests, the constraint vector of the linear test) is one record
+--  sized by the geometry, allocated on the heap for the duration of
+--  Verify under SPARK's ownership rules and freed on every path.
+--
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037.
 --  Public data only.
 

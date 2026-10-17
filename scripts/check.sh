@@ -7,14 +7,14 @@
 #  script stops at the first failure with a non-zero exit status.
 #
 #  Subcommands: build, prove, prove-partition <name>, partitions-check,
-#  test, vectors, lint, all. The proof partitions of the hosted runner
-#  are listed in scripts/prove-partitions.txt (ADR 0033).
+#  test, cli, vectors, lint, all. The proof partitions of the hosted
+#  runner are listed in scripts/prove-partitions.txt (ADR 0033).
 
 set -euo pipefail
 
 usage() {
    echo "usage: scripts/check.sh {build|prove|prove-partition <name>|" \
-        "partitions-check|test|vectors|lint|all}" >&2
+        "partitions-check|test|cli|vectors|lint|all}" >&2
    exit 2
 }
 
@@ -156,7 +156,7 @@ do_partitions_check() {
 do_test() {
    header "test: build the harnesses (assertions on)"
    alr -n exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
-   local harnesses="gf2_128_kat p256_kat sumcheck_kat transcript_kat ligero_kat"
+   local harnesses="gf2_128_kat p256_kat sumcheck_kat transcript_kat ligero_kat circuit_kat"
    local logs status=0 h
    logs="$(mktemp -d)"
    header "test: $harnesses, concurrently"
@@ -178,6 +178,43 @@ do_test() {
    fi
 }
 
+#  The release build (ADR 0046, 0048): the command-line verifier and
+#  the interop harness, built without assertions as the verifier is
+#  meant to run. interop_kat verifies the two upstream proofs end to
+#  end and refuses the altered copies; the verifier accepts the same
+#  two proofs with exit status 0, refuses with 1 under a wrong label and
+#  reports a usage error with 2.
+do_cli() {
+   header "cli: build cli/longfellow_verify.gpr (assertions off)"
+   alr -n exec -- gprbuild -P cli/longfellow_verify.gpr -p
+   local c=tests/vectors/upstream/circuits status
+   header "cli: interop_kat, the upstream proofs end to end"
+   cli/bin/interop_kat
+   header "cli: longfellow_verify on the two upstream proofs"
+   cli/bin/longfellow_verify --field gf2_128 --circuit $c/sha256_circuit.lfc2 \
+      --proof $c/sha256_proof.bin --label sha256_spec_test \
+      --rate-inv 3 --nreq 16 --ncol 256
+   cli/bin/longfellow_verify --field p256 --circuit $c/ecdsa2_circuit.lfc2 \
+      --proof $c/ecdsa2_proof.bin --label ecdsa2_spec_test \
+      --rate-inv 4 --nreq 16 --ncol 256
+   header "cli: a wrong label is refused, a missing argument is a usage error"
+   status=0
+   cli/bin/longfellow_verify --field gf2_128 --circuit $c/sha256_circuit.lfc2 \
+      --proof $c/sha256_proof.bin --label wrong \
+      --rate-inv 3 --nreq 16 --ncol 256 || status=$?
+   if [ "$status" -ne 1 ]; then
+      echo "cli: expected exit status 1 under a wrong label, got $status" >&2
+      exit 1
+   fi
+   status=0
+   cli/bin/longfellow_verify --field p256 2>/dev/null || status=$?
+   if [ "$status" -ne 2 ]; then
+      echo "cli: expected exit status 2 on a usage error, got $status" >&2
+      exit 1
+   fi
+   echo "cli: both proofs accepted, refusal and usage error reported"
+}
+
 do_vectors() {
    header "vectors: regenerate into a scratch directory and compare"
    #  The generators take an output directory as their first argument;
@@ -193,6 +230,7 @@ do_vectors() {
    python3 -I tests/vectors/gen_sumcheck_vectors.py "$scratch"
    python3 -I tests/vectors/gen_transcript_vectors.py "$scratch"
    python3 -I tests/vectors/gen_ligero_vectors.py "$scratch"
+   python3 -I tests/vectors/gen_circuit_vectors.py "$scratch"
    local name status=0
    for name in "$scratch"/*.txt; do
       name="$(basename "$name")"
@@ -242,6 +280,7 @@ case "${1:-}" in
    prove-partition)  do_prove_partition "${2:-}" ;;
    partitions-check) do_partitions_check ;;
    test)             do_test ;;
+   cli)              do_cli ;;
    vectors)          do_vectors ;;
    lint)             do_lint ;;
    all)
@@ -249,6 +288,7 @@ case "${1:-}" in
       do_partitions_check
       do_prove
       do_test
+      do_cli
       do_vectors
       do_lint
       header "all checks passed"

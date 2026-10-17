@@ -50,6 +50,9 @@ jobs:
       - name: Test
         run: make test
 
+      - name: Command-line verifier
+        run: make cli
+
       - name: Vectors
         run: make vectors
 

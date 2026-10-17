@@ -2,6 +2,22 @@
 
 All notable changes to this project are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project does not yet follow semantic versioning in the strict sense, since its interface is the pinned specification rather than an API. Every entry names the decision records (`docs/adr/`) and the guide chapter (`docs/guide/`) that describe it; the trust model that says what is proved, tested and trusted is in the README.
 
+## [0.2.0] - Unreleased
+
+Phase B: the verifier takes the circuits the upstream compiler produces and accepts the proofs the upstream prover made for them, from their files, on both fields.
+
+### Added
+
+- The LFC2 circuit loader (`Uleb128`, `Circuit_Status`, `Circuit_Reader` generic over the sumcheck algebra of a field, instantiated for GF(2^128) and P-256; chapter 6; ADR 0046): the format as the upstream production reader at d5e6be7 defines it, read in two passes with the circuit allocated once on the heap, `Well_Formed` of the core established on the result and the identifier (`compute_id`) recomputed and checked; `Uleb128.Read` proved Gold on the decoded value, `Circuit_Reader.Read` Silver on arbitrary bytes with the ownership checks and Gold on the shape of its result; 584 checks in the new proof partition `circuits`.
+- The working sets of `Zk_Verifier.Verify` and `Ligero_Verifier.Verify` in one heap allocation each, under SPARK's ownership rules, freed on every path (ADR 0047): the supported scale is the available memory, the stage 3 input constraint excepted.
+- The release project `cli/` with the command-line verifier `longfellow_verify` (exit status 0 accepted, 1 refused, 2 usage) and the interop harness `interop_kat`; the step `cli` of `scripts/check.sh` and of the `verify` workflow.
+- Vectors (ADR 0048): the two upstream circuits, inputs and proofs copied under `tests/vectors/upstream/circuits/` and pinned by SHA-256; `gen_circuit_vectors.py`, an independent LFC2 reader and writer whose `compute_id` must equal the identifiers the upstream files store; `circuit_summary.txt`, `circuit_lfc2.txt` (the Appendix B.3 circuits in two encodings, 28 malformed files) and `interop.txt`; the harness `circuit_kat` (121 cases).
+- The interop exit criterion of ADR 0011 met: the `sha256` proof (GF(2^128), 98 993 terms, 6657 inputs) and the `ecdsa2` proof (P-256, 48 256 terms, 1042 inputs) accepted end to end in about a second each; the six copies with one altered byte refused with `Merkle_Failed`.
+
+### Changed
+
+- 11967 checks proved in all (10738 at 0.1.0), seven proof partitions.
+
 ## [0.1.0] - 2026-10-16
 
 Phase A complete: a verifier of Longfellow ZK (libzk) in Ada/SPARK, from the proof string to a verdict, on the explicit circuits of the pinned specification (IETF draft-google-cfrg-libzk-03), with the two complete proofs of its Appendix B.3 accepted end to end on both fields and compared value by value with the upstream verifier (google/longfellow-zk at d5e6be7). Every SPARK check of the project is proved by GNATprove with the pinned toolchain (`gnat_native 16.1.0`, `gnatprove 16.1.0`), with no justification and no `pragma Assume`.
@@ -23,4 +39,5 @@ Phase A complete: a verifier of Longfellow ZK (libzk) in Ada/SPARK, from the pro
 
 What is proved, tested and trusted is listed in the README, section "Trust model", entry by entry, with the record that justifies each entry. Upstream-generated circuit files remain a declared trusted input until Phase D; the soundness and zero-knowledge theorems of the protocol are out of scope for proofs.
 
+[0.2.0]: https://github.com/cyberverso-net/longfellow-spark/compare/v0.1.0...phase-b-loader
 [0.1.0]: https://github.com/cyberverso-net/longfellow-spark/releases/tag/v0.1.0

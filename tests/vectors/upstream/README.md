@@ -39,3 +39,31 @@ To regenerate:
 
 The harness reads every `sumcheck_core_*.txt` here when it runs without
 arguments, and the `ligero_*.txt` of the same circuit when it exists.
+
+## Circuit files (Phase B, ADR 0048)
+
+`circuits/` holds the two circuits that google/longfellow-zk ships with
+inputs and proofs under `docs/specs/rust/tests/testdata/` at commit
+d5e6be77336933d50bf7f25a954f8ec273eb51ce, copied unchanged (the `.bin`
+twins of the circuit files upstream are byte-identical to the `.lfc2`
+files and are not copied). Licence: Apache-2.0, the project's own. The
+SHA-256 of each copy:
+
+    6e1b3f0d8a70470d1c82b41dc401eb6d770e6cc23638d7db53acf8040e9bc440  sha256_circuit.lfc2
+    c698ed9d0bb4d816419c17177a8c64860734cee7d7fa112d1e04a84a4e814297  sha256_inputs.json
+    3e44a4ed36006b581b42895de343745cae81f7ee5bd0b00a2664bfac2701d0d4  sha256_proof.bin
+    b9f25654d382abf81098df6e67a2dc331e90144a045bfe73e23bac23172031e9  ecdsa2_circuit.lfc2
+    6c9a8861ad49c446914ab6b73c91115c7f1c95926ae56123a03e3d7f9a939a43  ecdsa2_inputs.json
+    897951c8aff3b55c153f38dd9737ee063b99a24e2327f0da029d9748c29d3cc6  ecdsa2_proof.bin
+
+`sha256` is over GF(2^128) (FieldID 4, subfield boundary 3000, 12 layers,
+98993 terms, 6657 inputs, none public); `ecdsa2` over the P-256 base
+field (FieldID 1, 11 layers, 48256 terms, 1042 inputs, none public). The
+labels and Ligero configurations of their proofs are those of
+`docs/specs/rust/tests/test_reference.rs`: `sha256_spec_test` with rate
+3, 16 queries, 256 columns; `ecdsa2_spec_test` with rate 4, 16 queries,
+256 columns. `gen_circuit_vectors.py` parses the circuit files with its
+own LFC2 reader and writes `circuit_summary.txt`, which
+`tests/bin/circuit_kat` compares with the SPARK loader; the identifier
+each file stores must equal the one the generator computes, or the
+generator aborts.

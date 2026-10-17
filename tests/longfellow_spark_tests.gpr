@@ -10,7 +10,8 @@
 --
 --  Build:  alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
 --  Run:    tests/bin/gf2_128_kat, tests/bin/p256_kat, tests/bin/sumcheck_kat,
---          tests/bin/transcript_kat, tests/bin/ligero_kat [vector files]
+--          tests/bin/transcript_kat, tests/bin/ligero_kat,
+--          tests/bin/circuit_kat [vector files]
 
 with "sparklib";
 
@@ -22,7 +23,7 @@ project Longfellow_Spark_Tests is
    for Create_Missing_Dirs use "True";
    for Main use
      ("gf2_128_kat.adb", "p256_kat.adb", "sumcheck_kat.adb",
-      "transcript_kat.adb", "ligero_kat.adb");
+      "transcript_kat.adb", "ligero_kat.adb", "circuit_kat.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use
