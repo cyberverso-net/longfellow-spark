@@ -16,9 +16,9 @@ The reference test seeds a linear congruential generator, `SimpleRng` of `tests/
 
 ## Decision
 
-- **The prover takes its randomness as a byte stream**, through a generic formal: `with procedure Fill (B : out Byte_Array);`, which fills any array it is given with fresh bytes. The prover units are generic over it (together with the algebra), so that every proof about them holds for any source; nothing in the proofs depends on the bytes being random.
+- **The prover takes its randomness as a byte stream**, through a generic formal: `with procedure Fill (B : out Byte_Array);`, which fills any array it is given with fresh bytes. `Sampling` is generic over it (together with the field), and the prover units are generic over an instance of `Sampling`, so that every proof about them holds for any source; nothing in the proofs depends on the bytes being random.
 - **Every sampling is built on that stream exactly as the reference builds it**, in a package `Sampling` generic over the field: 16 bytes for a GF(2^128) element, 32 bytes with rejection below p for a P-256 element (the loop is literal, as in [ADR 0030](0030-literal-rejection-sampling.md), declared possibly non-terminating), 2 bytes for a subfield element through `GF2_128.Inject`, 32 bytes for a nonce; in the order of the Context.
-- **Sources.** The generator of the upstream test, `Simple_Rng`, is implemented in the test project and in the command-line prover behind the explicit option `--seed N`, documented as a test option and never the default: it makes the output reproducible, and it makes it predictable. The default source of the command-line prover is the operating system's cryptographically secure generator, read by code outside SPARK (`SPARK_Mode (Off)`, in `cli/`) and listed as trusted; `/dev/urandom` is its realisation on macOS and Linux at this date, and the decision does not depend on the path.
+- **Sources.** The generator of the upstream test, `Simple_Rng`, is implemented once as a SPARK library package in `src/` (a package with one abstract state, `Seed` and `Fill`), used by the test project and by the command-line prover behind the explicit option `--seed N`, documented as a test option and never the default: it makes the output reproducible, and it makes it predictable. It lives in `src/` and not in `tests/` because the instances of the prover units are library-level units (one per field, as every other instance of the repository) and must name their source at instantiation; a second source would mean a second set of instances. The package is proved like the rest of the library, which costs nothing and settles its absence of run-time errors. The default source of the command-line prover is the operating system's cryptographically secure generator, read by code outside SPARK (`SPARK_Mode (Off)`, in `cli/`) and listed as trusted; `/dev/urandom` is its realisation on macOS and Linux at this date, and the decision does not depend on the path.
 - **Chapter 7 states the consequence of a weak source:** the pads and the random rows are what makes the proof zero-knowledge; a predictable source lets a verifier recover the witness from the proof, and does not let a prover make the verifier accept a false statement, whose soundness rests on the transcript's challenges, not on the prover's randomness.
 
 ## Alternatives considered
@@ -30,8 +30,8 @@ The reference test seeds a linear congruential generator, `SimpleRng` of `tests/
 
 ## Consequences
 
-- One more generic formal on the prover units, and a `Sampling` package proved once per field.
-- `tests/` and `cli/` hold `Simple_Rng`; `cli/` holds the operating system source, outside SPARK.
+- One more generic formal on the prover units, and a `Sampling` package proved once per field and per source (`Sampling_GF2_128`, `Sampling_P256` over `Simple_Rng`).
+- `src/` holds `Simple_Rng` and the instances of the prover units over it, `tests/` and `cli/` use them; `cli/` holds the operating system source, outside SPARK, and the instances over it.
 - The README trust model lists the operating system's generator as trusted for the zero-knowledge property of proofs made by `longfellow_prove`.
 
 ## Verification impact

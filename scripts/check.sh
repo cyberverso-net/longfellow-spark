@@ -156,7 +156,7 @@ do_partitions_check() {
 do_test() {
    header "test: build the harnesses (assertions on)"
    alr -n exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
-   local harnesses="gf2_128_kat p256_kat sumcheck_kat transcript_kat ligero_kat circuit_kat writer_kat"
+   local harnesses="gf2_128_kat p256_kat sumcheck_kat transcript_kat ligero_kat circuit_kat writer_kat prover_kat"
    local logs status=0 h
    logs="$(mktemp -d)"
    header "test: $harnesses, concurrently"
