@@ -41,7 +41,10 @@
 --  by slot by prover_kat against the reference. Commit's postcondition
 --  is the shape of the commitment and Root = Heap (1) (Merkle.Build's
 --  postcondition gives the tree). What the random slots hold is not
---  stated (it is the randomness).
+--  stated (it is the randomness). Prove (block 5) is Silver: its
+--  polynomials are the reference's sums over the tableau, tested by
+--  the byte identity with the upstream proofs and by the verifier's
+--  acceptance (ADR 0053); its opening is Merkle.Open (Gold there).
 --
 --  Constant-time discipline (ADR 0051): constant time by construction.
 --  The row layout branches on positions and the geometry (public) and
@@ -52,8 +55,9 @@
 
 pragma SPARK_Mode (On);
 
-with Bytes;
+with Bytes;             use Bytes;
 with Proof_Levels;
+with Transcript;
 with Merkle;
 with Ligero_Geometry;  use Ligero_Geometry;
 with Ligero_Verifier;
@@ -65,7 +69,6 @@ generic
 package Ligero_Prover is
 
    use LV.ST.SA.F;
-   use type Bytes.Byte_Array;
 
    subtype Element is LV.Element;
    subtype Element_Array is LV.Element_Array;
@@ -195,5 +198,59 @@ package Ligero_Prover is
    procedure Free (Com : in out Commitment_Access) with
      Global => null,
      Post   => Com = null;
+
+   -------------------------------------------------------------------
+   --  The proof (ligero/prover.rs prove, Section 4.4)
+   -------------------------------------------------------------------
+
+   subtype Proof is LV.Proof;
+   subtype Terms is LV.Terms;
+
+   --  prove: on the live transcript, after the root, the statement and
+   --  the sumcheck. Writes the statement hash, draws the challenges
+   --  exactly as the verifier does (Draw_Challenges), computes y_ldt
+   --  (the LDT row plus u_ldt times the witness and quadratic rows, on
+   --  the first BLOCK columns), a_full (Build_A_Full of the verifier),
+   --  y_dot (the linear row plus, row by row, the row times the
+   --  encoding of its slice of a_full, on the first DBLOCK columns),
+   --  y_quad (the quadratic row plus u_quad times z - x y, on the first
+   --  DBLOCK columns), absorbs the four polynomials, chooses the columns
+   --  (Choose_Columns), copies their nonces, opens the tree
+   --  (Merkle.Open) and copies the queried columns row by row. Ok is
+   --  False only when the transcript's generator passed its bound (ADR
+   --  0028), and P is then not to be used.
+   procedure Prove
+     (G              : Valid_Geometry;
+      Com            : Commitment;
+      Lqc            : Lqc_Array;
+      A              : Terms;
+      B              : Element_Array;
+      Statement_Hash : Byte_Array;
+      P              : out Proof;
+      Ok             : out Boolean)
+   with
+     Global            => (In_Out => (Transcript.State, Transcript.Absorbed)),
+     Always_Terminates => False,
+     Pre               =>
+       Prover_Fits (G) and then Com_Shape (Com, G)
+       and then Lqc'First = 0 and then Lqc'Last in 0 .. Max_Quads - 1
+       and then G.Num_Quad_Rows
+                = (Lqc'Length + G.Witnesses_Per_Row - 1)
+                  / G.Witnesses_Per_Row
+       and then B'First = 0 and then B'Length >= 1
+       and then B'Last < Natural'Last
+       and then Statement_Hash'Length <= Transcript.Max_Payload
+       and then LV.Terms_In_Range (A, LV.Vector_Len (G), B'Length)
+       and then LV.Lqc_In_Range (Lqc, LV.Vector_Len (G))
+       and then P.Ldt_Last + 1 = G.Block_Len
+       and then P.Linear_Last + 1 = G.Dblock_Len
+       and then P.Low_Last + 1 = G.Num_Queries
+       and then P.High_Last + 1 = G.Dblock_Len - G.Block_Len
+       and then P.Nonce_Last + 1 = G.Num_Queries
+       and then P.Col_Last + 1 = LV.LP.Opened (G)
+       and then P.Path_Last + 1 = 2 * Num_Leaves (G),
+     Post              =>
+       LV.LP.Shape (P, G)
+       and then (if Ok then not Transcript.Is_Exhausted);
 
 end Ligero_Prover;

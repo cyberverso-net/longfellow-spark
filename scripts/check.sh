@@ -213,6 +213,51 @@ do_cli() {
       exit 1
    fi
    echo "cli: both proofs accepted, refusal and usage error reported"
+   header "cli: longfellow_prove reproduces the two upstream proofs byte for byte"
+   mkdir -p cli/out
+   cli/bin/longfellow_prove --field gf2_128 --circuit $c/sha256_circuit.lfc2 \
+      --inputs $c/sha256_inputs.json --label sha256_spec_test \
+      --rate-inv 3 --nreq 16 --ncol 256 --seed 12345 \
+      --out cli/out/sha256_proof.bin
+   cmp cli/out/sha256_proof.bin $c/sha256_proof.bin
+   cli/bin/longfellow_prove --field p256 --circuit $c/ecdsa2_circuit.lfc2 \
+      --inputs $c/ecdsa2_inputs.json --label ecdsa2_spec_test \
+      --rate-inv 4 --nreq 16 --ncol 256 --seed 123456789 \
+      --out cli/out/ecdsa2_proof.bin
+   cmp cli/out/ecdsa2_proof.bin $c/ecdsa2_proof.bin
+   header "cli: proofs under another seed and under the system source are accepted"
+   cli/bin/longfellow_prove --field gf2_128 --circuit $c/sha256_circuit.lfc2 \
+      --inputs $c/sha256_inputs.json --label sha256_spec_test \
+      --rate-inv 3 --nreq 16 --ncol 256 --seed 7 \
+      --out cli/out/sha256_seed7.bin
+   cli/bin/longfellow_verify --field gf2_128 --circuit $c/sha256_circuit.lfc2 \
+      --proof cli/out/sha256_seed7.bin --label sha256_spec_test \
+      --rate-inv 3 --nreq 16 --ncol 256
+   cli/bin/longfellow_prove --field p256 --circuit $c/ecdsa2_circuit.lfc2 \
+      --inputs $c/ecdsa2_inputs.json --label ecdsa2_spec_test \
+      --rate-inv 4 --nreq 16 --ncol 256 \
+      --out cli/out/ecdsa2_system.bin
+   cli/bin/longfellow_verify --field p256 --circuit $c/ecdsa2_circuit.lfc2 \
+      --proof cli/out/ecdsa2_system.bin --label ecdsa2_spec_test \
+      --rate-inv 4 --nreq 16 --ncol 256
+   header "cli: wrong inputs are a prover status, a missing argument a usage error"
+   echo '["1", "0"]' > cli/out/short_inputs.json
+   status=0
+   cli/bin/longfellow_prove --field gf2_128 --circuit $c/sha256_circuit.lfc2 \
+      --inputs cli/out/short_inputs.json --label sha256_spec_test \
+      --rate-inv 3 --nreq 16 --ncol 256 --seed 1 \
+      --out cli/out/never.bin || status=$?
+   if [ "$status" -ne 1 ]; then
+      echo "cli: expected exit status 1 on short inputs, got $status" >&2
+      exit 1
+   fi
+   status=0
+   cli/bin/longfellow_prove --field p256 2>/dev/null || status=$?
+   if [ "$status" -ne 2 ]; then
+      echo "cli: expected exit status 2 on a usage error, got $status" >&2
+      exit 1
+   fi
+   echo "cli: both upstream proofs reproduced byte for byte, other proofs accepted"
 }
 
 do_vectors() {

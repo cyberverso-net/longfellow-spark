@@ -21,10 +21,17 @@
 --  same commitment on an upstream circuit and its inputs must give the
 --  root stored in the upstream proof file.
 --
+--  Block 5 adds the complete prover (ADR 0049, 0053): on the prove
+--  lines Zk_Prover.Prove runs on a small circuit under the case name as
+--  label and must report the expected status; on ok the proof must be
+--  accepted by Zk_Verifier (completeness, tested). The byte identity
+--  with the upstream proof files is the cli step's (longfellow_prove,
+--  release build).
+--
 --  Test code, outside the proof perimeter: SPARK_Mode is Off. Reads
---  the vector files given as arguments (default: sumcheck_prover.txt
---  and ligero_commit.txt under tests/vectors/). Built with -gnata, so
---  the library's executable contracts run.
+--  the vector files given as arguments (default: sumcheck_prover.txt,
+--  ligero_commit.txt and zk_prove.txt under tests/vectors/). Built with
+--  -gnata, so the library's executable contracts run.
 --
 --  File format: '#' comments and blank lines are skipped; otherwise
 --    sumcheck <name> <field> <seed> <label> <root> <circuit lfc2>
@@ -34,6 +41,8 @@
 --           <idx...> <npath> <path...>
 --    root <name> <field> <seed> <rate_inv> <nreq> <ncol> <circuit>
 --         <nin> <inputs...> <root>
+--    prove <name> <field> <seed> <rate_inv> <nreq> <ncol> <circuit>
+--          <nin> <inputs...> <status>
 --  with elements as big-endian hex integers, bytes as hex, and
 --  <circuit> as hex or path:<file relative to the repository root>.
 --
@@ -42,6 +51,7 @@
 pragma SPARK_Mode (Off);
 
 with Ada.Calendar;
+with Ada.Characters.Handling;
 with Ada.Command_Line;
 with Ada.Directories;
 with Ada.Exceptions;
@@ -70,6 +80,10 @@ with Circuit_Reader;
 with Proof_Writer;
 with Sumcheck_Prover;
 with Ligero_Prover;
+with Zk_Prover;
+with Zk_Verifier;
+with Prover_Status;
+with Verifier_Status;
 with Simple_Rng;
 with Sumcheck_Algebra_GF2_128;
 with Sumcheck_Algebra_P256;
@@ -93,6 +107,10 @@ with Sumcheck_Prover_GF2_128;
 with Sumcheck_Prover_P256;
 with Ligero_Prover_GF2_128;
 with Ligero_Prover_P256;
+with Zk_Prover_GF2_128;
+with Zk_Prover_P256;
+with Zk_Verifier_GF2_128;
+with Zk_Verifier_P256;
 
 procedure Prover_KAT is
 
@@ -100,6 +118,7 @@ procedure Prover_KAT is
 
    Default_File   : constant String := "tests/vectors/sumcheck_prover.txt";
    Default_File_2 : constant String := "tests/vectors/ligero_commit.txt";
+   Default_File_3 : constant String := "tests/vectors/zk_prove.txt";
 
    Passed  : Natural := 0;
    Failed  : Natural := 0;
@@ -267,6 +286,8 @@ procedure Prover_KAT is
       with package PW is new Proof_Writer (LV => LV);
       with package SPR is new Sumcheck_Prover (ST => ST, others => <>);
       with package LPR is new Ligero_Prover (LV => LV, others => <>);
+      with package ZKP is new Zk_Prover (LPR => LPR, SPR => SPR, PW => PW);
+      with package ZK is new Zk_Verifier (LV => LV);
       with function To_Element (S : String) return SA.Element;
    procedure Check_Sumcheck
      (Name  : String;
@@ -471,6 +492,134 @@ procedure Prover_KAT is
          Passed := Passed + 1;
       end Check_Commit;
 
+      --  The prove lines (block 5).
+      procedure Check_Prove is
+         use Ligero_Geometry;
+         use type Prover_Status.Status;
+         use type Verifier_Status.Status;
+         Seed  : constant Unsigned_64 := Unsigned_64'Value (F (4));
+         Cfg   : constant Config :=
+           (Rate_Inv    => Positive'Value (F (5)),
+            Num_Queries => Positive'Value (F (6)),
+            Encoded_Len => Positive'Value (F (7)));
+         Circ  : Byte_Array_Access := Load (F (8));
+         Nin   : constant Natural := Natural'Value (F (9));
+         Want  : constant String := F (10 + Nin);
+         C     : CR.Circuit_Access;
+         H     : CR.Header;
+         CSt   : Circuit_Status.Status;
+         PSt   : Prover_Status.Status;
+         VSt   : Verifier_Status.Status;
+         Len   : Natural;
+         Label : constant Byte_Array := To_Label (Name);
+         T0    : Ada.Calendar.Time;
+         Secs  : Duration;
+         use type Ada.Calendar.Time;
+
+         function Got (S : String) return Boolean is
+           (Ada.Characters.Handling.To_Lower (S) = Want);
+
+         --  The prover of ADR 0053 that skips the checks: its proof of
+         --  false inputs must be refused by the verifier.
+         package ZKP_U is new Zk_Prover
+           (LPR => LPR, SPR => SPR, PW => PW, Validate => False);
+      begin
+         if Count /= 10 + Nin then
+            raise Parse_Error with "prove: field count";
+         end if;
+         CR.Read (Circ.all, C, H, CSt);
+         if CSt /= Circuit_Status.Ok then
+            Report_Failure (Name & ": circuit " & CSt'Image);
+            return;
+         end if;
+         if not Valid (Cfg) or else not ZKP.Config_Fits (Cfg, C.all) then
+            if Got ("config_invalid") then
+               TIO.Put_Line ("  " & Name & ": config_invalid as expected");
+               Passed := Passed + 1;
+            else
+               Report_Failure (Name & ": config_invalid, expected " & Want);
+            end if;
+            CR.Free (C);
+            Free (Circ);
+            return;
+         end if;
+         declare
+            W   : SA.Element_Array (0 .. Nin - 1);
+            Max : constant Natural :=
+              ZKP.Max_Proof_Len (Cfg, C.all, H.Subfield_Boundary);
+            B   : Byte_Array_Access := new Byte_Array (0 .. Max - 1);
+         begin
+            for I in W'Range loop
+               W (I) := To_Element (F (10 + I));
+            end loop;
+            Simple_Rng.Seed (Seed);
+            T0 := Ada.Calendar.Clock;
+            ZKP.Prove (Label, H.Id, H.Subfield_Boundary, Cfg, C.all, W,
+                       B.all, Len, PSt);
+            Secs := Ada.Calendar.Clock - T0;
+            if not Got (PSt'Image) then
+               Report_Failure (Name & ": status "
+                               & Ada.Characters.Handling.To_Lower (PSt'Image)
+                               & ", expected " & Want);
+               CR.Free (C);
+               Free (B);
+               return;
+            end if;
+            if PSt = Prover_Status.Ok then
+               if Nin < C.Npublic then
+                  Report_Failure (Name & ": public inputs");
+                  CR.Free (C);
+                  Free (B);
+                  return;
+               end if;
+               ZK.Verify (Label, H.Id, Cfg, C.all, W (0 .. C.Npublic - 1),
+                          B (0 .. Len - 1), VSt);
+               if VSt /= Verifier_Status.Ok then
+                  Report_Failure (Name & ": the verifier reports "
+                                  & VSt'Image & " on the proof");
+                  CR.Free (C);
+                  Free (B);
+                  return;
+               end if;
+               TIO.Put_Line ("  " & Name & ":" & Len'Image
+                             & " bytes, accepted by Zk_Verifier ("
+                             & Duration'Image (Secs) & " s)");
+            elsif PSt in Prover_Status.Not_Satisfied
+                       | Prover_Status.Not_In_Subfield
+            then
+               Simple_Rng.Seed (Seed);
+               ZKP_U.Prove (Label, H.Id, H.Subfield_Boundary, Cfg, C.all, W,
+                            B.all, Len, PSt);
+               if PSt /= Prover_Status.Ok then
+                  Report_Failure (Name & ": the unchecked prover reports "
+                                  & PSt'Image);
+                  CR.Free (C);
+                  Free (B);
+                  return;
+               end if;
+               ZK.Verify (Label, H.Id, Cfg, C.all, W (0 .. C.Npublic - 1),
+                          B (0 .. Len - 1), VSt);
+               if VSt = Verifier_Status.Ok then
+                  Report_Failure (Name & ": the verifier accepts the proof"
+                                  & " of false inputs");
+                  CR.Free (C);
+                  Free (B);
+                  return;
+               end if;
+               TIO.Put_Line ("  " & Name & ": " & Want & " as expected; the"
+                             & " unchecked prover's proof refused ("
+                             & Ada.Characters.Handling.To_Lower (VSt'Image)
+                             & ")");
+            else
+               TIO.Put_Line ("  " & Name & ": " & Want & " as expected");
+            end if;
+            Free (B);
+         end;
+         CR.Free (C);
+         Free (Circ);
+         Passed := Passed + 1;
+      end Check_Prove;
+
       --  The sumcheck lines (block 3).
       procedure Check_Sum is
          Seed  : constant Unsigned_64 := Unsigned_64'Value (F (4));
@@ -620,6 +769,8 @@ procedure Prover_KAT is
          Check_Commit (Root_Only => False);
       elsif Op = "root" then
          Check_Commit (Root_Only => True);
+      elsif Op = "prove" then
+         Check_Prove;
       else
          Check_Sum;
       end if;
@@ -632,7 +783,8 @@ procedure Prover_KAT is
       LP => Ligero_Proof_GF2_128, L => Lagrange_GF2_128,
       LV => Ligero_Verifier_GF2_128, CR => Circuit_Reader_GF2_128,
       PW => Proof_Writer_GF2_128, SPR => Sumcheck_Prover_GF2_128,
-      LPR => Ligero_Prover_GF2_128, To_Element => GF_To_Element);
+      LPR => Ligero_Prover_GF2_128, ZKP => Zk_Prover_GF2_128,
+      ZK => Zk_Verifier_GF2_128, To_Element => GF_To_Element);
    procedure Check_P is new Check_Sumcheck
      (FS => Field_P256.Sig,
       SA => Sumcheck_Algebra_P256, SE => Sumcheck_Expression_P256,
@@ -640,7 +792,8 @@ procedure Prover_KAT is
       LP => Ligero_Proof_P256, L => Lagrange_P256,
       LV => Ligero_Verifier_P256, CR => Circuit_Reader_P256,
       PW => Proof_Writer_P256, SPR => Sumcheck_Prover_P256,
-      LPR => Ligero_Prover_P256, To_Element => P_To_Element);
+      LPR => Ligero_Prover_P256, ZKP => Zk_Prover_P256,
+      ZK => Zk_Verifier_P256, To_Element => P_To_Element);
 
    procedure Check_Line (Line : String) is
       Fields : Field_Array;
@@ -659,7 +812,7 @@ procedure Prover_KAT is
          return;
       end if;
       if F (1) /= "sumcheck" and then F (1) /= "commit"
-        and then F (1) /= "root"
+        and then F (1) /= "root" and then F (1) /= "prove"
       then
          raise Parse_Error with "unknown op " & F (1);
       end if;
@@ -701,6 +854,7 @@ begin
    if Ada.Command_Line.Argument_Count = 0 then
       Run_File (Default_File);
       Run_File (Default_File_2);
+      Run_File (Default_File_3);
    else
       for I in 1 .. Ada.Command_Line.Argument_Count loop
          Run_File (Ada.Command_Line.Argument (I));

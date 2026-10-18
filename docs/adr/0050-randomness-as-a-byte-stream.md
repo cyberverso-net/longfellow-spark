@@ -31,7 +31,7 @@ The reference test seeds a linear congruential generator, `SimpleRng` of `tests/
 ## Consequences
 
 - One more generic formal on the prover units, and a `Sampling` package proved once per field and per source (`Sampling_GF2_128`, `Sampling_P256` over `Simple_Rng`).
-- `src/` holds `Simple_Rng` and the instances of the prover units over it, `tests/` and `cli/` use them; `cli/` holds the operating system source, outside SPARK, and the instances over it.
+- `src/` holds `Simple_Rng` and the instances of the prover units over it, which the test project uses; `cli/` holds the operating system source `Os_Random` (`/dev/urandom`), outside SPARK, and one chain of instances over `Cli_Random.Fill`, a procedure that reads `Os_Random` unless `--seed` was given and then reads `Simple_Rng`: one source procedure, hence one chain of instances in the command-line prover, chosen at run time (block 5; the generic instantiation of the prover chain inside the command-line program's generic body was refused by the compiler on the identity of the formal packages, and a run-time switch in the source is simpler than two chains).
 - The README trust model lists the operating system's generator as trusted for the zero-knowledge property of proofs made by `longfellow_prove`.
 
 ## Verification impact

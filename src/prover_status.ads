@@ -25,6 +25,11 @@ package Prover_Status is
       Input_Length,
       Not_Satisfied,
       Not_In_Subfield,
-      Config_Invalid);
+      Config_Invalid,
+      Exhausted);
+   --  Exhausted: the transcript's generator passed its bound while the
+   --  prover drew the Ligero challenges or chose the columns (ADR
+   --  0028), as the verifier's status of the same name; no proof is
+   --  produced. Added at block 5 (ADR 0049).
 
 end Prover_Status;

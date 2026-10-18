@@ -569,4 +569,191 @@ package body Ligero_Prover is
       Hash_Leaves (G, Com.all);
    end Commit;
 
+   -------------------------------------------------------------------
+   --  Prove
+   -------------------------------------------------------------------
+
+   --  Row I of the a_full layout: I WR + WR <= Vector_Len.
+   procedure Lemma_Wq_Row_Fits (G : Valid_Geometry; I : Natural) with
+     Ghost, Global => null,
+     Pre  => I < Num_Wq_Rows (G),
+     Post => (I + 1) * G.Witnesses_Per_Row <= LV.Vector_Len (G)
+   is
+   begin
+      SPARK.Lemmas.Integer_Arithmetic.Lemma_Mult_Is_Monotonic
+        (I + 1, Num_Wq_Rows (G), G.Witnesses_Per_Row);
+   end Lemma_Wq_Row_Fits;
+
+   --  The quadratic rows cover the triples: NQROW WR >= NQ.
+   procedure Lemma_Quads_Cover (G : Valid_Geometry; NQ : Natural) with
+     Ghost, Global => null,
+     Pre  => NQ <= Max_Quads
+             and then G.Num_Quad_Rows
+                      = (NQ + G.Witnesses_Per_Row - 1) / G.Witnesses_Per_Row,
+     Post => G.Num_Quad_Rows * G.Witnesses_Per_Row >= NQ
+   is
+   begin
+      null;
+   end Lemma_Quads_Cover;
+
+   --  The working set of the proof.
+   type Proof_Work
+     (Ldt_Last, Alphal_Last, Alphaq_Last, Quad_Last : Index;
+      Block_Last, Dblock_Last, Col_Last, Full_Last, Q_Last : Index)
+   is record
+      Ch      : LV.Challenges (Ldt_Last, Alphal_Last, Alphaq_Last, Quad_Last);
+      A_Full  : Element_Array (0 .. Full_Last);
+      Y_Ldt   : Element_Array (0 .. Block_Last);
+      Y_Dot   : Element_Array (0 .. Dblock_Last);
+      Y_Quad  : Element_Array (0 .. Dblock_Last);
+      Row_Buf : Element_Array (0 .. Dblock_Last);
+      A_Ext   : Element_Array (0 .. Block_Last);
+      A_Enc   : Element_Array (0 .. Col_Last);
+      Idx     : LV.Column_Indices (0 .. Q_Last);
+   end record;
+
+   type Proof_Work_Access is access Proof_Work;
+
+   procedure Free_Proof_Work is
+     new Ada.Unchecked_Deallocation (Proof_Work, Proof_Work_Access);
+
+   procedure Prove
+     (G              : Valid_Geometry;
+      Com            : Commitment;
+      Lqc            : Lqc_Array;
+      A              : Terms;
+      B              : Element_Array;
+      Statement_Hash : Byte_Array;
+      P              : out Proof;
+      Ok             : out Boolean)
+   is
+      NREQ  : constant Natural := G.Num_Queries;
+      WR    : constant Natural := G.Witnesses_Per_Row;
+      K_B   : constant Natural := G.Block_Len;
+      K_D   : constant Natural := G.Dblock_Len;
+      NL    : constant Natural := Num_Leaves (G);
+      NROW  : constant Natural := G.Total_Rows;
+      NWQ   : constant Natural := Num_Wq_Rows (G);
+      NQROW : constant Natural := G.Num_Quad_Rows;
+      QX    : constant Natural := Quad_X_Row_Start (G);
+      QY    : constant Natural := Quad_Y_Row_Start (G);
+      QZ    : constant Natural := Quad_Z_Row_Start (G);
+      Wk    : Proof_Work_Access;
+      Count : Natural;
+   begin
+      P := (Ldt_Last    => P.Ldt_Last,
+            Linear_Last => P.Linear_Last,
+            Low_Last    => P.Low_Last,
+            High_Last   => P.High_Last,
+            Nonce_Last  => P.Nonce_Last,
+            Col_Last    => P.Col_Last,
+            Path_Last   => P.Path_Last,
+            Ldt_Poly    => [others => Zero],
+            Linear_Poly => [others => Zero],
+            Quad_Low    => [others => Zero],
+            Quad_High   => [others => Zero],
+            Nonces      => [others => [others => 0]],
+            Columns     => [others => Zero],
+            Path        => [others => [others => 0]],
+            Path_Count  => 0);
+      Lemma_Quads_Cover (G, Lqc'Length);
+      Wk := new Proof_Work'
+        (Ldt_Last    => NWQ - 1,
+         Alphal_Last => B'Last,
+         Alphaq_Last => 3 * Lqc'Length - 1,
+         Quad_Last   => NQROW - 1,
+         Block_Last  => K_B - 1,
+         Dblock_Last => K_D - 1,
+         Col_Last    => G.Encoded_Len - 1,
+         Full_Last   => LV.Vector_Len (G) - 1,
+         Q_Last      => NREQ - 1,
+         Ch          => (Ldt_Last    => NWQ - 1,
+                         Alphal_Last => B'Last,
+                         Alphaq_Last => 3 * Lqc'Length - 1,
+                         Quad_Last   => NQROW - 1,
+                         U_Ldt       => [others => Zero],
+                         Alphal      => [others => Zero],
+                         Alphaq      => [others => Zero],
+                         U_Quad      => [others => Zero]),
+         A_Full      => [others => Zero],
+         Y_Ldt       => [others => Zero],
+         Y_Dot       => [others => Zero],
+         Y_Quad      => [others => Zero],
+         Row_Buf     => [others => Zero],
+         A_Ext       => [others => Zero],
+         A_Enc       => [others => Zero],
+         Idx         => [others => 0]);
+
+      Transcript.Write_Bytes (Statement_Hash);
+      LV.Draw_Challenges (G, B'Length, Lqc'Length, Wk.Ch);
+
+      --  y_ldt
+      for X in 0 .. K_B - 1 loop
+         Wk.Y_Ldt (X) := Com.Tab (Ldt_Row (G), X);
+      end loop;
+      for I in 0 .. NWQ - 1 loop
+         for X in 0 .. K_B - 1 loop
+            Wk.Row_Buf (X) := Com.Tab (Witness_Row_Start (G) + I, X);
+         end loop;
+         LV.Axpy (Wk.Y_Ldt, Wk.Row_Buf (0 .. K_B - 1), Wk.Ch.U_Ldt (I));
+      end loop;
+
+      --  a_full, then y_dot
+      LV.Build_A_Full (G, A, Lqc, Wk.Ch.Alphal, Wk.Ch.Alphaq, Wk.A_Full);
+      for X in 0 .. K_D - 1 loop
+         Wk.Y_Dot (X) := Com.Tab (Linear_Row (G), X);
+      end loop;
+      for I in 0 .. NWQ - 1 loop
+         Lemma_Wq_Row_Fits (G, I);
+         Wk.A_Ext := [others => Zero];
+         for J in 0 .. WR - 1 loop
+            Wk.A_Ext (NREQ + J) := Wk.A_Full (I * WR + J);
+         end loop;
+         Encode_Row (Wk.A_Ext, Com.T_Block, Wk.A_Enc);
+         for X in 0 .. K_D - 1 loop
+            Wk.Row_Buf (X) := Com.Tab (Witness_Row_Start (G) + I, X);
+         end loop;
+         LV.Vaxpy (Wk.Y_Dot, Wk.Row_Buf, Wk.A_Enc (0 .. K_D - 1));
+      end loop;
+
+      --  y_quad
+      for X in 0 .. K_D - 1 loop
+         Wk.Y_Quad (X) := Com.Tab (Quad_Row (G), X);
+      end loop;
+      for I in 0 .. NQROW - 1 loop
+         for X in 0 .. K_D - 1 loop
+            Wk.Row_Buf (X) :=
+              Com.Tab (QZ + I, X) - Com.Tab (QX + I, X) * Com.Tab (QY + I, X);
+         end loop;
+         LV.Axpy (Wk.Y_Quad, Wk.Row_Buf, Wk.Ch.U_Quad (I));
+      end loop;
+
+      P.Ldt_Poly    := Wk.Y_Ldt;
+      P.Linear_Poly := Wk.Y_Dot;
+      P.Quad_Low    := Wk.Y_Quad (0 .. NREQ - 1);
+      P.Quad_High   := Wk.Y_Quad (K_B .. K_D - 1);
+      LV.Absorb_Polynomials (G, P);
+      LV.Choose_Columns (G, Wk.Idx);
+      if Transcript.Is_Exhausted then
+         Free_Proof_Work (Wk);
+         Ok := False;
+         return;
+      end if;
+
+      --  The nonces, the opening and the queried columns.
+      for K in 0 .. NREQ - 1 loop
+         P.Nonces (K) := Com.Nonces (Wk.Idx (K));
+      end loop;
+      Merkle.Open (NL, Com.Heap, Merkle.Index_Array (Wk.Idx), P.Path, Count);
+      P.Path_Count := Count;
+      for Row in 0 .. NROW - 1 loop
+         for K in 0 .. NREQ - 1 loop
+            P.Columns (LV.LP.Row_Off (G, Row) + K) :=
+              Com.Tab (Row, K_D + Wk.Idx (K));
+         end loop;
+      end loop;
+      Free_Proof_Work (Wk);
+      Ok := True;
+   end Prove;
+
 end Ligero_Prover;
