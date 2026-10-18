@@ -1,12 +1,13 @@
 --  Merkle: the Merkle tree of draft Section 4.1 over SHA-256: heap
---  construction (4.1.2) and batch proof verification (4.1.4). The
---  batch opening of 4.1.3 is test code (the vector generator); the
---  nonce-blinded leaves of 4.1.1 are built by the Ligero verifier,
---  which hands this package leaf digests.
+--  construction (4.1.2), batch opening (4.1.3, the prover's, Phase C)
+--  and batch proof verification (4.1.4). The nonce-blinded leaves of
+--  4.1.1 are built by the Ligero verifier and the Ligero prover, which
+--  hand this package leaf digests.
 --
---  Documentation: docs/guide/05-ligero.md. Decisions: ADR 0035 (scope),
---  0038 (Gold perimeter), 0039 (sizes, status); frame: ADR 0003, 0020,
---  0029 (SHA-256 Silver plus vectors). Index: docs/adr/README.md.
+--  Documentation: docs/guide/05-ligero.md, 07-prover.md. Decisions: ADR
+--  0035 (scope), 0038 (Gold perimeter), 0039 (sizes, status), 0052 (the
+--  opening); frame: ADR 0003, 0020, 0029 (SHA-256 Silver plus vectors).
+--  Index: docs/adr/README.md.
 --
 --  Layout (Section 4.1): a tree of N leaves is an array of 2 N digests,
 --  the leaves at N .. 2 N - 1, node I the hash of nodes 2 I and 2 I + 1
@@ -19,6 +20,12 @@
 --    Build        : Gold, structural: the heap is the leaves at
 --                   N .. 2 N - 1 and, for 1 <= I < N, Hash_Pair of its
 --                   two children.
+--    Open         : Gold in Verify's model (ADR 0052): the opening
+--                   holds exactly Missing_Before (0, N, Path_Flags)
+--                   digests, and every child Verify reads for a node on
+--                   a path, from the nodes or from the opening, is that
+--                   node of the heap; so Verify recomputes the heap on
+--                   the honest opening and accepts (tested).
 --    Verify       : Gold on the path discipline (ADR 0038): the
 --                   verification succeeds only if there is at least one
 --                   index, every index is below N, no index repeats, and
@@ -173,6 +180,41 @@ package Merkle is
    --  False, with no other effect, when there is no index, an index is at
    --  or above N, an index repeats, the proof is shorter or longer than
    --  the reconstruction needs, or the reconstructed root differs.
+   --  Section 4.1.3, open_merkle_heap of merkle.rs (Phase C, ADR 0052):
+   --  the sibling digests the verifier needs for the leaves Indices,
+   --  taken from the heap of Build, node N - 1 down to 1, one per
+   --  missing child of a node on a path. Count digests are written to
+   --  Path (0 .. Count - 1); the rest of Path is zero. The postcondition
+   --  is Verify's model: Count is the number of digests Verify consumes
+   --  (Missing_Before over Path_Flags) and every child Verify reads,
+   --  from the path or from the nodes, is the heap's node, so that
+   --  Verify (N, Heap (1), Indices, Heap (N + Indices), Path (0 ..
+   --  Count - 1)) recomputes the heap and accepts.
+   procedure Open
+     (N       : Leaf_Count;
+      Heap    : Digest_Array;
+      Indices : Index_Array;
+      Path    : out Digest_Array;
+      Count   : out Natural)
+   with
+     Global => null,
+     Pre    =>
+       Heap'First = 0 and then Heap'Length = 2 * N
+       and then Indices'First = 0 and then Indices'Last < N
+       and then (for all K in Indices'Range => Indices (K) < N)
+       and then Path'First = 0 and then Path'Length = 2 * N,
+     Post   =>
+       Count = Missing_Before (0, N, Path_Flags (N, Indices))
+       and then Count <= 2 * (N - 1)
+       and then
+         (for all I in 1 .. N - 1 =>
+            (if Path_Flags (N, Indices) (I) then
+               Child (I, 2 * I, N, Path_Flags (N, Indices), Heap, Path)
+               = Heap (2 * I)
+               and then
+               Child (I, 2 * I + 1, N, Path_Flags (N, Indices), Heap, Path)
+               = Heap (2 * I + 1)));
+
    procedure Verify
      (N       : Leaf_Count;
       Root    : Digest;

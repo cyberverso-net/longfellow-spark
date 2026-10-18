@@ -14,6 +14,23 @@
                prover of this file on the transcript (<label>, <root>,
                the circuit identifier of <circuit>, the public inputs);
                Sumcheck_Prover under Simple_Rng must reproduce both.
+  ligero_commit.txt    commit <name> <field> <seed> <rate_inv> <nreq> <ncol>
+                              <circuit lfc2> <nin> <inputs...> <root>
+                              <nrow> {<k> <row...>} <nidx> <idx...>
+                              <npath> <path...>
+               the Ligero commitment of Section 4.3 (ligero/prover.rs
+               layout_tableau and commit) by the reference below on the
+               witness vector (private inputs, then the pads of
+               sumcheck_prover.txt drawn first from the same Simple_Rng):
+               the Merkle root, the unencoded rows (k elements each, the
+               systematic part of the encoded rows) and one batch opening
+               (open_merkle_heap) for the given leaf indices.
+                       root <name> <field> <seed> <rate_inv> <nreq> <ncol>
+                            <circuit path> <nin> <inputs...> <root>
+               the first 32 bytes of an upstream proof file: the root the
+               commitment on the upstream inputs and seed must reproduce
+               (ADR 0053 tier 1, the first byte-for-byte check against
+               the shipped proofs).
 
 The round-trip cases are every proof of the repository: the Appendix
 B.3 proofs of draft-google-cfrg-libzk-03 (their bytes from
@@ -37,11 +54,21 @@ eval_round_poly, round_poly, bind, the term update) from the clone, with
 SimpleRng of tests/test_reference.rs; it shares no code with the Ada
 prover.
 
+The commit cases are the same circuits and seeds under the B.3 Ligero
+configuration (rate 4, 6 queries, 64 columns), plus one GF(2^128) case
+with 8 queries and a subfield boundary that puts the first witness row
+below it, so that the subfield sampler of the random prefix is
+exercised. The reference transcribes layout_tableau and commit of
+ligero/prover.rs, lagrange_matrix and encode_row (through
+gen_ligero_vectors.py) and commit_merkle_heap and open_merkle_heap of
+merkle.rs. The root cases take the root from the upstream proof files.
+
 Usage: python3 -I gen_prover_vectors.py [output-directory]
 Output is deterministic (no timestamps).
 """
 
 import importlib.util
+import random
 import sys
 from pathlib import Path
 
@@ -272,6 +299,179 @@ def sumcheck_cases(lines):
             + f" {proof_bytes.hex()}")
 
 
+GL = load_sibling("gen_ligero_vectors")
+
+
+def sample_sub(fld, glf, rng) -> int:
+    """BinarySubfield::sample: 2 bytes on the basis of GF(2^16) in
+    GF(2^128); on P-256 the field's own sampler (the field is its own
+    subfield)."""
+    if fld["binary"]:
+        return glf.point(int.from_bytes(rng.bytes(2), "little"))
+    return sample_elt(fld, rng)
+
+
+def lqc_triples(circ):
+    """generate_lqc_triples of zk/common.rs on the witness vector."""
+    pi = circ["ninput"] - circ["npublic"]
+    lqc = []
+    for logw, _, _ in circ["layers"]:
+        pi += 4 * logw
+        lqc.append((pi, pi + 1, pi + 2))
+        pi += 3
+    return lqc
+
+
+def ligero_commit(fld, geom, witness, lqc, sfb, rng):
+    """layout_tableau and commit of ligero/prover.rs, commit_merkle_heap
+    of merkle.rs: the unencoded rows, the encoded tableau, the nonces,
+    the heap layers and the root. sfb is the boundary within the
+    witness vector."""
+    F = fld["F"]
+    glf = GL.GF2128() if fld["binary"] else GL.P256()
+    codec = TV.FieldCodec(F.name)
+    ncol, nreq = geom["ncol"], geom["nreq"]
+    block, dblock, wr = geom["block"], geom["dblock"], geom["wr"]
+    pts = [glf.point(x) for x in range(ncol)]
+    _, lb = GL.lagrange_matrix(glf, pts, block, ncol)
+    _, ld = GL.lagrange_matrix(glf, pts, dblock, ncol)
+    enc_b = lambda row: GL.encode_row(glf, lb, block, ncol, row)
+    enc_d = lambda row: GL.encode_row(glf, ld, dblock, ncol, row)
+    raw, tab = [], []
+    # row 0, ILDT
+    row = [sample_elt(fld, rng) for _ in range(block)]
+    raw.append(row)
+    tab.append(enc_b(row))
+    # row 1, IDOT
+    row = [sample_elt(fld, rng) for _ in range(dblock)]
+    s = 0
+    for v in row[nreq:nreq + wr]:
+        s = F.add(s, v)
+    row[nreq] = F.sub(row[nreq], s)
+    raw.append(row)
+    tab.append(enc_d(row))
+    # row 2, IQUAD
+    row = [sample_elt(fld, rng) for _ in range(dblock)]
+    for j in range(wr):
+        row[nreq + j] = 0
+    raw.append(row)
+    tab.append(enc_d(row))
+    # witness rows
+    nw = len(witness)
+    for i in range(geom["nwrow"]):
+        sub = (i + 1) * wr <= sfb
+        row = [0] * block
+        for k in range(nreq):
+            row[k] = sample_sub(fld, glf, rng) if sub else sample_elt(fld, rng)
+        start = i * wr
+        for j in range(wr):
+            if start + j < nw:
+                row[nreq + j] = witness[start + j]
+        raw.append(row)
+        tab.append(enc_b(row))
+    # quadratic constraint rows: x, y, z sampled per row index, placed
+    # as three groups
+    nq = len(lqc)
+    groups = ([], [], [])
+    for i in range(geom["nqt"]):
+        start = i * wr
+        for h in range(3):
+            row = [0] * block
+            for k in range(nreq):
+                row[k] = sample_elt(fld, rng)
+            for j in range(wr):
+                if start + j < nq:
+                    row[nreq + j] = witness[lqc[start + j][h]]
+            groups[h].append(row)
+    for h in range(3):
+        for row in groups[h]:
+            raw.append(row)
+            tab.append(enc_b(row))
+    if len(tab) != geom["nrow"]:
+        fail("reference commit: row count")
+    # nonces, then the leaves, then the heap
+    nl = ncol - dblock
+    nonces = [rng.bytes(32) for _ in range(nl)]
+    leaves = []
+    for j in range(nl):
+        data = nonces[j] + b"".join(codec.to_bytes(tab[r][dblock + j])
+                                    for r in range(geom["nrow"]))
+        leaves.append(GL.sha256(data))
+    layers = GL.merkle_heap(leaves)
+    return raw, tab, nonces, leaves, layers, layers[1]
+
+
+def commit_cases(lines):
+    """Block 4 (ADR 0053 tier 2): the commitment of the reference above on
+    the sumcheck cases' circuits and seeds under the B.3 configuration,
+    plus a subfield case; the root, the unencoded rows and one opening."""
+    cases = [
+        ("gf2_128", SC.sgonal_gf2_128(), [1, 0x6C, 5, 6], 12345, (4, 6, 64), 0),
+        ("gf2_128", SC.sgonal_gf2_128(), [1, 0x6C, 5, 6], 7, (4, 6, 64), 0),
+        ("gf2_128", SC.sgonal_gf2_128(), [1, 0x6C, 5, 6], 5, (4, 8, 64), 3),
+        ("gf2_128", SC.zcheck(), [1, 0, 7], 3, (4, 6, 64), 0),
+        ("p256", SC.sgonal_p256(), [1, 45, 5, 6], 123456789, (4, 6, 64), 0),
+        ("p256", SC.sgonal_p256(), [1, 45, 5, 6], 11, (4, 6, 64), 0),
+    ]
+    for fname, circ, inputs, seed, (rate_inv, nreq, ncol), sfb in cases:
+        fld = GC.FIELDS[fname]
+        lfc2 = GC.write_lfc2(fld, circ, sfb=sfb)
+        name = f"{circ['name']}_{seed}" + ("_sub" if sfb else "")
+        rng = SimpleRng(seed)
+        pads = sample_pads(fld, circ, rng)
+        witness = inputs[circ["npublic"]:] + pads
+        lqc = lqc_triples(circ)
+        geom = GL.geometry(rate_inv, nreq, ncol, len(witness), len(lqc))
+        if geom is None:
+            fail(f"commit case {name}: invalid configuration")
+        geom["ncol"], geom["nreq"] = ncol, nreq
+        sfb_w = max(sfb - circ["npublic"], 0)
+        raw, tab, nonces, leaves, layers, root = ligero_commit(
+            fld, geom, witness, lqc, sfb_w, rng)
+        nl = ncol - geom["dblock"]
+        idx = random.Random(seed).sample(range(nl), nreq)
+        path = GL.merkle_open(layers, nl, idx)
+        if not GL.merkle_verify(nl, root, idx, [leaves[i] for i in idx], path):
+            fail(f"commit case {name}: the opening does not verify")
+        hx = fld["hx"]
+        rows = " ".join(f"{len(r)} " + " ".join(hx(v) for v in r) for r in raw)
+        lines.append(
+            f"commit {name} {fname} {seed} {rate_inv} {nreq} {ncol} {lfc2.hex()} "
+            f"{len(inputs)} " + " ".join(hx(w) for w in inputs)
+            + f" {root.hex()} {len(raw)} {rows} {len(idx)} "
+            + " ".join(str(i) for i in idx)
+            + f" {len(path)} " + " ".join(d.hex() for d in path))
+
+
+def root_cases(lines):
+    """Block 4 (ADR 0053 tier 1): the roots of the two upstream proofs,
+    with the inputs of the upstream JSON files as elements."""
+    import json
+    cases = [
+        ("sha256", "gf2_128", 12345, (3, 16, 256)),
+        ("ecdsa2", "p256", 123456789, (4, 16, 256)),
+    ]
+    for name, fname, seed, (rate_inv, nreq, ncol) in cases:
+        fld = GC.FIELDS[fname]
+        base = f"tests/vectors/upstream/circuits/{name}"
+        raw = json.loads((HERE / "upstream" / "circuits" / f"{name}_inputs.json")
+                         .read_text())
+        inputs = []
+        for s in raw:
+            v = int(s)
+            if fld["mod"] is not None:
+                v %= fld["mod"]
+            elif v >= 2**128:
+                fail(f"root case {name}: input does not fit 16 bytes")
+            inputs.append(v)
+        root = (HERE / "upstream" / "circuits" / f"{name}_proof.bin").read_bytes()[:32]
+        hx = fld["hx"]
+        lines.append(
+            f"root {name} {fname} {seed} {rate_inv} {nreq} {ncol} "
+            f"path:{base}_circuit.lfc2 {len(inputs)} "
+            + " ".join(hx(w) for w in inputs) + f" {root.hex()}")
+
+
 def main() -> None:
     out_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -289,6 +489,26 @@ def main() -> None:
     ]
     sumcheck_cases(sumcheck_lines)
     (out_dir / "sumcheck_prover.txt").write_text("\n".join(sumcheck_lines) + "\n")
+    commit_lines = [
+        "# Phase C, block 4 (ADR 0053): the Ligero commitment of Section 4.3.",
+        "# commit lines (tier 2): the reference commitment of",
+        "# gen_prover_vectors.py on the witness vector (private inputs, then",
+        "# the pads drawn first from Simple_Rng under the seed) with the given",
+        "# configuration and the circuit's subfield boundary: the Merkle root,",
+        "# the unencoded rows (k elements each, equal to the systematic part of",
+        "# the encoded rows) and one batch opening for the given leaf indices.",
+        "#   commit <name> <field> <seed> <rate_inv> <nreq> <ncol> <circuit lfc2>",
+        "#          <nin> <inputs...> <root> <nrow> {<k> <row...>} <nidx> <idx...>",
+        "#          <npath> <path...>",
+        "# root lines (tier 1): the first 32 bytes of the upstream proof files,",
+        "# to be reproduced from the upstream inputs and seed.",
+        "#   root <name> <field> <seed> <rate_inv> <nreq> <ncol> <circuit path>",
+        "#        <nin> <inputs...> <root>",
+        "# Generated by gen_prover_vectors.py (this directory); do not edit.",
+    ]
+    commit_cases(commit_lines)
+    root_cases(commit_lines)
+    (out_dir / "ligero_commit.txt").write_text("\n".join(commit_lines) + "\n")
     lines = [
         "# Phase C, block 2 (ADR 0053): the writers of Sections 7.3, 7.4 and 7.5",
         "# as inverses of the readers. Each proof of the repository, read by",
@@ -310,7 +530,8 @@ def main() -> None:
     lines.append(f"roundtrip ecdsa2 p256 path:{base}/ecdsa2_circuit.lfc2 "
                  f"path:{base}/ecdsa2_proof.bin 4 16 256")
     (out_dir / "writer.txt").write_text("\n".join(lines) + "\n")
-    print(f"gen_prover_vectors: wrote writer.txt (4 round trips) and "
+    print(f"gen_prover_vectors: wrote ligero_commit.txt (6 commit and 2 root "
+          f"cases), writer.txt (4 round trips) and "
           f"sumcheck_prover.txt (5 cases) to {out_dir}")
 
 

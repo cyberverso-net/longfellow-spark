@@ -19,6 +19,8 @@
 --  the pads from Sample_Pads in the order the reference consumes its
 --  randomness: per layer, per round the two pads of hand 0 then the
 --  two of hand 1, then the two claim pads, the product pad computed.
+--  Lqc_Triples numbers the quadratic constraints of the claim pads in
+--  the witness vector of the commitment (generate_lqc_triples).
 --
 --  Documentation: docs/guide/07-prover.md.
 --
@@ -59,6 +61,7 @@ package Sumcheck_Prover is
    subtype Challenges is ST.SV.Challenges;
 
    use ST.SA.F;
+   use type ST.SV.Lqc_Triple;
 
    -------------------------------------------------------------------
    --  The pads (Section 6.5)
@@ -76,6 +79,22 @@ package Sumcheck_Prover is
    procedure Sample_Pads (C : Circuit; Pads : out Element_Array) with
      Always_Terminates => not ST.SA.F.Sampling_Rejects,
      Pre => Pads'First = 0 and then Pads'Length = Pad_Total (C);
+
+   --  generate_lqc_triples of zk/common.rs: the quadratic constraint of
+   --  layer J ties the claim pads c0, c1 and their product, numbered in
+   --  the witness vector of the commitment (the private inputs first,
+   --  then the pads), exactly the triples Verifier_Core emits.
+   procedure Lqc_Triples (C : Circuit; Lqc : out ST.SV.Lqc_Array) with
+     Global => null,
+     Pre    => Lqc'First = 0 and then Lqc'Last = C.Last_Layer,
+     Post   =>
+       (for all J in 0 .. C.Last_Layer =>
+          Lqc (J) = (X => ST.SV.Pad_Off (C, J, C.Ninput - C.Npublic)
+                            + 4 * C.Layers (J).Logw,
+                     Y => ST.SV.Pad_Off (C, J, C.Ninput - C.Npublic)
+                            + 4 * C.Layers (J).Logw + 1,
+                     Z => ST.SV.Pad_Off (C, J, C.Ninput - C.Npublic)
+                            + 4 * C.Layers (J).Logw + 2));
 
    -------------------------------------------------------------------
    --  eval_round_poly (Section 6.6)

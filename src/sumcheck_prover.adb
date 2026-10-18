@@ -153,6 +153,34 @@ package body Sumcheck_Prover is
    end Sample_Pads;
 
    -------------------------------------------------------------------
+   --  Lqc_Triples
+   -------------------------------------------------------------------
+
+   procedure Lqc_Triples (C : Circuit; Lqc : out ST.SV.Lqc_Array) is
+      Base : constant Natural := C.Ninput - C.Npublic;
+      Pi   : Natural := Base;
+   begin
+      Lqc := [others => (X => 0, Y => 0, Z => 0)];
+      ST.SV.Lemma_Pads_Below (C);
+      for J in 0 .. C.Last_Layer loop
+         pragma Loop_Invariant (Pi = ST.SV.Pad_Off (C, J, Base));
+         pragma Loop_Invariant
+           (for all J2 in 0 .. J - 1 =>
+              Lqc (J2) = (X => ST.SV.Pad_Off (C, J2, Base)
+                                 + 4 * C.Layers (J2).Logw,
+                          Y => ST.SV.Pad_Off (C, J2, Base)
+                                 + 4 * C.Layers (J2).Logw + 1,
+                          Z => ST.SV.Pad_Off (C, J2, Base)
+                                 + 4 * C.Layers (J2).Logw + 2));
+         Lqc (J) := (X => Pi + 4 * C.Layers (J).Logw,
+                     Y => Pi + 4 * C.Layers (J).Logw + 1,
+                     Z => Pi + 4 * C.Layers (J).Logw + 2);
+         ST.SV.Lemma_Pad_Step (C, J, Base);
+         Pi := Pi + 4 * C.Layers (J).Logw + 3;
+      end loop;
+   end Lqc_Triples;
+
+   -------------------------------------------------------------------
    --  Round_Evals
    -------------------------------------------------------------------
 
