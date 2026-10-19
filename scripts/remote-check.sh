@@ -20,6 +20,10 @@ USER_NAME="$(gcloud compute os-login describe-profile --project "$PROJECT" \
                --format='value(posixAccounts[0].username)')"
 SSH="ssh -i $HOME/.ssh/google_compute_engine -o IdentitiesOnly=yes -o BatchMode=yes -o ProxyCommand='gcloud compute start-iap-tunnel $VM 22 --listen-on-stdin --zone $ZONE --project $PROJECT --quiet' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 
+#  The lint reads the tracked files through git, which the copy on the
+#  VM does not carry: it runs here, in seconds, before anything else.
+scripts/check.sh lint
+
 status="$(gcloud compute instances describe "$VM" --zone "$ZONE" --project "$PROJECT" --format='value(status)')"
 if [ "$status" != "RUNNING" ]; then
    echo "remote-check: starting $VM ($status)"
