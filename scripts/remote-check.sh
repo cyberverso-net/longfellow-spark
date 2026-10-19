@@ -12,7 +12,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 PROJECT=longfellow-512114
-ZONE=europe-west4-a
+ZONE=europe-west4-c
 VM=prove-runner
 TARGET="${1:-check}"
 USER_NAME="$(gcloud compute os-login describe-profile --project "$PROJECT" \

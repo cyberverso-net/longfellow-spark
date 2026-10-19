@@ -11,7 +11,7 @@
 #  Cloud through Workload Identity Federation (no key in the repository)
 #  and starts the virtual machine prove-runner, which registers its
 #  self-hosted runner at boot and shuts itself down after the job. prove
-#  runs there: 32 cores, the toolchain installed once, the whole proof in
+#  runs there: 24 cores, the toolchain installed once, the whole proof in
 #  one job (`make prove`, one prover per core), where the hosted runners
 #  of four cores needed nine partitions and still exceeded a sixty
 #  minute limit on one of them (ADR 0054). The partitions of
@@ -57,12 +57,12 @@ jobs:
       - name: Start prove-runner
         run: |
           status="$(gcloud compute instances describe prove-runner \
-                      --zone europe-west4-a --project longfellow-512114 \
+                      --zone europe-west4-c --project longfellow-512114 \
                       --format='value(status)')"
           echo "prove-runner is $status"
           if [ "$status" != "RUNNING" ]; then
              gcloud compute instances start prove-runner \
-                --zone europe-west4-a --project longfellow-512114
+                --zone europe-west4-c --project longfellow-512114
           fi
 
   prove:
