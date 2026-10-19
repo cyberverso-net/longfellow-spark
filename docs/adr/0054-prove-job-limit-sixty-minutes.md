@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-19, after the merge of Phase C)
+Accepted (2026-10-19, after the merge of Phase C) Amended 2026-10-19 by [ADR 0060](0060-proving-machine-on-google-cloud.md): the proof runs as one job on the project's own machine; the partitions remain for local use.
 
 ## Date
 
