@@ -113,10 +113,11 @@ GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-p
 
 | partition | checks | units |
 |-----------|--------|-------|
-| `prover` | 4591 | `Proof_Writer` 558 and 570, `Sumcheck_Prover` 544 and 616, `Ligero_Prover` 756 and 798, `Zk_Prover` 350 and 365, `Sampling` 13 and 15, `Simple_Rng` 6, `Prover_Status` flow only |
+| `prover` | 2322 | `Proof_Writer` 558 and 570, `Sumcheck_Prover` 544 and 616, `Sampling` 13 and 15, `Simple_Rng` 6, `Prover_Status` flow only |
+| `ligero-prover` | 2269 | `Ligero_Prover` 756 and 798, `Zk_Prover` 350 and 365 |
 | `primitives` | 848 | `Merkle` 326 (206 at Phase B: `Open` and its lemmas), `GF2_128` 105 (58: the masks, `Parity`, `Subfield_Coords`), `Field_GF2_128` 22 (8: `To_Subfield_Bytes`), the rest as chapter 6 |
 
-The proof of the six units added at block 3 took 12 minutes from a clean session with ten provers, the two instances of `Ligero_Prover` about 20 at block 4; the whole proof inside `make check` grew from 46 minutes at block 2 to about an hour at the close of the phase (1 hour 15 minutes for the whole check), the `prover` partition being the heaviest. Reproduce with `make prove`; the summary is in `obj/development/gnatprove/gnatprove.out`.
+The proof of the six units added at block 3 took 12 minutes from a clean session with ten provers, the two instances of `Ligero_Prover` about 20 at block 4; the whole proof inside `make check` grew from 46 minutes at block 2 to about an hour at the close of the phase (1 hour 15 minutes for the whole check). On the hosted runner the prover units as one partition exceeded first the forty-five and then the sixty minute job limit, so they are two partitions since [ADR 0054](../adr/0054-prove-job-limit-sixty-minutes.md). Reproduce with `make prove`; the summary is in `obj/development/gnatprove/gnatprove.out`.
 
 ## 5. What is only tested
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-16, consolidation after Phase A) Amended 2026-10-19 by [ADR 0054](0054-prove-job-limit-sixty-minutes.md): the job limit is sixty minutes and the `prover` partition joins the required checks.
+Accepted (2026-10-16, consolidation after Phase A) Amended 2026-10-19 by [ADR 0054](0054-prove-job-limit-sixty-minutes.md): the job limit is sixty minutes and the partitions `prover` and `ligero-prover` join the required checks.
 
 ## Date
 

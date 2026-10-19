@@ -34,7 +34,7 @@ The larger hosted runners of GitHub need a Team or Enterprise plan and bill from
 
 - The `prove` workflow, `scripts/remote-check.sh`, this record; ADR 0041 and ADR 0054 amended in their Status lines; the README's continuous integration section.
 - Branch protection: `verify` and `prove` required (two checks), to be set by the author.
-- Pull request 19 (the partition split) is superseded by this record: the split stays useful locally and is kept, the nine required checks are not.
+- Pull request 19 (the partition split) was merged before this record: the split stays useful locally and is kept, the nine required checks it implied are not.
 - Trusted: Google Cloud as the operator of the machine, as GitHub was for the hosted runners; the same pinned toolchain as the hosted check and the laptop.
 
 ## Verification impact
