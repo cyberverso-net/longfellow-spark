@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Amended 2026-10-15 by [ADR 0033](0033-parallel-proof-partitions.md): the `prove` job is a matrix of partitions. Amended 2026-10-15 by [ADR 0034](0034-proof-as-information-harnesses-in-parallel.md): the proof still runs on pull requests but is no longer a required check. Amended 2026-10-16 by [ADR 0041](0041-verification-cadence.md): the pre-push hook is withdrawn and the proof gate is `make check` by hand.
+Accepted. Amended 2026-10-15 by [ADR 0033](0033-parallel-proof-partitions.md): the `prove` job is a matrix of partitions. Amended 2026-10-15 by [ADR 0034](0034-proof-as-information-harnesses-in-parallel.md): the proof still runs on pull requests but is no longer a required check. Amended 2026-10-16 by [ADR 0041](0041-verification-cadence.md): the pre-push hook is withdrawn and the proof gate is `make check` by hand. Amended 2026-10-19 by [ADR 0054](0054-prove-job-limit-sixty-minutes.md): the job limit is sixty minutes.
 
 ## Date
 
