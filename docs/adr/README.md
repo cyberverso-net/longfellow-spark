@@ -44,7 +44,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0038](0038-gold-perimeter-for-merkle-and-ligero.md) | Gold perimeter for Merkle and Ligero | Accepted | 2026-10-15 |
 | [0039](0039-sizes-allocation-and-status.md) | Sizes, allocation and the status enumeration | Accepted, amended by 0043 | 2026-10-15 |
 | [0040](0040-ligero-vectors-and-upstream-instrumentation.md) | Ligero vectors and upstream instrumentation | Accepted | 2026-10-15 |
-| [0041](0041-verification-cadence.md) | Verification cadence: the proof by hand, the slow harness cases weekly | Accepted, amended by 0044 and 0045, 0060 | 2026-10-16 |
+| [0041](0041-verification-cadence.md) | Verification cadence: the proof by hand, the slow harness cases weekly | Accepted, amended by 0044, 0045, 0060, 0062 | 2026-10-16 |
 | [0042](0042-status-amendments.md) | Status amendments | Accepted | 2026-10-16 |
 | [0043](0043-exhausted-status-and-streaming-slice.md) | Exhausted status and streaming slice | Accepted | 2026-10-16 |
 | [0044](0044-field-contracts-at-proof-only-level.md) | Field contracts at proof-only level | Accepted | 2026-10-16 |
@@ -58,5 +58,6 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0052](0052-gold-perimeter-for-the-prover.md) | Gold perimeter for the prover | Accepted | 2026-10-17 |
 | [0053](0053-prover-vectors-and-cross-verification.md) | Prover vectors and cross-verification | Accepted | 2026-10-17 |
 | [0054](0054-prove-job-limit-sixty-minutes.md) | Prove job limit raised to sixty minutes and the prover partition split | Accepted, amended by 0060 | 2026-10-19 |
-| [0060](0060-proving-machine-on-google-cloud.md) | A proving machine on Google Cloud: prove as one job, make check remote | Accepted | 2026-10-19 |
+| [0060](0060-proving-machine-on-google-cloud.md) | A proving machine on Google Cloud: prove as one job, make check remote | Accepted, amended by 0062 | 2026-10-19 |
 | [0061](0061-readme-as-front-page.md) | The README as a front page, the trust model in the guide | Accepted | 2026-10-19 |
+| [0062](0062-pull-request-checks-as-the-gate.md) | The pull request checks as the gate | Accepted | 2026-10-19 |
