@@ -21,11 +21,11 @@ Accepted
 ## Decision
 
 - **The proof leaves the workflows.** `prove.yml`, the self-hosted runner and its shutdown hook are withdrawn. `verify` stays as it is, on hosted runners, on every push and pull request.
-- **`scripts/remote-check.sh` runs the proof on demand.** It requires a clean working tree whose commit is on GitHub. The machine fetches that commit into its own clone and runs `make check` there. The script then posts the result on the commit as the status `prove`: pending while it runs, then success or failure with the failing step. Any interruption posts an error instead of leaving it pending.
+- **`scripts/remote-check.sh` runs the proof on demand.** It requires a clean working tree whose commit is on GitHub. The machine fetches that commit into its own clone and runs `make check` there. The script then posts the result on the commit as the status `prove`: pending while it runs, then success or failure with the failing step. The run is detached on the machine, so the developer's laptop may sleep or lose the network: the machine keeps the log and the exit code on its disk and shuts itself down when done. The script checks once a minute, starts the machine again only to read the result if it has stopped, and then posts the status. `--collect` picks up a run whose script was closed. A run that disappears, for example because the machine was stopped under it, is posted as an error.
 - **Text-only changes.** `scripts/remote-check.sh --text-only` checks that the branch changes only Markdown files and `LICENSE` against `main`, and posts `prove` as passed without starting the machine.
 - **Iteration.** `scripts/remote-check.sh --tree` copies the working tree as it is and runs any make target there, posting nothing. It is for a result before a push.
 - **The gate.** Branch protection requires `verify` and `prove` on `main`. At the end of a block the developer commits, pushes, opens the pull request and runs the script once. A red check is shown with its diagnosis before any code or contract changes, and the fix is a new commit, never an amend or a rebase.
-- **One run at a time.** The developer runs the script, so two proofs never share the machine. `make check` may still run on the developer's own machine whenever useful.
+- **One run at a time.** The developer runs the script, so two proofs never share the machine, and the script refuses to start a run while another is in progress there. `make check` may still run on the developer's own machine whenever useful.
 
 ## Alternatives considered
 

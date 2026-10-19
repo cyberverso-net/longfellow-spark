@@ -63,9 +63,12 @@ The project's proving machine, a 24-core virtual machine on Google Cloud, runs t
 
 ```bash
 scripts/remote-check.sh               # make check on the pushed commit, posts the status prove
+scripts/remote-check.sh --collect     # picks up that run later, if the terminal was closed
 scripts/remote-check.sh --text-only   # a text-only branch: posts prove without running the proof
 scripts/remote-check.sh --tree prove  # the working tree as it is, any target, posts nothing
 ```
+
+The run on a pushed commit does not depend on the connection: the laptop may sleep. The machine keeps the result, shuts itself down, and the script posts the status when it next reaches it.
 
 ## Testing
 
