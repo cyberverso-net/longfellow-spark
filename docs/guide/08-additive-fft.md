@@ -8,8 +8,8 @@ Outline (Phase D, block 1); the sections are written as the blocks land, in the 
 ### 1.2 Why not the multiplicative FFT in characteristic 2: no roots of unity of order 2^k in GF(2^128)
 ### 1.3 The evaluation points inj(i) of Section 2.2.2 and the subspace they span; the vanishing polynomials of the subspaces
 ### 1.4 The novel basis of Lin, Chung and Han (2014): X_j and the subspace polynomials, the change of basis from values to coefficients
-### 1.5 Evaluating on 2^l points and truncating to NCOL; cosets when NCOL exceeds 2^l
-### 1.6 P-256: p - 1 = 2^96 q, roots of unity of order up to 2^96, the multiplicative NTT in F_p; what the reference does with Fp2 and why this project need not
+### 1.5 Evaluating on 2^l points and truncating to NCOL; cosets when NCOL exceeds 2^l; every point in the subfield, hence NCOL at most 2^16
+### 1.6 P-256: the extension on consecutive points as a Lagrange middle product (kernel 1 / (k - j), binomial constants), the convolution by a number-theoretic transform; p - 1 = 2^96 q gives roots of unity of order up to 2^96 in F_p itself; what the reference does with Fp2 and why this project need not
 
 ## 2. The algorithms
 
@@ -38,4 +38,4 @@ Outline (Phase D, block 1); the sections are written as the blocks land, in the 
 
 ## 6. What stays trusted, and the limits
 
-The mathematical identity between the two encoders beyond the tested rows; the paper's basis; the scale beyond 2^16 points.
+The mathematical identity between the two encoders beyond the tested rows; the paper's basis; the bound NCOL <= 2^16 (every evaluation point in the subfield of GF(2^16), `can_encode` of the reference), the same bound `Ligero_Geometry.Max_Encoded_Len` imposes, beyond which the code would need a larger subfield.

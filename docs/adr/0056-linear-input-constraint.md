@@ -17,8 +17,9 @@ The same constraint is a theorem of the stage 3 Gold: `Verifier_Core` is Silver 
 ## Decision
 
 - The input constraint is built directly in the form the core emits it, one term per private input in input order, without the search-and-merge of `Expression`: a linear pass, on the heap.
-- The specification does not change: the constraint is the same polynomial, stated by the same ghost reference; the structural Gold of the stage is kept, and the postconditions of `Verifier_Core` on what it emits stand. Where the new construction needs a lemma connecting the direct form to `Expression`'s reference, the lemma is proved, not assumed.
-- `Eval_Circuit`'s per-layer value arrays move to the heap under [ADR 0047](0047-heap-allocation-by-ownership.md) in the same block, so that the prover runs within the default stack on every circuit in the bounds.
+- The perimeter, stated explicitly. `Expression` stays as it is and stays Gold for the claim expressions of the layers, which are small. The direct construction has its own Gold against the same ghost reference (the constraint polynomial of stage 3), with the lemmas connecting the direct form to `Expression`'s reference proved and never assumed; the postconditions of `Verifier_Core` on what it emits stand. `Eval_Circuit` with its per-layer value arrays on the heap keeps its Gold postconditions of stage 3 (`Layer_Holds`, `Layer_Z`, the inputs in the last segment) unchanged.
+- `Eval_Circuit`'s per-layer value arrays move to the heap under [ADR 0047](0047-heap-allocation-by-ownership.md) in the same block, so that the prover and the verifier run within the default stack on every circuit in the bounds.
+- Chapter 3 (Section 3.5, the capacities) and chapter 6 (the stack as the limit of the input constraint) receive an update note pointing to this record.
 - The vectors of stage 3 (`sumcheck_kat`, the recorded upstream runs) and the byte identity of the two Phase C proofs must stay green; the time of the core on the hash circuit is measured before and after.
 
 ## Alternatives considered

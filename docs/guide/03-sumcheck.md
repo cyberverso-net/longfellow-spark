@@ -104,6 +104,9 @@ Two capacities are used, not one: the claim expressions of every layer are alloc
 
 The Ligero output is `Ligero_Terms (Max)`, the sparse matrix A in coordinate form as three parallel arrays (coefficient, constraint number, variable) with a count, and `B`, the vector of constants. Three arrays rather than an array of records because, with a P-256 `Element` inside the record, the frame conditions of `Constrain_To_Be_Zero` cost the provers 583450 steps; with parallel arrays, 62606.
 
+
+Update (Phase D, [ADR 0056](../adr/0056-linear-input-constraint.md)): the input constraint of Section 2.5 is no longer built as an `Expression` on the stack but directly in the form the core emits it, one term per private input, on the heap and in linear time, with its own Gold against the same reference; `Expression` remains for the layer claims. The mDoc hash circuit (84 166 private inputs) overflowed the default stack here before that change.
+
 ### 3.6 Errors as status
 
 No subprogram of stage 3 raises. `Eval_Quad` and `Eval_Circuit` return a Boolean; the core's inputs are checked by preconditions on the sizes of the records (`Chal_Total`, `Proof_Total`, `A_Bound`), which the caller of phase B establishes from the circuit before building them.

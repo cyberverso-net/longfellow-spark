@@ -26,7 +26,8 @@ The production artifacts (`rust/applications/mdoc_zk/artifacts/` at d5e6be7) are
 
 ## Consequences
 
-- 4.2 MB of upstream artifacts in the repository, pinned.
+- 7.3 MB committed under `tests/vectors/upstream/mdoc/`: 4.2 MB of upstream artifacts (two archives, two proofs, four witnesses) and 3.0 MB of decompressed LFC2 payloads, all pinned.
+- When block 4 brings the version 7 pair within the target of ADR 0055, the pair enters the `cli` step of `scripts/check.sh` as the permanent test of the phase's exit criterion (prove both circuits from the upstream witnesses, verify them, and accept the upstream example proof's two bare proofs once ADR 0058 reads the format), with its time recorded; `scripts/measure-mdoc.sh` stays for the full table on the four configurations.
 - One more default file for `circuit_kat` (36 seconds with assertions on).
 
 ## Verification impact
