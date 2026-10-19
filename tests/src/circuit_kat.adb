@@ -5,8 +5,9 @@
 --  malformed cases with the status each must give.
 --
 --  Test code, outside the proof perimeter: SPARK_Mode is Off. Reads
---  the vector files given as arguments (default: circuit_summary.txt
---  and circuit_lfc2.txt under tests/vectors/) and checks every case
+--  the vector files given as arguments (default: circuit_summary.txt,
+--  circuit_lfc2.txt and mdoc_summary.txt under tests/vectors/) and
+--  checks every case
 --  against Circuit_Reader on the field of the current "field" line.
 --  Built with -gnata, so the library's executable contracts run.
 --
@@ -50,6 +51,7 @@ procedure Circuit_KAT is
 
    Default_Summary : constant String := "tests/vectors/circuit_summary.txt";
    Default_Lfc2    : constant String := "tests/vectors/circuit_lfc2.txt";
+   Default_Mdoc    : constant String := "tests/vectors/mdoc_summary.txt";
 
    type Field_Kind is (None, GF, P);
    Current_Field : Field_Kind := None;
@@ -498,6 +500,7 @@ begin
    if Ada.Command_Line.Argument_Count = 0 then
       Run_File (Default_Summary);
       Run_File (Default_Lfc2);
+      Run_File (Default_Mdoc);
    else
       for I in 1 .. Ada.Command_Line.Argument_Count loop
          Run_File (Ada.Command_Line.Argument (I));

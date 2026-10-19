@@ -63,7 +63,8 @@ tests/bin/sumcheck_kat       # default: sumcheck_*.txt, zk_proof_*.txt, then tes
                              # included, on both fields (seconds, ADR 0044)
 tests/bin/transcript_kat     # default: sha256.txt, aes256.txt and transcript_fs.txt (Appendix B.2)
 tests/bin/ligero_kat         # default: merkle.txt, ligero_geometry.txt, lagrange_*.txt, ligero_proof.txt
-tests/bin/circuit_kat        # default: circuit_summary.txt (the upstream circuit files), circuit_lfc2.txt
+tests/bin/circuit_kat        # default: circuit_summary.txt (the upstream circuit files), circuit_lfc2.txt,
+                             # mdoc_summary.txt (the four mDoc production circuits, Phase D)
 tests/bin/writer_kat         # default: writer.txt (every proof of the repository rewritten by the writers)
 tests/bin/prover_kat         # default: sumcheck_prover.txt, ligero_commit.txt, zk_prove.txt (the prover, piece by piece
                              # and whole, against the Python reference and Zk_Verifier; the upstream Merkle roots)
@@ -76,7 +77,7 @@ alr exec -- gprbuild -P cli/longfellow_verify.gpr -p
 cli/bin/interop_kat
 ```
 
-Each harness takes vector file paths as arguments, prints pass and fail counts and exits with a non-zero status on any failure or if no case ran. Vector files are rebuilt with `python3 -I tests/vectors/gen_gf2_128_vectors.py`, `python3 -I tests/vectors/gen_p256_vectors.py`, `python3 -I tests/vectors/gen_sumcheck_vectors.py`, `python3 -I tests/vectors/gen_transcript_vectors.py`, `python3 -I tests/vectors/gen_ligero_vectors.py`, `python3 -I tests/vectors/gen_circuit_vectors.py` and `python3 -I tests/vectors/gen_prover_vectors.py`; the generators abort if their recomputed anchors disagree with the external constants they embed, and the P-256 generator also re-derives the Solinas reduction table and the inversion chain used by the implementation.
+Each harness takes vector file paths as arguments, prints pass and fail counts and exits with a non-zero status on any failure or if no case ran. Vector files are rebuilt with `python3 -I tests/vectors/gen_gf2_128_vectors.py`, `python3 -I tests/vectors/gen_p256_vectors.py`, `python3 -I tests/vectors/gen_sumcheck_vectors.py`, `python3 -I tests/vectors/gen_transcript_vectors.py`, `python3 -I tests/vectors/gen_ligero_vectors.py`, `python3 -I tests/vectors/gen_circuit_vectors.py`, `python3 -I tests/vectors/gen_prover_vectors.py` and `python3 -I tests/vectors/gen_mdoc_vectors.py`; the generators abort if their recomputed anchors disagree with the external constants they embed, and the P-256 generator also re-derives the Solinas reduction table and the inversion chain used by the implementation.
 
 Definition of done, for every commit: `make check` passes. It runs, in order, `alr build`, the check that the proof partitions cover the project, the full proof from a clean session with the project's prover configuration and unproved checks treated as errors, the eight harnesses, the release build with the interop harness, the command-line verifier on the two upstream proofs and the command-line prover reproducing them byte for byte (`make cli`), the vector generators with a comparison against the committed files, and a lint over tracked files; `scripts/check.sh` is the single definition of these steps and `make build`, `make prove`, `make test`, `make cli`, `make vectors` and `make lint` run them one at a time. The harnesses have no slow set: since ADR 0044 they run every case of both fields in seconds, `prover_kat` in about half a minute. There is no pre-push hook: the proof that gates a change is the one the developer runs by hand before the commit (ADR 0041).
 

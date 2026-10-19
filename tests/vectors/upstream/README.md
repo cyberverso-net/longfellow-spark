@@ -96,3 +96,60 @@ The two proof files are those `scripts/check.sh cli` writes under
 `ecdsa2_system.bin` under the operating system's source, so neither is a
 copy of the upstream file. The proofs made under the upstream seeds are
 compared byte for byte with the upstream files by that step instead.
+
+## mDoc circuit archives, witnesses and proofs (Phase D)
+
+`mdoc/` holds, copied unchanged from `rust/applications/mdoc_zk/artifacts/`
+of google/longfellow-zk at commit d5e6be77336933d50bf7f25a954f8ec273eb51ce
+(licence Apache-2.0, the project's own), the two production circuit
+archives chosen for Phase D, one per Ligero configuration in use: the
+version 7 archive with one attribute (`8d079211...`, hash circuit rate 7,
+132 queries, 4151 columns; signature circuit rate 7, 132, 4096) and the
+version 6 archive with one attribute (`137e5a75...`, hash rate 4, 128,
+4096; signature rate 4, 128, 2945), as `runtime/src/zk_spec.rs` lists
+them. Beside each archive: the example mDoc proof of `artifacts/proofs/`
+(`<hash>.bin`: six MACs, then the hash proof, then the signature proof,
+`runtime/src/proto.rs`) and the two witness files (`<hash>_hash_witness.bin`,
+`<hash>_sig_witness.bin`: the circuit's inputs, public ones first, as
+little-endian field elements, 16 and 32 bytes each). The archives are zstd
+streams of LFA2 archives (`rust/core/proto/src/archive`); their two
+payloads, the LFC2 circuits "hash" and "sig", are committed decompressed
+as `<hash>_hash.lfc2` and `<hash>_sig.lfc2` and are what the harnesses and
+the command-line tools read. `gen_mdoc_vectors.py` checks the archives
+against the committed payloads when a zstd decompressor is available and
+writes `mdoc_summary.txt` for `circuit_kat`. The signature circuit is the
+same in both archives (identifier `2845210a...`); only the hash circuit
+changes between versions 6 and 7. The SHA-256 of each copy:
+
+    94c665e8a4067f5cd10153c96164afcecfbb1a41afa513f4a8c99ae01723a2f0  8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121.lfa2
+    3cb762b110ddc5b309f3b067ff3e891381a479f291dd4903e8c19c5d987bbe91  8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121.bin
+    1fa4aaa93915a97fe7ef4d4fe0becb944fc20251785552e4bf37b415e9b78650  8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121_hash_witness.bin
+    6964e1db765b186624ed6f91cec35c2533e819ad74cace0ec50a4c27368c55e4  8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121_sig_witness.bin
+    293f3f73ae64ec3f8607dbe63e9c86577ccb8eba66144ce27fbeca98c6448d7a  137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6.lfa2
+    de23149f38f8da67e59054a998e1ca439845b79d4cead0e714ac9d68ff9d635f  137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6.bin
+    f7d3da1d379cda70a0b91fbd6a6712a23f4e8850ea296420443a985c89b77ffc  137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6_hash_witness.bin
+    8bfd5e271a387ded40766b3464bbbcfafcaf3b440d6e40d5126abf65be1af1b8  137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6_sig_witness.bin
+
+The hash circuit of version 7 has 17 layers, 7 757 579 terms, 85 118
+inputs (952 public) and subfield boundary 85 112; that of version 6 has 15
+layers, 6 823 073 terms, 75 098 inputs (944 public), boundary 75 092; the
+signature circuit has 21 layers, 481 833 terms, 3739 inputs (900 public).
+
+To cross-verify a bare Longfellow proof of one of these circuits with the
+upstream `ZkVerifier` (Phase D, block 1), `verify_proof_file.rs` is used as
+it is, on the extracted LFC2 file and on the witness converted to the JSON
+inputs format (as `scripts/measure-mdoc.sh` writes it under `cli/out/`),
+with the label and the configuration of the proof:
+
+    LFS_FIELD=p256 \
+      LFS_CIRCUIT=<longfellow-spark>/tests/vectors/upstream/mdoc/8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121_sig.lfc2 \
+      LFS_INPUTS=<longfellow-spark>/cli/out/mdoc_v7_sig_inputs.json \
+      LFS_PROOF=<longfellow-spark>/cli/out/mdoc_v7_sig.bin \
+      LFS_LABEL=mdoc_sig_test LFS_RATE_INV=7 LFS_NREQ=132 LFS_NCOL=4096 \
+      cargo test --release --test verify_proof_file -- --nocapture
+    LFS_FIELD=gf2_128 \
+      LFS_CIRCUIT=<longfellow-spark>/tests/vectors/upstream/mdoc/8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121_hash.lfc2 \
+      LFS_INPUTS=<longfellow-spark>/cli/out/mdoc_v7_hash_inputs.json \
+      LFS_PROOF=<longfellow-spark>/cli/out/mdoc_v7_hash.bin \
+      LFS_LABEL=mdoc_hash_test LFS_RATE_INV=7 LFS_NREQ=132 LFS_NCOL=4151 \
+      cargo test --release --test verify_proof_file -- --nocapture
