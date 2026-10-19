@@ -24,7 +24,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0018](0018-continuous-verification-gate.md) | Continuous verification gate | Accepted, amended by 0019 and 0020 | 2026-10-09 |
 | [0019](0019-proof-off-the-hosted-gate.md) | Proof off the hosted gate | Accepted, amended by 0021, 0033 and 0041 | 2026-10-11 |
 | [0020](0020-prover-configuration-step-budget.md) | Prover configuration by step budget | Accepted | 2026-10-11 |
-| [0021](0021-proof-on-pull-requests.md) | Proof on pull requests to main | Accepted, amended by 0033, 0034 and 0041 | 2026-10-11 |
+| [0021](0021-proof-on-pull-requests.md) | Proof on pull requests to main | Accepted, amended by 0033, 0034, 0041 and 0054 | 2026-10-11 |
 | [0022](0022-stage-3-scope-and-challenges-as-input.md) | Stage 3 scope: sumcheck algebra and symbolic verifier core, challenges as input | Accepted | 2026-10-12 |
 | [0023](0023-gold-perimeter-for-protocol-code.md) | Gold perimeter for protocol code | Accepted | 2026-10-12 |
 | [0024](0024-field-genericity-by-formal-package.md) | Field genericity by formal package | Accepted | 2026-10-12 |
@@ -48,7 +48,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0042](0042-status-amendments.md) | Status amendments | Accepted | 2026-10-16 |
 | [0043](0043-exhausted-status-and-streaming-slice.md) | Exhausted status and streaming slice | Accepted | 2026-10-16 |
 | [0044](0044-field-contracts-at-proof-only-level.md) | Field contracts at proof-only level | Accepted | 2026-10-16 |
-| [0045](0045-proof-gate-restored-through-partitions.md) | Proof gate restored through partitions | Accepted | 2026-10-16 |
+| [0045](0045-proof-gate-restored-through-partitions.md) | Proof gate restored through partitions | Accepted, amended by 0054 | 2026-10-16 |
 | [0046](0046-phase-b-scope-lfc2-loader-and-interop.md) | Phase B scope: the LFC2 circuit loader and the interop exit criterion | Accepted | 2026-10-16 |
 | [0047](0047-heap-allocation-by-ownership.md) | Heap allocation by ownership for the circuit and the working set | Accepted | 2026-10-16 |
 | [0048](0048-circuit-vectors-and-interop-proofs.md) | Circuit vectors and the upstream interop proofs | Accepted | 2026-10-16 |
@@ -57,3 +57,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0051](0051-constant-time-in-the-prover.md) | Constant time in the prover, unit by unit | Accepted | 2026-10-17 |
 | [0052](0052-gold-perimeter-for-the-prover.md) | Gold perimeter for the prover | Accepted | 2026-10-17 |
 | [0053](0053-prover-vectors-and-cross-verification.md) | Prover vectors and cross-verification | Accepted | 2026-10-17 |
+| [0054](0054-prove-job-limit-sixty-minutes.md) | Prove job limit raised to sixty minutes | Accepted | 2026-10-19 |
