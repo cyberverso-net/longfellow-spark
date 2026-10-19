@@ -134,7 +134,7 @@ Each takes about six seconds. Without `--seed` the proof changes at every run, a
 Two workflows run the steps of `scripts/check.sh` with the same toolchain as local work: `gnat_native 16.1.0`, `gprbuild 26.0.1` and `gnatprove 16.1.0`, pinned in `alire.toml`.
 
 - **`verify`** runs on every push and pull request, on a hosted Ubuntu runner. It covers everything in `make check` except the proof.
-- **`prove`** runs the full proof on the project's own machine, a 24-core virtual machine on Google Cloud (ADR 0060). A small job starts the machine, the proof runs there as one job, and the machine shuts itself down afterwards. It runs on pull requests to `main`, weekly, and by hand before a release or after a toolchain change.
+- **`prove`** runs the full proof on the project's own machine, a 24-core virtual machine on Google Cloud (ADR 0060). A small job starts the machine, the proof runs there as one job, and the machine shuts itself down afterwards. It runs on pull requests to `main`, weekly, and by hand before a release or after a toolchain change. A pull request that changes only Markdown files skips it, without starting the machine.
 
 Both checks are required to merge into `main`, and they are the gate for every change (ADR 0062). Work happens on a branch per stage or block, and reaches `main` through a pull request. A red check is fixed with a new commit on the branch.
 

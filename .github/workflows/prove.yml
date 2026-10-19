@@ -3,11 +3,15 @@
 #  request to main, weekly as an independent record that the proof still
 #  holds on the pinned toolchain, and on demand before a release or after
 #  a toolchain change. Its one check, `prove`, is required for merging
-#  (ADR 0045, 0060); the proof that gates a commit is the one the
-#  developer runs with make check, locally or on the same machine
-#  through scripts/remote-check.sh (ADR 0041).
+#  and, with `verify`, is the gate for every change (ADR 0062).
 #
-#  Two jobs. start-runner, on a hosted runner, authenticates to Google
+#  A pull request that changes only text (Markdown files and LICENSE)
+#  does not start the machine: the job `changes` sees it in seconds, the
+#  two jobs below are skipped, and GitHub counts a skipped required
+#  check as passed. Any other file, the weekly run and a manual run
+#  prove in full.
+#
+#  Then two jobs. start-runner, on a hosted runner, authenticates to Google
 #  Cloud through Workload Identity Federation (no key in the repository)
 #  and starts the virtual machine prove-runner, which registers its
 #  self-hosted runner at boot and shuts itself down after the job. prove
@@ -37,8 +41,43 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: code or text only
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Files changed
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+             echo "code=true" >> "$GITHUB_OUTPUT"
+             exit 0
+          fi
+          files="$(git diff --name-only "$BASE...$HEAD")"
+          echo "$files"
+          code="$(echo "$files" | grep -v -E '(\.md$|^LICENSE$)' | grep -c . || true)"
+          if [ "$code" -gt 0 ]; then
+             echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+             echo "Text only: the proving machine is not started."
+             echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   start-runner:
     name: start the proving machine
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -67,7 +106,7 @@ jobs:
 
   prove:
     name: prove
-    needs: start-runner
+    needs: [changes, start-runner]
     runs-on: [self-hosted, linux, x64, prove]
     timeout-minutes: 90
     steps:

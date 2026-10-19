@@ -34,8 +34,8 @@ Running `make check` before the commit as well now costs twice and buys nothing.
 - ADR 0041 and ADR 0060 are amended in their Status lines.
 - A commit on a branch is no longer guaranteed green; the merge into `main` is. A branch may carry fix commits after its pull request is opened.
 - The README's definition of done and branch model change accordingly.
-- `prove` also runs for text-only pull requests and for every push to an open pull request. That costs a run of the proving machine each time. Making the job pass quickly when only text files changed is left for a later change.
-- Every push to a pull request starts a `prove` job, so a remote check should not run while any pull request is being updated.
+- A pull request that changes only text does not start the proving machine. A first job lists the changed files, and when all of them are Markdown files or `LICENSE`, the jobs that start the machine and prove are skipped. GitHub counts a skipped required check as passed. The weekly and manual runs always prove in full.
+- Every other push to an open pull request starts a `prove` job, so a remote check should not run while a pull request with code is being updated.
 
 ## Verification impact
 
@@ -44,4 +44,4 @@ Nothing changes in what is proved, tested or trusted. What changes is where and 
 ## References
 
 - [ADR 0041](0041-verification-cadence.md), [ADR 0045](0045-proof-gate-restored-through-partitions.md), [ADR 0060](0060-proving-machine-on-google-cloud.md).
-- `.github/workflows/verify.yml`, `.github/workflows/prove.yml`, `scripts/check.sh`, `scripts/remote-check.sh`.
+- `.github/workflows/verify.yml`, `.github/workflows/prove.yml` (the job `changes`), `scripts/check.sh`, `scripts/remote-check.sh`.
