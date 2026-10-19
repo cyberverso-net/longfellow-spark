@@ -310,6 +310,44 @@ package body Ligero_Prover is
    --  The three groups of rows
    -------------------------------------------------------------------
 
+   --  Row 2, the quadratic row: DBLOCK random elements, the witness
+   --  slots zeroed, committed with the table T_D.
+   procedure Quad_Fixed_Row
+     (G     : Valid_Geometry;
+      Tab   : in out Tableau;
+      T_D   : Table;
+      Row_D : in out Element_Array)
+   with
+     Always_Terminates => not Sampling_Rejects,
+     Pre  => Prover_Fits (G) and then Tab_Shape (Tab, G)
+             and then Dblock_Table (T_D, G)
+             and then Row_Shape (Row_D, G.Dblock_Len),
+     Post =>
+       (Proof_Only =>
+          (for all J in 0 .. G.Witnesses_Per_Row - 1 =>
+             Same (Tab (Quad_Row (G), G.Num_Queries + J), Zero)))
+   is
+      NREQ : constant Natural := G.Num_Queries;
+      WR   : constant Natural := G.Witnesses_Per_Row;
+   begin
+      Sample_Prefix (Row_D, G.Dblock_Len, False);
+      Zero_Slots (Row_D, NREQ, WR);
+      Commit_Row (Tab, Quad_Row (G), Row_D, T_D);
+      pragma Assert
+        (Proof_Only =>
+           (for all J in 0 .. WR - 1 => Same (Row_D (NREQ + J), Zero)));
+      pragma Assert (NREQ + WR <= G.Dblock_Len);
+      pragma Assert (Row_D'Last = G.Dblock_Len - 1);
+      pragma Assert
+        (Proof_Only =>
+           (for all X in 0 .. Row_D'Last =>
+              Same (Tab (Quad_Row (G), X), Row_D (X))));
+      pragma Assert
+        (Proof_Only =>
+           (for all J in 0 .. WR - 1 =>
+              Same (Tab (Quad_Row (G), NREQ + J), Row_D (NREQ + J))));
+   end Quad_Fixed_Row;
+
    --  Rows 0, 1 and 2.
    procedure Fixed_Rows
      (G            : Valid_Geometry;
@@ -338,28 +376,8 @@ package body Ligero_Prover is
       Sample_Prefix (Row_D, G.Dblock_Len, False);
       Row_D (NREQ) := Row_D (NREQ) - LV.Dot1 (Row_D (NREQ .. NREQ + WR - 1));
       Commit_Row (Tab, Linear_Row (G), Row_D, T_D);
-      --  Row 2, the quadratic row: DBLOCK random elements, the witness
-      --  slots zeroed.
-      Sample_Prefix (Row_D, G.Dblock_Len, False);
-      Zero_Slots (Row_D, NREQ, WR);
-      Commit_Row (Tab, Quad_Row (G), Row_D, T_D);
-      pragma Assert
-        (Proof_Only =>
-           (for all J in 0 .. WR - 1 => Same (Row_D (NREQ + J), Zero)));
-      pragma Assert (NREQ + WR <= G.Dblock_Len);
-      pragma Assert (Row_D'Last = G.Dblock_Len - 1);
-      pragma Assert
-        (Proof_Only =>
-           (for all X in 0 .. Row_D'Last =>
-              Same (Tab (Quad_Row (G), X), Row_D (X))));
-      pragma Assert
-        (Proof_Only =>
-           (for all J in 0 .. WR - 1 =>
-              Same (Tab (Quad_Row (G), NREQ + J), Row_D (NREQ + J))));
-      pragma Assert
-        (Proof_Only =>
-           (for all J in 0 .. WR - 1 =>
-              Same (Tab (Quad_Row (G), NREQ + J), Zero)));
+      --  Row 2, the quadratic row.
+      Quad_Fixed_Row (G, Tab, T_D, Row_D);
    end Fixed_Rows;
 
    --  The witness rows. Each row's witness slots are proved against W
