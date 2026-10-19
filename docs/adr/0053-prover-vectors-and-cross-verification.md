@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-17, block 1 of Phase C)
+Accepted (2026-10-18, at the close of block 6 of Phase C; proposed 2026-10-17 and edited until then)
 
 ## Date
 

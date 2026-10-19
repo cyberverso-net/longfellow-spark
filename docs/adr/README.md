@@ -52,8 +52,8 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0046](0046-phase-b-scope-lfc2-loader-and-interop.md) | Phase B scope: the LFC2 circuit loader and the interop exit criterion | Accepted | 2026-10-16 |
 | [0047](0047-heap-allocation-by-ownership.md) | Heap allocation by ownership for the circuit and the working set | Accepted | 2026-10-16 |
 | [0048](0048-circuit-vectors-and-interop-proofs.md) | Circuit vectors and the upstream interop proofs | Accepted | 2026-10-16 |
-| [0049](0049-phase-c-scope-the-prover.md) | Phase C scope: the prover and its exit criterion | Proposed | 2026-10-17 |
-| [0050](0050-randomness-as-a-byte-stream.md) | Randomness as a byte stream, and its sources | Proposed | 2026-10-17 |
-| [0051](0051-constant-time-in-the-prover.md) | Constant time in the prover, unit by unit | Proposed | 2026-10-17 |
-| [0052](0052-gold-perimeter-for-the-prover.md) | Gold perimeter for the prover | Proposed | 2026-10-17 |
-| [0053](0053-prover-vectors-and-cross-verification.md) | Prover vectors and cross-verification | Proposed | 2026-10-17 |
+| [0049](0049-phase-c-scope-the-prover.md) | Phase C scope: the prover and its exit criterion | Accepted | 2026-10-17 |
+| [0050](0050-randomness-as-a-byte-stream.md) | Randomness as a byte stream, and its sources | Accepted | 2026-10-17 |
+| [0051](0051-constant-time-in-the-prover.md) | Constant time in the prover, unit by unit | Accepted | 2026-10-17 |
+| [0052](0052-gold-perimeter-for-the-prover.md) | Gold perimeter for the prover | Accepted | 2026-10-17 |
+| [0053](0053-prover-vectors-and-cross-verification.md) | Prover vectors and cross-verification | Accepted | 2026-10-17 |

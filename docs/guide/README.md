@@ -11,9 +11,10 @@ This guide explains the project to a reader who knows some cryptography and litt
 5. [Chapter 4, the Fiat-Shamir transcript and the challenge replay](04-transcript.md): the transcript of draft Section 3 over SHA-256 and AES-256, field serialisation and sampling, and the replay of the challenges of a proof into the record of chapter 3; the fourth complete stage.
 6. [Chapter 5, Ligero and the complete verifier](05-ligero.md): the Merkle commitment, the geometry and the Reed-Solomon code by Lagrange interpolation, the Ligero proof reader and verifier, and the complete verifier from the proof string to a verdict; the fifth and last stage of Phase A.
 7. [Chapter 6, the circuit loader, the heap and the interop proofs](06-circuits.md): the LFC2 format of the upstream compiler as a representation of the quad circuits of Section 6.3, the loader that proves the shape of what it returns, access types under SPARK's ownership rules, the working sets on the heap, the command-line verifier, and the two upstream proofs accepted from their files; Phase B.
-8. The [architecture decision records](../adr/README.md), referenced from the chapters where a choice is explained.
+8. [Chapter 7, the prover](07-prover.md): the sumcheck from the prover's side with its one-time pads, the Ligero commitment and proof, randomness as a generic formal so that a program is proved for any source, the writers as inverses of the readers, the subfield projection as a fixed linear map, the command-line prover, and the two upstream proofs reproduced byte for byte from their inputs and seeds; Phase C.
+9. The [architecture decision records](../adr/README.md), referenced from the chapters where a choice is explained.
 
-Later chapters follow the roadmap: Phase C, the prover; then the circuit compiler.
+Later chapters follow the roadmap: the circuit compiler (Phase D).
 
 ## Building, proving and testing
 
@@ -23,14 +24,15 @@ Requirements: [Alire](https://alire.ada.dev) with a GNAT toolchain selected (`al
 alr build                                                     # the library
 alr exec -- gnatprove -P longfellow_spark.gpr
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p   # the test harness, assertions on
-make test                                                     # the six harnesses, concurrently
-make cli                                                      # the release build: interop harness and command-line verifier
+make test                                                     # the eight harnesses, concurrently
+make cli                                                      # the release build: interop harness, command-line verifier and prover
 python3 -I tests/vectors/gen_gf2_128_vectors.py               # regenerate vectors (optional)
 python3 -I tests/vectors/gen_p256_vectors.py
 python3 -I tests/vectors/gen_sumcheck_vectors.py
 python3 -I tests/vectors/gen_transcript_vectors.py
 python3 -I tests/vectors/gen_ligero_vectors.py
 python3 -I tests/vectors/gen_circuit_vectors.py
+python3 -I tests/vectors/gen_prover_vectors.py
 ```
 
 `make check` runs everything in order and is the definition of done for a commit and for a pull request.

@@ -2,6 +2,25 @@
 
 All notable changes to this project are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project does not yet follow semantic versioning in the strict sense, since its interface is the pinned specification rather than an API. Every entry names the decision records (`docs/adr/`) and the guide chapter (`docs/guide/`) that describe it; the trust model that says what is proved, tested and trusted is in the README.
 
+## [0.3.0] - unreleased
+
+Phase C: the prover. From a circuit, its inputs and a randomness source to the proof string of Section 7.5, in the reference's order of operations: the two proofs that google/longfellow-zk ships are reproduced byte for byte from their inputs and seeds.
+
+### Added
+
+- The prover units, generic over the field's transcript glue and over a `Sampling` instance that carries the randomness source (chapter 7; ADR 0049 to 0053): `Prover_Status`; `Simple_Rng`, the generator of the upstream reference test, and `Sampling` (the reference's samplers on a byte stream); `Proof_Writer` (the writers of Sections 7.3, 7.4 and 7.5, the run-length structure of the subfield encoding decided by position, Gold on the reader's rules `Well_Coded`); `Sumcheck_Prover` (the pads of Section 6.5, the round evaluations proved equal to the ghost transcription of `eval_round_poly`, the layers on the live transcript with the challenges recorded for the core, the quadratic triples); `Ligero_Prover` (the tableau of Section 4.3 on the heap, the Reed-Solomon encoder on all columns with its systematic part proved equal to the row, the commitment with nonces and `Merkle.Build`, the proof of Section 4.4 with the verifier's own challenge and absorption procedures); `Merkle.Open`, the batch opening of Section 4.1.3, Gold in the model of `Merkle.Verify`; `Zk_Prover`, the composition of `zk/prover.rs` with the validation statuses `Input_Length`, `Not_Satisfied`, `Not_In_Subfield`, `Config_Invalid` and `Exhausted`; the fixed projection of GF(2^128) on the coordinates of GF(2^16) (`GF2_128.Subfield_Coords`, sixteen masks) and the formal `To_Subfield_Bytes` of `Field_Signature`; the proof partition `prover` (4591 checks).
+- The command-line prover `longfellow_prove` in `cli/` (ADR 0049, 0050): the field, the circuit file, the inputs file in the upstream JSON format, the label, the Ligero configuration, the output file; the operating system's generator by default (`Os_Random`, `/dev/urandom`, outside SPARK) and the upstream test generator behind `--seed`; exit status 0 written, 1 prover status, 2 usage or file error.
+- Vectors and harnesses (ADR 0053): `gen_prover_vectors.py`, an independent Python transcription of the reference prover piece by piece (`writer.txt`, `sumcheck_prover.txt`, `ligero_commit.txt`, `zk_prove.txt`) and the masks of the projection in `gen_gf2_128_vectors.py`; the harnesses `writer_kat` (every proof of the repository rewritten identical) and `prover_kat` (the pads and padded sumcheck proofs, the commitments with their openings, the Merkle roots of the two upstream proofs reproduced, the complete proofs of the small circuits accepted by `Zk_Verifier`, the statuses, and the refusal of the proofs an unchecked prover makes of false inputs); the `cli` step reproduces `sha256_proof.bin` and `ecdsa2_proof.bin` byte for byte with `longfellow_prove` under the upstream seeds and verifies proofs under another seed and under the system source; `verify_proof_file.rs`, a test for the upstream crate that verifies a proof file of this project with the upstream verifier, run by hand.
+
+### Changed
+
+- 16671 checks proved in all (11967 at 0.2.0), eight proof partitions; the `prover` partition is now the heaviest and `make check` takes about an hour and a quarter.
+- `Merkle`, `GF2_128` and `Field_GF2_128` gained the opening and the projection; `Field_Signature` gained one formal, so every instance of the sumcheck generics names `To_Subfield_Bytes`.
+
+### Trust model
+
+The operating system's generator is trusted for the zero-knowledge property of the proofs made without `--seed`; the shapes of the tableau are proved row by row and tested as a whole (ADR 0052, amended at block 4); completeness is tested, not proved. The README lists the entries.
+
 ## [0.2.0] - 2026-10-17
 
 Phase B: the verifier takes the circuits the upstream compiler produces and accepts the proofs the upstream prover made for them, from their files, on both fields.
