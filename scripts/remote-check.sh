@@ -47,12 +47,15 @@ POLL=60
 
 PROXY="gcloud compute start-iap-tunnel $VM 22 --listen-on-stdin --zone $ZONE --project $PROJECT --quiet"
 KEY="$HOME/.ssh/google_compute_engine"
-SSH_OPTS=(-i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes
+#  ForwardAgent=no: the developer's keys never reach the VM, which
+#  fetches with its own read-only deploy key (core.sshCommand of its
+#  clone names that key and no agent).
+SSH_OPTS=(-i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ForwardAgent=no
           -o ConnectTimeout=30 -o "ProxyCommand=$PROXY"
           -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
           -o LogLevel=ERROR)
 #  The same options as one string, for rsync -e, which honours quotes.
-SSH_STRING="ssh -i '$KEY' -o IdentitiesOnly=yes -o BatchMode=yes -o 'ProxyCommand=$PROXY' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+SSH_STRING="ssh -i '$KEY' -o IdentitiesOnly=yes -o BatchMode=yes -o ForwardAgent=no -o 'ProxyCommand=$PROXY' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 
 repo() { gh repo view --json nameWithOwner --jq .nameWithOwner; }
 
