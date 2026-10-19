@@ -7,7 +7,8 @@
 #  machine as the hosted check, and the developer's machine stays free.
 #
 #  Usage: scripts/remote-check.sh [make target, default check]
-#  Needs gcloud authenticated on the developer's account (OS Login) and
+#  Needs gcloud authenticated on the developer's account (OS Login), the
+#  key gcloud compute ssh created (~/.ssh/google_compute_engine) and
 #  rsync. The log is written to remote-check.log in the working tree.
 set -eu
 cd "$(dirname "$0")/.."
@@ -17,7 +18,7 @@ VM=prove-runner
 TARGET="${1:-check}"
 USER_NAME="$(gcloud compute os-login describe-profile --project "$PROJECT" \
                --format='value(posixAccounts[0].username)')"
-SSH="ssh -o ProxyCommand='gcloud compute start-iap-tunnel $VM 22 --listen-on-stdin --zone $ZONE --project $PROJECT --quiet' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+SSH="ssh -i $HOME/.ssh/google_compute_engine -o IdentitiesOnly=yes -o BatchMode=yes -o ProxyCommand='gcloud compute start-iap-tunnel $VM 22 --listen-on-stdin --zone $ZONE --project $PROJECT --quiet' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 
 status="$(gcloud compute instances describe "$VM" --zone "$ZONE" --project "$PROJECT" --format='value(status)')"
 if [ "$status" != "RUNNING" ]; then
