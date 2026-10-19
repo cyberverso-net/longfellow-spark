@@ -31,9 +31,10 @@ fi
 #  ; are the VM's and not the shell's of this machine.
 eval "$SSH" "$USER_NAME@$VM" "'touch /tmp/keep-running; mkdir -p ~/remote-check'"
 echo "remote-check: copying the working tree"
-eval rsync -az --delete --exclude .git --exclude obj --exclude lib --exclude bin \
-   --exclude tests/obj --exclude tests/bin --exclude cli/obj --exclude cli/bin \
-   --exclude cli/out --exclude remote-check.log -e "\"$SSH\"" ./ "$USER_NAME@$VM:~/remote-check/"
+#  What .gitignore ignores stays out (alire/ and config/ of this machine
+#  name its own toolchain) and survives on the VM, which keeps its own.
+eval rsync -az --delete --exclude .git --exclude remote-check.log \
+   --filter="':- .gitignore'" -e "\"$SSH\"" ./ "$USER_NAME@$VM:~/remote-check/"
 echo "remote-check: make $TARGET on $VM"
 set +e
 eval "$SSH" "$USER_NAME@$VM" "'cd ~/remote-check && (time make $TARGET) > ~/remote-check.log 2>&1; echo \"exit \$?\" >> ~/remote-check.log; tail -3 ~/remote-check.log'"
