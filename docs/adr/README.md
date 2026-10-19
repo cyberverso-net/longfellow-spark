@@ -57,4 +57,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0051](0051-constant-time-in-the-prover.md) | Constant time in the prover, unit by unit | Accepted | 2026-10-17 |
 | [0052](0052-gold-perimeter-for-the-prover.md) | Gold perimeter for the prover | Accepted | 2026-10-17 |
 | [0053](0053-prover-vectors-and-cross-verification.md) | Prover vectors and cross-verification | Accepted | 2026-10-17 |
-| [0054](0054-prove-job-limit-sixty-minutes.md) | Prove job limit raised to sixty minutes | Accepted | 2026-10-19 |
+| [0054](0054-prove-job-limit-sixty-minutes.md) | Prove job limit raised to sixty minutes and the prover partition split | Accepted | 2026-10-19 |
