@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-19) Amended 2026-10-19 by [ADR 0062](0062-pull-request-checks-as-the-gate.md): the pull request checks are the gate, and the remote check runs only when the machine is free.
+Accepted (2026-10-19) Amended 2026-10-19 by [ADR 0062](0062-proof-on-demand.md): the workflow and the self-hosted runner are withdrawn, and the proof runs on demand through `scripts/remote-check.sh`, which posts the status `prove`.
 
 ## Date
 
