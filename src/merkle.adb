@@ -103,6 +103,94 @@ package body Merkle is
       return Flags;
    end Path_Flags;
 
+   ----------------------------------------------------------------------
+   --  Open (4.1.3)
+   ----------------------------------------------------------------------
+
+   --  Missing_Before decreases with its first argument.
+   procedure Lemma_Missing_Mono
+     (I, J : Node_Index; N : Leaf_Count; On_Path : Flag_Array)
+   with
+     Ghost,
+     Global => null,
+     Pre    => On_Path'First = 0 and then On_Path'Length = 2 * N
+               and then I <= J and then J <= N - 1,
+     Post   => Missing_Before (J, N, On_Path)
+               <= Missing_Before (I, N, On_Path),
+     Subprogram_Variant => (Decreases => J)
+   is
+   begin
+      if J > I then
+         Lemma_Missing_Step (J, N, On_Path);
+         Lemma_Missing_Mono (I, J - 1, N, On_Path);
+      end if;
+   end Lemma_Missing_Mono;
+
+   --  The path positions node J reads (Missing_Before (J) and the one
+   --  after) lie below Missing_Before (I) for every J above I.
+   procedure Lemma_Reads_Below
+     (I : Node_Index; N : Leaf_Count; On_Path : Flag_Array)
+   with
+     Ghost,
+     Global => null,
+     Pre    => On_Path'First = 0 and then On_Path'Length = 2 * N
+               and then I <= N - 1,
+     Post   =>
+       (for all J in I + 1 .. N - 1 =>
+          Missing_Before (J, N, On_Path) + Missing (J, On_Path)
+          <= Missing_Before (I, N, On_Path))
+   is
+   begin
+      for J in I + 1 .. N - 1 loop
+         Lemma_Missing_Step (J, N, On_Path);
+         Lemma_Missing_Mono (I, J - 1, N, On_Path);
+         pragma Loop_Invariant
+           (for all J2 in I + 1 .. J =>
+              Missing_Before (J2, N, On_Path) + Missing (J2, On_Path)
+              <= Missing_Before (I, N, On_Path));
+      end loop;
+   end Lemma_Reads_Below;
+
+   procedure Open
+     (N       : Leaf_Count;
+      Heap    : Digest_Array;
+      Indices : Index_Array;
+      Path    : out Digest_Array;
+      Count   : out Natural)
+   is
+      On_Path : constant Flag_Array := Path_Flags (N, Indices);
+   begin
+      Path  := [others => Zero_Digest];
+      Count := 0;
+      Lemma_Missing_Top (N - 1, N, On_Path);
+      for I in reverse 1 .. N - 1 loop
+         pragma Loop_Invariant (Count = Missing_Before (I, N, On_Path));
+         pragma Loop_Invariant (Count <= 2 * (N - 1 - I));
+         pragma Loop_Invariant
+           (for all J in I + 1 .. N - 1 =>
+              (if On_Path (J) then
+                 Child (J, 2 * J, N, On_Path, Heap, Path) = Heap (2 * J)
+                 and then Child (J, 2 * J + 1, N, On_Path, Heap, Path)
+                          = Heap (2 * J + 1)));
+         Lemma_Reads_Below (I, N, On_Path);
+         if On_Path (I) then
+            if not On_Path (2 * I) then
+               Path (Count) := Heap (2 * I);
+               Count := Count + 1;
+            end if;
+            if not On_Path (2 * I + 1) then
+               Path (Count) := Heap (2 * I + 1);
+               Count := Count + 1;
+            end if;
+         end if;
+         Lemma_Missing_Step (I, N, On_Path);
+      end loop;
+   end Open;
+
+   ----------------------------------------------------------------------
+   --  Verify (4.1.4)
+   ----------------------------------------------------------------------
+
    procedure Verify
      (N       : Leaf_Count;
       Root    : Digest;

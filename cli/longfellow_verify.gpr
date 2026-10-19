@@ -1,6 +1,7 @@
---  longfellow_verify: the command-line verifier of Phase B (ADR 0046)
---  and the interop harness interop_kat (ADR 0048), both outside the
---  proof perimeter. The library sources are compiled here without
+--  longfellow_verify: the command-line verifier of Phase B (ADR 0046),
+--  the interop harness interop_kat (ADR 0048) and the command-line
+--  prover longfellow_prove of Phase C (ADR 0049), all outside the proof
+--  perimeter. The library sources are compiled here without
 --  assertions (the proofs establish what the contracts state; run-time
 --  checks stay on), with optimisation: this is the build to run on real
 --  circuits and proofs, and the interop test runs on the same binary
@@ -10,6 +11,7 @@
 --
 --  Build:  alr exec -- gprbuild -P cli/longfellow_verify.gpr -p
 --  Run:    cli/bin/longfellow_verify --help
+--          cli/bin/longfellow_prove --help
 --          cli/bin/interop_kat [vector files]
 
 with "sparklib";
@@ -20,7 +22,8 @@ project Longfellow_Verify is
    for Object_Dir use "obj";
    for Exec_Dir use "bin";
    for Create_Missing_Dirs use "True";
-   for Main use ("longfellow_verify.adb", "interop_kat.adb");
+   for Main use
+     ("longfellow_verify.adb", "interop_kat.adb", "longfellow_prove.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use

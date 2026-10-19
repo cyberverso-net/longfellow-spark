@@ -55,6 +55,11 @@ package Field_P256 is
    with Global => null,
         Pre    => B'Length = 32;
 
+   --  P-256 is its own subfield: the encoding of 7.2.1.
+   function To_Subfield_Bytes (E : P256_Field.Element) return Bytes.Byte_Array
+   is (P256_Field.To_Bytes (E))
+   with Global => null;
+
    package Sig is new Field_Signature
      (Element    => P256_Field.Element,
       Zero       => P256_Field.Zero,
@@ -76,6 +81,7 @@ package Field_P256 is
       Eval_Point       => Eval_Point,
       Max_Eval_Point   => Natural'Last - 1,
       Subfield_Size    => 32,
-      From_Subfield_Bytes => From_Subfield_Bytes);
+      From_Subfield_Bytes => From_Subfield_Bytes,
+      To_Subfield_Bytes   => To_Subfield_Bytes);
 
 end Field_P256;

@@ -67,3 +67,32 @@ own LFC2 reader and writes `circuit_summary.txt`, which
 `tests/bin/circuit_kat` compares with the SPARK loader; the identifier
 each file stores must equal the one the generator computes, or the
 generator aborts.
+
+## Cross-verification of this project's proofs (Phase C, ADR 0053)
+
+`verify_proof_file.rs` is a test to drop into `docs/specs/rust/tests/` of
+the same commit. It loads a circuit and its inputs as `test_reference.rs`
+does, reads a proof file written by this project's `longfellow_prove` and
+verifies it with the upstream `ZkVerifier` under the label and the
+Ligero configuration given in the environment. It is run by hand, outside
+the CI, at the close of block 5 and after any change to the prover:
+
+    cd <clone of longfellow-zk>/docs/specs/rust
+    git checkout d5e6be7
+    cp <this directory>/verify_proof_file.rs tests/
+    LFS_FIELD=gf2_128 LFS_CIRCUIT=tests/testdata/sha256_circuit.lfc2 \
+      LFS_INPUTS=tests/testdata/sha256_inputs.json \
+      LFS_PROOF=<longfellow-spark>/cli/out/sha256_seed7.bin \
+      LFS_LABEL=sha256_spec_test LFS_RATE_INV=3 LFS_NREQ=16 LFS_NCOL=256 \
+      cargo test --test verify_proof_file -- --nocapture
+    LFS_FIELD=p256 LFS_CIRCUIT=tests/testdata/ecdsa2_circuit.lfc2 \
+      LFS_INPUTS=tests/testdata/ecdsa2_inputs.json \
+      LFS_PROOF=<longfellow-spark>/cli/out/ecdsa2_system.bin \
+      LFS_LABEL=ecdsa2_spec_test LFS_RATE_INV=4 LFS_NREQ=16 LFS_NCOL=256 \
+      cargo test --test verify_proof_file -- --nocapture
+
+The two proof files are those `scripts/check.sh cli` writes under
+`cli/out/`: `sha256_seed7.bin` under `Simple_Rng (7)` and
+`ecdsa2_system.bin` under the operating system's source, so neither is a
+copy of the upstream file. The proofs made under the upstream seeds are
+compared byte for byte with the upstream files by that step instead.

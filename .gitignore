@@ -19,6 +19,7 @@ __pycache__/
 # macOS Finder metadata
 .DS_Store
 
-# command-line verifier build
+# command-line verifier build, and the proofs the prover harness writes
 /cli/obj/
 /cli/bin/
+/cli/out/

@@ -66,6 +66,13 @@ package Field_GF2_128 is
         Pre    => B'Length = 2,
         Post   => Ok;
 
+   --  The two bytes, little-endian, of the coordinates of E on the
+   --  basis (Section 7.2.2), through the fixed map of GF2_128.
+   function To_Subfield_Bytes (E : GF2_128.Element) return Bytes.Byte_Array
+   with Global => null,
+        Post   => To_Subfield_Bytes'Result'First = 0
+                  and then To_Subfield_Bytes'Result'Length = 2;
+
    package Sig is new Field_Signature
      (Element    => GF2_128.Element,
       Zero       => GF2_128.Zero,
@@ -87,6 +94,7 @@ package Field_GF2_128 is
       Eval_Point       => Eval_Point,
       Max_Eval_Point   => 2**16 - 1,
       Subfield_Size    => 2,
-      From_Subfield_Bytes => From_Subfield_Bytes);
+      From_Subfield_Bytes => From_Subfield_Bytes,
+      To_Subfield_Bytes   => To_Subfield_Bytes);
 
 end Field_GF2_128;
