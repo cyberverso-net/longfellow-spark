@@ -6,6 +6,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Changed
 
+- The README is a short front page, and the full trust model is `docs/guide/trust-model.md`, arranged by part of the system (ADR 0061, amending ADR 0003). No entry changed in meaning.
 - The `prove` workflow's job limit is sixty minutes and the prover units are two proof partitions, `prover` and `ligero-prover`, nine in all (ADR 0054): the one partition of Phase C exceeded both the forty-five and the sixty minute limit on the hosted runner.
 - The proof runs on the project's own proving machine on Google Cloud (ADR 0060): the `prove` workflow starts the VM and runs `make prove` as one job on its self-hosted runner, replacing the partition matrix on hosted runners; `scripts/remote-check.sh` runs `make check` there from the developer's working tree.
 

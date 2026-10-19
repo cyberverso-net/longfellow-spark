@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Amended 2026-10-11 by [ADR 0020](0020-prover-configuration-step-budget.md): the prover configuration is the step budget of that record.
+Accepted. Amended 2026-10-11 by [ADR 0020](0020-prover-configuration-step-budget.md): the prover configuration is the step budget of that record. Amended 2026-10-19 by [ADR 0061](0061-readme-as-front-page.md): the trust model is kept in `docs/guide/trust-model.md` and the README summarises it.
 
 ## Date
 
