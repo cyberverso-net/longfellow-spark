@@ -7,7 +7,8 @@
 #  machine as the hosted check, and the developer's machine stays free.
 #
 #  Usage: scripts/remote-check.sh [make target, default check]
-#  Needs gcloud authenticated on the developer's account (OS Login) and
+#  Needs gcloud authenticated on the developer's account (OS Login), the
+#  key gcloud compute ssh created (~/.ssh/google_compute_engine) and
 #  rsync. The log is written to remote-check.log in the working tree.
 set -eu
 cd "$(dirname "$0")/.."
@@ -17,7 +18,7 @@ VM=prove-runner
 TARGET="${1:-check}"
 USER_NAME="$(gcloud compute os-login describe-profile --project "$PROJECT" \
                --format='value(posixAccounts[0].username)')"
-SSH="ssh -o ProxyCommand='gcloud compute start-iap-tunnel $VM 22 --listen-on-stdin --zone $ZONE --project $PROJECT --quiet' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+SSH="ssh -i $HOME/.ssh/google_compute_engine -o IdentitiesOnly=yes -o BatchMode=yes -o ProxyCommand='gcloud compute start-iap-tunnel $VM 22 --listen-on-stdin --zone $ZONE --project $PROJECT --quiet' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 
 status="$(gcloud compute instances describe "$VM" --zone "$ZONE" --project "$PROJECT" --format='value(status)')"
 if [ "$status" != "RUNNING" ]; then
@@ -26,16 +27,19 @@ if [ "$status" != "RUNNING" ]; then
    sleep 30
 fi
 #  While we work, a GitHub job finishing on the same VM must not shut it down.
-eval "$SSH" "$USER_NAME@$VM" "touch /tmp/keep-running; mkdir -p ~/remote-check"
+#  Each remote command keeps its own quotes through eval, so that ~ and
+#  ; are the VM's and not the shell's of this machine.
+eval "$SSH" "$USER_NAME@$VM" "'touch /tmp/keep-running; mkdir -p ~/remote-check'"
 echo "remote-check: copying the working tree"
-eval rsync -az --delete --exclude .git --exclude obj --exclude lib --exclude bin \
-   --exclude tests/obj --exclude tests/bin --exclude cli/obj --exclude cli/bin \
-   --exclude cli/out --exclude remote-check.log -e "\"$SSH\"" ./ "$USER_NAME@$VM:~/remote-check/"
+#  What .gitignore ignores stays out (alire/ and config/ of this machine
+#  name its own toolchain) and survives on the VM, which keeps its own.
+eval rsync -az --delete --exclude .git --exclude remote-check.log \
+   --filter="':- .gitignore'" -e "\"$SSH\"" ./ "$USER_NAME@$VM:~/remote-check/"
 echo "remote-check: make $TARGET on $VM"
 set +e
-eval "$SSH" "$USER_NAME@$VM" "cd ~/remote-check && (time make $TARGET) > ~/remote-check.log 2>&1; echo \"exit \$?\" >> ~/remote-check.log; tail -3 ~/remote-check.log"
-eval "$SSH" "$USER_NAME@$VM" "cat ~/remote-check.log" > remote-check.log
-eval "$SSH" "$USER_NAME@$VM" "rm -f /tmp/keep-running"
+eval "$SSH" "$USER_NAME@$VM" "'cd ~/remote-check && (time make $TARGET) > ~/remote-check.log 2>&1; echo \"exit \$?\" >> ~/remote-check.log; tail -3 ~/remote-check.log'"
+eval "$SSH" "$USER_NAME@$VM" "'cat ~/remote-check.log'" > remote-check.log
+eval "$SSH" "$USER_NAME@$VM" "'rm -f /tmp/keep-running'"
 set -e
 if [ "${REMOTE_CHECK_KEEP:-}" = "" ]; then
    echo "remote-check: stopping $VM"
