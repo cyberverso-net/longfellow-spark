@@ -286,6 +286,13 @@ do_lint() {
    #  sweep because it has to spell the patterns out.
    local status=0
    local -a scope=(-- . ':!scripts/check.sh')
+   #  Outside a git work tree (the copy remote-check.sh makes on the
+   #  proving machine) git grep fails and would read as clean; that
+   #  script runs this step on the developer's machine instead.
+   if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+      echo "lint: not a git work tree, not run here"
+      return 0
+   fi
    #  U+2014 (em-dash) anywhere.
    if git grep -n -I -e $'\xe2\x80\x94' "${scope[@]}"; then
       echo "lint: em-dash found" >&2
