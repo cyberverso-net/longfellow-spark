@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+### Fixed
+
+- The quadratic row of `Ligero_Prover.Commit` is built in its own procedure, `Quad_Fixed_Row`, so that its witness slots are proved zero in a small context: on the 24-core proving machine, whose cores are slower than the laptop's, the stepping assertions after `Commit_Row` in `Fixed_Rows` ran out of the 120-second timeout. No contract changed.
+
 ### Changed
 
 - The README is a short front page, and the full trust model is `docs/guide/trust-model.md`, arranged by part of the system (ADR 0061, amending ADR 0003). No entry changed in meaning.
