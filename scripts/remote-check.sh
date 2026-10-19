@@ -205,17 +205,21 @@ if [ "$MODE" = commit ]; then
    #  exactly this commit (untracked files go, ignored ones such as the
    #  toolchain state of alire/ and the build stay), make check, the
    #  exit code and the minutes in ~/runs/<commit>.done, then the VM
-   #  shuts itself down two minutes later unless REMOTE_CHECK_KEEP is
-   #  set here. The target is spelt make "chec"k so that no command line
+   #  powers itself off five minutes later unless REMOTE_CHECK_KEEP is
+   #  set here. A plain wait then poweroff, not shutdown -h +N, which
+   #  refuses ssh logins in its last minutes: the script reads the
+   #  result within a minute and stops the VM itself. A run started in
+   #  those five minutes first cancels the pending poweroff. The target is spelt make "chec"k so that no command line
    #  but the one of make itself matches the pattern [m]ake check.
-   if [ -n "${REMOTE_CHECK_KEEP:-}" ]; then OFF=true; else OFF='sudo shutdown -h +2'; fi
+   if [ -n "${REMOTE_CHECK_KEEP:-}" ]; then OFF=true; else OFF='echo $$ > ~/runs/off.pid; sleep 300 && sudo poweroff'; fi
    launched="$(remote "mkdir -p ~/runs
       if [ -e ~/runs/current ] && pgrep -f '[m]ake check' > /dev/null; then echo busy \$(cat ~/runs/current); exit 0; fi
+      if [ -e ~/runs/off.pid ]; then kill \$(cat ~/runs/off.pid) 2> /dev/null; rm -f ~/runs/off.pid; fi
       echo $SHA > ~/runs/current
       rm -f ~/runs/$SHA.done ~/runs/$SHA.log
       cd ~/longfellow-spark && git fetch -q origin && git checkout -q --detach $SHA && git clean -q -fd || { echo fetch-failed; exit 0; }
       nohup setsid bash -c 'start=\$(date +%s); (time make \"chec\"k) > ~/runs/$SHA.log 2>&1; code=\$?; echo \"\$code \$(( (\$(date +%s) - start + 59) / 60 ))\" > ~/runs/$SHA.done; rm -f ~/runs/current; $OFF' > /dev/null 2>&1 < /dev/null &
-      echo started")"
+      echo started" 2> /dev/null || echo unreachable)"
    case "$launched" in
       started)
          post_status pending "make check running on $VM" ;;
@@ -223,7 +227,7 @@ if [ "$MODE" = commit ]; then
          echo "remote-check: $VM is already checking ${launched#busy }; wait for it, or --collect it" >&2
          exit 2 ;;
       *)
-         echo "remote-check: could not start the run on $VM: $launched" >&2
+         echo "remote-check: could not start the run on $VM: ${launched:-no answer}" >&2
          vm_stop
          exit 1 ;;
    esac
