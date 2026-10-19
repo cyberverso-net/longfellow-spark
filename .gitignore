@@ -23,3 +23,6 @@ __pycache__/
 /cli/obj/
 /cli/bin/
 /cli/out/
+
+# the log scripts/remote-check.sh brings back from the proving machine
+/remote-check.log

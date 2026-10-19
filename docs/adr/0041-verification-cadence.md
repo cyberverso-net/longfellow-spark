@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-16, after block 4 of stage 5). Amended 2026-10-16 by [ADR 0044](0044-field-contracts-at-proof-only-level.md): the slow set is folded into the default harness run; `make check-full`, `test-slow` and the workflow `full` are removed. Amended 2026-10-16 by [ADR 0045](0045-proof-gate-restored-through-partitions.md): the hosted proof is a required check again, per partition; the hook stays withdrawn.
+Accepted (2026-10-16, after block 4 of stage 5). Amended 2026-10-16 by [ADR 0044](0044-field-contracts-at-proof-only-level.md): the slow set is folded into the default harness run; `make check-full`, `test-slow` and the workflow `full` are removed. Amended 2026-10-16 by [ADR 0045](0045-proof-gate-restored-through-partitions.md): the hosted proof is a required check again, per partition; the hook stays withdrawn. Amended 2026-10-19 by [ADR 0060](0060-proving-machine-on-google-cloud.md): `make check` may run on the project's proving machine through `scripts/remote-check.sh`. Amended 2026-10-19 by [ADR 0062](0062-proof-on-demand.md): the gate is `verify` and the status `prove` that `scripts/remote-check.sh` posts on the commit, and `make check` before the commit is optional.
 
 ## Date
 

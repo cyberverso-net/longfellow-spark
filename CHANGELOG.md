@@ -2,6 +2,15 @@
 
 All notable changes to this project are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project does not yet follow semantic versioning in the strict sense, since its interface is the pinned specification rather than an API. Every entry names the decision records (`docs/adr/`) and the guide chapter (`docs/guide/`) that describe it; the trust model that says what is proved, tested and trusted is in the README.
 
+## [Unreleased]
+
+### Changed
+
+- The README is a short front page, and the full trust model is `docs/guide/trust-model.md`, arranged by part of the system (ADR 0061, amending ADR 0003). No entry changed in meaning.
+- The proof runs on demand: `scripts/remote-check.sh` runs `make check` on the proving machine for the pushed commit and posts the result as the commit status `prove`, which branch protection requires with `verify`; `--text-only` posts it for branches that change only text, `--tree` checks a working tree without posting. The `prove` workflow and the self-hosted runner are withdrawn, and `make check` before a commit is optional (ADR 0062, amending ADR 0041 and 0060).
+- The `prove` workflow's job limit is sixty minutes and the prover units are two proof partitions, `prover` and `ligero-prover`, nine in all (ADR 0054): the one partition of Phase C exceeded both the forty-five and the sixty minute limit on the hosted runner.
+- The proof runs on the project's own proving machine on Google Cloud (ADR 0060): the `prove` workflow starts the VM and runs `make prove` as one job on its self-hosted runner, replacing the partition matrix on hosted runners; `scripts/remote-check.sh` runs `make check` there from the developer's working tree.
+
 ## [0.3.0] - 2026-10-19
 
 Phase C: the prover. From a circuit, its inputs and a randomness source to the proof string of Section 7.5, in the reference's order of operations: the two proofs that google/longfellow-zk ships are reproduced byte for byte from their inputs and seeds.

@@ -6,7 +6,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 |--------|-------|--------|------|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted, amended by 0042 | 2026-10-09 |
 | [0002](0002-pin-the-specification.md) | Pin the specification to draft-google-cfrg-libzk-03 | Accepted | 2026-10-06 |
-| [0003](0003-proof-policy-and-trust-model.md) | Proof policy and trust model | Accepted, amended by 0020 | 2026-10-06 |
+| [0003](0003-proof-policy-and-trust-model.md) | Proof policy and trust model | Accepted, amended by 0020, 0061 | 2026-10-06 |
 | [0004](0004-gf2-128-element-representation.md) | GF(2^128) element representation | Accepted | 2026-10-06 |
 | [0005](0005-mul-ref-as-proof-target.md) | Ghost reference Mul_Ref as the proof target of Mul | Accepted | 2026-10-06 |
 | [0006](0006-constant-time-discipline-and-scope.md) | Constant-time discipline and its scope | Accepted | 2026-10-06 |
@@ -44,7 +44,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0038](0038-gold-perimeter-for-merkle-and-ligero.md) | Gold perimeter for Merkle and Ligero | Accepted | 2026-10-15 |
 | [0039](0039-sizes-allocation-and-status.md) | Sizes, allocation and the status enumeration | Accepted, amended by 0043 | 2026-10-15 |
 | [0040](0040-ligero-vectors-and-upstream-instrumentation.md) | Ligero vectors and upstream instrumentation | Accepted | 2026-10-15 |
-| [0041](0041-verification-cadence.md) | Verification cadence: the proof by hand, the slow harness cases weekly | Accepted, amended by 0044 and 0045 | 2026-10-16 |
+| [0041](0041-verification-cadence.md) | Verification cadence: the proof by hand, the slow harness cases weekly | Accepted, amended by 0044, 0045, 0060, 0062 | 2026-10-16 |
 | [0042](0042-status-amendments.md) | Status amendments | Accepted | 2026-10-16 |
 | [0043](0043-exhausted-status-and-streaming-slice.md) | Exhausted status and streaming slice | Accepted | 2026-10-16 |
 | [0044](0044-field-contracts-at-proof-only-level.md) | Field contracts at proof-only level | Accepted | 2026-10-16 |
@@ -57,9 +57,12 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0051](0051-constant-time-in-the-prover.md) | Constant time in the prover, unit by unit | Accepted | 2026-10-17 |
 | [0052](0052-gold-perimeter-for-the-prover.md) | Gold perimeter for the prover | Accepted | 2026-10-17 |
 | [0053](0053-prover-vectors-and-cross-verification.md) | Prover vectors and cross-verification | Accepted | 2026-10-17 |
-| [0054](0054-prove-job-limit-sixty-minutes.md) | Prove job limit raised to sixty minutes | Accepted | 2026-10-19 |
+| [0054](0054-prove-job-limit-sixty-minutes.md) | Prove job limit raised to sixty minutes and the prover partition split | Accepted, amended by 0060 | 2026-10-19 |
 | [0055](0055-phase-d-scope-mdoc-scale.md) | Phase D scope: the mDoc scale and the proof of age | Proposed | 2026-10-19 |
 | [0056](0056-linear-input-constraint.md) | The input constraint in linear time | Proposed | 2026-10-19 |
 | [0057](0057-additive-fft.md) | The additive FFT for the Reed-Solomon code | Proposed | 2026-10-19 |
 | [0058](0058-mdoc-layer.md) | The mDoc layer: MACs, public inputs, transcript, proof format and witness | Proposed | 2026-10-19 |
 | [0059](0059-mdoc-vectors-and-measurement.md) | mDoc vectors, witness inputs and measurement | Proposed | 2026-10-19 |
+| [0060](0060-proving-machine-on-google-cloud.md) | A proving machine on Google Cloud: prove as one job, make check remote | Accepted, amended by 0062 | 2026-10-19 |
+| [0061](0061-readme-as-front-page.md) | The README as a front page, the trust model in the guide | Accepted | 2026-10-19 |
+| [0062](0062-proof-on-demand.md) | The proof on demand, posted as a commit status | Accepted | 2026-10-19 |

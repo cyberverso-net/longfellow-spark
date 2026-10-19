@@ -1,6 +1,6 @@
 # Verification approach
 
-This document explains what formal verification with SPARK buys for a zero-knowledge proof system, what it cannot buy, and how the gap is covered. It is the key to reading every package header and every entry of the README trust model.
+This document explains what formal verification with SPARK buys for a zero-knowledge proof system, what it cannot buy, and how the gap is covered. It is the key to reading every package header and every entry of the [trust model](trust-model.md).
 
 ## The system in one paragraph
 
@@ -44,7 +44,7 @@ The implementation then mirrors the reference step by step, and the *loop invari
 
 ## Reading a package header
 
-Every package header states, subprogram by subprogram, its level (Silver or Gold), what the postcondition is proved against, which vectors anchor what the proof does not cover, the specification sections implemented, the decision records applied, and the scope of the constant-time claim. The README trust model aggregates these into one list where every claim is proved, tested or trusted. If a header and this document disagree, the header is wrong and should be fixed, not the other way round.
+Every package header states, subprogram by subprogram, its level (Silver or Gold), what the postcondition is proved against, which vectors anchor what the proof does not cover, the specification sections implemented, the decision records applied, and the scope of the constant-time claim. The [trust model](trust-model.md) gathers these into one list, where every claim is proved, tested or trusted. If a header and this document disagree, the header is wrong and should be fixed, not the other way round.
 
 ## Circuits as data
 
