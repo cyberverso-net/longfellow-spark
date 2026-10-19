@@ -18,7 +18,7 @@ Phase A complete (2026-10-16, release 0.1.0): a verifier of Longfellow ZK from t
 
 No check is justified and no `pragma Assume` is used; Platinum is not a goal. The consolidation after Phase A (ADR 0042 to 0045) put the field contracts at the proof-only assertion level, so the harness set runs in seconds, and restored the hosted proof as a required check. Phase B (ADR 0046 to 0048, chapter 6) loads the circuits the upstream compiler produces (LFC2) and accepts the proofs the upstream prover made for them, from their files, on both fields. Phase C (ADR 0049 to 0053, chapter 7) is complete: the prover produces, from the same inputs and the same seeded generator, exactly the bytes the upstream prover shipped, and its proofs under other seeds are accepted by both verifiers. Next: Phase D, the circuit compiler.
 
-Releases: [CHANGELOG.md](CHANGELOG.md) lists each release by stage with its figures; the current release is 0.2.0, tagged `v0.2.0`, and 0.3.0 (Phase C) is unreleased on this branch.
+Releases: [CHANGELOG.md](CHANGELOG.md) lists each release by stage with its figures; the current release is 0.3.0, tagged `v0.3.0`.
 
 Pinned spec: **IETF draft-google-cfrg-libzk-03 (23 September 2026)**; field definition in Section 2.2.2. Divergences in later draft versions are handled as explicit migrations (ADR 0002).
 
