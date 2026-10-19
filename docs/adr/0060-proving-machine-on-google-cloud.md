@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-19)
+Accepted (2026-10-19) Amended 2026-10-19 by [ADR 0062](0062-pull-request-checks-as-the-gate.md): the pull request checks are the gate, and the remote check runs only when the machine is free.
 
 ## Date
 

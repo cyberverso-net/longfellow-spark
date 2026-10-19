@@ -48,7 +48,7 @@ The repository is `longfellow-spark`. The Alire crate and the project file are `
 
 The prover settings are in `longfellow_spark.gpr` (ADR 0020): CVC5, Z3 and Alt-Ergo with a budget of 600000 steps per check. The budget makes a proof reproducible across machines. A timeout of 120 seconds guards against runs that never end.
 
-`make check` is the definition of done for every commit. It runs, in order:
+`make check` runs every check of the project, in order:
 
 1. the build and the check that the proof partitions cover the project;
 2. the full proof, with any unproved check treated as an error;
@@ -57,7 +57,9 @@ The prover settings are in `longfellow_spark.gpr` (ADR 0020): CVC5, Z3 and Alt-E
 5. the vector generators, compared with the committed files;
 6. a lint of the tracked files.
 
-`scripts/check.sh` defines these steps. `make build`, `make prove`, `make test`, `make cli`, `make vectors` and `make lint` run them one at a time. The full proof takes about an hour on a laptop. `scripts/remote-check.sh` runs `make check` on the project's proving machine instead (ADR 0060).
+`scripts/check.sh` defines these steps. `make build`, `make prove`, `make test`, `make cli`, `make vectors` and `make lint` run them one at a time. The full proof takes about an hour on a laptop. `scripts/remote-check.sh` runs `make check` on the project's proving machine instead, when no pull request is using it (ADR 0060).
+
+The same steps run as the checks of every pull request, and those checks are the gate for a merge (ADR 0062). Running `make check` before a commit is optional.
 
 ## Testing
 
@@ -134,7 +136,7 @@ Two workflows run the steps of `scripts/check.sh` with the same toolchain as loc
 - **`verify`** runs on every push and pull request, on a hosted Ubuntu runner. It covers everything in `make check` except the proof.
 - **`prove`** runs the full proof on the project's own machine, a 24-core virtual machine on Google Cloud (ADR 0060). A small job starts the machine, the proof runs there as one job, and the machine shuts itself down afterwards. It runs on pull requests to `main`, weekly, and by hand before a release or after a toolchain change.
 
-Both checks are required to merge into `main`. Work happens on a branch per stage or block, and reaches `main` through a pull request after `make check` has passed on the branch.
+Both checks are required to merge into `main`, and they are the gate for every change (ADR 0062). Work happens on a branch per stage or block, and reaches `main` through a pull request. A red check is fixed with a new commit on the branch.
 
 Together the two badges certify what `make check` certifies. Neither says anything about constant time, or about fidelity to the specification beyond the vectors.
 
