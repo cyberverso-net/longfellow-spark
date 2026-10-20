@@ -36,6 +36,7 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 - `Eq`, `Bindeq`, `Bind`, `Lagrange_Basis`, `Eval_Quad`, `Eval_Circuit`, `Bind_G`, `Eval_Bound_Quad` and every `Expression` operation are proved equal to a ghost reference. Each reference transcribes the draft's formula in a fixed order of operations. Equality is the logical equality `Same`.
 - `Eval_Circuit` carries the semantics of the Z assertions. `Symbolic_Round` is the draft's formula by definition.
 - `Verifier_Core` is Silver. It is proved to emit only terms the Ligero verifier can index, with the right pad indices for the quadratic triples.
+- `Input_Constraint` is Gold against the formula of Section 6.7. Term W of the constraint has witness W and coefficient `Eq2 (npublic + W)`. The constant is the public binding, summed over the public inputs in order, minus the final claim. The last terms are the claim pads, built with the operations of `Expression` (Phase D, ADR 0056).
 - These are structural proofs. They say nothing about the laws of the field. That `Bindeq` agrees with `Eq`, that the Lagrange basis interpolates, and that the constraints are the upstream verifier's, are all tested.
 
 **The transcript** (chapter 4).
@@ -130,6 +131,7 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 | Transcript | `sha256.txt`, `aes256.txt`, `transcript_fs.txt`, `zk_proof_*.txt` | `gen_transcript_vectors.py` | `transcript_kat`, `sumcheck_kat` |
 | Ligero | `merkle.txt`, `ligero_geometry.txt`, `lagrange_*.txt`, `ligero_proof.txt`, `upstream/ligero_*.txt` | `gen_ligero_vectors.py` | `ligero_kat`, `sumcheck_kat` |
 | Circuits | `circuit_summary.txt`, `circuit_lfc2.txt` | `gen_circuit_vectors.py` | `circuit_kat` |
+| mDoc circuits (Phase D) | `mdoc_summary.txt`, from the archives in `upstream/mdoc/` | `gen_mdoc_vectors.py` | `circuit_kat` |
 | Interop | `interop.txt` | `gen_circuit_vectors.py` | `interop_kat` (release build) |
 | Prover | `writer.txt`, `sumcheck_prover.txt`, `ligero_commit.txt`, `zk_prove.txt` | `gen_prover_vectors.py` | `writer_kat`, `prover_kat`; `make cli` for the byte identity |
 
@@ -169,7 +171,6 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 
 - Enough memory for one circuit and the two working sets of a verification, all on the heap. A failed allocation raises `Storage_Error`, which is outside the proofs (ADR 0047).
 - GNAT building an aggregate allocator in place. The spike of ADR 0047 observed it, but the language does not guarantee it.
-- The input constraint of chapter 3, still built on the stack, at about 120 bytes per private input on P-256.
 - A 64-bit target, behind `Unsigned_128` (ADR 0012).
 
 ## Outside the proofs, and what covers it

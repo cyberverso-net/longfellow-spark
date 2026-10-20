@@ -104,6 +104,9 @@ Two capacities are used, not one: the claim expressions of every layer are alloc
 
 The Ligero output is `Ligero_Terms (Max)`, the sparse matrix A in coordinate form as three parallel arrays (coefficient, constraint number, variable) with a count, and `B`, the vector of constants. Three arrays rather than an array of records because, with a P-256 `Element` inside the record, the frame conditions of `Constrain_To_Be_Zero` cost the provers 583450 steps; with parallel arrays, 62606.
 
+
+Update (Phase D, [ADR 0056](../adr/0056-linear-input-constraint.md)). The input constraint is no longer an `Expression`. `Input_Constraint` writes one term per private input straight into the Ligero terms, in input order, with its coefficient `Eq2 (npublic + W)` computed on the spot. Then it appends the few terms of the claims, built as before with the operations of `Expression` (`Input_Tail`). The terms, their order and their values are those of the old sorted expression, so the proofs of Phase C are unchanged byte for byte. The cost is linear in the inputs, and the stack no longer grows with them. `Input_Constraint` became Gold against the formula of Section 6.7: input term W, the public binding `Pub_Binding_Ref`, then the tail. `Input_Capacity_Of` is gone. The per-layer values of `Eval_Circuit` moved to the heap as well. The mDoc hash circuit, with 84 166 private inputs, overflowed the default stack in both places before.
+
 ### 3.6 Errors as status
 
 No subprogram of stage 3 raises. `Eval_Quad` and `Eval_Circuit` return a Boolean; the core's inputs are checked by preconditions on the sizes of the records (`Chal_Total`, `Proof_Total`, `A_Bound`), which the caller of phase B establishes from the circuit before building them.
@@ -172,4 +175,4 @@ Appendix B.3.2 is labelled "P-256 scalar field (Field ID 2)" but prints the base
 - That the upstream recordings of tier 3 were taken faithfully from d5e6be7 with the kept patch, and that the upstream reference is itself the draft's protocol.
 - The soundness argument of the protocol, which no contract states, and the pinned specification itself.
 
-Limits of this stage: no accept or reject exists yet (the Ligero check is phase B); `Expression` is linear in the number of terms and quadratic in the input constraint, and the input constraint lives on the stack (Section 3.5), adequate for the test circuits and a few tens of thousands of inputs, a phase B concern beyond that; stack exhaustion is outside the proofs; `Ceil_Lg2` and the bound `Max_Wires = 2^24` cap the circuits this unit accepts.
+Limits of this stage: no accept or reject exists yet (the Ligero check is phase B); `Expression` is linear in the number of terms and quadratic in the input constraint, and the input constraint lives on the stack (Section 3.5), adequate for the test circuits and a few tens of thousands of inputs, a phase B concern beyond that (update, Phase D: the input constraint is no longer an `Expression`, ADR 0056); stack exhaustion is outside the proofs; `Ceil_Lg2` and the bound `Max_Wires = 2^24` cap the circuits this unit accepts.

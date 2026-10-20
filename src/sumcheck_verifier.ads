@@ -28,24 +28,25 @@
 --
 --  Sizes and memory. The claim expressions of a layer hold at most
 --  4 logw + 5 variables (ADR 0026) and are allocated with
---  Layer_Capacity = 4 * Max_Logw + 5 pairs each; the input constraint
---  holds ninput - npublic + 2 and is allocated with Input_Capacity_Of.
---  Expressions live on the stack, and Input_Constraint keeps three of
---  the large kind alive at once (about 120 bytes per private input on
---  P-256, 100 on GF(2^128)); Add_Term in its loop is quadratic in the
---  number of inputs. The default 8 MiB stack of macOS therefore limits
---  this unit to a few tens of thousands of private inputs, and a stack
---  exhaustion is a Storage_Error, which is outside what the absence of
---  run-time errors proof covers. Circuits of phase B size need a dense
---  input constraint built outside the stack; that is a phase B change
---  and is recorded in chapter 3.
+--  Layer_Capacity = 4 * Max_Logw + 5 pairs each, on the stack. The input
+--  constraint is not an Expression (ADR 0056): Input_Constraint writes
+--  one term per private input straight into the Ligero terms, its
+--  coefficient computed on the spot, then the few terms of the claims
+--  through Input_Tail. It takes time linear in the inputs and no stack
+--  in proportion to them, so circuits of the mDoc size fit the default
+--  stack.
 --
 --  Proof status (per instance). Symbolic_Round is Gold by definition:
 --  an expression function that is the formula next = p0 l0 + p1 l1 +
 --  p2 l2, p1 = claim - p0, written with the Gold operations of
---  Sumcheck_Expression. Verify_Layer, Input_Constraint and
---  Verifier_Core are Silver with postconditions on the sizes emitted
---  and on the pad indices of the quadratic triples (Gold trivially);
+--  Sumcheck_Expression. Input_Constraint is Gold against the formula
+--  of Section 6.7 (ADR 0056): term W has witness W and coefficient
+--  Eq2 (npublic + W), the public inputs fold into the constant as
+--  Pub_Binding_Ref in input order, and the claims come last as the
+--  terms of Input_Tail, built with the Gold operations of
+--  Sumcheck_Expression. Verify_Layer and Verifier_Core are Silver with
+--  postconditions on the sizes emitted and on the pad indices of the
+--  quadratic triples (Gold trivially);
 --  every claim expression keeps its variables below the current pad
 --  pointer, which is what bounds the expression lengths by 4 logw + 5
 --  (ADR 0026). Agreement with the upstream verifier on the emitted
@@ -57,6 +58,7 @@
 
 pragma SPARK_Mode (On);
 
+with Proof_Levels;
 with Sumcheck_Algebra;
 with Sumcheck_Expression;
 
@@ -210,12 +212,6 @@ package Sumcheck_Verifier is
    --  claim pads, four round pads per round, three claim pads.
    Layer_Capacity : constant Capacity_Type := 4 * Max_Logw + 5;
 
-   --  Capacity of the input constraint: one variable per private input
-   --  and the two claim pads of the last layer.
-   function Input_Capacity_Of (C : Circuit) return Capacity_Type is
-     (C.Ninput - C.Npublic + 2)
-   with Global => null;
-
    --  An upper bound on the Ligero terms emitted: 4 logw + 5 per layer
    --  and ninput - npublic + 2 for the input constraint.
    function A_Bound (C : Circuit) return Natural is
@@ -352,9 +348,44 @@ package Sumcheck_Verifier is
                        Y => Pad_Off (C, J, Base) + 4 * C.Layers (J).Logw + 1,
                        Z => Pad_Off (C, J, Base) + 4 * C.Layers (J).Logw + 2);
 
+   --  The public inputs folded into the constant of the input
+   --  constraint: the sum over the first N public inputs I of
+   --  Eq2 (I) * Pub (I), in input order.
+   function Pub_Binding_Ref
+     (Pub   : Element_Array;
+      State : Claims_State;
+      Alpha : Element;
+      N     : Natural) return Element
+   is
+     (if N = 0 then Zero
+      else SA."+" (Pub_Binding_Ref (Pub, State, Alpha, N - 1),
+                   SA."*" (Eq2 (N - 1, State.Logv, State.HC0, State.HC1,
+                                Alpha),
+                           Pub (N - 1))))
+   with Ghost => Proof_Only,
+        Global => null,
+        Pre => Pub'First = 0 and then N <= Pub'Length,
+        Subprogram_Variant => (Decreases => N);
+
+   --  The end of the input constraint: the public binding Binding minus
+   --  the final claim, claim0 + alpha claim1 (Section 6.7). Its terms
+   --  are the pads of the claims, all after the private inputs.
+   function Input_Tail
+     (Binding : Element;
+      State   : Claims_State;
+      Alpha   : Element) return Expression
+   is
+     (Sub (From_Constant (Binding, Layer_Capacity),
+           Add (State.Claim0, Scale (State.Claim1, Alpha))))
+   with Global => null,
+        Pre => State.Claim0.Length <= 1 and then State.Claim1.Length <= 1;
+
    --  The input constraint (Section 6.7, input_constraint): the
    --  multilinear extension of the inputs at the final binding, public
-   --  inputs folded into the constant, minus the final claim.
+   --  inputs folded into the constant, minus the final claim. Written
+   --  term by term in input order, then the terms of Input_Tail; the
+   --  same terms, in the same order and with the same values, as the
+   --  sorted Expression of the reference.
    procedure Input_Constraint
      (C       : Circuit;
       Pub     : Element_Array;
@@ -371,14 +402,36 @@ package Sumcheck_Verifier is
        and then Below (State.Claim1, Witness_Count (C))
        and then A.Max + 1 - A.Count >= C.Ninput + 2
        and then B'First = 0 and then B_Count < B'Length,
-     Post => A.Count <= A.Count'Old + C.Ninput + 2
-       and then B_Count = B_Count'Old + 1
-       and then (for all K in 0 .. A.Count'Old - 1 =>
-                   A.Witness (K) = A.Witness'Old (K)
-                   and then A.Constraint (K) = A.Constraint'Old (K))
-       and then (for all K in A.Count'Old .. A.Count - 1 =>
-                   A.Witness (K) < Witness_Count (C)
-                   and then A.Constraint (K) = B_Count'Old);
+     Post =>
+       (Runtime =>
+          A.Count <= A.Count'Old + C.Ninput + 2
+          and then B_Count = B_Count'Old + 1
+          and then (for all K in 0 .. A.Count'Old - 1 =>
+                      A.Witness (K) = A.Witness'Old (K)
+                      and then A.Constraint (K) = A.Constraint'Old (K))
+          and then (for all K in A.Count'Old .. A.Count - 1 =>
+                      A.Witness (K) < Witness_Count (C)
+                      and then A.Constraint (K) = B_Count'Old),
+        Proof_Only =>
+          (for all W in 0 .. C.Ninput - C.Npublic - 1 =>
+             A.Witness (A.Count'Old + W) = W
+             and then A.Constraint (A.Count'Old + W) = B_Count'Old
+             and then Same (A.Coeff (A.Count'Old + W),
+                            Eq2 (C.Npublic + W, State.Logv,
+                                 State.HC0, State.HC1, Alpha)))
+          and then
+          (declare
+             T : constant Expression :=
+               Input_Tail (Pub_Binding_Ref (Pub, State, Alpha, C.Npublic),
+                           State, Alpha);
+             S : constant Natural := A.Count'Old + (C.Ninput - C.Npublic);
+           begin
+             A.Count = S + T.Length
+             and then (for all I in 1 .. T.Length =>
+                         A.Witness (S + I - 1) = T.Terms (I).V
+                         and then A.Constraint (S + I - 1) = B_Count'Old
+                         and then Same (A.Coeff (S + I - 1), T.Terms (I).C))
+             and then Same (B (B_Count'Old), T.Known)));
 
    --  The whole core (Section 6.7, symbolic_sumcheck_verifier_core).
    procedure Verifier_Core

@@ -1,6 +1,16 @@
 pragma SPARK_Mode (On);
 
+with Ada.Unchecked_Deallocation;
+
 package body Sumcheck_Algebra is
+
+   --  The values of one layer in Eval_Circuit, on the heap (ADR 0047,
+   --  ADR 0056): a layer of the mDoc hash circuit has 2^20 wires, more
+   --  than the default stack holds.
+   type Elems_Access is access Element_Array;
+
+   procedure Free_Elems is
+     new Ada.Unchecked_Deallocation (Element_Array, Elems_Access);
 
    function "+" (A, B : Element) return Element is
    begin
@@ -353,11 +363,12 @@ package body Sumcheck_Algebra is
             Size     : constant Wire_Count := Seg_Size (C, J);
             Base_In  : constant Natural := Off (C, J + 1);
             Base_Out : constant Natural := Off (C, J);
-            V        : Element_Array (0 .. Size - 1);
+            V        : Elems_Access :=
+              new Element_Array'(0 .. Size - 1 => Zero);
             Layer_OK : Boolean;
             Before   : constant Element_Array := Wires with Ghost;
          begin
-            Eval_Quad (Wires, Base_In, Layer_Terms (C, J), V, Layer_OK);
+            Eval_Quad (Wires, Base_In, Layer_Terms (C, J), V.all, Layer_OK);
             OK := OK and Layer_OK;
             for G in 0 .. Size - 1 loop
                Wires (Base_Out + G) := V (G);
@@ -376,7 +387,8 @@ package body Sumcheck_Algebra is
                Lemma_Layer_Frame (C, Before, Wires, J2, J);
             end loop;
             Lemma_From_Frame (C, Before, Wires, J);
-            Lemma_Layer_Intro (C, Wires, J, V);
+            Lemma_Layer_Intro (C, Wires, J, V.all);
+            Free_Elems (V);
          end;
       end loop;
 
