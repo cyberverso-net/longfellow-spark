@@ -28,8 +28,8 @@
 --
 --  Cost: Find is a linear scan and insertion shifts the tail; the
 --  expressions of the verifier core hold at most a few hundred terms
---  per layer, and the input constraint ninput - npublic terms. A dense
---  path for large circuits is a phase B concern.
+--  per layer. The input constraint, which holds one term per private
+--  input, is not built as an Expression (ADR 0056).
 
 pragma SPARK_Mode (On);
 

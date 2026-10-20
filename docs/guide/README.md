@@ -34,6 +34,7 @@ python3 -I tests/vectors/gen_transcript_vectors.py
 python3 -I tests/vectors/gen_ligero_vectors.py
 python3 -I tests/vectors/gen_circuit_vectors.py
 python3 -I tests/vectors/gen_prover_vectors.py
+python3 -I tests/vectors/gen_mdoc_vectors.py                  # the mDoc production circuits (Phase D)
 ```
 
 `make check` runs everything in order and is the definition of done for a commit and for a pull request.

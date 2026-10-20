@@ -339,6 +339,122 @@ package body Sumcheck_Verifier is
    --  Input_Constraint
    ----------------------------------------------------------------------
 
+   --  The terms of E appended as constraint Cst, without its constant.
+   procedure Append_Terms
+     (E   : Expression;
+      A   : in out Ligero_Terms;
+      Cst : Natural)
+   with
+     Global => null,
+     Pre  => E.Length <= A.Max + 1 - A.Count,
+     Post => A.Count = A.Count'Old + E.Length
+       and then (for all I in 1 .. E.Length =>
+                   A.Witness (A.Count'Old + I - 1) = E.Terms (I).V)
+       and then (for all I in 1 .. E.Length =>
+                   A.Constraint (A.Count'Old + I - 1) = Cst)
+       and then (for all I in 1 .. E.Length =>
+                   Same (A.Coeff (A.Count'Old + I - 1), E.Terms (I).C))
+       and then (for all K in 0 .. A.Count'Old - 1 =>
+                   A.Witness (K) = A.Witness'Old (K))
+       and then (for all K in 0 .. A.Count'Old - 1 =>
+                   A.Constraint (K) = A.Constraint'Old (K))
+       and then (for all K in 0 .. A.Count'Old - 1 =>
+                   Same (A.Coeff (K), A.Coeff'Old (K)))
+   is
+      Start : constant Natural := A.Count;
+      Coeff_Before      : constant Element_Array := A.Coeff with Ghost;
+      Constraint_Before : constant Index_Array := A.Constraint with Ghost;
+      Witness_Before    : constant Index_Array := A.Witness with Ghost;
+   begin
+      for I in 1 .. E.Length loop
+         pragma Loop_Invariant (A.Count = Start);
+         pragma Loop_Invariant
+           (for all K in 1 .. I - 1 =>
+              A.Witness (Start + K - 1) = E.Terms (K).V);
+         pragma Loop_Invariant
+           (for all K in 1 .. I - 1 => A.Constraint (Start + K - 1) = Cst);
+         pragma Loop_Invariant
+           (for all K in 1 .. I - 1 =>
+              Same (A.Coeff (Start + K - 1), E.Terms (K).C));
+         pragma Loop_Invariant
+           (for all K in 0 .. Start - 1 =>
+              A.Witness (K) = Witness_Before (K));
+         pragma Loop_Invariant
+           (for all K in 0 .. Start - 1 =>
+              A.Constraint (K) = Constraint_Before (K));
+         pragma Loop_Invariant
+           (for all K in 0 .. Start - 1 =>
+              Same (A.Coeff (K), Coeff_Before (K)));
+         A.Coeff (Start + I - 1)      := E.Terms (I).C;
+         A.Constraint (Start + I - 1) := Cst;
+         A.Witness (Start + I - 1)    := E.Terms (I).V;
+      end loop;
+      A.Count := Start + E.Length;
+   end Append_Terms;
+
+   --  One term per private input W, in input order: witness W,
+   --  coefficient Eq2 (npublic + W), constraint Cst.
+   procedure Append_Inputs
+     (C     : Circuit;
+      State : Claims_State;
+      Alpha : Element;
+      A     : in out Ligero_Terms;
+      Cst   : Natural)
+   with
+     Global => null,
+     Pre  => A.Max + 1 - A.Count >= C.Ninput - C.Npublic,
+     Post =>
+       (Runtime =>
+          A.Count = A.Count'Old + (C.Ninput - C.Npublic)
+          and then (for all W in 0 .. C.Ninput - C.Npublic - 1 =>
+                      A.Witness (A.Count'Old + W) = W
+                      and then A.Constraint (A.Count'Old + W) = Cst)
+          and then (for all K in A.Count'Old .. A.Count - 1 =>
+                      A.Witness (K) = K - A.Count'Old
+                      and then A.Constraint (K) = Cst)
+          and then (for all K in 0 .. A.Count'Old - 1 =>
+                      A.Witness (K) = A.Witness'Old (K)
+                      and then A.Constraint (K) = A.Constraint'Old (K)),
+        Proof_Only =>
+          (for all W in 0 .. C.Ninput - C.Npublic - 1 =>
+             Same (A.Coeff (A.Count'Old + W),
+                   Eq2 (C.Npublic + W, State.Logv,
+                        State.HC0, State.HC1, Alpha))))
+   is
+      Start : constant Natural := A.Count;
+      NP    : constant Wire_Count := C.Npublic;
+      NW    : constant Natural := C.Ninput - C.Npublic;
+      Constraint_Before : constant Index_Array := A.Constraint with Ghost;
+      Witness_Before    : constant Index_Array := A.Witness with Ghost;
+   begin
+      for W in 0 .. NW - 1 loop
+         A.Coeff (Start + W) :=
+           Eq2 (NP + W, State.Logv, State.HC0, State.HC1, Alpha);
+         A.Constraint (Start + W) := Cst;
+         A.Witness (Start + W)    := W;
+         pragma Loop_Invariant (A.Count = Start);
+         pragma Loop_Invariant
+           (for all K in 0 .. W =>
+              A.Witness (Start + K) = K
+              and then A.Constraint (Start + K) = Cst);
+         pragma Loop_Invariant
+           (for all K in Start .. Start + W =>
+              A.Witness (K) = K - Start
+              and then A.Constraint (K) = Cst);
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (for all K in 0 .. W =>
+                 Same (A.Coeff (Start + K),
+                       Eq2 (NP + K, State.Logv, State.HC0, State.HC1,
+                            Alpha))));
+         pragma Loop_Invariant
+           (for all K in 0 .. Start - 1 =>
+              A.Witness (K) = Witness_Before (K)
+              and then A.Constraint (K) = Constraint_Before (K));
+      end loop;
+      A.Count := Start + NW;
+   end Append_Inputs;
+
    procedure Input_Constraint
      (C       : Circuit;
       Pub     : Element_Array;
@@ -348,49 +464,55 @@ package body Sumcheck_Verifier is
       B       : in out Element_Array;
       B_Count : in out Natural)
    is
-      Cap    : constant Capacity_Type := Input_Capacity_Of (C);
-      N      : constant Wire_Count := C.Ninput;
-      NP     : constant Wire_Count := C.Npublic;
-      Eq_Vec : Element_Array (0 .. N - 1) := [others => Zero];
-      Pub_Binding : Element := Zero;
-      Mle    : Expression (Cap) := From_Constant (Zero, Cap);
+      NP    : constant Wire_Count := C.Npublic;
+      NW    : constant Natural := C.Ninput - C.Npublic;
+      WC    : constant Natural := Witness_Count (C);
+      Start : constant Natural := A.Count;
+      Cst   : constant Natural := B_Count;
+      Binding : Element := Zero;
    begin
-      for I in 0 .. N - 1 loop
-         Eq_Vec (I) := Eq2 (I, State.Logv, State.HC0, State.HC1, Alpha);
-      end loop;
       for I in 0 .. NP - 1 loop
-         Pub_Binding := Pub_Binding + Eq_Vec (I) * Pub (I);
+         Binding := SA."+" (Binding,
+                            SA."*" (Eq2 (I, State.Logv, State.HC0,
+                                         State.HC1, Alpha),
+                                    Pub (I)));
+         pragma Loop_Invariant
+           (Proof_Only =>
+              Same (Binding, Pub_Binding_Ref (Pub, State, Alpha, I + 1)));
       end loop;
-      Mle := From_Constant (Pub_Binding, Cap);
-      for W in 0 .. N - NP - 1 loop
-         pragma Loop_Invariant (Mle.Capacity = Cap);
-         pragma Loop_Invariant (Mle.Length = W);
-         pragma Loop_Invariant (Below (Mle, W));
-         declare
-            Prev : constant Expression := Mle with Ghost;
-         begin
-            Mle := Add_Term (Mle, W, Eq_Vec (NP + W));
-            Lemma_Below_Insert (Prev, Mle, W, W + 1);
-         end;
-      end loop;
+      pragma Assert
+        (Proof_Only =>
+           Same (Binding, Pub_Binding_Ref (Pub, State, Alpha, NP)));
+
+      Append_Inputs (C, State, Alpha, A, Cst);
+      --  The input terms name witnesses below NW, and NW is below the
+      --  witness count: the private inputs come before every pad.
+      pragma Assert (NW <= WC);
+      pragma Assert
+        (for all K in Start .. A.Count - 1 =>
+           A.Witness (K) < WC and then A.Constraint (K) = Cst);
+
       declare
-         WC   : constant Natural := Witness_Count (C);
-         SC1  : constant Expression := Scale (State.Claim1, Alpha);
-         Got  : constant Expression := Add (State.Claim0, SC1);
-         Prev : constant Expression := Mle with Ghost;
+         FC  : constant Expression := From_Constant (Binding, Layer_Capacity);
+         SC1 : constant Expression := Scale (State.Claim1, Alpha);
+         Got : constant Expression := Add (State.Claim0, SC1);
+         T   : constant Expression := Input_Tail (Binding, State, Alpha);
+         Mid : constant Natural := A.Count;
       begin
-         pragma Assert (Below (Mle, WC));
+         pragma Assert (SC1.Length = State.Claim1.Length);
+         pragma Assert (Got.Length <= 2);
+         pragma Assert (T.Length <= Got.Length);
          pragma Assert (Below (SC1, WC));
          Lemma_Below_Union (State.Claim0, SC1, Got, WC);
-         Mle := Sub (Mle, Got);
-         Lemma_Below_Union (Prev, Got, Mle, WC);
-         declare
-            Start : constant Natural := A.Count with Ghost;
-            Cst   : constant Natural := B_Count with Ghost;
-         begin
-            Constrain_To_Be_Zero (Mle, A, B, B_Count);
-            Lemma_Terms_Below (A, Start, Mle, WC, Cst);
-         end;
+         pragma Assert (Below (FC, WC));
+         Lemma_Below_Union (FC, Got, T, WC);
+         Append_Terms (T, A, Cst);
+         Lemma_Terms_Below (A, Mid, T, WC, Cst);
+         B (Cst) := T.Known;
+         B_Count := Cst + 1;
+         pragma Assert
+           (for all K in Start .. Mid - 1 =>
+              A.Witness (K) < WC and then A.Constraint (K) = Cst);
       end;
    end Input_Constraint;
 
