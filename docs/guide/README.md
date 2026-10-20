@@ -13,7 +13,8 @@ This guide explains the project to a reader who knows some cryptography and litt
 7. [Chapter 5, Ligero and the complete verifier](05-ligero.md): the Merkle commitment, the geometry and the Reed-Solomon code by Lagrange interpolation, the Ligero proof reader and verifier, and the complete verifier from the proof string to a verdict; the fifth and last stage of Phase A.
 8. [Chapter 6, the circuit loader, the heap and the interop proofs](06-circuits.md): the LFC2 format of the upstream compiler as a representation of the quad circuits of Section 6.3, the loader that proves the shape of what it returns, access types under SPARK's ownership rules, the working sets on the heap, the command-line verifier, and the two upstream proofs accepted from their files; Phase B.
 9. [Chapter 7, the prover](07-prover.md): the sumcheck from the prover's side with its one-time pads, the Ligero commitment and proof, randomness as a generic formal so that a program is proved for any source, the writers as inverses of the readers, the subfield projection as a fixed linear map, the command-line prover, and the two upstream proofs reproduced byte for byte from their inputs and seeds; Phase C.
-10. The [architecture decision records](../adr/README.md), referenced from the chapters where a choice is explained.
+10. [Chapter 8, the additive FFT](08-additive-fft.md): the Reed-Solomon code on GF(2^128) by the FFT of Lin, Chung and Han, its subspace polynomials and novel basis, a small example by hand, the encoder of the prover switched to it, and what is proved and what is tested; Phase D.
+11. The [architecture decision records](../adr/README.md), referenced from the chapters where a choice is explained.
 
 Later chapters follow the roadmap: the circuit compiler (Phase D).
 
@@ -25,7 +26,7 @@ Requirements: [Alire](https://alire.ada.dev) with a GNAT toolchain selected (`al
 alr build                                                     # the library
 alr exec -- gnatprove -P longfellow_spark.gpr
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p   # the test harness, assertions on
-make test                                                     # the eight harnesses, concurrently
+make test                                                     # the nine harnesses, concurrently
 make cli                                                      # the release build: interop harness, command-line verifier and prover
 python3 -I tests/vectors/gen_gf2_128_vectors.py               # regenerate vectors (optional)
 python3 -I tests/vectors/gen_p256_vectors.py

@@ -144,7 +144,7 @@ do_partitions_check() {
 do_test() {
    header "test: build the harnesses (assertions on)"
    alr -n exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
-   local harnesses="gf2_128_kat p256_kat sumcheck_kat transcript_kat ligero_kat circuit_kat writer_kat prover_kat"
+   local harnesses="gf2_128_kat p256_kat sumcheck_kat transcript_kat ligero_kat circuit_kat writer_kat prover_kat fft_kat"
    local logs status=0 h
    logs="$(mktemp -d)"
    header "test: $harnesses, concurrently"
@@ -266,6 +266,7 @@ do_vectors() {
    python3 -I tests/vectors/gen_circuit_vectors.py "$scratch"
    python3 -I tests/vectors/gen_prover_vectors.py "$scratch"
    python3 -I tests/vectors/gen_mdoc_vectors.py "$scratch"
+   python3 -I tests/vectors/gen_fft_vectors.py "$scratch"
    local name status=0
    for name in "$scratch"/*.txt; do
       name="$(basename "$name")"
