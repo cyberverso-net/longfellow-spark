@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-19, block 1 of Phase D; realised in blocks 3 and 4)
+Proposed (2026-10-19, block 1 of Phase D; realised in blocks 3 and 4). Block 3 done on 2026-10-20 for GF(2^128); P-256 waits for block 4.
 
 ## Date
 
@@ -27,6 +27,13 @@ The codeword does not depend on the algorithm: the two Phase C proofs, whose row
 - **P-256 is measured first** (block 4), after the linear constraint and the heap: if the Lagrange encoding of the signature circuit (3739 inputs, 19 rows, 4096 columns) with its tables built once stays within the target of ADR 0055, it stays and this record says so; otherwise the Lagrange extension on consecutive points by middle product, as the production prover computes it, with the convolution computed by a number-theoretic transform in F_p (roots of unity of order 2^k up to 96, no Fp2), same perimeter as the additive FFT. The numbers decide, here.
 - **The bound NCOL <= 2^16** of the additive FFT (every point in the subfield) is stated where the geometry is checked (`Ligero_Geometry`, `Fits` of the prover) and in chapter 8.
 - **Memory** is measured with the FFT in place (block 4): the table of bytes per circuit, the peak, and the heap of [ADR 0047](0047-heap-allocation-by-ownership.md) extended where a stack object remains.
+
+## Block 3, as realised
+
+- `Additive_Fft` follows the decision above, with two changes of form that keep every value: the transforms recurse on halves, and the twiddles are computed directly. Chapter 8 explains both.
+- `Ligero_Prover` takes the formal Boolean `Use_Fft` and the formal procedure `Extend`, with no contract on the formal: GNAT does not resolve one through the chain of formal packages. Since the proof is per instance, the call is proved against `Additive_Fft.Extend`'s own contract. `Encode_Row` rewrites the systematic part itself.
+- The postcondition of `Encode_Row` became conditional, by the author's decision: the systematic part for both fields, the parity part proved equal to Lagrange only with the Lagrange encoder.
+- On the proving machine, the version 7 hash circuit is proved in 6 min 30 s and 599 MB, against 19 min 59 s and 672 MB with Lagrange, and the proof is the same bytes. 17 269 checks are proved.
 
 ## Alternatives considered
 
