@@ -147,6 +147,6 @@ The same generator writes the Appendix B.3 circuits and the Z-assertion circuit 
 - The LFC2 files as to meaning, until Phase D reimplements the compiler: the loader proves their shape and checks their identifier, not what they compute.
 - The production reader as the definition of the format, and the two upstream files as what d5e6be7 ships (pinned by hash).
 - That the upstream prover's proofs are valid, which its own tests assert; this project confirms that it accepts them.
-- The stage 3 input constraint on the stack and quadratic in time, the one piece of the verifier not yet sized by the heap (update, Phase D: moved to the heap and made linear by [ADR 0056](../adr/0056-linear-input-constraint.md), after the mDoc hash circuit overflowed the default stack in it), adequate for the upstream circuits and recorded for the prover's phase.
+- The stage 3 input constraint on the stack and quadratic in time, the one piece of the verifier not yet sized by the heap (update, Phase D: written straight into the Ligero terms in linear time by [ADR 0056](../adr/0056-linear-input-constraint.md), after the mDoc hash circuit overflowed the default stack in it), adequate for the upstream circuits and recorded for the prover's phase.
 
 What Phase B leaves for later: the prover (Phase C), the additive FFT of the draft in place of Lagrange interpolation when the prover needs the full code, and the scale of an mDoc circuit, which the heap now admits and no vector yet exercises.

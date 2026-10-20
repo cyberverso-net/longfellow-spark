@@ -8,7 +8,9 @@
 #
 #  Usage: scripts/measure-mdoc.sh [v7|v6] [hash|sig]
 #  Needs the release build (make cli) and python3 for the witness
-#  conversion; raises the stack limit to 64 MB for Eval_Circuit.
+#  conversion. MEASURE_STACK_KB sets the stack limit (default 65520, the
+#  64 MB that the hash circuit needed before ADR 0056; 8192 checks that
+#  the prover and the verifier fit the default stack).
 #
 #  Runs on macOS (time -l) and on Linux (GNU time -v), the proving
 #  machine of ADR 0060 included. MEASURE_BIN names another directory of
@@ -21,7 +23,7 @@
 #  the plain release build.
 set -eu
 cd "$(dirname "$0")/.."
-ulimit -s 65520
+ulimit -s "${MEASURE_STACK_KB:-65520}"
 BIN="${MEASURE_BIN:-cli/bin}"
 if [ "$(uname)" = Linux ]; then
    TIME=(/usr/bin/time -v)

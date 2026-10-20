@@ -16,8 +16,9 @@ The same constraint is a theorem of the stage 3 Gold: `Verifier_Core` is Silver 
 
 ## Decision
 
-- The input constraint is built directly in the form the core emits it, one term per private input in input order, without the search-and-merge of `Expression`: a linear pass, on the heap.
-- The perimeter, stated explicitly. `Expression` stays as it is and stays Gold for the claim expressions of the layers, which are small. The direct construction has its own Gold against the same ghost reference (the constraint polynomial of stage 3), with the lemmas connecting the direct form to `Expression`'s reference proved and never assumed; the postconditions of `Verifier_Core` on what it emits stand. `Eval_Circuit` with its per-layer value arrays on the heap keeps its Gold postconditions of stage 3 (`Layer_Holds`, `Layer_Z`, the inputs in the last segment) unchanged.
+- The input constraint is written directly in the form the core emits it. Each private input in turn gets one term, whose coefficient is computed on the spot, written straight into the Ligero terms, which are already on the heap. The few terms of the claims follow, built as before with the operations of `Expression`. There is no search-and-merge and no array of coefficients: a linear pass, with no stack in proportion to the inputs.
+- The perimeter, stated explicitly. `Expression` stays as it is and stays Gold for the claim expressions of the layers, which are small. `Input_Constraint`, which was Silver, becomes Gold against the formula of Section 6.7. Term W has witness W and coefficient `Eq2 (npublic + W)`. The constant is the public binding minus the final claim, where the binding is `Pub_Binding_Ref`, the sum over the public inputs in input order. The last terms are those of `Input_Tail`, built with the Gold operations of `Expression`. No lemma relates the new form to the old sorted expression: the old construction is removed, and the formula is the reference. The postconditions of `Verifier_Core` on what it emits stand. `Eval_Circuit` with its per-layer value arrays on the heap keeps its Gold postconditions of stage 3 (`Layer_Holds`, `Layer_Z`, the inputs in the last segment) unchanged.
+- The Gold postconditions are at the assertion level `Proof_Only`, next to the executable bounds of the same contract (ADR 0044).
 - `Eval_Circuit`'s per-layer value arrays move to the heap under [ADR 0047](0047-heap-allocation-by-ownership.md) in the same block, so that the prover and the verifier run within the default stack on every circuit in the bounds.
 - Chapter 3 (Section 3.5, the capacities) and chapter 6 (the stack as the limit of the input constraint) receive an update note pointing to this record.
 - The vectors of stage 3 (`sumcheck_kat`, the recorded upstream runs) and the byte identity of the two Phase C proofs must stay green; the time of the core on the hash circuit is measured before and after.
@@ -34,7 +35,8 @@ The same constraint is a theorem of the stage 3 Gold: `Verifier_Core` is Silver 
 
 ## Verification impact
 
-- Provable: the direct construction equal to the reference polynomial; absence of run-time errors; the ownership checks on the new heap objects.
+- Provable: the direct construction equal to the formula of Section 6.7; absence of run-time errors; the ownership checks on the new heap object of `Eval_Circuit`.
+- Measured before the change (block 2, on the proving machine): the input constraint took 17% of the verification of the version 7 hash circuit and 2% of its proof. The quadratic insertion itself took about 4%. The gain of this record is the stack more than the time. The largest cost of the verifier core, `Eval_Bound_Quad` at 57% of that verification, is left to a block of its own, because a table of eq values needs a proof that its entries equal `Eq`.
 - Tested: the vectors of stage 3 unchanged; the byte identity of Phase C.
 - Trusted: unchanged.
 - Constant time: the pass is over public positions with public coefficients; not applicable to the verifier, declared for the prover as ADR 0051.
