@@ -17,6 +17,18 @@ package body Ligero_Prover is
    is
       K : constant Positive := Row'Length;
    begin
+      if Use_Fft then
+         --  The parity part from the FFT, the systematic part written
+         --  here (the same values Extend leaves there).
+         Extend (Row, Enc);
+         for X in 0 .. Row'Last loop
+            Enc (X) := Row (X);
+            pragma Loop_Invariant
+              (Proof_Only =>
+                 (for all X2 in 0 .. X => Same (Enc (X2), Row (X2))));
+         end loop;
+         return;
+      end if;
       Enc := [others => Zero];
       for X in 0 .. Row'Last loop
          Enc (X) := Row (X);
@@ -77,16 +89,22 @@ package body Ligero_Prover is
       and then Tab'First (2) = 0 and then Tab'Last (2) = G.Encoded_Len - 1)
    with Global => null, Pre => Prover_Fits (G);
 
+   --  The two tables of the Lagrange encoder; one unused element each
+   --  with the FFT.
    function Block_Table (T : Table; G : Valid_Geometry) return Boolean is
-     (T'First (1) = 0 and then T'Last (1) = G.Block_Len - 1
-      and then T'First (2) = 0
-      and then T'Last (2) = G.Encoded_Len - G.Block_Len - 1)
+     (T'First (1) = 0 and then T'First (2) = 0
+      and then
+      (if Use_Fft then T'Last (1) = 0 and then T'Last (2) = 0
+       else T'Last (1) = G.Block_Len - 1
+            and then T'Last (2) = G.Encoded_Len - G.Block_Len - 1))
    with Global => null, Pre => Prover_Fits (G);
 
    function Dblock_Table (T : Table; G : Valid_Geometry) return Boolean is
-     (T'First (1) = 0 and then T'Last (1) = G.Dblock_Len - 1
-      and then T'First (2) = 0
-      and then T'Last (2) = G.Encoded_Len - G.Dblock_Len - 1)
+     (T'First (1) = 0 and then T'First (2) = 0
+      and then
+      (if Use_Fft then T'Last (1) = 0 and then T'Last (2) = 0
+       else T'Last (1) = G.Dblock_Len - 1
+            and then T'Last (2) = G.Encoded_Len - G.Dblock_Len - 1))
    with Global => null, Pre => Prover_Fits (G);
 
    function Row_Shape (Row : Element_Array; K : Natural) return Boolean is
@@ -276,10 +294,13 @@ package body Ligero_Prover is
      Pre    =>
        Tab'First (1) = 0 and then R <= Tab'Last (1) and then Tab'First (2) = 0
        and then Row'First = 0 and then Row'Length in 1 .. LV.L.Max_K
-       and then T'First (1) = 0 and then T'Last (1) = Row'Last
-       and then T'First (2) = 0
+       and then T'First (1) = 0 and then T'First (2) = 0
        and then Tab'Last (2) < Natural'Last
-       and then Tab'Length (2) = Row'Length + T'Length (2),
+       and then Tab'Length (2) <= 2**16
+       and then
+       (if Use_Fft then Row'Length <= Tab'Length (2)
+        else T'Last (1) = Row'Last
+             and then Tab'Length (2) = Row'Length + T'Length (2)),
      Post   =>
        (Proof_Only =>
           (for all X in 0 .. Row'Last => Same (Tab (R, X), Row (X)))
@@ -489,6 +510,26 @@ package body Ligero_Prover is
       Wk    : Work_Access;
       Ok_B, Ok_D : Boolean;
    begin
+      if Use_Fft then
+         --  No table: the parity columns come from Extend.
+         Com := new Commitment'
+           (Row_Last    => G.Total_Rows - 1,
+            Col_Last    => NCOL - 1,
+            Leaf_Last   => NL - 1,
+            Heap_Last   => 2 * NL - 1,
+            Block_Last  => 0,
+            Dblock_Last => 0,
+            Par_B_Last  => 0,
+            Par_D_Last  => 0,
+            Tab         => [others => [others => Zero]],
+            Nonces      => [others => [others => 0]],
+            Heap        => [others => [others => 0]],
+            T_Block     => [others => [others => Zero]],
+            T_Dblock    => [others => [others => Zero]],
+            Root        => [others => 0]);
+         Ok := True;
+         return;
+      end if;
       Com := new Commitment'
         (Row_Last    => G.Total_Rows - 1,
          Col_Last    => NCOL - 1,

@@ -52,7 +52,7 @@ The prover settings are in `longfellow_spark.gpr` (ADR 0020): CVC5, Z3 and Alt-E
 
 1. the build and the check that the proof partitions cover the project;
 2. the full proof, with any unproved check treated as an error;
-3. the eight test harnesses;
+3. the nine test harnesses;
 4. the release build: the interop harness, the command-line verifier on the upstream proofs, and the command-line prover reproducing them;
 5. the vector generators, compared with the committed files;
 6. a lint of the tracked files.
@@ -75,7 +75,7 @@ This is not the constant-time build. Never measure or ship binaries built from `
 
 ```bash
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
-make test        # the eight harnesses, concurrently, in under a minute
+make test        # the nine harnesses, concurrently, in about a minute
 ```
 
 Each harness reads its vector files from `tests/vectors/` by default, prints pass and fail counts, and fails if any case fails or none ran. The [trust model](docs/guide/trust-model.md) maps each file to its generator and harness.

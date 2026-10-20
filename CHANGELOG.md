@@ -6,6 +6,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Added
 
+- `Additive_Fft`, the Reed-Solomon extension on GF(2^128) by the additive FFT of Lin, Chung and Han, in the form of the production prover; the GF(2^128) prover encodes its rows with it and keeps no Lagrange table, P-256 keeps the Lagrange encoder (chapter 8, ADR 0057). `gen_fft_vectors.py` and the harness `fft_kat`; the `config_invalid` case of `zk_prove.txt` moves to P-256, and a GF(2^128) case with more columns than the subfield holds is added.
 - The mDoc production circuits of upstream, versions 7 and 6 with one attribute: archives, example proofs, witnesses and the extracted LFC2 circuits under `tests/vectors/upstream/mdoc/`, read by the independent `gen_mdoc_vectors.py` and loaded by `circuit_kat` (Phase D, ADR 0055 to 0059). `scripts/measure-mdoc.sh` measures the prover and the verifier on them, on macOS or Linux, with an optional profile per function.
 
 ### Changed

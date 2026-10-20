@@ -19,4 +19,4 @@ ligero     ligero_geometry lagrange_gf2_128 lagrange_p256 verifier_status ligero
 verifier   ligero_verifier_gf2_128 ligero_verifier_p256 zk_verifier_gf2_128 zk_verifier_p256
 circuits   uleb128 circuit_status circuit_reader_gf2_128 circuit_reader_p256
 prover     proof_writer_gf2_128 proof_writer_p256 prover_status sampling_gf2_128 sampling_p256 simple_rng sumcheck_prover_gf2_128 sumcheck_prover_p256
-ligero-prover ligero_prover_gf2_128 ligero_prover_p256 zk_prover_gf2_128 zk_prover_p256
+ligero-prover ligero_prover_gf2_128 ligero_prover_p256 zk_prover_gf2_128 zk_prover_p256 additive_fft no_fft_p256

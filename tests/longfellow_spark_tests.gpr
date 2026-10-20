@@ -24,7 +24,7 @@ project Longfellow_Spark_Tests is
    for Main use
      ("gf2_128_kat.adb", "p256_kat.adb", "sumcheck_kat.adb",
       "transcript_kat.adb", "ligero_kat.adb", "circuit_kat.adb",
-      "writer_kat.adb", "prover_kat.adb");
+      "writer_kat.adb", "prover_kat.adb", "fft_kat.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use

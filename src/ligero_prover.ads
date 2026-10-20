@@ -66,6 +66,20 @@ with Sampling;
 generic
    with package LV is new Ligero_Verifier (<>);
    with package SP is new Sampling (F => LV.ST.SA.F, others => <>);
+   --  The encoder of the rows (ADR 0057). When Use_Fft is True the
+   --  parity columns come from Extend, the additive FFT on GF(2^128),
+   --  and the commitment holds no Lagrange table; otherwise from the
+   --  Lagrange tables of chapter 5, and Extend is never called. The
+   --  formal carries no contract: the compiler does not resolve one
+   --  through the chain of formal packages in the instance. The proof
+   --  is per instance, so a call to Extend is proved against the
+   --  actual's contract (Additive_Fft.Extend: a row of 1 to NCOL values
+   --  and at most 2^16 points), and Encode_Row writes the systematic
+   --  part itself.
+   Use_Fft : Boolean;
+   with procedure Extend
+     (Row : LV.Element_Array;
+      Enc : out LV.Element_Array);
 package Ligero_Prover is
 
    use LV.ST.SA.F;
@@ -84,13 +98,14 @@ package Ligero_Prover is
 
    --  A geometry the prover handles: the proof fits (Ligero_Proof),
    --  every column is an evaluation point, the longest row fits a
-   --  Lagrange table, the parity columns fit the table's width, the
-   --  tableau fits.
+   --  Lagrange table and, with the Lagrange encoder, the parity columns
+   --  fit the table's width, the tableau fits.
    function Prover_Fits (G : Valid_Geometry) return Boolean is
      (LV.LP.Fits (G)
       and then G.Encoded_Len - 1 <= LV.Max_Eval_Point
       and then G.Dblock_Len <= LV.L.Max_K
-      and then G.Encoded_Len - G.Block_Len <= LV.L.Max_Columns
+      and then (Use_Fft
+                or else G.Encoded_Len - G.Block_Len <= LV.L.Max_Columns)
       and then Long_Long_Integer (G.Total_Rows)
                * Long_Long_Integer (G.Encoded_Len)
                <= Max_Tableau);
@@ -100,9 +115,11 @@ package Ligero_Prover is
    -------------------------------------------------------------------
 
    --  encode_row: the row on the first K columns (the identity part of
-   --  the Lagrange matrix), the Lagrange evaluation on the others, T
-   --  the table of Lagrange.Build for K and the parity columns K ..
-   --  NCOL - 1.
+   --  the Lagrange matrix), the parity columns on the others. With the
+   --  Lagrange encoder, T is the table of Lagrange.Build for K and the
+   --  parity columns K .. NCOL - 1, and the parity part is proved to be
+   --  its evaluation; with the FFT, T is not read and the parity part
+   --  is Extend's, equal to the Lagrange evaluation by test (ADR 0057).
    procedure Encode_Row
      (Row : Element_Array;
       T   : Table;
@@ -111,17 +128,21 @@ package Ligero_Prover is
      Global => null,
      Pre    =>
        Row'First = 0 and then Row'Length in 1 .. LV.L.Max_K
-       and then T'First (1) = 0 and then T'Last (1) = Row'Last
-       and then T'First (2) = 0
-       and then Enc'First = 0 and then Enc'Length = Row'Length + T'Length (2),
+       and then T'First (1) = 0 and then T'First (2) = 0
+       and then Enc'First = 0 and then Enc'Length <= 2**16
+       and then
+       (if Use_Fft then Row'Length <= Enc'Length
+        else T'Last (1) = Row'Last
+             and then Enc'Length = Row'Length + T'Length (2)),
      Post   =>
        (Proof_Only =>
           (for all X in 0 .. Row'Last => Same (Enc (X), Row (X)))
           and then
-          (for all X in Row'Length .. Enc'Last =>
-             Same (Enc (X),
-                   LV.L.Dot_Ref (LV.L.Element_Array (Row), T,
-                                 X - Row'Length, Row'Length))));
+          (if not Use_Fft then
+             (for all X in Row'Length .. Enc'Last =>
+                Same (Enc (X),
+                      LV.L.Dot_Ref (LV.L.Element_Array (Row), T,
+                                    X - Row'Length, Row'Length)))));
 
    -------------------------------------------------------------------
    --  The commitment (ligero/prover.rs commit)
@@ -133,7 +154,8 @@ package Ligero_Prover is
 
    --  What the prover keeps after commit for the proof (Section 4.4,
    --  block 5): the tableau, the nonces, the Merkle heap (root at node
-   --  1), the two Lagrange tables over the parity columns.
+   --  1), the two Lagrange tables over the parity columns (one element
+   --  each, unused, with the FFT).
    type Commitment
      (Row_Last, Col_Last      : Index;
       Leaf_Last               : Leaf_Index;
@@ -157,10 +179,15 @@ package Ligero_Prover is
       and then Com.Col_Last + 1 = G.Encoded_Len
       and then Com.Leaf_Last + 1 = Num_Leaves (G)
       and then Com.Heap_Last + 1 = 2 * Num_Leaves (G)
-      and then Com.Block_Last + 1 = G.Block_Len
-      and then Com.Dblock_Last + 1 = G.Dblock_Len
-      and then Com.Par_B_Last + 1 = G.Encoded_Len - G.Block_Len
-      and then Com.Par_D_Last + 1 = G.Encoded_Len - G.Dblock_Len);
+      and then
+      (if Use_Fft then
+         Com.Block_Last = 0 and then Com.Dblock_Last = 0
+         and then Com.Par_B_Last = 0 and then Com.Par_D_Last = 0
+       else
+         Com.Block_Last + 1 = G.Block_Len
+         and then Com.Dblock_Last + 1 = G.Dblock_Len
+         and then Com.Par_B_Last + 1 = G.Encoded_Len - G.Block_Len
+         and then Com.Par_D_Last + 1 = G.Encoded_Len - G.Dblock_Len));
 
    --  The witness index of hand H (x, y, z) of a triple.
    function Sel (T : Lqc_Triple; H : Natural) return Natural is

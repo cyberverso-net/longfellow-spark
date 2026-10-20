@@ -6,9 +6,13 @@
 
 pragma SPARK_Mode (On);
 
+with Additive_Fft;
 with Ligero_Prover;
 with Ligero_Verifier_GF2_128;
 with Sampling_GF2_128;
 
 package Ligero_Prover_GF2_128 is new Ligero_Prover
-  (LV => Ligero_Verifier_GF2_128, SP => Sampling_GF2_128);
+  (LV      => Ligero_Verifier_GF2_128,
+   SP      => Sampling_GF2_128,
+   Use_Fft => True,
+   Extend  => Additive_Fft.Extend);

@@ -503,7 +503,13 @@ def prove_cases(lines):
         # projected and 0x6c is not in GF(2^16)
         ("gf2_128", SC.sgonal_gf2_128(), [1, 0x6C, 5, 6], 1, (4, 8, 64), 4,
          "not_in_subfield"),
-        ("gf2_128", SC.sgonal_gf2_128(), [1, 0x6C, 5, 6], 1, (1, 16, 8192), 0,
+        # P-256 encodes by Lagrange: 8192 columns exceed the parity columns
+        # one table holds. GF(2^128) encodes by the additive FFT (ADR 0057),
+        # whose points must lie in GF(2^16): 70000 columns exceed it, as
+        # can_encode of lch14_reed_solomon.rs refuses them.
+        ("p256", SC.sgonal_p256(), [1, 45, 5, 7], 1, (1, 16, 8192), 0,
+         "config_invalid"),
+        ("gf2_128", SC.sgonal_gf2_128(), [1, 0x6C, 5, 6], 1, (2, 16, 70000), 0,
          "config_invalid"),
     ]
     seen = set()
