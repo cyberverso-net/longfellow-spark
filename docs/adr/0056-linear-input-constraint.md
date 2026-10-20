@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-19, block 1 of Phase D; realised in block 2)
+Accepted (2026-10-20, at the close of block 2 of Phase D)
 
 ## Date
 
@@ -37,6 +37,16 @@ The same constraint is a theorem of the stage 3 Gold: `Verifier_Core` is Silver 
 
 - Provable: the direct construction equal to the formula of Section 6.7; absence of run-time errors; the ownership checks on the new heap object of `Eval_Circuit`.
 - Measured before the change (block 2, on the proving machine): the input constraint took 17% of the verification of the version 7 hash circuit and 2% of its proof. The quadratic insertion itself took about 4%. The gain of this record is the stack more than the time. The largest cost of the verifier core, `Eval_Bound_Quad` at 57% of that verification, is left to a block of its own, because a table of eq values needs a proof that its entries equal `Eq`.
+- Measured after the change, on the proving machine with the default 8 MB stack, version 7 circuits (the baseline needed a 64 MB stack for the hash circuit):
+
+| Run | Before (64 MB stack) | After (8 MB stack) |
+|-----|----------------------|--------------------|
+| hash, prove | 21 min 20 s, 683 MB | 20 min 23 s, 672 MB |
+| hash, verify | 2 min 44 s, 375 MB | 2 min 04 s, 371 MB |
+| signature, prove | 19 min 13 s, 217 MB | 19 min 09 s, 216 MB |
+| signature, verify | 54 s, 41 MB | 55 s, 41 MB |
+
+  The proofs keep their sizes (161 640 and 199 020 bytes) and are accepted. The two upstream proofs of Phase C are still reproduced byte for byte. `make check` proves 17 002 checks.
 - Tested: the vectors of stage 3 unchanged; the byte identity of Phase C.
 - Trusted: unchanged.
 - Constant time: the pass is over public positions with public coefficients; not applicable to the verifier, declared for the prover as ADR 0051.

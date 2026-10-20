@@ -4,8 +4,13 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+### Added
+
+- The mDoc production circuits of upstream, versions 7 and 6 with one attribute: archives, example proofs, witnesses and the extracted LFC2 circuits under `tests/vectors/upstream/mdoc/`, read by the independent `gen_mdoc_vectors.py` and loaded by `circuit_kat` (Phase D, ADR 0055 to 0059). `scripts/measure-mdoc.sh` measures the prover and the verifier on them, on macOS or Linux, with an optional profile per function.
+
 ### Changed
 
+- The input constraint is written straight into the Ligero terms in linear time, and `Input_Constraint` is Gold against the formula of Section 6.7; the per-layer values of `Eval_Circuit` are on the heap (ADR 0056). The prover and the verifier of the mDoc hash circuit now fit the default 8 MB stack, where they needed 64 MB, and its verification takes 24% less time. 17 002 checks proved.
 - The README is a short front page, and the full trust model is `docs/guide/trust-model.md`, arranged by part of the system (ADR 0061, amending ADR 0003). No entry changed in meaning.
 - The proof runs on demand: `scripts/remote-check.sh` runs `make check` on the proving machine for the pushed commit and posts the result as the commit status `prove`, which branch protection requires with `verify`; `--text-only` posts it for branches that change only text, `--tree` checks a working tree without posting. The `prove` workflow and the self-hosted runner are withdrawn, and `make check` before a commit is optional (ADR 0062, amending ADR 0041 and 0060).
 - The `prove` workflow's job limit is sixty minutes and the prover units are two proof partitions, `prover` and `ligero-prover`, nine in all (ADR 0054): the one partition of Phase C exceeded both the forty-five and the sixty minute limit on the hosted runner.
