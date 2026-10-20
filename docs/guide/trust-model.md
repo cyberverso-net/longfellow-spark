@@ -69,7 +69,7 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 - `Merkle.Open` produces exactly the digests `Merkle.Verify` consumes, stated in `Verify`'s own model.
 - `Lqc_Triples` equals the core's layout. The pad layout gives `Witness_Count` as the private inputs plus `Pad_Total`.
 - Every prover unit is Silver for any circuit, inputs, configuration and random byte stream. The subfield projection and `In_Subfield` are Silver.
-- `Additive_Fft` is Silver for every row of up to 2^16 values, and `Extend` keeps the row as the first part of its output. In `Encode_Row`, the parity part is proved equal to the Lagrange evaluation only with the Lagrange encoder, which P-256 uses; on GF(2^128) it comes from the FFT and is tested (Phase D, ADR 0057).
+- `Additive_Fft` and `Rfft_P256` are Silver for every row of up to 2^16 values, and each `Extend` keeps the row as the first part of its output. In `Encode_Row`, the parity part is proved equal to the Lagrange evaluation only with the Lagrange encoder; both fields now encode by an FFT, and the parity part is tested (Phase D, ADR 0057).
 
 ## What is tested
 
@@ -120,7 +120,7 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 - The complete proofs of the small circuits are accepted by `Zk_Verifier`. The statuses `input_length`, `not_satisfied`, `not_in_subfield` and `config_invalid` are each triggered. A prover with input checks turned off makes proofs of false statements, and the verifier refuses them.
 - The sixteen masks of the subfield projection are checked on all 65536 subfield elements.
 - The shape of the whole tableau is checked slot by slot (ADR 0052).
-- The additive FFT gives the Lagrange codeword. A Python transcription of the upstream FFT is checked against barycentric Lagrange interpolation (`gen_fft_vectors.py`), `fft_kat` checks the Ada FFT on those vectors and against `Lagrange.Evaluate` on random rows, and the prover's commitments and the `sha256` proof stay those of the Lagrange encoder (Phase D).
+- Both FFTs give the Lagrange codeword. Python transcriptions of the upstream transforms are checked against Lagrange interpolation (`gen_fft_vectors.py` for GF(2^128), `gen_rs_p256_vectors.py` for the real FFT over F_p^2), `fft_kat` checks the Ada units on those vectors and against `Lagrange.Evaluate` on random rows, and the prover's commitments and the two upstream proofs stay those of the Lagrange encoder (Phase D).
 - A proof file made by this project was verified by the upstream `ZkVerifier`, by hand, through `tests/vectors/upstream/verify_proof_file.rs`.
 
 **Where the vectors are.**
@@ -133,7 +133,7 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 | Transcript | `sha256.txt`, `aes256.txt`, `transcript_fs.txt`, `zk_proof_*.txt` | `gen_transcript_vectors.py` | `transcript_kat`, `sumcheck_kat` |
 | Ligero | `merkle.txt`, `ligero_geometry.txt`, `lagrange_*.txt`, `ligero_proof.txt`, `upstream/ligero_*.txt` | `gen_ligero_vectors.py` | `ligero_kat`, `sumcheck_kat` |
 | Circuits | `circuit_summary.txt`, `circuit_lfc2.txt` | `gen_circuit_vectors.py` | `circuit_kat` |
-| Additive FFT (Phase D) | `fft.txt` | `gen_fft_vectors.py` | `fft_kat` |
+| FFTs (Phase D) | `fft.txt`, `rs_p256.txt` | `gen_fft_vectors.py`, `gen_rs_p256_vectors.py` | `fft_kat` |
 | mDoc circuits (Phase D) | `mdoc_summary.txt`, from the archives in `upstream/mdoc/` | `gen_mdoc_vectors.py` | `circuit_kat` |
 | Interop | `interop.txt` | `gen_circuit_vectors.py` | `interop_kat` (release build) |
 | Prover | `writer.txt`, `sumcheck_prover.txt`, `ligero_commit.txt`, `zk_prove.txt` | `gen_prover_vectors.py` | `writer_kat`, `prover_kat`; `make cli` for the byte identity |
@@ -166,7 +166,7 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 **Properties tested but not proved.**
 
 - That `Sha256` and `Aes256` compute SHA-256 and AES-256 beyond the NIST and Appendix B.2 vectors. Both are Silver (ADR 0029).
-- That the additive FFT and the Lagrange encoder agree beyond the tested rows, and the algorithm of Lin, Chung and Han as the reference implements it (ADR 0057).
+- That the two FFTs and the Lagrange encoder agree beyond the tested rows, and the algorithms as the reference implements them: Lin, Chung and Han on GF(2^128), the real FFT over F_p^2 with the reference's root of unity on P-256 (ADR 0057).
 - Fermat's little theorem, behind the test anchors of both `Inv`. On the verification path every inverse is checked at run time by `Checked_Inv` (ADR 0037).
 - That the absorption into the transcript is complete beyond the two Appendix B.3 proofs. The sequence of calls in `Replay_Challenges` is the checklist.
 - The termination of `Transcript.Nat`, of the P-256 sampler and of their callers in the P-256 instance. It is a probabilistic property, declared with `Always_Terminates` (ADR 0030).

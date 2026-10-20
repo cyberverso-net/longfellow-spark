@@ -41,7 +41,17 @@ Every point used is below m, and m is at most 2^16, so every point lies in the s
 
 ### 1.5 P-256
 
-The prime field has no subspace structure, and its points 0, 1, 2 and so on are integers, not roots of unity. Block 4 decides how to encode there, on measurements. The P-256 prover keeps the Lagrange encoder of chapter 5 until then.
+The prime field has no subspace structure, and its points 0, 1, 2 and so on are integers, not roots of unity. Block 4 of the phase moved P-256 off the Lagrange tables too, with the production prover's method (`reed_solomon.rs`, `middle_product.rs`, `rfft.rs`).
+
+**A formula for consecutive points.** For a polynomial p of degree at most d = n - 1 known at 0 .. d, and k at least n,
+
+    p(k) = (-1)^d (k - d) C(k, d)  SUM over j of  x_j / (k - j),   x_j = (-1)^j C(d, j) p(j).
+
+The coefficients C(k, d), C(d, j) and the inverses 1 / t follow from one batch inversion. The sum is a convolution of x with the sequence 1 / t: the "middle product", of which only the indices n .. m - 1 are needed. A cyclic convolution of size P = 2^l at least m computes them exactly, since none of those indices wraps around.
+
+**Where the roots are.** A convolution by FFT needs a root of unity of order P. F_p has none of order 4 or more: p - 1 is 2 times an odd number. But p + 1 = 2^96 q, so the field F_p^2 = F_p[i] / (i^2 + 1), a genuine extension since p is 3 modulo 4, has roots of order up to 2^97. The reference takes one of order 2^31, and this project uses the same constant.
+
+**A real FFT.** The inputs are in F_p, so their transform over F_p^2 is conjugate-symmetric: F[j] is the conjugate of F[P - j]. The reference stores it in the "half-complex" form of FFTW, P elements of F_p: the real parts of F[0 .. P / 2], then the imaginary parts of F[P / 2 - 1 .. 1]. It transforms the real input directly with a radix-4 Cooley-Tukey, `r2hc` forward and `hc2r` back, and multiplies the two transforms pair by pair. This costs about half of a complex FFT on the same input.
 
 ## 2. The algorithm
 
@@ -85,11 +95,21 @@ Every loop bound, index and twiddle depends on n and m, which are the public geo
 `Ligero_Prover` takes two new generic formals: a Boolean `Use_Fft` and a procedure `Extend`.
 
 - With `Use_Fft => True`, `Encode_Row` calls `Extend` and then writes the systematic part itself. The commitment holds no Lagrange table, only an unused element per table. `Allocate` builds none, which is where the time went.
-- With `Use_Fft => False`, `Encode_Row` is the Lagrange encoder of Phase C and `Extend` is never called. The P-256 instances pass `No_Fft_P256.Extend`, which only copies the row.
+- With `Use_Fft => False`, `Encode_Row` is the Lagrange encoder of Phase C and `Extend` is never called. Since block 4 no instance uses it: the GF(2^128) instances pass `Additive_Fft.Extend`, the P-256 instances `Rfft_P256.Extend`. The branch stays, with its Gold, as the reference encoder in the code.
 
 The formal procedure carries no contract. GNAT accepts a contract on a formal subprogram, but it does not resolve one that names the element types through the chain of formal packages of `Ligero_Prover`. That is not a loss: GNATprove proves a generic instance by instance, so in the GF(2^128) instance the call is proved against the contract of `Additive_Fft.Extend` itself. For the same reason `Encode_Row` rewrites the systematic part after `Extend`, so that its own postcondition needs nothing from the formal.
 
-### 3.4 Memory
+### 3.4 `Rfft_P256`
+
+The unit transcribes `rfft.rs` butterfly by butterfly: the leaves of size 2 and 4, the general merges `hc2hc_f_4` and `hc2hc_b_4`, the middle merges with the eighth root of unity, the two complex products with three multiplications. Three things differ in form, and none changes a value.
+
+- **Recursion on quarters.** As in `Additive_Fft`, the transforms call themselves on the four quarters of a block, where the reference loops over the levels and over the blocks of a level.
+- **One table per level.** The twiddles of a level of size s are the powers of the root of order s. The table of the level below is every fourth entry of this one. So the indices are j, 2 j and 3 j, with j below s / 8, and no product of two variables has to be proved, where the reference reads one table at stride P / s.
+- **The permutation by a recurrence.** rev (i) = rev (i / 2) / 2 + (i mod 2) P / 2 gives the bit reversal of i on l bits without the XOR walk of `bitrev`.
+
+`Extend` computes the inverses, the binomial factors and the transform of 1 / t for every row. The reference keeps them per shape, which saves about one transform per row.
+
+### 3.5 Memory
 
 With the FFT, the commitment loses its two Lagrange tables, n (m - n) elements each, and the work arrays of `Extend` are at most 2^16 elements, allocated per row. The measurements of section 5 give the peak.
 
@@ -97,7 +117,8 @@ With the FFT, the commitment loses its two Lagrange tables, n (m - n) elements e
 
 - Silver on `Additive_Fft` for every row of 1 to 2^16 values and every output length up to 2^16, with the ownership checks on its two work arrays.
 - `Extend` leaves the first n values unchanged: the systematic part of the code.
-- `Encode_Row`, conditional on the encoder ([ADR 0057](../adr/0057-additive-fft.md)). The systematic part is the row, for both fields. With the Lagrange encoder, for P-256, the parity part is the Lagrange evaluation, as in Phase C. With the FFT, for GF(2^128), the parity part is not proved equal to anything: that is the test of section 5.
+- Silver on `Rfft_P256` for the same lengths, and its `Extend` also leaves the first n values unchanged.
+- `Encode_Row`, conditional on the encoder ([ADR 0057](../adr/0057-additive-fft.md)). The systematic part is the row, for both fields. With the Lagrange encoder the parity part is the Lagrange evaluation, as in Phase C. With an FFT, which both fields now use, the parity part is not proved equal to anything: that is the test of section 5.
 
 The table of verification conditions is added when the block closes.
 

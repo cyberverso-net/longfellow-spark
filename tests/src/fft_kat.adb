@@ -1,18 +1,24 @@
---  FFT_KAT: test harness for Additive_Fft (Phase D, block 3, ADR 0057).
+--  FFT_KAT: test harness for the two encoders of Phase D (ADR 0057):
+--  Additive_Fft on GF(2^128) (block 3) and Rfft_P256 on P-256 (block 4).
 --
 --  Test code, outside the proof perimeter: SPARK_Mode is Off. Built with
 --  -gnata, so the executable contracts of the library run. This build is
 --  not the constant-time build.
 --
 --  Two kinds of check.
---  - The vector file given as argument (default tests/vectors/fft.txt,
---    written by gen_fft_vectors.py), one case per line, '#' comments:
+--  - The vector files given as arguments (default tests/vectors/fft.txt,
+--    written by gen_fft_vectors.py, and tests/vectors/rs_p256.txt,
+--    written by gen_rs_p256_vectors.py), one case per line, '#' comments:
 --      what <i> <j> <value>          W_Hat (i, j) = value
 --      twiddle <i> <u> <value>       Twiddle (i, u) = value
 --      extend <n> <m> <y ...> <c ...>
 --                                    Extend of the n values y gives the
 --                                    m - n values c after them
---    with each element as 32 big-endian hex digits, as gf2_128_kat.
+--      root_p256 <re> <im>           Rfft_P256.Root = (re, im)
+--      extend_p256 <n> <m> <y ...> <c ...>
+--                                    the same for Rfft_P256.Extend
+--    with each GF(2^128) element as 32 big-endian hex digits, as
+--    gf2_128_kat, and each P-256 element as 64.
 --  - The encoder of chapter 5: on pseudo-random rows of the lengths of
 --    the Ligero geometries, Extend must agree with Lagrange.Evaluate on
 --    every parity column. This is the test that the two encoders give
@@ -29,13 +35,21 @@ with Interfaces;    use Interfaces;
 with GF2_128;       use GF2_128;
 with Additive_Fft;
 with Lagrange_GF2_128;
+with Lagrange_P256;
+with P256_Field;
+with Rfft_P256;
 
 procedure FFT_KAT is
 
    package TIO renames Ada.Text_IO;
    package LG renames Lagrange_GF2_128;
 
-   Default_File : constant String := "tests/vectors/fft.txt";
+   Default_File  : constant String := "tests/vectors/fft.txt";
+   Default_P256  : constant String := "tests/vectors/rs_p256.txt";
+
+   package LP renames Lagrange_P256;
+   use type P256_Field.Element;
+   use type Rfft_P256.Fp2;
 
    Passed  : Natural := 0;
    Failed  : Natural := 0;
@@ -69,6 +83,21 @@ procedure FFT_KAT is
       end loop;
       return R;
    end To_Element;
+
+   --  64 big-endian hex digits; the last 16 form Limbs (0).
+   function To_P256 (S : String) return P256_Field.Element is
+      L : P256_Field.Limb_Array := [others => 0];
+      K : Natural;
+   begin
+      if S'Length /= 64 then
+         raise Parse_Error with "expected 64 hex digits, got '" & S & "'";
+      end if;
+      for I in 0 .. 63 loop
+         K := 3 - I / 16;
+         L (K) := Shift_Left (L (K), 4) or Hex_Digit (S (S'First + I));
+      end loop;
+      return (Limbs => L);
+   end To_P256;
 
    procedure Check (Ok : Boolean; What : String) is
    begin
@@ -149,6 +178,31 @@ procedure FFT_KAT is
                   end loop;
                   Check (Ok, "Extend n =" & N'Image & ", m =" & M'Image);
                end;
+            elsif Fld (1) = "root_p256" then
+               Check (Rfft_P256.Root
+                        = (Re => To_P256 (Fld (2)), Im => To_P256 (Fld (3))),
+                      "Rfft_P256.Root");
+            elsif Fld (1) = "extend_p256" then
+               declare
+                  N   : constant Positive := Num (2);
+                  M   : constant Positive := Num (3);
+                  Row : Rfft_P256.Element_Array (0 .. N - 1);
+                  Enc : Rfft_P256.Element_Array (0 .. M - 1);
+                  Ok  : Boolean := True;
+               begin
+                  if F'Length /= 3 + M then
+                     raise Parse_Error with "extend_p256: expected"
+                       & Natural'Image (M) & " elements";
+                  end if;
+                  for X in 0 .. N - 1 loop
+                     Row (X) := To_P256 (Fld (4 + X));
+                  end loop;
+                  Rfft_P256.Extend (Row, Enc);
+                  for X in 0 .. M - 1 loop
+                     Ok := Ok and then Enc (X) = To_P256 (Fld (4 + X));
+                  end loop;
+                  Check (Ok, "Rfft_P256.Extend n =" & N'Image & ", m =" & M'Image);
+               end;
             else
                raise Parse_Error with "unknown operation '" & Fld (1) & "'";
             end if;
@@ -199,6 +253,36 @@ procedure FFT_KAT is
              "Extend /= Lagrange for n =" & N'Image & ", m =" & M'Image);
    end Against_Lagrange;
 
+   --  Rfft_P256.Extend against Lagrange.Evaluate of the P-256 instance.
+   procedure Against_Lagrange_P256 (N, M : Positive) is
+      Cols  : LP.Column_Array (0 .. M - N - 1);
+      T     : LP.Table (0 .. N - 1, 0 .. M - N - 1);
+      Inv_D : LP.Element_Array (0 .. N - 1);
+      Coeff : LP.Element_Array (0 .. N - 1);
+      Row   : Rfft_P256.Element_Array (0 .. N - 1);
+      Enc   : Rfft_P256.Element_Array (0 .. M - 1);
+      Ok    : Boolean;
+      Same  : Boolean := True;
+   begin
+      for C in Cols'Range loop
+         Cols (C) := N + C;
+      end loop;
+      LP.Build (N, Cols, T, Inv_D, Ok);
+      for X in 0 .. N - 1 loop
+         Row (X) := P256_Field.Mul
+           (P256_Field.Of_Natural (Natural (Next mod 2**30)),
+            P256_Field.Of_Natural (Natural (Next mod 2**30)));
+         Row (X) := P256_Field.Mul (Row (X), Row (X));
+         Coeff (X) := Row (X);
+      end loop;
+      Rfft_P256.Extend (Row, Enc);
+      for C in Cols'Range loop
+         Same := Same and then Enc (N + C) = LP.Evaluate (Coeff, T, C);
+      end loop;
+      Check (Ok and then Same,
+             "Rfft_P256 /= Lagrange for n =" & N'Image & ", m =" & M'Image);
+   end Against_Lagrange_P256;
+
    type Shape is record
       N, M : Positive;
    end record;
@@ -209,10 +293,14 @@ procedure FFT_KAT is
      [(1, 2), (2, 3), (3, 4), (4, 9), (5, 64), (8, 8), (15, 47), (16, 17),
       (17, 18), (33, 200), (64, 256), (85, 256), (120, 256), (128, 300),
       (171, 256), (100, 600)];
+   Shapes_P256 : constant array (Positive range <>) of Shape :=
+     [(1, 2), (2, 3), (3, 8), (5, 9), (7, 32), (16, 64), (17, 100),
+      (42, 256), (83, 256), (40, 1000)];
 
 begin
    if Ada.Command_Line.Argument_Count = 0 then
       Run_File (Default_File);
+      Run_File (Default_P256);
    else
       for I in 1 .. Ada.Command_Line.Argument_Count loop
          Run_File (Ada.Command_Line.Argument (I));
@@ -220,6 +308,11 @@ begin
    end if;
    for S of Shapes loop
       Against_Lagrange (S.N, S.M);
+   end loop;
+   --  P-256: transform sizes 2 to 1024, both kinds of leaf, and the row
+   --  shapes of the two Phase C geometries of ecdsa2.
+   for S of Shapes_P256 loop
+      Against_Lagrange_P256 (S.N, S.M);
    end loop;
    TIO.Put_Line ("passed" & Passed'Image & ", failed" & Failed'Image);
    if Failed > 0 or else Passed = 0 then
