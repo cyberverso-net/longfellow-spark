@@ -19,9 +19,10 @@
 #     defaults to HEAD.
 #
 #  scripts/remote-check.sh --text-only
-#     Checks that the branch changes only text against origin/main
-#     (Markdown files and LICENSE) and posts `prove` as passed without
-#     starting the VM.
+#     Checks that the commit changes only text (Markdown files and
+#     LICENSE) since a commit already proved: the nearest ancestor whose
+#     status `prove` is success, or else origin/main. Then posts `prove`
+#     as passed, naming that commit, without starting the VM.
 #
 #  scripts/remote-check.sh --tree [make target...]
 #     Copies the working tree as it is, committed or not, and runs the
@@ -183,16 +184,35 @@ if [ "$MODE" != text ]; then
    need_user
 fi
 
+#  The nearest ancestor of $SHA, at most 50 first-parent steps back,
+#  whose status `prove` is success; empty if none.
+proved_ancestor() {
+   local c
+   for c in $(git rev-list --first-parent --max-count=50 "$SHA^" 2> /dev/null); do
+      if [ "$(gh api "repos/$(repo)/commits/$c/statuses" \
+                --jq "[.[] | select(.context == \"$CONTEXT\")][0].state" 2> /dev/null)" = success ]; then
+         echo "$c"
+         return 0
+      fi
+   done
+}
+
 if [ "$MODE" = text ]; then
    commit_preconditions
    git fetch -q origin main
-   others="$(git diff --name-only "origin/main...$SHA" | grep -v -E '(\.md$|^LICENSE$)' || true)"
+   BASE="$(proved_ancestor)"
+   if [ -n "$BASE" ]; then
+      RANGE="$BASE..$SHA"; FROM="${BASE:0:7}, proved"
+   else
+      RANGE="origin/main...$SHA"; FROM="main"
+   fi
+   others="$(git diff --name-only "$RANGE" | grep -v -E '(\.md$|^LICENSE$)' || true)"
    if [ -n "$others" ]; then
-      echo "remote-check: the branch changes files that are not text:" >&2
+      echo "remote-check: files that are not text changed since $FROM:" >&2
       echo "$others" >&2
       exit 1
    fi
-   post_status success "Text only: Markdown files and LICENSE, proof not run"
+   post_status success "Text only since $FROM: Markdown files and LICENSE, proof not run"
    exit 0
 fi
 
