@@ -85,8 +85,7 @@ package body Rfft_P256 is
    procedure Quarter (T : Fp2_Array; Tc : out Fp2_Array) with
      Global => null,
      Pre    => T'First = 0 and then Tc'First = 0
-               and then Tc'Length <= Natural'Last / 4
-               and then 4 * Tc'Length <= T'Length + 3
+               and then T'Last >= 0 and then Tc'Last <= T'Last / 4
    is
    begin
       Tc := [others => One2];

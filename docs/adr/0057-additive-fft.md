@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-19, block 1 of Phase D; realised in blocks 3 and 4)
+Accepted (2026-10-20, at the close of block 4 of Phase D). Proposed on 2026-10-19 in block 1; block 3 realised it for GF(2^128), block 4 for P-256; corrected while Proposed: F_p has no large roots of unity, the reference's transform on P-256 is a real FFT over F_p^2.
 
 ## Date
 
@@ -27,6 +27,12 @@ The codeword does not depend on the algorithm: the two Phase C proofs, whose row
 - **P-256 is measured first** (block 4), after the linear constraint and the heap: if the Lagrange encoding of the signature circuit (3739 inputs, 19 rows, 4096 columns) with its tables built once stays within the target of ADR 0055, it stays and this record says so; otherwise the Lagrange extension on consecutive points by middle product, as the production prover computes it, with the convolution computed by the real FFT over F_p^2 of `rfft.rs`, transcribed in its form (half-complex storage, radix 4) with the reference's root of unity, same perimeter as the additive FFT. The numbers decide, here.
 - **The bound NCOL <= 2^16** of the additive FFT (every point in the subfield) is stated where the geometry is checked (`Ligero_Geometry`, `Fits` of the prover) and in chapter 8.
 - **Memory** is measured with the FFT in place (block 4): the table of bytes per circuit, the peak, and the heap of [ADR 0047](0047-heap-allocation-by-ownership.md) extended where a stack object remains.
+
+## Block 4, as realised
+
+- The Lagrange encoder of the signature circuit was measured against the target of ADR 0055: 1129 seconds of CPU for the version 7 signature proof, against about 27 for the two proofs together. It was replaced, as the decision above foresees.
+- `Rfft_P256` transcribes `rfft.rs` with three changes of form that keep every value: recursion on quarters, one twiddle table per level built by taking every fourth entry of the level above, and the bit-reversal permutation by a recurrence. The P-256 prover encodes with it (`Use_Fft => True`), and `No_Fft_P256` is gone.
+- On the proving machine, the version 7 signature circuit is proved in 41 seconds and 74 MB, against 1129 seconds and 216 MB with Lagrange, and the proof is the same bytes. The partition `ligero-prover` proves 3253 checks.
 
 ## Alternatives considered
 

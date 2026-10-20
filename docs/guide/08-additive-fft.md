@@ -111,7 +111,14 @@ The unit transcribes `rfft.rs` butterfly by butterfly: the leaves of size 2 and 
 
 ### 3.5 Memory
 
-With the FFT, the commitment loses its two Lagrange tables, n (m - n) elements each, and the work arrays of `Extend` are at most 2^16 elements, allocated per row. The measurements of section 5 give the peak.
+With an FFT, the commitment loses its two Lagrange tables, n (m - n) elements each, and the work arrays of `Extend` are at most 2^16 elements, allocated per row. What remains large is the circuit and what the sumcheck derives from it. For the version 7 circuits, with the geometry of the production configuration (rate 7, NREQ 132):
+
+| Circuit | Witnesses | Tableau | Size | Circuit terms | Wires | Measured peak |
+|---------|-----------|---------|------|---------------|-------|---------------|
+| hash | 85 349 | 266 rows x 4151 columns | 16.8 MiB | 7 757 579, about 207 MiB | about 53 MiB | 599 MB |
+| signature | 3 986 | 19 rows x 4096 columns | 2.4 MiB | 481 833, about 20 MiB | about 7 MiB | 74 MB |
+
+The tableau is a small part of the peak. The rest is the circuit as loaded, the wires of every layer and the copies the sumcheck prover keeps while it binds them. Every one of these objects is on the heap ([ADR 0047](../adr/0047-heap-allocation-by-ownership.md)), and both provers and verifiers run in the default 8 MB stack.
 
 ## 4. What the proofs guarantee
 
