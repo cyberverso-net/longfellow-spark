@@ -16,6 +16,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - The `prove` workflow's job limit is sixty minutes and the prover units are two proof partitions, `prover` and `ligero-prover`, nine in all (ADR 0054): the one partition of Phase C exceeded both the forty-five and the sixty minute limit on the hosted runner.
 - The proof runs on the project's own proving machine on Google Cloud (ADR 0060): the `prove` workflow starts the VM and runs `make prove` as one job on its self-hosted runner, replacing the partition matrix on hosted runners; `scripts/remote-check.sh` runs `make check` there from the developer's working tree.
 
+### Fixed
+
+- The quadratic row of `Ligero_Prover.Commit` is built in its own procedure, `Quad_Fixed_Row`, so that its witness slots are proved zero in a small context: on the 24-core proving machine, whose cores are slower than the laptop's, the stepping assertions after `Commit_Row` in `Fixed_Rows` ran out of the 120-second timeout. No contract changed.
+
 ## [0.3.0] - 2026-10-19
 
 Phase C: the prover. From a circuit, its inputs and a randomness source to the proof string of Section 7.5, in the reference's order of operations: the two proofs that google/longfellow-zk ships are reproduced byte for byte from their inputs and seeds.
