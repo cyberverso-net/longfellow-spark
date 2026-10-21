@@ -695,6 +695,15 @@ package body Sumcheck_KAT_Generic is
       Expect ("the Appendix B.3 proof", Full, Pub, Ok);
       Expect ("a public input too many", Full, Pub & Zero,
               Public_Input_Length);
+      if Pub'Length > 0 then
+         declare
+            Alt : Element_Array := Pub;
+         begin
+            Alt (Alt'First) := Alt (Alt'First) + One;
+            Expect ("a first public input other than 1", Full, Alt,
+                    Public_Input_Not_One);
+         end;
+      end if;
       if not Valid (Cfg) then
          return;
       end if;

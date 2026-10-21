@@ -4,6 +4,8 @@
 --
 --    Ok               the inputs are admissible and the proof was made
 --    Input_Length     the inputs are not ninput elements
+--    Input_Not_One    the circuit has public inputs and the first is
+--                     not 1 (OneWire, ADR 0064)
 --    Not_Satisfied    an output of layer 0 is not zero or a Z assertion
 --                     fails: the inputs do not satisfy the circuit
 --    Not_In_Subfield  on GF(2^128), a private input below the subfield
@@ -23,6 +25,7 @@ package Prover_Status is
    type Status is
      (Ok,
       Input_Length,
+      Input_Not_One,
       Not_Satisfied,
       Not_In_Subfield,
       Config_Invalid,

@@ -34,8 +34,8 @@
   zk_prove.txt         prove <name> <field> <seed> <rate_inv> <nreq> <ncol>
                              <circuit lfc2> <nin> <inputs...> <status>
                the complete prover (Zk_Prover.Prove) on a small circuit:
-               the status it must report (ok, input_length, not_satisfied,
-               not_in_subfield, config_invalid) and, on ok, the proof must
+               the status it must report (ok, input_length, input_not_one,
+               not_satisfied, not_in_subfield, config_invalid) and, on ok, the proof must
                be accepted by Zk_Verifier under the case name as label
                (completeness, tested: ADR 0052); the bytes themselves are
                checked against the upstream files by the cli step.
@@ -493,6 +493,11 @@ def prove_cases(lines):
          "input_length"),
         ("gf2_128", SC.sgonal_gf2_128(), [1, 0x6C, 5, 7], 1, (4, 6, 64), 0,
          "not_satisfied"),
+        # OneWire (ADR 0064): the first public input is not 1
+        ("gf2_128", SC.sgonal_gf2_128(), [0x6C, 0x6C, 5, 6], 1, (4, 6, 64), 0,
+         "input_not_one"),
+        ("p256", SC.sgonal_p256(), [2, 45, 5, 6], 1, (4, 6, 64), 0,
+         "input_not_one"),
         ("gf2_128", SC.zcheck(), [1, 1, 7], 1, (4, 6, 64), 0, "not_satisfied"),
         ("p256", SC.sgonal_p256(), [1, 45, 5, 7], 1, (4, 6, 64), 0,
          "not_satisfied"),

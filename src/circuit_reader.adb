@@ -45,6 +45,13 @@ package body Circuit_Reader is
    procedure Free_Circuit is
      new Ada.Unchecked_Deallocation (Raw_Circuit, Circuit_Access);
 
+   --  Per wire of a layer, the index of its assertion, or 0.
+   type Marks is array (Natural range <>) of Natural;
+   type Marks_Access is access Marks;
+
+   procedure Free_Marks is
+     new Ada.Unchecked_Deallocation (Marks, Marks_Access);
+
    procedure Free (C : in out Circuit_Access) is
    begin
       Free_Circuit (C);
@@ -626,6 +633,216 @@ package body Circuit_Reader is
    end Walk;
 
    -------------------------------------------------------------------
+   --  The circuit premises (ADR 0064)
+   -------------------------------------------------------------------
+
+   --  Layer J: Ok when every assertion of the layer is alone on its
+   --  wire; then M (W) is the assertion of wire W, or 0.
+   procedure Mark_Layer
+     (C : Raw_Circuit; J : Natural; M : in out Marks; Ok : out Boolean)
+   with
+     Global => null,
+     Pre    => SA.Well_Formed (C) and then J <= C.Last_Layer
+               and then M'First = 0 and then M'Last >= SA.NW_Out (C, J) - 1,
+     Post   =>
+       (Proof_Only =>
+          Ok = Isolated_Layer (C, J)
+          and then
+          (if Ok then
+             (for all W in 0 .. SA.NW_Out (C, J) - 1 =>
+                (M (W) /= 0) = Assert_Wire (C, J, W))))
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Isolated_Layer);
+      First : constant Positive := C.Layers (J).First;
+      Last  : constant Natural := C.Layers (J).Last;
+      NV    : constant Natural := SA.NW_Out (C, J);
+      K     : Natural;
+   begin
+      pragma Assert
+        (SA.Fits (C.Terms (First .. Last), NV, C.Layers (J).NW_In));
+      for W in 0 .. NV - 1 loop
+         M (W) := 0;
+         pragma Loop_Invariant
+           (Proof_Only => (for all V in 0 .. W => M (V) = 0));
+      end loop;
+      Ok := True;
+      --  Each assertion marks its wire; a second one on a marked wire
+      --  is not isolated.
+      for I in First .. Last loop
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (for all W in 0 .. NV - 1 =>
+                 (if M (W) /= 0 then
+                    M (W) in First .. I - 1
+                    and then Is_Assert (C.Terms (M (W)))
+                    and then C.Terms (M (W)).G = W))
+              and then
+              (for all I2 in First .. I - 1 =>
+                 (if Is_Assert (C.Terms (I2)) then
+                    M (C.Terms (I2).G) = I2)));
+         if Is_Assert (C.Terms (I)) then
+            K := M (C.Terms (I).G);
+            if K /= 0 then
+               --  K and I: two terms on one wire, K an assertion.
+               pragma Assert
+                 (Proof_Only =>
+                    K in First .. Last and then K /= I
+                    and then Is_Assert (C.Terms (K))
+                    and then C.Terms (I).G = C.Terms (K).G);
+               pragma Assert (Proof_Only => not Isolated_Layer (C, J));
+               Ok := False;
+               return;
+            end if;
+            M (C.Terms (I).G) := I;
+         end if;
+      end loop;
+      pragma Assert
+        (Proof_Only =>
+           (for all I in First .. Last =>
+              (if Is_Assert (C.Terms (I)) then M (C.Terms (I).G) = I)));
+      --  Any other term on a marked wire.
+      for I in First .. Last loop
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (for all I2 in First .. I - 1 =>
+                 M (C.Terms (I2).G) = 0 or else M (C.Terms (I2).G) = I2));
+         K := M (C.Terms (I).G);
+         if K /= 0 and then K /= I then
+            --  The assertion K shares its wire with I.
+            pragma Assert
+              (Proof_Only =>
+                 K in First .. Last
+                 and then Is_Assert (C.Terms (K))
+                 and then C.Terms (I).G = C.Terms (K).G);
+            pragma Assert (Proof_Only => not Isolated_Layer (C, J));
+            Ok := False;
+            return;
+         end if;
+      end loop;
+      pragma Assert
+        (Proof_Only =>
+           (for all I in First .. Last =>
+              M (C.Terms (I).G) = 0 or else M (C.Terms (I).G) = I));
+      pragma Assert (Proof_Only => Isolated_Layer (C, J));
+      pragma Assert
+        (Proof_Only =>
+           (for all W in 0 .. NV - 1 =>
+              (M (W) /= 0) = Assert_Wire (C, J, W)));
+   end Mark_Layer;
+
+   --  Dead_End_Layer of layer J - 1 from its reads, either way.
+   procedure Lemma_Dead_End (C : Raw_Circuit; J : Positive) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => SA.Well_Formed (C) and then J <= C.Last_Layer
+               and then
+               (for all I in C.Layers (J - 1).First .. C.Layers (J - 1).Last =>
+                  not Assert_Wire (C, J, C.Terms (I).H0)
+                  and then not Assert_Wire (C, J, C.Terms (I).H1)),
+     Post   => Dead_End_Layer (C, J - 1)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Dead_End_Layer);
+   begin
+      null;
+   end Lemma_Dead_End;
+
+   procedure Lemma_Not_Dead_End (C : Raw_Circuit; J : Positive; I : Positive)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => SA.Well_Formed (C) and then J <= C.Last_Layer
+               and then I in C.Layers (J - 1).First .. C.Layers (J - 1).Last
+               and then (Assert_Wire (C, J, C.Terms (I).H0)
+                         or else Assert_Wire (C, J, C.Terms (I).H1)),
+     Post   => not Dead_End_Layer (C, J - 1)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Dead_End_Layer);
+   begin
+      null;
+   end Lemma_Not_Dead_End;
+
+   --  Isolated and Dead_End, layer by layer: the marks of layer J are
+   --  checked against the reads of layer J - 1.
+   procedure Check_Premises (C : Raw_Circuit; St : out Status) with
+     Global => null,
+     Pre    => SA.Well_Formed (C),
+     Post   =>
+       (Runtime => St in Ok | Not_Isolated | Not_Dead_End,
+        Proof_Only =>
+          (St = Ok) = (Isolated (C) and then Dead_End (C))
+          and then (if St = Not_Isolated then not Isolated (C))
+          and then (if St = Not_Dead_End then not Dead_End (C)))
+   is
+      NV_Max : Natural := 0;
+      M      : Marks_Access;
+      Iso    : Boolean;
+   begin
+      for J in 0 .. C.Last_Layer loop
+         pragma Loop_Invariant
+           (for all J2 in 0 .. J - 1 => SA.NW_Out (C, J2) <= NV_Max);
+         pragma Loop_Invariant (NV_Max <= SA.Max_Wires);
+         if SA.NW_Out (C, J) > NV_Max then
+            NV_Max := SA.NW_Out (C, J);
+         end if;
+      end loop;
+      M := new Marks'(0 .. NV_Max - 1 => 0);
+      for J in 0 .. C.Last_Layer loop
+         pragma Loop_Invariant (M /= null and then M'First = 0
+                                and then M'Last = NV_Max - 1);
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (for all J2 in 0 .. J - 1 => Isolated_Layer (C, J2))
+              and then
+              (for all J2 in 0 .. J - 2 => Dead_End_Layer (C, J2)));
+         Mark_Layer (C, J, M.all, Iso);
+         if not Iso then
+            Free_Marks (M);
+            St := Not_Isolated;
+            return;
+         end if;
+         if J > 0 then
+            pragma Assert
+              (SA.NW_Out (C, J) = C.Layers (J - 1).NW_In
+               and then
+               SA.Fits (C.Terms (C.Layers (J - 1).First
+                                 .. C.Layers (J - 1).Last),
+                        SA.NW_Out (C, J - 1), C.Layers (J - 1).NW_In));
+            for I in C.Layers (J - 1).First .. C.Layers (J - 1).Last loop
+               pragma Loop_Invariant
+                 (M /= null and then M'First = 0
+                  and then M'Last = NV_Max - 1);
+               pragma Loop_Invariant
+                 (Proof_Only =>
+                    (for all I2 in C.Layers (J - 1).First .. I - 1 =>
+                       not Assert_Wire (C, J, C.Terms (I2).H0)
+                       and then not Assert_Wire (C, J, C.Terms (I2).H1)));
+               pragma Assert
+                 (C.Terms (I).H0 < SA.NW_Out (C, J)
+                  and then C.Terms (I).H1 < SA.NW_Out (C, J));
+               if M (C.Terms (I).H0) /= 0 or else M (C.Terms (I).H1) /= 0
+               then
+                  pragma Assert
+                    (Proof_Only =>
+                       Assert_Wire (C, J, C.Terms (I).H0)
+                       or else Assert_Wire (C, J, C.Terms (I).H1));
+                  Lemma_Not_Dead_End (C, J, I);
+                  Free_Marks (M);
+                  St := Not_Dead_End;
+                  return;
+               end if;
+            end loop;
+            Lemma_Dead_End (C, J);
+         end if;
+      end loop;
+      pragma Assert (Proof_Only => Isolated (C) and then Dead_End (C));
+      Free_Marks (M);
+      St := Ok;
+   end Check_Premises;
+
+   -------------------------------------------------------------------
    --  Read
    -------------------------------------------------------------------
 
@@ -668,6 +885,11 @@ package body Circuit_Reader is
       if not SA.Well_Formed (C.all) then
          Free (C);
          St := Not_Well_Formed;
+         return;
+      end if;
+      Check_Premises (C.all, St);
+      if St /= Ok then
+         Free (C);
          return;
       end if;
       Id := B (Cnt.Id_Pos .. Cnt.Id_Pos + 31);

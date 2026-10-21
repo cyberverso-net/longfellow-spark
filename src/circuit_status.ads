@@ -20,6 +20,12 @@
 --                       core (a wire outside its layer's width, a width
 --                       above 2^logw, a last layer not reading ninput
 --                       wires, npublic above ninput)
+--    Not_Isolated       an assertion (a term of constant zero) shares
+--                       its wire with another term (Isolated of
+--                       upstream's Lean proofs, ADR 0064; stricter than
+--                       the upstream reader)
+--    Not_Dead_End       a term reads an assertion of the layer below
+--                       (DeadEnd, ADR 0064; stricter than upstream)
 --
 --  Documentation: docs/guide/06-circuits.md. Proof status: an
 --  enumeration, nothing to prove.
@@ -40,6 +46,8 @@ package Circuit_Status is
       Truncated,
       Trailing_Bytes,
       Id_Mismatch,
-      Not_Well_Formed);
+      Not_Well_Formed,
+      Not_Isolated,
+      Not_Dead_End);
 
 end Circuit_Status;

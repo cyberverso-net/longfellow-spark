@@ -333,6 +333,7 @@ def read_lfc2(fld, data: bytes):
         circ, sfb, ident = parse_body(fld, Cursor(data))
         if not well_formed(circ):
             raise Reject("not_well_formed")
+        premises(circ)
         if compute_id(fld, circ, sfb) != ident:
             raise Reject("id_mismatch")
         return "ok", circ, sfb, ident
@@ -352,6 +353,28 @@ def well_formed(circ) -> bool:
                 return False
         nv = nw
     return circ["layers"][-1][1] == circ["ninput"]
+
+
+def premises(circ) -> None:
+    """Isolated and DeadEnd of upstream's Lean proofs (ADR 0064), in the
+    order of Circuit_Reader: layer by layer from the output, each
+    layer's assertions alone on their wires, then the reads of the
+    layer above against them. An assertion is a term of constant 0."""
+    layers = circ["layers"]
+    for j, (_, _, terms) in enumerate(layers):
+        mark = {}
+        for i, (g, _, _, k) in enumerate(terms):
+            if k == 0:
+                if g in mark:
+                    raise Reject("not_isolated")
+                mark[g] = i
+        for i, (g, _, _, _) in enumerate(terms):
+            if mark.get(g, i) != i:
+                raise Reject("not_isolated")
+        if j > 0:
+            for _, h0, h1, _ in layers[j - 1][2]:
+                if h0 in mark or h1 in mark:
+                    raise Reject("not_dead_end")
 
 
 # ------------------------------------------------------------- output
@@ -538,6 +561,16 @@ def main() -> None:
     bad["npublic"] = 5
     bad["ninput"] = 4
     case("npublic_above_ninput", "not_well_formed", write_lfc2(fld, bad))
+    # the circuit premises (ADR 0064): an assertion sharing its wire, and
+    # a term reading an assertion of the layer below
+    bad = SC.zcheck()
+    logw, nw, terms = bad["layers"][0]
+    bad["layers"][0] = (logw, nw, terms + [(1, 2, 2, 1)])
+    case("assertion_not_isolated", "not_isolated", write_lfc2(fld, bad))
+    bad = SC.sgonal_gf2_128()
+    logw, nw, terms = bad["layers"][1]
+    bad["layers"][1] = (logw, nw, terms[:-1] + [(4, 0, 1, 0)])
+    case("assertion_read", "not_dead_end", write_lfc2(fld, bad))
     # a negative prefix sum: a delta that takes g below zero
     neg = SC.sgonal_gf2_128()
     logw, nw, terms = neg["layers"][0]

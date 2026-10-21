@@ -7,29 +7,31 @@
 --  the sumcheck prover over the same transcript glue and the writers.
 --
 --  Prove validates first (ADR 0049): the inputs are ninput elements
---  (Input_Length); they satisfy the circuit (Not_Satisfied, from
---  Eval_Circuit of stage 3: every output of layer 0 zero and every Z
---  assertion met); and the witnesses the writer will project on the
---  subfield lie in it (Not_In_Subfield): those of the witness rows
---  wholly below the subfield boundary (Proof_Writer.Sub_Rows, the
---  rows the reference writer projects and where its prover would
---  panic), which must all be private inputs (a pad there is a
---  full-field element) and each of which is projected with the fixed
---  map of ADR 0051, re-injected and compared, the differences
---  accumulated in one mask; nothing is projected when the field is
---  its own subfield (P-256). The last two checks are skipped when the
---  generic formal Validate is False, which only the test project does.
---  Then, in the reference's order: the pads (Sample_Pads), the
---  witness vector (the private inputs, then the pads), the quadratic
---  triples (Lqc_Triples), the Ligero commitment (Commit; Config_Invalid
---  when a Lagrange denominator has no inverse), the transcript (the
---  label, the root, the statement), the sumcheck proof on the live
---  transcript with its challenges recorded (Sumcheck_Prover.Prove), the
---  verifier core on those challenges for the constraints (ADR 0022,
---  0049), the Ligero proof under the fixed statement hash of zk/
---  common.rs (Exhausted when the generator passes its bound), and the
---  bytes (Write_Proof). Memory: the wires, the pads, the witness
---  vector, the proofs and the constraints live on the heap (ADR 0047).
+--  (Input_Length); the first is 1 when the circuit has public inputs
+--  (Input_Not_One, OneWire of ADR 0064); they satisfy the circuit
+--  (Not_Satisfied, from Eval_Circuit of stage 3: every output of layer
+--  0 zero and every Z assertion met); and the witnesses the writer will
+--  project on the subfield lie in it (Not_In_Subfield): those of the
+--  witness rows wholly below the subfield boundary
+--  (Proof_Writer.Sub_Rows, the rows the reference writer projects and
+--  where its prover would panic), which must all be private inputs (a
+--  pad there is a full-field element) and each of which is projected
+--  with the fixed map of ADR 0051, re-injected and compared, the
+--  differences accumulated in one mask; nothing is projected when the
+--  field is its own subfield (P-256). The last two checks are skipped
+--  when the generic formal Validate is False, which only the test
+--  project does. Then, in the reference's order: the pads
+--  (Sample_Pads), the witness vector (the private inputs, then the
+--  pads), the quadratic triples (Lqc_Triples), the Ligero commitment
+--  (Commit; Config_Invalid when a Lagrange denominator has no inverse),
+--  the transcript (the label, the root, the statement), the sumcheck
+--  proof on the live transcript with its challenges recorded
+--  (Sumcheck_Prover.Prove), the verifier core on those challenges for
+--  the constraints (ADR 0022, 0049), the Ligero proof under the fixed
+--  statement hash of zk/ common.rs (Exhausted when the generator passes
+--  its bound), and the bytes (Write_Proof). Memory: the wires, the
+--  pads, the witness vector, the proofs and the constraints live on the
+--  heap (ADR 0047).
 --
 --  Documentation: docs/guide/07-prover.md.
 --
@@ -69,6 +71,8 @@ package Zk_Prover is
    subtype Element is LPR.LV.ST.SA.Element;
    subtype Element_Array is LPR.LV.ST.SA.Element_Array;
    subtype Circuit is LPR.LV.ST.SA.Circuit;
+
+   use type LPR.LV.ST.SA.Element;
 
    --  The statement hash the reference passes to Ligero, fixed for
    --  backward compatibility (DEFAULT_STATEMENT_HASH of zk/common.rs);
@@ -127,6 +131,9 @@ package Zk_Prover is
        and then B'First = 0 and then B'Length = Max_Proof_Len (Cfg, C, Sfb),
      Post              =>
        (if St = Ok then Len in 1 .. B'Length else Len = 0)
-       and then (St = Input_Length) = (Inputs'Length /= C.Ninput);
+       and then (St = Input_Length) = (Inputs'Length /= C.Ninput)
+       and then (St = Input_Not_One)
+                = (Inputs'Length = C.Ninput and then C.Npublic > 0
+                   and then Inputs (0) /= LPR.LV.ST.SA.One);
 
 end Zk_Prover;

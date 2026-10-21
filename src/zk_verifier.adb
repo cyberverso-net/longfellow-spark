@@ -118,6 +118,13 @@ package body Zk_Verifier is
          St := Public_Input_Length;
          return;
       end if;
+      if C.Npublic > 0 and then Pub (0) /= LV.ST.SA.One then
+         St := Public_Input_Not_One;
+         return;
+      end if;
+      pragma Assert
+        (Pub'Length = C.Npublic
+         and then (C.Npublic = 0 or else Pub (0) = LV.ST.SA.One));
       if not LV.LP.Fits (G) then
          St := Proof_Encoding;
          return;
@@ -189,6 +196,8 @@ package body Zk_Verifier is
          LV.ST.SV.Lemma_Pads_Below (C);
          LV.Verify (Cfg, NW, W.B_Vec, Root, W.Lig, W.A,
                     Default_Statement_Hash, W.Lqc, St);
+         pragma Assert
+           (St not in Queried_Columns_Length | Polynomial_Lengths);
          Free_Work (W);
       end;
    end Verify;

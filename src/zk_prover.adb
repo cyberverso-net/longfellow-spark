@@ -232,6 +232,10 @@ package body Zk_Prover is
          St := Input_Length;
          return;
       end if;
+      if C.Npublic > 0 and then Inputs (0) /= LPR.LV.ST.SA.One then
+         St := Input_Not_One;
+         return;
+      end if;
       pragma Assert
         (G.Num_Quad_Rows
          = (C.Last_Layer + 1 + G.Witnesses_Per_Row - 1)
