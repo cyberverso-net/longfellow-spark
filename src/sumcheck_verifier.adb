@@ -1,8 +1,15 @@
 pragma SPARK_Mode (On);
 
 with Interfaces; use Interfaces;
+with Ada.Unchecked_Deallocation;
 
 package body Sumcheck_Verifier is
+
+   --  The eq2 table of the input constraint, on the heap (ADR 0047).
+   type Elems_Access is access Element_Array;
+
+   procedure Free_Elems is
+     new Ada.Unchecked_Deallocation (Element_Array, Elems_Access);
 
    ----------------------------------------------------------------------
    --  Offset lemmas (the bodies of the offset functions are hidden).
@@ -286,11 +293,22 @@ package body Sumcheck_Verifier is
             end;
          end loop;
 
+         --  The bound quad, by the bindeq tables when they fit (Phase D,
+         --  M1), otherwise term by term as Section 6.7 writes it.
          declare
-            EQQ  : constant Element :=
-              Eval_Bound_Quad (Layer_Terms (C, J), State.Logv,
-                               State.HC0, State.HC1, HC0, HC1, Logw,
-                               Alpha, Beta);
+            EQQ_V : Element;
+         begin
+            if State.Logv <= Max_Bindeq_Log and then Logw <= Max_Bindeq_Log then
+               Eval_Bound_Quad_T (Layer_Terms (C, J), State.Logv,
+                                  State.HC0, State.HC1, HC0, HC1, Logw,
+                                  Alpha, Beta, EQQ_V);
+            else
+               EQQ_V := Eval_Bound_Quad (Layer_Terms (C, J), State.Logv,
+                                         State.HC0, State.HC1, HC0, HC1,
+                                         Logw, Alpha, Beta);
+            end if;
+         declare
+            EQQ  : constant Element := EQQ_V;
             C0   : constant Natural := PB + 4 * Logw;
             C1   : constant Natural := C0 + 1;
             CR   : constant Natural := C0 + 2;
@@ -331,6 +349,7 @@ package body Sumcheck_Verifier is
                       Claim1   => Add_Constant (Var (C1, Cap), Cl1),
                       HC0      => HC0,
                       HC1      => HC1);
+         end;
          end;
       end;
    end Verify_Layer;
@@ -398,11 +417,21 @@ package body Sumcheck_Verifier is
      (C     : Circuit;
       State : Claims_State;
       Alpha : Element;
+      E     : Element_Array;
       A     : in out Ligero_Terms;
       Cst   : Natural)
    with
      Global => null,
-     Pre  => A.Max + 1 - A.Count >= C.Ninput - C.Npublic,
+     Pre  =>
+       (Runtime =>
+          A.Max + 1 - A.Count >= C.Ninput - C.Npublic and then E'First = 0
+          and then (if State.Logv <= Max_Bindeq_Log
+                    then E'Last = Table_Len (State.Logv) - 1),
+        Proof_Only =>
+          (if State.Logv <= Max_Bindeq_Log then
+             (for all X in E'Range =>
+                Same (E (X), Beq2 (X, State.Logv, State.HC0, State.HC1,
+                                   Alpha))))),
      Post =>
        (Runtime =>
           A.Count = A.Count'Old + (C.Ninput - C.Npublic)
@@ -418,18 +447,19 @@ package body Sumcheck_Verifier is
         Proof_Only =>
           (for all W in 0 .. C.Ninput - C.Npublic - 1 =>
              Same (A.Coeff (A.Count'Old + W),
-                   Eq2 (C.Npublic + W, State.Logv,
-                        State.HC0, State.HC1, Alpha))))
+                   In_Coef (C.Npublic + W, State, Alpha))))
    is
       Start : constant Natural := A.Count;
       NP    : constant Wire_Count := C.Npublic;
       NW    : constant Natural := C.Ninput - C.Npublic;
+      Fast  : constant Boolean := State.Logv <= Max_Bindeq_Log;
       Constraint_Before : constant Index_Array := A.Constraint with Ghost;
       Witness_Before    : constant Index_Array := A.Witness with Ghost;
    begin
       for W in 0 .. NW - 1 loop
          A.Coeff (Start + W) :=
-           Eq2 (NP + W, State.Logv, State.HC0, State.HC1, Alpha);
+           (if Fast then Pad (E, NP + W)
+            else Eq2 (NP + W, State.Logv, State.HC0, State.HC1, Alpha));
          A.Constraint (Start + W) := Cst;
          A.Witness (Start + W)    := W;
          pragma Loop_Invariant (A.Count = Start);
@@ -444,9 +474,7 @@ package body Sumcheck_Verifier is
          pragma Loop_Invariant
            (Proof_Only =>
               (for all K in 0 .. W =>
-                 Same (A.Coeff (Start + K),
-                       Eq2 (NP + K, State.Logv, State.HC0, State.HC1,
-                            Alpha))));
+                 Same (A.Coeff (Start + K), In_Coef (NP + K, State, Alpha))));
          pragma Loop_Invariant
            (for all K in 0 .. Start - 1 =>
               A.Witness (K) = Witness_Before (K)
@@ -469,12 +497,22 @@ package body Sumcheck_Verifier is
       WC    : constant Natural := Witness_Count (C);
       Start : constant Natural := A.Count;
       Cst   : constant Natural := B_Count;
+      Fast  : constant Boolean := State.Logv <= Max_Bindeq_Log;
       Binding : Element := Zero;
+      --  The eq2 table of the final binding (Phase D, M1); one unused
+      --  element when it does not fit.
+      E : Elems_Access :=
+        new Element_Array'(0 .. (if Fast then Table_Len (State.Logv) - 1 else 0)
+                           => Zero);
    begin
+      if Fast then
+         Eq2_Table (State.Logv, State.HC0, State.HC1, Alpha, E.all);
+      end if;
       for I in 0 .. NP - 1 loop
          Binding := SA."+" (Binding,
-                            SA."*" (Eq2 (I, State.Logv, State.HC0,
-                                         State.HC1, Alpha),
+                            SA."*" ((if Fast then Pad (E.all, I)
+                                     else Eq2 (I, State.Logv, State.HC0,
+                                               State.HC1, Alpha)),
                                     Pub (I)));
          pragma Loop_Invariant
            (Proof_Only =>
@@ -484,7 +522,8 @@ package body Sumcheck_Verifier is
         (Proof_Only =>
            Same (Binding, Pub_Binding_Ref (Pub, State, Alpha, NP)));
 
-      Append_Inputs (C, State, Alpha, A, Cst);
+      Append_Inputs (C, State, Alpha, E.all, A, Cst);
+      Free_Elems (E);
       --  The input terms name witnesses below NW, and NW is below the
       --  witness count: the private inputs come before every pad.
       pragma Assert (NW <= WC);

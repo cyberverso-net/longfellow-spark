@@ -453,4 +453,129 @@ package body Sumcheck_Algebra is
       return S;
    end Eval_Bound_Quad;
 
+   ----------------------------------------------------------------------
+   --  Eval_Bound_Quad_T
+   ----------------------------------------------------------------------
+
+   --  Pow2 (24) = 2^24, one unfolding at a time.
+   procedure Lemma_Pow2_Max with
+     Ghost, Global => null,
+     Post => Pow2 (Max_Bindeq_Log) = To_Big_Integer (2**Max_Bindeq_Log);
+
+   procedure Lemma_Pow2_Max is
+   begin
+      pragma Assert (Pow2 (0) = To_Big_Integer (1));
+      pragma Assert (Pow2 (1) = To_Big_Integer (2));
+      pragma Assert (Pow2 (2) = To_Big_Integer (4));
+      pragma Assert (Pow2 (3) = To_Big_Integer (8));
+      pragma Assert (Pow2 (4) = To_Big_Integer (16));
+      pragma Assert (Pow2 (5) = To_Big_Integer (32));
+      pragma Assert (Pow2 (6) = To_Big_Integer (64));
+      pragma Assert (Pow2 (7) = To_Big_Integer (128));
+      pragma Assert (Pow2 (8) = To_Big_Integer (256));
+      pragma Assert (Pow2 (9) = To_Big_Integer (512));
+      pragma Assert (Pow2 (10) = To_Big_Integer (1024));
+      pragma Assert (Pow2 (11) = To_Big_Integer (2048));
+      pragma Assert (Pow2 (12) = To_Big_Integer (4096));
+      pragma Assert (Pow2 (13) = To_Big_Integer (8192));
+      pragma Assert (Pow2 (14) = To_Big_Integer (16384));
+      pragma Assert (Pow2 (15) = To_Big_Integer (32768));
+      pragma Assert (Pow2 (16) = To_Big_Integer (65536));
+      pragma Assert (Pow2 (17) = To_Big_Integer (131072));
+      pragma Assert (Pow2 (18) = To_Big_Integer (262144));
+      pragma Assert (Pow2 (19) = To_Big_Integer (524288));
+      pragma Assert (Pow2 (20) = To_Big_Integer (1048576));
+      pragma Assert (Pow2 (21) = To_Big_Integer (2097152));
+      pragma Assert (Pow2 (22) = To_Big_Integer (4194304));
+      pragma Assert (Pow2 (23) = To_Big_Integer (8388608));
+      pragma Assert (Pow2 (24) = To_Big_Integer (16777216));
+   end Lemma_Pow2_Max;
+
+   function Table_Len (L : Natural) return Positive is
+      Len : Positive := 1;
+   begin
+      Lemma_Pow2_Max;
+      for K in 1 .. L loop
+         pragma Loop_Invariant (To_Big_Integer (Len) = Pow2 (K - 1));
+         Lemma_Pow2_Mono (K - 1, Max_Bindeq_Log);
+         Len := 2 * Len;
+      end loop;
+      Lemma_Pow2_Mono (L, Max_Bindeq_Log);
+      return Len;
+   end Table_Len;
+
+   procedure Eq2_Table
+     (L      : Natural;
+      G0, G1 : Element_Array;
+      Alpha  : Element;
+      E      : out Element_Array)
+   is
+      N  : constant Positive := Table_Len (L);
+      B1 : Elems_Access := new Element_Array'(0 .. N - 1 => Zero);
+   begin
+      Bindeq (G0 (0 .. L - 1), E);
+      Bindeq (G1 (0 .. L - 1), B1.all);
+      for X in 0 .. N - 1 loop
+         E (X) := E (X) + Alpha * B1 (X);
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (for all X2 in 0 .. X =>
+                 Same (E (X2), Beq2 (X2, L, G0, G1, Alpha))));
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (for all X2 in X + 1 .. N - 1 =>
+                 Same (E (X2), Bindeq_Ref (G0 (0 .. L - 1), 0, X2))));
+      end loop;
+      Free_Elems (B1);
+   end Eq2_Table;
+
+   procedure Eval_Bound_Quad_T
+     (T        : Term_Array;
+      Logv     : Natural;
+      G0, G1   : Element_Array;
+      HC0, HC1 : Element_Array;
+      Logw     : Natural;
+      Alpha, Beta : Element;
+      Result   : out Element)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", EBQT_Ref);
+      NV  : constant Positive := Table_Len (Logv);
+      NW  : constant Positive := Table_Len (Logw);
+      E   : Elems_Access := new Element_Array'(0 .. NV - 1 => Zero);
+      H0t : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
+      H1t : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
+      S   : Element := Zero;
+   begin
+      --  E = bindeq (G0) + alpha bindeq (G1), the eq2 of every g.
+      Eq2_Table (Logv, G0, G1, Alpha, E.all);
+      --  bindeq of the two hands' challenges.
+      Bindeq (HC0 (0 .. Logw - 1), H0t.all);
+      Bindeq (HC1 (0 .. Logw - 1), H1t.all);
+      for I in T'Range loop
+         pragma Loop_Invariant
+           (Proof_Only =>
+              Same (S, EBQT_Ref (T, I - T'First, Logv, G0, G1, HC0, HC1,
+                                 Logw, Alpha, Beta)));
+         declare
+            Tm  : constant Term := T (I);
+            Dot : constant Element := Pad (E.all, Tm.G);
+            Kv  : constant Element :=
+              (if Tm.K = Zero then Beta * Dot else Tm.K * Dot);
+         begin
+            pragma Assert
+              (Proof_Only => Same (Dot, Beq2 (Tm.G, Logv, G0, G1, Alpha)));
+            pragma Assert
+              (Proof_Only =>
+                 Same (Pad (H0t.all, Tm.H0), Beq (HC0, Logw, Tm.H0))
+                 and then Same (Pad (H1t.all, Tm.H1), Beq (HC1, Logw, Tm.H1)));
+            S := S + ((Kv * Pad (H0t.all, Tm.H0)) * Pad (H1t.all, Tm.H1));
+         end;
+      end loop;
+      Result := S;
+      Free_Elems (E);
+      Free_Elems (H0t);
+      Free_Elems (H1t);
+   end Eval_Bound_Quad_T;
+
 end Sumcheck_Algebra;
