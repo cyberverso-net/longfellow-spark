@@ -20,15 +20,16 @@
 --  the statement hash), 0039 (sizes, the status), 0028 (the replay);
 --  frame: ADR 0022, 0024. Index: docs/adr/README.md.
 --
---  Proof status (per instance). Silver with proved shape: the status is
---  one of the listed values; Public_Input_Length exactly when the
---  public inputs are not the circuit's; the two length statuses of the
---  Ligero verifier cannot occur, since the reader sizes the record by
---  the same geometry. The preconditions of the Ligero verifier (every
---  term and triple of the core below the slots of the constraint
---  vector) are discharged from the postcondition of the core (every
---  witness index below Witness_Count) and the geometry's rows covering
---  the witnesses. Soundness is the paper's theorem, out of scope.
+--  Proof status (per instance). Silver with proved shape: the status is one
+--  of the listed values; Public_Input_Length exactly when the public inputs
+--  are not the circuit's; Public_Input_Not_One exactly when there are
+--  public inputs and the first is not 1 (ADR 0064); the two length statuses
+--  of the Ligero verifier cannot occur, since the reader sizes the record
+--  by the same geometry. The preconditions of the Ligero verifier (every
+--  term and triple of the core below the slots of the constraint vector)
+--  are discharged from the postcondition of the core (every witness index
+--  below Witness_Count) and the geometry's rows covering the witnesses.
+--  Soundness is the paper's theorem, out of scope.
 --
 --  Sizes (ADR 0039, ADR 0047): the proof, the challenges, the
 --  constraints and the quadratic triples form one record sized by the
@@ -57,6 +58,8 @@ package Zk_Verifier is
    subtype Circuit is LV.ST.SA.Circuit;
    subtype Sumcheck_Proof is LV.ST.SV.Sumcheck_Proof;
    subtype Ligero_Part is LV.LP.Proof;
+
+   use type LV.ST.SA.Element;
 
    --  DEFAULT_STATEMENT_HASH of zk/common.rs.
    Default_Statement_Hash : constant Bytes_32 :=
@@ -125,6 +128,9 @@ package Zk_Verifier is
        and then B'First = 0,
      Post              =>
        St not in Queried_Columns_Length | Polynomial_Lengths
-       and then (St = Public_Input_Length) = (Pub'Length /= C.Npublic);
+       and then (St = Public_Input_Length) = (Pub'Length /= C.Npublic)
+       and then (St = Public_Input_Not_One)
+                = (Pub'Length = C.Npublic and then C.Npublic > 0
+                   and then Pub (0) /= LV.ST.SA.One);
 
 end Zk_Verifier;

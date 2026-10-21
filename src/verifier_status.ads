@@ -4,6 +4,9 @@
 --
 --    Ok                     accepted.
 --    Public_Input_Length    the public inputs are not the circuit's.
+--    Public_Input_Not_One   the circuit has public inputs and the first
+--                           is not 1 (OneWire of upstream's Lean proofs,
+--                           ADR 0064; stricter than upstream).
 --    Queried_Columns_Length the opened columns are not NROW * NREQ.
 --    Polynomial_Lengths     a response polynomial, the nonces or the
 --                           path capacity do not match the geometry.
@@ -31,6 +34,7 @@ package Verifier_Status is
    type Status is
      (Ok,
       Public_Input_Length,
+      Public_Input_Not_One,
       Queried_Columns_Length,
       Polynomial_Lengths,
       Exhausted,

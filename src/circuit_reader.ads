@@ -12,14 +12,14 @@
 --  is the layer's term list; then the 32-byte identifier, SHA-256 of
 --  the canonical form (compute_id of rust/core/proto/src/circuit.rs).
 --
---  Read makes two passes over the bytes: the first validates and
---  counts the layers and terms, the second allocates the circuit once
---  on the heap (ADR 0047) and fills it; then Well_Formed of the core is
---  checked and the identifier recomputed and compared. Where this
---  project is stricter than upstream the header of Circuit_Status says
---  so. The circuit is returned through an access type under SPARK's
---  ownership rules; the caller passes C.all to the verifier and calls
---  Free when done.
+--  Read makes two passes over the bytes: the first validates and counts
+--  the layers and terms, the second allocates the circuit once on the
+--  heap (ADR 0047) and fills it; then Well_Formed of the core and the
+--  two premises are checked and the identifier recomputed and compared.
+--  Where this project is stricter than upstream the header of
+--  Circuit_Status says so. The circuit is returned through an access
+--  type under SPARK's ownership rules; the caller passes C.all to the
+--  verifier and calls Free when done.
 --
 --  Documentation: docs/guide/06-circuits.md. Decisions: ADR 0046
 --  (scope, the format, the status), 0047 (the heap), 0048 (vectors);
@@ -28,15 +28,17 @@
 --  Proof status. Silver on arbitrary bytes, with the ownership checks
 --  (no dangling or null dereference, every allocation freed on every
 --  path that does not return it). Gold on the shape of the result: on
---  Ok the circuit is well formed and its identifier is the stored one;
---  on any other status no circuit is returned. The expansion of
---  deltas, segments and tokens agrees with upstream by the vectors
---  (ADR 0048), not by proof.
+--  Ok the circuit is well formed, satisfies the premises Isolated and
+--  Dead_End of upstream's Lean proofs (ADR 0064) and its identifier is
+--  the stored one; on any other status no circuit is returned. The
+--  expansion of deltas, segments and tokens agrees with upstream by the
+--  vectors (ADR 0048), not by proof.
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037.
 
 pragma SPARK_Mode (On);
 
+with Proof_Levels;
 with Bytes;           use Bytes;
 with Sumcheck_Algebra;
 with Circuit_Status;  use Circuit_Status;
@@ -82,10 +84,63 @@ package Circuit_Reader is
    with Global => null,
         Pre    => SA.Well_Formed (C);
 
+   -------------------------------------------------------------------
+   --  The circuit premises of upstream's Lean proofs (ADR 0064)
+   -------------------------------------------------------------------
+
+   use type SA.Element;
+
+   --  An assertion: a term whose constant is zero (assert-zero).
+   function Is_Assert (T : SA.Term) return Boolean is (T.K = SA.Zero)
+   with Global => null;
+
+   --  AssertWire: wire W of layer J carries an assertion.
+   function Assert_Wire (C : Raw_Circuit; J, W : Natural) return Boolean is
+     (for some I in C.Layers (J).First .. C.Layers (J).Last =>
+        Is_Assert (C.Terms (I)) and then C.Terms (I).G = W)
+   with Ghost => Proof_Only,
+        Global => null,
+        Pre    => SA.Well_Formed (C) and then J <= C.Last_Layer;
+
+   --  Isolated, on layer J: an assertion is the only term on its wire.
+   --  This predicate and the next are hidden; the reader's body unhides
+   --  them where it proves them.
+   function Isolated_Layer (C : Raw_Circuit; J : Natural) return Boolean is
+     (for all I in C.Layers (J).First .. C.Layers (J).Last =>
+        (if Is_Assert (C.Terms (I)) then
+           (for all I2 in C.Layers (J).First .. C.Layers (J).Last =>
+              (if C.Terms (I2).G = C.Terms (I).G then I2 = I))))
+   with Ghost => Proof_Only,
+        Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre    => SA.Well_Formed (C) and then J <= C.Last_Layer;
+
+   --  DeadEnd, on layer J: no term reads an assertion of layer J + 1.
+   function Dead_End_Layer (C : Raw_Circuit; J : Natural) return Boolean is
+     (for all I in C.Layers (J).First .. C.Layers (J).Last =>
+        not Assert_Wire (C, J + 1, C.Terms (I).H0)
+        and then not Assert_Wire (C, J + 1, C.Terms (I).H1))
+   with Ghost => Proof_Only,
+        Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre    => SA.Well_Formed (C) and then J < C.Last_Layer;
+
+   function Isolated (C : Raw_Circuit) return Boolean is
+     (for all J in 0 .. C.Last_Layer => Isolated_Layer (C, J))
+   with Ghost => Proof_Only,
+        Global => null,
+        Pre    => SA.Well_Formed (C);
+
+   function Dead_End (C : Raw_Circuit) return Boolean is
+     (for all J in 0 .. C.Last_Layer - 1 => Dead_End_Layer (C, J))
+   with Ghost => Proof_Only,
+        Global => null,
+        Pre    => SA.Well_Formed (C);
+
    --  The loader. On Ok, C is the circuit (well formed) and H its
    --  header, with H.Id the identifier the file stored, equal to the
-   --  recomputed one; on any other status C is null and H is
-   --  Null_Header.
+   --  recomputed one, and the circuit satisfies Isolated and Dead_End;
+   --  on any other status C is null and H is Null_Header.
    procedure Read
      (B  : Byte_Array;
       C  : out Circuit_Access;
@@ -95,12 +150,15 @@ package Circuit_Reader is
      Global => null,
      Pre    => B'First = 0,
      Post   =>
-       (St = Ok) = (C /= null)
-       and then (if St = Ok then
-                   SA.Well_Formed (C.all)
-                   and then H.Field_Id = Field_Id
-                   and then H.Id = Compute_Id (C.all, H.Subfield_Boundary)
-                 else H = Null_Header);
+       (Runtime =>
+          (St = Ok) = (C /= null)
+          and then (if St = Ok then
+                      SA.Well_Formed (C.all)
+                      and then H.Field_Id = Field_Id
+                      and then H.Id = Compute_Id (C.all, H.Subfield_Boundary)
+                    else H = Null_Header),
+        Proof_Only =>
+          (if St = Ok then Isolated (C.all) and then Dead_End (C.all)));
 
    procedure Free (C : in out Circuit_Access) with
      Global => null,

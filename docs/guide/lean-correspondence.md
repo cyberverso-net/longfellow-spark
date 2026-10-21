@@ -24,7 +24,7 @@ The theorems are about a verifier written in Lean, which transcribes upstream's 
 
 The other premises upstream lists are:
 
-- **The circuits.** `WellFormedP`, `Isolated` and `DeadEnd` hold on the registered circuits. Upstream checks them with Rust tools outside Lean, and the identification of the circuit files with Lean's `QuadCircuit` data is outside Lean too.
+- **The circuits.** `WellFormedP`, `Isolated` and `DeadEnd` hold on the registered circuits. Upstream checks them with Rust tools outside Lean, and the identification of the circuit files with Lean's `QuadCircuit` data is outside Lean too. This project checks `Isolated` and `DeadEnd` itself, when it loads a circuit.
 - **The challenge sampler.** Each transcript answer is an ideal uniform coin. The correspondence with SHA-256, the AES expansion and the rejection samplers is not proved.
 - **The hash model.** A Merkle random oracle and an independent transcript oracle.
 - **The commitments.** The byte encoding, the leaf as nonce and column, and the root as context are deployment obligations.
@@ -37,10 +37,10 @@ For each element of the Lean model, the unit of this project that implements it,
 | Lean model | This project | Link |
 |------------|--------------|------|
 | `QuadCircuit`: layers of terms ⟨g, h0, h1, v⟩, `ninp`, `npub`; layer 0 is the output layer | `Sumcheck_Algebra.Circuit`, built by `Circuit_Reader.Read` from the LFC2 bytes | Proved: the reader returns, on `Ok`, a circuit of this shape with its identifier recomputed. Lean's own premise "the circuit is the artifact's bytes" is closed on our side by a proved parser; the agreement of the two shapes is by reading. |
-| `WellFormed`: wire indices in range, `nv <= 2^logw`, `0 < npub <= ninp` | `Well_Formed`, the type predicate of `Circuit` | Proved, and stricter on the indices: each term reads only wires of its own layers. Not checked: `0 < npub`. |
-| `OneWire`: input wire 0 is the public constant 1 | not checked | Open. Proposed: the verifier refuses a statement whose first public input is not `One`, with a proved postcondition. |
-| `Isolated`: an assert-zero term is the only term on its output wire | not checked | Open. Proposed: a proved check in the loader. |
-| `DeadEnd`: no term reads an assert-zero wire of the layer below | not checked | Open. Proposed: a proved check in the loader. |
+| `WellFormed`: wire indices in range, `nv <= 2^logw`, `0 < npub <= ninp` | `Well_Formed`, the type predicate of `Circuit` | Proved, and stricter on the indices: each term reads only wires of its own layers. Not checked: `0 < npub` (see below). |
+| `OneWire`: input wire 0 is the public constant 1 | `Zk_Verifier.Verify` (`Public_Input_Not_One`) and `Zk_Prover.Prove` (`Input_Not_One`) | Proved: each status is returned exactly when the circuit has public inputs and the first is not 1. A circuit without public inputs is accepted as upstream accepts it; its wire 0 is private, and such a circuit lies outside the Lean model. |
+| `Isolated`: an assert-zero term is the only term on its output wire | `Circuit_Reader.Read` (`Not_Isolated`), against the ghost predicate `Isolated` | Proved: on `Ok` the circuit satisfies the predicate. The predicate transcribes Lean's definition; the agreement is by reading. |
+| `DeadEnd`: no term reads an assert-zero wire of the layer below | `Circuit_Reader.Read` (`Not_Dead_End`), against the ghost predicate `Dead_End` | Proved, as for `Isolated`. |
 | `Satisfied`: every assert-zero hand product is zero at the honest wires, every output is zero | `Eval_Circuit` (Gold): its status is "all Z assertions hold and every output is zero" | Proved against `Z_Ref` and `Layer_Holds`; the agreement with `Satisfied` is by reading. The factor order differs (we write w(h1) w(h0)), which is the same value. |
 | Padded sumcheck rounds, p(1) := claim − p(0), no cleartext round check | `Sumcheck_Verifier.Symbolic_Round` (Gold by definition) and `Verify_Layer` | Proved that the code computes this formula; agreement with the model by reading. |
 | `begin_circuit` puts both claim points at G | `Verifier_Core`: the first `Claims_State` has HC0 = HC1 = G | By reading. |
@@ -61,8 +61,7 @@ The soundness and zero-knowledge theorems are no longer only "trusted": upstream
 
 ## What would close the gap
 
-In order of cost:
+The three circuit premises `OneWire`, `Isolated` and `DeadEnd` are now checked, with proved postconditions ([ADR 0064](../adr/0064-lean-circuit-premises.md)). What remains, in order of cost:
 
-1. **Prove the circuit premises in SPARK.** `OneWire`, `Isolated` and `DeadEnd` are simple decidable properties. Checking them in the loader and the verifier, with proved postconditions, turns three rows from "open" into "proved".
-2. **Keep this matrix current.** Each change to the verifier, here or upstream, is checked against it, and each row names the definitions on both sides.
-3. **A machine-checked link.** Express the ghost references of this project, the formulas its Gold contracts are proved against, as Lean definitions, and prove in Lean that they agree with upstream's model. That is the "verified executable definition" route upstream names, and it is research: a phase of its own, after the current one.
+1. **Keep this matrix current.** Each change to the verifier, here or upstream, is checked against it, and each row names the definitions on both sides.
+2. **A machine-checked link.** Express the ghost references of this project, the formulas its Gold contracts are proved against, as Lean definitions, and prove in Lean that they agree with upstream's model. That is the "verified executable definition" route upstream names, and it is research: a phase of its own, after the current one.

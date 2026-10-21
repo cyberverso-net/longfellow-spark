@@ -118,6 +118,10 @@ package body Zk_Verifier is
          St := Public_Input_Length;
          return;
       end if;
+      if C.Npublic > 0 and then Pub (0) /= LV.ST.SA.One then
+         St := Public_Input_Not_One;
+         return;
+      end if;
       if not LV.LP.Fits (G) then
          St := Proof_Encoding;
          return;

@@ -48,7 +48,12 @@ The two walks are one procedure, `Walk`, with the circuit as a parameter that is
 
 ### 2.3 After the walks
 
-The loaded circuit is checked against `Well_Formed`, at run time, in one linear pass (`Not_Well_Formed`); then its identifier is recomputed and compared with the stored one (`Id_Mismatch`). Only then is the circuit returned.
+The loaded circuit is checked against `Well_Formed`, at run time, in one linear pass (`Not_Well_Formed`). Then come two premises of upstream's Lean proofs ([ADR 0064](../adr/0064-lean-circuit-premises.md)), also in linear time:
+
+- `Not_Isolated`: an assertion, a term of constant zero, shares its wire with another term.
+- `Not_Dead_End`: a term reads an assertion of the layer below.
+
+The upstream reader checks neither. Every circuit upstream ships satisfies both. Then its identifier is recomputed and compared with the stored one (`Id_Mismatch`). Only then is the circuit returned.
 
 ## 3. The Ada/SPARK implementation
 
