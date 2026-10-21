@@ -146,7 +146,7 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 
 - The operating system's generator, `/dev/urandom`, read outside SPARK by `Os_Random`. Zero knowledge of the proofs `longfellow_prove` makes without `--seed` depends on it. A proof made with `--seed` is predictable by design.
 - That `Simple_Rng` is the generator of the upstream test. It was transcribed, and the byte identity confirms it.
-- The soundness, completeness and zero-knowledge theorems of the padded sumcheck, of Ligero and of their composition (ADR 0035, 0050, 0052).
+- The soundness, completeness and zero-knowledge theorems of the padded sumcheck, of Ligero and of their composition (ADR 0035, 0050, 0052). Upstream now proves soundness and zero knowledge in Lean for a model of the v7 verifier this project implements: 115-bit soundness for the pair of mDoc circuits, and zero knowledge within 2^-127. They stay trusted here, because the link between that model and this code is mostly by reading. [The correspondence page](lean-correspondence.md) lists it row by row.
 - The fixed statement hash `DEFAULT_STATEMENT_HASH` of the reference (ADR 0035).
 
 **Tools.**
