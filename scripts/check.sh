@@ -267,6 +267,7 @@ do_vectors() {
    python3 -I tests/vectors/gen_prover_vectors.py "$scratch"
    python3 -I tests/vectors/gen_mdoc_vectors.py "$scratch"
    python3 -I tests/vectors/gen_fft_vectors.py "$scratch"
+   python3 -I tests/vectors/gen_rs_p256_vectors.py "$scratch"
    local name status=0
    for name in "$scratch"/*.txt; do
       name="$(basename "$name")"
