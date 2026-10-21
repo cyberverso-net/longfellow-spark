@@ -450,6 +450,332 @@ package body Sumcheck_Prover is
       end loop;
    end Round_Evals_Dense;
 
+   procedure Bind_G_T (T : in out Term_Array; E : Element_Array;
+                       Beta : Element)
+   is
+      EG : Element;
+   begin
+      for I in T'Range loop
+         pragma Loop_Invariant
+           (for all J in T'First .. I - 1 =>
+              Same (T (J).K,
+                    (if T'Loop_Entry (J).K = Zero
+                     then Beta * Ref (E, E'Length, T'Loop_Entry (J).G)
+                     else T'Loop_Entry (J).K
+                          * Ref (E, E'Length, T'Loop_Entry (J).G)))
+              and then T (J).G = 0
+              and then T (J).H0 = T'Loop_Entry (J).H0
+              and then T (J).H1 = T'Loop_Entry (J).H1);
+         pragma Loop_Invariant
+           (for all J in I .. T'Last => T (J) = T'Loop_Entry (J));
+         EG := Ref (E, E'Length, T (I).G);
+         if T (I).K = Zero then
+            T (I).K := Beta * EG;
+         else
+            T (I).K := T (I).K * EG;
+         end if;
+         T (I).G := 0;
+      end loop;
+   end Bind_G_T;
+
+   --  The same term: the same hands and output wire, the same
+   --  coefficient by Same (the equality of the field may not be the
+   --  logical one).
+   function Same_Term (A, B : Term) return Boolean is
+     (Same (A.K, B.K) and then A.G = B.G
+      and then A.H0 = B.H0 and then A.H1 = B.H1)
+   with Ghost => Proof_Only, Global => null;
+
+   procedure Lemma_Run_Id_Zero (T : Term_Array)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => T'Length >= 1,
+     Post   => Run_Id (T, 0) = 0
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Run_Id);
+   begin
+      null;
+   end Lemma_Run_Id_Zero;
+
+   procedure Lemma_Run_Id_Step (T : Term_Array; I : Natural)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => I >= 1 and then I < T'Length,
+     Post   =>
+       Run_Id (T, I)
+       = (if Same_Hands (T (T'First + I - 1), T (T'First + I))
+          then Run_Id (T, I - 1)
+          else Run_Id (T, I - 1) + 1)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Run_Id);
+   begin
+      null;
+   end Lemma_Run_Id_Step;
+
+   procedure Lemma_Run_Sum_Step (T : Term_Array; N : Natural)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => N >= 1 and then N <= T'Length,
+     Post   =>
+       (for all X in Natural =>
+          Same (Run_Sum (T, X, N),
+                (if Run_Id (T, N - 1) = X
+                 then Run_Sum (T, X, N - 1) + T (T'First + N - 1).K
+                 else Run_Sum (T, X, N - 1))))
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Run_Sum);
+   begin
+      null;
+   end Lemma_Run_Sum_Step;
+
+   --  A run not reached yet has the coefficient zero.
+   procedure Lemma_Run_Sum_Zero (T : Term_Array; X : Natural; N : Natural)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => N <= T'Length
+               and then (N = 0 or else X > Run_Id (T, N - 1)),
+     Post   => Same (Run_Sum (T, X, N), Zero),
+     Subprogram_Variant => (Decreases => N)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Run_Sum);
+   begin
+      if N >= 1 then
+         if N >= 2 then
+            Lemma_Run_Id_Step (T, N - 1);
+         end if;
+         Lemma_Run_Sum_Zero (T, X, N - 1);
+      end if;
+   end Lemma_Run_Sum_Zero;
+
+   procedure Merge_Runs (T : in out Term_Array; N : out Natural) is
+      T0 : constant Term_Array := T with Ghost => Proof_Only;
+      W  : Natural := 0;
+   begin
+      if T'Length = 0 then
+         N := 0;
+         return;
+      end if;
+      Lemma_Run_Id_Zero (T0);
+      Lemma_Run_Sum_Zero (T0, 0, 0);
+      Lemma_Run_Sum_Step (T0, 1);
+      T (T'First).K := Zero + T (T'First).K;
+      for I in 1 .. T'Length - 1 loop
+         pragma Loop_Invariant (W <= I - 1);
+         pragma Loop_Invariant (Proof_Only => W = Run_Id (T0, I - 1));
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (for all J in I .. T'Length - 1 =>
+                 Same_Term (T (T'First + J), T0 (T'First + J))));
+         pragma Loop_Invariant
+           (Proof_Only =>
+              Same_Hands (T (T'First + W), T0 (T'First + I - 1)));
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (for all X in 0 .. W =>
+                 Same (T (T'First + X).K, Run_Sum (T0, X, I))));
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (for all J in 0 .. I - 1 =>
+                 Run_Id (T0, J) <= W
+                 and then Same_Hands (T (T'First + Run_Id (T0, J)),
+                                      T0 (T'First + J))));
+         pragma Assert
+           (Proof_Only => Same_Term (T (T'First + I), T0 (T'First + I)));
+         Lemma_Run_Id_Step (T0, I);
+         Lemma_Run_Sum_Step (T0, I + 1);
+         if Same_Hands (T (T'First + W), T (T'First + I)) then
+            pragma Assert (Proof_Only => Run_Id (T0, I) = W);
+            pragma Assert
+              (Proof_Only =>
+                 Same (Run_Sum (T0, W, I + 1),
+                       Run_Sum (T0, W, I) + T0 (T'First + I).K));
+            declare
+               V : constant Element :=
+                 T (T'First + W).K + T (T'First + I).K;
+            begin
+               pragma Assert
+                 (Proof_Only => Same (V, Run_Sum (T0, W, I + 1)));
+               T (T'First + W).K := V;
+            end;
+            pragma Assert
+              (Proof_Only =>
+                 (for all J in I + 1 .. T'Length - 1 =>
+                    Same_Term (T (T'First + J), T0 (T'First + J))));
+            pragma Assert
+              (Proof_Only =>
+                 Same (T (T'First + W).K, Run_Sum (T0, W, I + 1)));
+            pragma Assert
+              (Proof_Only =>
+                 (for all X in 0 .. W - 1 =>
+                    Same (T (T'First + X).K, Run_Sum (T0, X, I + 1))));
+         else
+            W := W + 1;
+            pragma Assert (Proof_Only => Run_Id (T0, I) = W);
+            Lemma_Run_Sum_Zero (T0, W, I);
+            pragma Assert
+              (Proof_Only =>
+                 Same (Run_Sum (T0, W, I + 1),
+                       Zero + T0 (T'First + I).K));
+            declare
+               V : constant Element := Zero + T (T'First + I).K;
+            begin
+               pragma Assert
+                 (Proof_Only => Same (V, Run_Sum (T0, W, I + 1)));
+               T (T'First + W) := (K  => V,
+                                   G  => T (T'First + I).G,
+                                   H0 => T (T'First + I).H0,
+                                   H1 => T (T'First + I).H1);
+            end;
+            pragma Assert
+              (Proof_Only =>
+                 (for all J in I + 1 .. T'Length - 1 =>
+                    Same_Term (T (T'First + J), T0 (T'First + J))));
+            pragma Assert
+              (Proof_Only =>
+                 Same (T (T'First + W).K, Run_Sum (T0, W, I + 1)));
+            pragma Assert
+              (Proof_Only =>
+                 (for all X in 0 .. W - 1 =>
+                    Same (T (T'First + X).K, Run_Sum (T0, X, I + 1))));
+         end if;
+      end loop;
+      N := W + 1;
+   end Merge_Runs;
+
+   procedure Lemma_Rd_Zero (T : Term_Array; H : Hand)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Rd (T, H, 0) = 0
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Rd);
+   begin
+      null;
+   end Lemma_Rd_Zero;
+
+   procedure Lemma_Rd_Step (T : Term_Array; H : Hand; K : Natural)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => K >= 1,
+     Post   =>
+       Rd (T, H, K)
+       = (if Rd (T, H, K - 1) >= T'Length then Rd (T, H, K - 1)
+          elsif Two (T, Rd (T, H, K - 1), H) then Rd (T, H, K - 1) + 2
+          else Rd (T, H, K - 1) + 1)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Rd);
+   begin
+      null;
+   end Lemma_Rd_Step;
+
+   --  Two and Corner_K read only the terms at P and P + 1.
+   procedure Lemma_Corner_Frame
+     (T, T0 : Term_Array; P : Natural; H : Hand; R : Element)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => T'First = T0'First and then T'Length = T0'Length
+               and then P < T'Length
+               and then Same_Term (T (T'First + P), T0 (T0'First + P))
+               and then (if P + 1 < T'Length
+                         then Same_Term (T (T'First + P + 1),
+                                         T0 (T0'First + P + 1))),
+     Post   => Two (T, P, H) = Two (T0, P, H)
+               and then Same (Corner_K (T, P, H, R), Corner_K (T0, P, H, R))
+   is
+   begin
+      null;
+   end Lemma_Corner_Frame;
+
+   procedure Bind_H (T : in out Term_Array; H : Hand; R : Element;
+                     N : out Natural)
+   is
+      T0 : constant Term_Array := T with Ghost => Proof_Only;
+      P  : Natural := 0;
+      W  : Natural := 0;
+      Tm : Term;
+   begin
+      Lemma_Rd_Zero (T0, H);
+      while P < T'Length loop
+         pragma Loop_Invariant (W <= P and then P <= T'Length);
+         pragma Loop_Invariant
+           (Proof_Only =>
+              Rd (T0, H, W) = P
+              and then
+              (for all J in P .. T'Length - 1 =>
+                 Same_Term (T (T'First + J), T0 (T'First + J)))
+              and then
+              (for all K in 0 .. W - 1 =>
+                 Rd (T0, H, K) < T'Length
+                 and then
+                 Same (T (T'First + K).K,
+                       Corner_K (T0, Rd (T0, H, K), H, R))
+                 and then
+                 Hand_Index (T (T'First + K), H)
+                 = Hand_Index (T0 (T'First + Rd (T0, H, K)), H) / 2
+                 and then
+                 Hand_Index (T (T'First + K), 1 - H)
+                 = Hand_Index (T0 (T'First + Rd (T0, H, K)), 1 - H)));
+         pragma Loop_Variant (Increases => P);
+         pragma Assert
+           (Proof_Only => Same_Term (T (T'First + P), T0 (T'First + P)));
+         if P + 1 < T'Length then
+            declare
+               Q : constant Natural := P + 1 with Ghost => Proof_Only;
+            begin
+               pragma Assert
+                 (Proof_Only =>
+                    Same_Term (T (T'First + Q), T0 (T'First + Q)));
+            end;
+         end if;
+         Lemma_Corner_Frame (T, T0, P, H, R);
+         Tm := T (T'First + P);
+         Tm.K := Corner_K (T, P, H, R);
+         if H = 0 then
+            Tm.H0 := Tm.H0 / 2;
+         else
+            Tm.H1 := Tm.H1 / 2;
+         end if;
+         Lemma_Rd_Step (T0, H, W + 1);
+         if Two (T, P, H) then
+            P := P + 2;
+         else
+            P := P + 1;
+         end if;
+         T (T'First + W) := Tm;
+         W := W + 1;
+      end loop;
+      N := W;
+   end Bind_H;
+
+   procedure Update_Terms (T : in out Term_Array; H : Hand; X : Element) is
+      One_Minus_X : constant Element := One - X;
+   begin
+      for I in T'Range loop
+         if Hand_Index (T (I), H) mod 2 = 0 then
+            T (I).K := T (I).K * One_Minus_X;
+         else
+            T (I).K := T (I).K * X;
+         end if;
+         if H = 0 then
+            T (I).H0 := T (I).H0 / 2;
+         else
+            T (I).H1 := T (I).H1 / 2;
+         end if;
+      end loop;
+   end Update_Terms;
+
    -------------------------------------------------------------------
    --  Prove
    -------------------------------------------------------------------
@@ -503,27 +829,6 @@ package body Sumcheck_Prover is
    --  The terms after a round of hand H with challenge X: k scaled by
    --  1 - x for an even wire index of that hand, by x for an odd one;
    --  the index halved (sumcheck_prove_layer).
-   procedure Update_Terms (T : Terms_Access; H : Hand; X : Element) with
-     Global => null,
-     Pre    => T /= null;
-
-   procedure Update_Terms (T : Terms_Access; H : Hand; X : Element) is
-      One_Minus_X : constant Element := One - X;
-   begin
-      for I in T'Range loop
-         if Hand_Index (T (I), H) mod 2 = 0 then
-            T (I).K := T (I).K * One_Minus_X;
-         else
-            T (I).K := T (I).K * X;
-         end if;
-         if H = 0 then
-            T (I).H0 := T (I).H0 / 2;
-         else
-            T (I).H1 := T (I).H1 / 2;
-         end if;
-      end loop;
-   end Update_Terms;
-
    procedure Prove
      (C     : Circuit;
       Wires : Element_Array;
@@ -535,7 +840,7 @@ package body Sumcheck_Prover is
       Cur0, Cur1 : Element_Array (0 .. Max_Logw - 1);
       Nxt0, Nxt1 : Element_Array (0 .. Max_Logw - 1) := [others => Zero];
       Alpha, Beta, Chal, Ev0, Ev2, P0, P2V : Element;
-      N0, N1 : Natural;
+      N0, N1, NT, NB : Natural;
    begin
       Proof := (Last => Proof.Last, Evals => [others => Zero]);
       Ch := (Last        => Ch.Last,
@@ -578,7 +883,21 @@ package body Sumcheck_Prover is
             ST.Begin_Layer (Alpha, Beta);
             Ch.Layer (Off_C)     := Alpha;
             Ch.Layer (Off_C + 1) := Beta;
-            ST.SA.Bind_G (T.all, Logv, Cur0, Cur1, Alpha, Beta);
+            --  bind_g with the eq2 table when it fits, then the runs of
+            --  equal hands merged: NT terms from here on.
+            if Logv <= ST.SA.Max_Bindeq_Log then
+               declare
+                  E : Elems_Access := new Element_Array'
+                    (0 .. ST.SA.Table_Len (Logv) - 1 => Zero);
+               begin
+                  ST.SA.Eq2_Table (Logv, Cur0, Cur1, Alpha, E.all);
+                  Bind_G_T (T.all, E.all, Beta);
+                  Free_Elems (E);
+               end;
+            else
+               ST.SA.Bind_G (T.all, Logv, Cur0, Cur1, Alpha, Beta);
+            end if;
+            Merge_Runs (T.all, NT);
             for R in 0 .. Logw - 1 loop
                pragma Loop_Invariant
                  (T /= null and then A0 /= null and then A1 /= null
@@ -592,12 +911,14 @@ package body Sumcheck_Prover is
                   and then B0'Length = NW and then B1'Length = NW
                   and then Q'Length = NW);
                pragma Loop_Invariant (N0 <= NW and then N1 <= NW);
+               pragma Loop_Invariant (NT <= T'Length);
                pragma Loop_Invariant (Proof.Last + 1 = ST.SV.Proof_Total (C));
                pragma Loop_Invariant (Ch.Last + 1 = ST.SV.Chal_Total (C));
                --  Hand 0 on A0 against A1, then hand 1 on A1 against the
                --  bound A0, as the reference does.
                Round_Evals_Dense
-                 (T.all, A0.all, N0, A1.all, N1, 0, P2, Q.all, Ev0, Ev2);
+                 (T (T'First .. T'First + NT - 1), A0.all, N0, A1.all, N1, 0,
+                  P2, Q.all, Ev0, Ev2);
                P0  := Ev0 - Pads (Off_D + 4 * R);
                P2V := Ev2 - Pads (Off_D + 4 * R + 1);
                ST.Round_Poly (P0, P2V, Chal);
@@ -612,9 +933,11 @@ package body Sumcheck_Prover is
                   A0 := B0;
                   B0 := Tmp;
                end;
-               Update_Terms (T, 0, Chal);
+               Bind_H (T (T'First .. T'First + NT - 1), 0, Chal, NB);
+               NT := NB;
                Round_Evals_Dense
-                 (T.all, A1.all, N1, A0.all, N0, 1, P2, Q.all, Ev0, Ev2);
+                 (T (T'First .. T'First + NT - 1), A1.all, N1, A0.all, N0, 1,
+                  P2, Q.all, Ev0, Ev2);
                P0  := Ev0 - Pads (Off_D + 4 * R + 2);
                P2V := Ev2 - Pads (Off_D + 4 * R + 3);
                ST.Round_Poly (P0, P2V, Chal);
@@ -629,7 +952,8 @@ package body Sumcheck_Prover is
                   A1 := B1;
                   B1 := Tmp;
                end;
-               Update_Terms (T, 1, Chal);
+               Bind_H (T (T'First .. T'First + NT - 1), 1, Chal, NB);
+               NT := NB;
             end loop;
             P0  := Ref (A0.all, N0, 0) - Pads (Off_D + 4 * Logw);
             P2V := Ref (A1.all, N1, 0) - Pads (Off_D + 4 * Logw + 1);
