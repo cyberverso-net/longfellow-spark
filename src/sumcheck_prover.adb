@@ -302,6 +302,155 @@ package body Sumcheck_Prover is
    end Round_Evals;
 
    -------------------------------------------------------------------
+   --  Round_Evals_Dense
+   -------------------------------------------------------------------
+
+   procedure Lemma_QW_Zero
+     (T : Term_Array; Other : Element_Array; NO : Natural; H : Hand)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => Other'First = 0 and then NO <= Other'Length,
+     Post   => (for all X in Natural =>
+                  Same (QW_Ref (T, Other, NO, H, X, 0), Zero))
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", QW_Ref);
+   begin
+      null;
+   end Lemma_QW_Zero;
+
+   procedure Lemma_QW_Step
+     (T : Term_Array; Other : Element_Array; NO : Natural; H : Hand;
+      K : Natural)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => Other'First = 0 and then NO <= Other'Length
+               and then K >= 1 and then K <= T'Length,
+     Post   =>
+       (for all X in Natural =>
+          Same (QW_Ref (T, Other, NO, H, X, K),
+                (if Hand_Index (T (T'First + K - 1), H) = X
+                 then QW_Ref (T, Other, NO, H, X, K - 1)
+                      + T (T'First + K - 1).K
+                        * Ref (Other, NO,
+                               Hand_Index (T (T'First + K - 1), 1 - H))
+                 else QW_Ref (T, Other, NO, H, X, K - 1))))
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", QW_Ref);
+   begin
+      null;
+   end Lemma_QW_Step;
+
+   procedure Lemma_D_Zero
+     (QW : Element_Array; A : Element_Array; NA : Natural; X2 : Element)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => QW'First = 0 and then A'First = 0
+               and then NA <= QW'Length and then NA <= A'Length,
+     Post   => Same (D0_Ref (QW, A, NA, 0), Zero)
+               and then Same (D2_Ref (QW, A, NA, X2, 0), Zero)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", D0_Ref);
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", D2_Ref);
+   begin
+      null;
+   end Lemma_D_Zero;
+
+   procedure Lemma_D_Step
+     (QW : Element_Array; A : Element_Array; NA : Natural; X2 : Element;
+      M  : Natural)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => QW'First = 0 and then A'First = 0
+               and then NA <= QW'Length and then NA <= A'Length
+               and then M >= 1 and then M <= Natural'Last / 2,
+     Post   =>
+       Same (D0_Ref (QW, A, NA, M),
+             D0_Ref (QW, A, NA, M - 1)
+             + Ref (QW, NA, 2 * (M - 1)) * Ref (A, NA, 2 * (M - 1)))
+       and then
+       Same (D2_Ref (QW, A, NA, X2, M),
+             D2_Ref (QW, A, NA, X2, M - 1)
+             + (Ref (QW, NA, 2 * (M - 1))
+                + X2 * (Ref (QW, NA, 2 * M - 1)
+                        - Ref (QW, NA, 2 * (M - 1))))
+               * (Ref (A, NA, 2 * (M - 1))
+                  + X2 * (Ref (A, NA, 2 * M - 1)
+                          - Ref (A, NA, 2 * (M - 1)))))
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", D0_Ref);
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", D2_Ref);
+   begin
+      null;
+   end Lemma_D_Step;
+
+   procedure Round_Evals_Dense
+     (T      : Term_Array;
+      Active : Element_Array;
+      NA     : Natural;
+      Other  : Element_Array;
+      NO     : Natural;
+      H      : Hand;
+      X2     : Element;
+      QW     : in out Element_Array;
+      Ev0    : out Element;
+      Ev2    : out Element)
+   is
+      Hb : Natural;
+      Q0, Q1, W0, W1 : Element;
+   begin
+      for X in 0 .. NA - 1 loop
+         QW (X) := Zero;
+         pragma Loop_Invariant
+           (Proof_Only => (for all Y in 0 .. X => Same (QW (Y), Zero)));
+      end loop;
+      Lemma_QW_Zero (T, Other, NO, H);
+
+      --  The scatter: one product per term. The index of a term of a
+      --  well-formed circuit is always below NA; the guard keeps the
+      --  write in range otherwise, and QW_Ref agrees below NA.
+      for I in T'Range loop
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (for all X in 0 .. NA - 1 =>
+                 Same (QW (X), QW_Ref (T, Other, NO, H, X, I - T'First))));
+         Hb := Hand_Index (T (I), H);
+         if Hb < NA then
+            QW (Hb) :=
+              QW (Hb) + T (I).K * Ref (Other, NO, Hand_Index (T (I), 1 - H));
+         end if;
+         Lemma_QW_Step (T, Other, NO, H, I - T'First + 1);
+      end loop;
+
+      --  The pairs: p (0) and p (P2), three products per pair.
+      Ev0 := Zero;
+      Ev2 := Zero;
+      Lemma_D_Zero (QW, Active, NA, X2);
+      for M in 0 .. (NA + 1) / 2 - 1 loop
+         pragma Loop_Invariant
+           (Proof_Only =>
+              Same (Ev0, D0_Ref (QW, Active, NA, M))
+              and then Same (Ev2, D2_Ref (QW, Active, NA, X2, M)));
+         Q0 := Ref (QW, NA, 2 * M);
+         Q1 := Ref (QW, NA, 2 * M + 1);
+         W0 := Ref (Active, NA, 2 * M);
+         W1 := Ref (Active, NA, 2 * M + 1);
+         Ev0 := Ev0 + Q0 * W0;
+         Ev2 := Ev2 + (Q0 + X2 * (Q1 - Q0)) * (W0 + X2 * (W1 - W0));
+         Lemma_D_Step (QW, Active, NA, X2, M + 1);
+      end loop;
+   end Round_Evals_Dense;
+
+   -------------------------------------------------------------------
    --  Prove
    -------------------------------------------------------------------
 
@@ -416,6 +565,7 @@ package body Sumcheck_Prover is
             A1 : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
             B0 : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
             B1 : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
+            Q  : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
          begin
             for I in 0 .. NW - 1 loop
                pragma Loop_Invariant (A0 /= null and then A1 /= null);
@@ -432,18 +582,22 @@ package body Sumcheck_Prover is
             for R in 0 .. Logw - 1 loop
                pragma Loop_Invariant
                  (T /= null and then A0 /= null and then A1 /= null
-                  and then B0 /= null and then B1 /= null);
+                  and then B0 /= null and then B1 /= null
+                  and then Q /= null);
                pragma Loop_Invariant
                  (A0'First = 0 and then A1'First = 0
                   and then B0'First = 0 and then B1'First = 0
+                  and then Q'First = 0
                   and then A0'Length = NW and then A1'Length = NW
-                  and then B0'Length = NW and then B1'Length = NW);
+                  and then B0'Length = NW and then B1'Length = NW
+                  and then Q'Length = NW);
                pragma Loop_Invariant (N0 <= NW and then N1 <= NW);
                pragma Loop_Invariant (Proof.Last + 1 = ST.SV.Proof_Total (C));
                pragma Loop_Invariant (Ch.Last + 1 = ST.SV.Chal_Total (C));
                --  Hand 0 on A0 against A1, then hand 1 on A1 against the
                --  bound A0, as the reference does.
-               Round_Evals (T.all, A0.all, N0, A1.all, N1, 0, P2, Ev0, Ev2);
+               Round_Evals_Dense
+                 (T.all, A0.all, N0, A1.all, N1, 0, P2, Q.all, Ev0, Ev2);
                P0  := Ev0 - Pads (Off_D + 4 * R);
                P2V := Ev2 - Pads (Off_D + 4 * R + 1);
                ST.Round_Poly (P0, P2V, Chal);
@@ -459,7 +613,8 @@ package body Sumcheck_Prover is
                   B0 := Tmp;
                end;
                Update_Terms (T, 0, Chal);
-               Round_Evals (T.all, A1.all, N1, A0.all, N0, 1, P2, Ev0, Ev2);
+               Round_Evals_Dense
+                 (T.all, A1.all, N1, A0.all, N0, 1, P2, Q.all, Ev0, Ev2);
                P0  := Ev0 - Pads (Off_D + 4 * R + 2);
                P2V := Ev2 - Pads (Off_D + 4 * R + 3);
                ST.Round_Poly (P0, P2V, Chal);
@@ -489,6 +644,7 @@ package body Sumcheck_Prover is
             Free_Elems (A1);
             Free_Elems (B0);
             Free_Elems (B1);
+            Free_Elems (Q);
          end;
       end loop;
       ST.Sample (Ch.Alpha_Input);

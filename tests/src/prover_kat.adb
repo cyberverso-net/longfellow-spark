@@ -694,6 +694,42 @@ procedure Prover_KAT is
                   return;
                end if;
             end loop;
+            --  Phase D, M1: the dense round polynomial agrees with the
+            --  term-by-term one, both hands, on the first round of every
+            --  layer at the honest wires (the fast form is tested against
+            --  the reference form).
+            for J in 0 .. C.Last_Layer loop
+               declare
+                  use type SA.Element;
+                  NW  : constant Natural := C.Layers (J).NW_In;
+                  Seg : constant Natural := SA.Off (C.all, J + 1);
+                  T   : constant SA.Term_Array :=
+                    C.Terms (C.Layers (J).First .. C.Layers (J).Last);
+                  A   : constant SA.Element_Array (0 .. NW - 1) :=
+                    Wires (Seg .. Seg + NW - 1);
+                  B   : SA.Element_Array (0 .. NW - 1);
+                  QW  : SA.Element_Array (0 .. NW - 1);
+                  X2  : constant SA.Element :=
+                    Pads (Pads'First) * Pads (Pads'Last) + SA.One;
+                  E0, E2, D0, D2 : SA.Element;
+               begin
+                  for I in B'Range loop
+                     B (I) := A (NW - 1 - I) * X2 + SA.One;
+                  end loop;
+                  for H in SPR.Hand loop
+                     SPR.Round_Evals (T, A, NW, B, NW, H, X2, E0, E2);
+                     SPR.Round_Evals_Dense
+                       (T, A, NW, B, NW, H, X2, QW, D0, D2);
+                     if E0 /= D0 or else E2 /= D2 then
+                        Report_Failure (Name & ": layer" & J'Image
+                                        & " hand" & H'Image
+                                        & ": dense round differs");
+                        CR.Free (C);
+                        return;
+                     end if;
+                  end loop;
+               end;
+            end loop;
             --  The verifier side on the proof just made.
             declare
                use type ST.Status;

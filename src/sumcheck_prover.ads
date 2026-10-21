@@ -28,7 +28,11 @@
 --  the heap buffers. Gold, structural (ADR 0052): Round_Evals equals
 --  the ghost transcription Ev0_Ref, Ev2_Ref of eval_round_poly in its
 --  order of operations, through the logical equality Same (p (1) is
---  not emitted, so its sum is not transcribed).
+--  not emitted, so its sum is not transcribed). Since M1 (ADR 0063)
+--  Prove computes the round polynomial in the dense form of the
+--  production prover, Round_Evals_Dense, Gold against QW_Ref, D0_Ref
+--  and D2_Ref; Round_Evals stays as the reference, and the harness
+--  checks that the two agree.
 --  The padded values are the evaluations minus the pads by the two
 --  statements that compute them. Completeness (the verifier accepts the
 --  honest proof) is tested, not proved.
@@ -36,6 +40,8 @@
 --  Constant-time discipline (ADR 0051): constant time by construction.
 --  Round_Evals loops over the terms of the layer, a public structure,
 --  and branches on the parity of a wire index of the term, public;
+--  Round_Evals_Dense writes at a wire index of the term and loops over
+--  the pairs of a public length;
 --  Bind is a fixed loop; the pads depend on the randomness. The wires
 --  and the pads are secret, and so are the evaluations until padded.
 --  The guarantee is scoped to builds with assertions disabled (ADR
@@ -206,6 +212,102 @@ package Sumcheck_Prover is
           Same (Ev0, Ev0_Ref (T, Active, NA, Other, NO, H, X2, T'Length))
           and then
           Same (Ev2, Ev2_Ref (T, Active, NA, Other, NO, H, X2, T'Length)));
+
+   -------------------------------------------------------------------
+   --  The dense round polynomial (Phase D, M1; ADR 0063), as the
+   --  production prover computes it (rust/runtime/sumcheck/src/
+   --  prover.rs, layer and quad_round_poly): each term adds k times its
+   --  other-hand wire to qw at its active-hand index, then p (0) and
+   --  p (P2) are sums over the pairs (2 i, 2 i + 1) of qw and of the
+   --  active wires. The same values as Round_Evals, which stays as the
+   --  reference: their agreement is distributivity, tested.
+   -------------------------------------------------------------------
+
+   --  qw at X after the first N terms, in their order.
+   function QW_Ref
+     (T     : Term_Array;
+      Other : Element_Array;
+      NO    : Natural;
+      H     : Hand;
+      X     : Natural;
+      N     : Natural) return Element
+   is
+     (if N = 0 then Zero
+      elsif Hand_Index (T (T'First + N - 1), H) = X
+      then QW_Ref (T, Other, NO, H, X, N - 1)
+           + T (T'First + N - 1).K
+             * Ref (Other, NO, Hand_Index (T (T'First + N - 1), 1 - H))
+      else QW_Ref (T, Other, NO, H, X, N - 1))
+   with Ghost => Proof_Only,
+        Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre => Other'First = 0 and then NO <= Other'Length
+               and then N <= T'Length,
+        Subprogram_Variant => (Decreases => N);
+
+   --  p (0) over the first M pairs: qw (2 i) times w (2 i).
+   function D0_Ref
+     (QW : Element_Array; A : Element_Array; NA : Natural; M : Natural)
+      return Element
+   is
+     (if M = 0 then Zero
+      else D0_Ref (QW, A, NA, M - 1)
+           + Ref (QW, NA, 2 * (M - 1)) * Ref (A, NA, 2 * (M - 1)))
+   with Ghost => Proof_Only,
+        Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre => QW'First = 0 and then A'First = 0
+               and then NA <= QW'Length and then NA <= A'Length
+               and then M <= Natural'Last / 2,
+        Subprogram_Variant => (Decreases => M);
+
+   --  p (P2) over the first M pairs: qw and w each at P2 on its pair.
+   function D2_Ref
+     (QW : Element_Array; A : Element_Array; NA : Natural; X2 : Element;
+      M  : Natural) return Element
+   is
+     (if M = 0 then Zero
+      else D2_Ref (QW, A, NA, X2, M - 1)
+           + (Ref (QW, NA, 2 * (M - 1))
+              + X2 * (Ref (QW, NA, 2 * M - 1) - Ref (QW, NA, 2 * (M - 1))))
+             * (Ref (A, NA, 2 * (M - 1))
+                + X2 * (Ref (A, NA, 2 * M - 1) - Ref (A, NA, 2 * (M - 1)))))
+   with Ghost => Proof_Only,
+        Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre => QW'First = 0 and then A'First = 0
+               and then NA <= QW'Length and then NA <= A'Length
+               and then M <= Natural'Last / 2,
+        Subprogram_Variant => (Decreases => M);
+
+   --  The evaluations of hand H in 0 and in X2 by the dense form. QW is
+   --  a work array of at least NA entries; on return its first NA hold
+   --  qw.
+   procedure Round_Evals_Dense
+     (T      : Term_Array;
+      Active : Element_Array;
+      NA     : Natural;
+      Other  : Element_Array;
+      NO     : Natural;
+      H      : Hand;
+      X2     : Element;
+      QW     : in out Element_Array;
+      Ev0    : out Element;
+      Ev2    : out Element)
+   with
+     Global => null,
+     Pre    => Active'First = 0 and then NA <= Active'Length
+               and then Other'First = 0 and then NO <= Other'Length
+               and then QW'First = 0 and then NA <= QW'Length
+               and then NA <= ST.SA.Max_Wires,
+     Post   =>
+       (Proof_Only =>
+          (for all X in 0 .. NA - 1 =>
+             Same (QW (X), QW_Ref (T, Other, NO, H, X, T'Length)))
+          and then
+          Same (Ev0, D0_Ref (QW, Active, NA, (NA + 1) / 2))
+          and then
+          Same (Ev2, D2_Ref (QW, Active, NA, X2, (NA + 1) / 2)));
 
    -------------------------------------------------------------------
    --  sumcheck_prove
