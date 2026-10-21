@@ -298,7 +298,9 @@ package body Sumcheck_Verifier is
          declare
             EQQ_V : Element;
          begin
-            if State.Logv <= Max_Bindeq_Log and then Logw <= Max_Bindeq_Log then
+            if State.Logv <= Max_Bindeq_Log
+              and then Logw <= Max_Bindeq_Log
+            then
                Eval_Bound_Quad_T (Layer_Terms (C, J), State.Logv,
                                   State.HC0, State.HC1, HC0, HC1, Logw,
                                   Alpha, Beta, EQQ_V);
@@ -307,49 +309,49 @@ package body Sumcheck_Verifier is
                                          State.HC0, State.HC1, HC0, HC1,
                                          Logw, Alpha, Beta);
             end if;
-         declare
-            EQQ  : constant Element := EQQ_V;
-            C0   : constant Natural := PB + 4 * Logw;
-            C1   : constant Natural := C0 + 1;
-            CR   : constant Natural := C0 + 2;
-            Cl0  : constant Element := Proof.Evals (PO + 4 * Logw);
-            Cl1  : constant Element := Proof.Evals (PO + 4 * Logw + 1);
-            --  (Var c0 * cl1 + Var c1 * cl0 + Var cr + cl0 cl1) * eqq,
-            --  piece by piece so that its variables are seen below
-            --  the next layer's pad offset (the Post on the terms).
-            V0   : constant Expression := Scale (Var (C0, Cap), Cl1);
-            V1   : constant Expression := Scale (Var (C1, Cap), Cl0);
-            V01  : constant Expression := Add (V0, V1);
-            V2   : constant Expression := Var (CR, Cap);
-            V012 : constant Expression := Add (V01, V2);
-            Prod : constant Expression :=
-              Scale (Add_Constant (V012, Cl0 * Cl1), EQQ);
-            Before : constant Expression := Claim with Ghost;
-         begin
-            pragma Assert (Below (V0, CR + 1));
-            pragma Assert (Below (V1, CR + 1));
-            Lemma_Below_Union (V0, V1, V01, CR + 1);
-            pragma Assert (Below (V2, CR + 1));
-            Lemma_Below_Union (V01, V2, V012, CR + 1);
-            pragma Assert (Below (Prod, CR + 1));
-            pragma Assert (Below (Before, CR + 1));
-            Claim := Sub (Claim, Prod);
-            Lemma_Below_Union (Before, Prod, Claim, CR + 1);
-            pragma Assert (CR + 1 = Pad_Off (C, J + 1, Base));
             declare
-               Start : constant Natural := A.Count with Ghost;
-               Cst   : constant Natural := B_Count with Ghost;
+               EQQ  : constant Element := EQQ_V;
+               C0   : constant Natural := PB + 4 * Logw;
+               C1   : constant Natural := C0 + 1;
+               CR   : constant Natural := C0 + 2;
+               Cl0  : constant Element := Proof.Evals (PO + 4 * Logw);
+               Cl1  : constant Element := Proof.Evals (PO + 4 * Logw + 1);
+               --  (Var c0 * cl1 + Var c1 * cl0 + Var cr + cl0 cl1) * eqq,
+               --  piece by piece so that its variables are seen below
+               --  the next layer's pad offset (the Post on the terms).
+               V0   : constant Expression := Scale (Var (C0, Cap), Cl1);
+               V1   : constant Expression := Scale (Var (C1, Cap), Cl0);
+               V01  : constant Expression := Add (V0, V1);
+               V2   : constant Expression := Var (CR, Cap);
+               V012 : constant Expression := Add (V01, V2);
+               Prod : constant Expression :=
+                 Scale (Add_Constant (V012, Cl0 * Cl1), EQQ);
+               Before : constant Expression := Claim with Ghost;
             begin
-               Constrain_To_Be_Zero (Claim, A, B, B_Count);
-               Lemma_Terms_Below (A, Start, Claim, CR + 1, Cst);
+               pragma Assert (Below (V0, CR + 1));
+               pragma Assert (Below (V1, CR + 1));
+               Lemma_Below_Union (V0, V1, V01, CR + 1);
+               pragma Assert (Below (V2, CR + 1));
+               Lemma_Below_Union (V01, V2, V012, CR + 1);
+               pragma Assert (Below (Prod, CR + 1));
+               pragma Assert (Below (Before, CR + 1));
+               Claim := Sub (Claim, Prod);
+               Lemma_Below_Union (Before, Prod, Claim, CR + 1);
+               pragma Assert (CR + 1 = Pad_Off (C, J + 1, Base));
+               declare
+                  Start : constant Natural := A.Count with Ghost;
+                  Cst   : constant Natural := B_Count with Ghost;
+               begin
+                  Constrain_To_Be_Zero (Claim, A, B, B_Count);
+                  Lemma_Terms_Below (A, Start, Claim, CR + 1, Cst);
+               end;
+               Lqc := (X => C0, Y => C1, Z => CR);
+               State := (Logv     => Logw,
+                         Claim0   => Add_Constant (Var (C0, Cap), Cl0),
+                         Claim1   => Add_Constant (Var (C1, Cap), Cl1),
+                         HC0      => HC0,
+                         HC1      => HC1);
             end;
-            Lqc := (X => C0, Y => C1, Z => CR);
-            State := (Logv     => Logw,
-                      Claim0   => Add_Constant (Var (C0, Cap), Cl0),
-                      Claim1   => Add_Constant (Var (C1, Cap), Cl1),
-                      HC0      => HC0,
-                      HC1      => HC1);
-         end;
          end;
       end;
    end Verify_Layer;
@@ -502,8 +504,8 @@ package body Sumcheck_Verifier is
       --  The eq2 table of the final binding (Phase D, M1); one unused
       --  element when it does not fit.
       E : Elems_Access :=
-        new Element_Array'(0 .. (if Fast then Table_Len (State.Logv) - 1 else 0)
-                           => Zero);
+        new Element_Array'
+          (0 .. (if Fast then Table_Len (State.Logv) - 1 else 0) => Zero);
    begin
       if Fast then
          Eq2_Table (State.Logv, State.HC0, State.HC1, Alpha, E.all);

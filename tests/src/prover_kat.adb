@@ -700,7 +700,6 @@ procedure Prover_KAT is
             --  the reference form).
             for J in 0 .. C.Last_Layer loop
                declare
-                  use type SA.Element;
                   NW  : constant Natural := C.Layers (J).NW_In;
                   Seg : constant Natural := SA.Off (C.all, J + 1);
                   T   : constant SA.Term_Array :=
@@ -730,6 +729,84 @@ procedure Prover_KAT is
                   end loop;
                end;
             end loop;
+            --  The merged terms (bind_g with the eq2 table, the runs
+            --  merged, bind_h at every round) give the round polynomial
+            --  of the reference terms (Bind_G, Update_Terms), every
+            --  round, both hands, at fixed wires and claim points (the
+            --  identity is linear in the terms, for any wires).
+            declare
+               Lv : Natural := CR.Ceil_Lg2 (C.Noutput);
+            begin
+               for J in 0 .. C.Last_Layer loop
+                  declare
+                     type Elems_Access is access SA.Element_Array;
+                     procedure Free is new Ada.Unchecked_Deallocation
+                       (SA.Element_Array, Elems_Access);
+                     NW  : constant Natural := C.Layers (J).NW_In;
+                     Lw  : constant Natural := C.Layers (J).Logw;
+                     Seg : constant Natural := SA.Off (C.all, J + 1);
+                     TR  : SA.Term_Array :=
+                       C.Terms (C.Layers (J).First .. C.Layers (J).Last);
+                     TF  : SA.Term_Array := TR;
+                     A   : constant SA.Element_Array (0 .. NW - 1) :=
+                       Wires (Seg .. Seg + NW - 1);
+                     B   : SA.Element_Array (0 .. NW - 1);
+                     QW  : SA.Element_Array (0 .. NW - 1);
+                     G0, G1 : SA.Element_Array (0 .. SA.Max_Logw - 1);
+                     Al  : constant SA.Element := Pads (Pads'First) + SA.One;
+                     Be  : constant SA.Element := Pads (Pads'Last) + Al;
+                     X   : SA.Element := Al * Be + SA.One;
+                     NT, NB : Natural;
+                     E0, E2, D0, D2 : SA.Element;
+                  begin
+                     for I in B'Range loop
+                        B (I) := A (NW - 1 - I) * X + SA.One;
+                     end loop;
+                     for I in G0'Range loop
+                        G0 (I) :=
+                          X * Al + Pads (Pads'First + I mod Pads'Length);
+                        G1 (I) := G0 (I) * Be + SA.One;
+                     end loop;
+                     SA.Bind_G (TR, Lv, G0, G1, Al, Be);
+                     if Lv <= SA.Max_Bindeq_Log then
+                        declare
+                           E : Elems_Access := new SA.Element_Array'
+                             (0 .. SA.Table_Len (Lv) - 1 => SA.Zero);
+                        begin
+                           SA.Eq2_Table (Lv, G0, G1, Al, E.all);
+                           SPR.Bind_G_T (TF, E.all, Be);
+                           Free (E);
+                        end;
+                     else
+                        SA.Bind_G (TF, Lv, G0, G1, Al, Be);
+                     end if;
+                     SPR.Merge_Runs (TF, NT);
+                     for R in 0 .. Lw - 1 loop
+                        for H in SPR.Hand loop
+                           SPR.Round_Evals_Dense
+                             (TR, A, NW, B, NW, H, X, QW, E0, E2);
+                           SPR.Round_Evals_Dense
+                             (TF (TF'First .. TF'First + NT - 1), A, NW, B,
+                              NW, H, X, QW, D0, D2);
+                           if E0 /= D0 or else E2 /= D2 then
+                              Report_Failure
+                                (Name & ": layer" & J'Image & " round"
+                                 & R'Image & " hand" & H'Image
+                                 & ": merged terms differ");
+                              CR.Free (C);
+                              return;
+                           end if;
+                           SPR.Update_Terms (TR, H, X);
+                           SPR.Bind_H
+                             (TF (TF'First .. TF'First + NT - 1), H, X, NB);
+                           NT := NB;
+                           X := X * X + Al;
+                        end loop;
+                     end loop;
+                     Lv := Lw;
+                  end;
+               end loop;
+            end;
             --  The verifier side on the proof just made.
             declare
                use type ST.Status;
