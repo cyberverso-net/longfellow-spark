@@ -39,6 +39,12 @@
 --    Bind_G           : Gold, the per-term formula is the
 --                       postcondition.
 --    Eval_Bound_Quad  : Gold against EBQ_Ref (sum over terms in order).
+--    Eval_Bound_Quad_T: Gold against EBQT_Ref (Phase D, M1): the same
+--                       sum with eq read from the bindeq tables of
+--                       Section 6.2, built once per layer, instead of
+--                       computed bit by bit for every term. That the two
+--                       sums agree is the tested fact that bindeq agrees
+--                       with eq; Eval_Bound_Quad stays as the reference.
 --
 --  Errors are statuses (ADR 0022, D6): a Z assertion that fails or an
 --  output wire that is not Zero makes OK False; nothing is raised.
@@ -56,6 +62,7 @@
 pragma SPARK_Mode (On);
 
 with Interfaces; use Interfaces;
+with Proof_Levels;
 with Ada.Numerics.Big_Numbers.Big_Integers;
 use  Ada.Numerics.Big_Numbers.Big_Integers;
 with Field_Signature;
@@ -482,6 +489,111 @@ package Sumcheck_Algebra is
           and then Logw <= HC0'Length and then Logw <= HC1'Length
           and then Logw <= Max_Logw,
         Subprogram_Variant => (Decreases => N);
+
+   -------------------------------------------------------------------
+   --  The bound quad by tables (Phase D, M1). The value of eq at X on
+   --  the first L challenges of C, read from bindeq of Section 6.2
+   --  (Zero beyond the table), and eq2 the same way.
+   -------------------------------------------------------------------
+
+   --  2^L, the length of a bindeq table, computed by doubling (the
+   --  provers do not bound 2**L for a variable L); as Pow2 states it.
+   function Table_Len (L : Natural) return Positive with
+     Global => null,
+     Pre    => L <= Max_Bindeq_Log,
+     Post   => To_Big_Integer (Table_Len'Result) = Pow2 (L)
+               and then Table_Len'Result <= 2**Max_Bindeq_Log;
+
+   function Beq (C : Element_Array; L : Natural; X : Natural) return Element
+   is
+     (if X < Table_Len (L) then Bindeq_Ref (C (0 .. L - 1), 0, X) else Zero)
+   with Ghost => Proof_Only, Global => null,
+        Pre => C'First = 0 and then L <= C'Length
+               and then L <= Max_Bindeq_Log;
+
+   function Beq2 (X : Natural; L : Natural; G0, G1 : Element_Array;
+                  Alpha : Element) return Element
+   is
+     (if X < Table_Len (L)
+      then Bindeq_Ref (G0 (0 .. L - 1), 0, X)
+           + Alpha * Bindeq_Ref (G1 (0 .. L - 1), 0, X)
+      else Zero)
+   with Ghost => Proof_Only, Global => null,
+        Pre => G0'First = 0 and then G1'First = 0
+               and then L <= G0'Length and then L <= G1'Length
+               and then L <= Max_Bindeq_Log;
+
+   --  The eq2 table: E (X) = bindeq (G0) (X) + alpha bindeq (G1) (X) for
+   --  every X below 2^L, built on the heap.
+   procedure Eq2_Table
+     (L      : Natural;
+      G0, G1 : Element_Array;
+      Alpha  : Element;
+      E      : out Element_Array)
+   with
+     Global => null,
+     Pre  => G0'First = 0 and then G1'First = 0
+       and then L <= G0'Length and then L <= G1'Length
+       and then L <= Max_Bindeq_Log
+       and then E'First = 0 and then E'Last = Table_Len (L) - 1,
+     Post => (Proof_Only =>
+                (for all X in E'Range =>
+                   Same (E (X), Beq2 (X, L, G0, G1, Alpha))));
+
+   --  Bound_K with the tables.
+   function Bound_KT (Tm : Term; Logv : Natural; G0, G1 : Element_Array;
+                      Alpha, Beta : Element) return Element
+   is
+     (if Tm.K = Zero then Beta * Beq2 (Tm.G, Logv, G0, G1, Alpha)
+      else Tm.K * Beq2 (Tm.G, Logv, G0, G1, Alpha))
+   with Ghost => Proof_Only, Global => null,
+        Pre => G0'First = 0 and then G1'First = 0
+               and then Logv <= G0'Length and then Logv <= G1'Length
+               and then Logv <= Max_Bindeq_Log;
+
+   function EBQT_Ref (T : Term_Array; N : Natural; Logv : Natural;
+                      G0, G1 : Element_Array; HC0, HC1 : Element_Array;
+                      Logw : Natural; Alpha, Beta : Element) return Element
+   is
+     (if N = 0 then Zero
+      else EBQT_Ref (T, N - 1, Logv, G0, G1, HC0, HC1, Logw, Alpha, Beta)
+             + ((Bound_KT (T (T'First + N - 1), Logv, G0, G1, Alpha, Beta)
+                   * Beq (HC0, Logw, T (T'First + N - 1).H0))
+                * Beq (HC1, Logw, T (T'First + N - 1).H1)))
+   with Ghost => Proof_Only, Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre => N <= T'Length
+          and then G0'First = 0 and then G1'First = 0
+          and then Logv <= G0'Length and then Logv <= G1'Length
+          and then Logv <= Max_Bindeq_Log
+          and then HC0'First = 0 and then HC1'First = 0
+          and then Logw <= HC0'Length and then Logw <= HC1'Length
+          and then Logw <= Max_Bindeq_Log,
+        Subprogram_Variant => (Decreases => N);
+
+   --  eval_bound_quad with the tables: E = bindeq (G0) + alpha bindeq (G1)
+   --  over 2^Logv entries and bindeq of HC0 and HC1 over 2^Logw, built
+   --  once on the heap; three multiplications per term.
+   procedure Eval_Bound_Quad_T
+     (T        : Term_Array;
+      Logv     : Natural;
+      G0, G1   : Element_Array;
+      HC0, HC1 : Element_Array;
+      Logw     : Natural;
+      Alpha, Beta : Element;
+      Result   : out Element)
+   with
+     Global => null,
+     Pre  => G0'First = 0 and then G1'First = 0
+       and then Logv <= G0'Length and then Logv <= G1'Length
+       and then Logv <= Max_Bindeq_Log
+       and then HC0'First = 0 and then HC1'First = 0
+       and then Logw <= HC0'Length and then Logw <= HC1'Length
+       and then Logw <= Max_Bindeq_Log,
+     Post => (Proof_Only =>
+                Same (Result,
+                      EBQT_Ref (T, T'Length, Logv, G0, G1, HC0, HC1, Logw,
+                                Alpha, Beta)));
 
    function Eval_Bound_Quad (T : Term_Array; Logv : Natural;
                              G0, G1 : Element_Array;

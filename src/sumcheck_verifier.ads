@@ -41,7 +41,8 @@
 --  p2 l2, p1 = claim - p0, written with the Gold operations of
 --  Sumcheck_Expression. Input_Constraint is Gold against the formula
 --  of Section 6.7 (ADR 0056): term W has witness W and coefficient
---  Eq2 (npublic + W), the public inputs fold into the constant as
+--  In_Coef (npublic + W), eq2 read from the bindeq tables (Phase D,
+--  M1), the public inputs fold into the constant as
 --  Pub_Binding_Ref in input order, and the claims come last as the
 --  terms of Input_Tail, built with the Gold operations of
 --  Sumcheck_Expression. Verify_Layer and Verifier_Core are Silver with
@@ -348,9 +349,21 @@ package Sumcheck_Verifier is
                        Y => Pad_Off (C, J, Base) + 4 * C.Layers (J).Logw + 1,
                        Z => Pad_Off (C, J, Base) + 4 * C.Layers (J).Logw + 2);
 
+   --  The coefficient of input I in the input constraint: eq2 at I of
+   --  the final binding, read from the eq2 table of bindeq when it fits
+   --  (Phase D, M1), computed bit by bit otherwise. That the two agree
+   --  is the tested fact that bindeq agrees with eq.
+   function In_Coef (I : Natural; State : Claims_State; Alpha : Element)
+                     return Element
+   is
+     (if State.Logv <= Max_Bindeq_Log
+      then Beq2 (I, State.Logv, State.HC0, State.HC1, Alpha)
+      else Eq2 (I, State.Logv, State.HC0, State.HC1, Alpha))
+   with Ghost => Proof_Only, Global => null;
+
    --  The public inputs folded into the constant of the input
    --  constraint: the sum over the first N public inputs I of
-   --  Eq2 (I) * Pub (I), in input order.
+   --  In_Coef (I) * Pub (I), in input order.
    function Pub_Binding_Ref
      (Pub   : Element_Array;
       State : Claims_State;
@@ -359,9 +372,7 @@ package Sumcheck_Verifier is
    is
      (if N = 0 then Zero
       else SA."+" (Pub_Binding_Ref (Pub, State, Alpha, N - 1),
-                   SA."*" (Eq2 (N - 1, State.Logv, State.HC0, State.HC1,
-                                Alpha),
-                           Pub (N - 1))))
+                   SA."*" (In_Coef (N - 1, State, Alpha), Pub (N - 1))))
    with Ghost => Proof_Only,
         Global => null,
         Pre => Pub'First = 0 and then N <= Pub'Length,
@@ -417,8 +428,7 @@ package Sumcheck_Verifier is
              A.Witness (A.Count'Old + W) = W
              and then A.Constraint (A.Count'Old + W) = B_Count'Old
              and then Same (A.Coeff (A.Count'Old + W),
-                            Eq2 (C.Npublic + W, State.Logv,
-                                 State.HC0, State.HC1, Alpha)))
+                            In_Coef (C.Npublic + W, State, Alpha)))
           and then
           (declare
              T : constant Expression :=

@@ -270,6 +270,38 @@ package body Sumcheck_KAT_Generic is
                   end;
                end if;
             end loop;
+            --  Phase D, M1: the bound quad by the bindeq tables agrees
+            --  with the bound quad term by term, on every layer, under
+            --  challenges that depend on the layer (ADR 0057's rule: the
+            --  fast form is tested against the reference form).
+            for J in 0 .. C.Last_Layer loop
+               declare
+                  Size : constant Natural := Seg_Size (C, J);
+                  Logv : Natural := 0;
+                  G0, G1, H0, H1 : Element_Array (0 .. Max_Logw - 1);
+                  V : Element := P2;
+                  Slow, Fast : Element;
+               begin
+                  while 2 ** Logv < Size loop
+                     Logv := Logv + 1;
+                  end loop;
+                  for K in 0 .. Max_Logw - 1 loop
+                     V := V * P2 + One;
+                     G0 (K) := V;
+                     G1 (K) := V * V;
+                     H0 (K) := V + P2;
+                     H1 (K) := V * P2;
+                  end loop;
+                  Slow := Eval_Bound_Quad
+                    (Layer_Terms (C, J), Logv, G0, G1, H0, H1,
+                     C.Layers (J).Logw, G0 (J), H1 (J));
+                  Eval_Bound_Quad_T
+                    (Layer_Terms (C, J), Logv, G0, G1, H0, H1,
+                     C.Layers (J).Logw, G0 (J), H1 (J), Fast);
+                  Check (Fast = Slow, "circuit " & Name & ": layer" & J'Image
+                         & ", the bound quad by tables differs");
+               end;
+            end loop;
          end;
       end;
    end Finish_Circuit;
