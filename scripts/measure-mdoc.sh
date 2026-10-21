@@ -47,16 +47,29 @@ run() {
    fi
 }
 M=tests/vectors/upstream/mdoc
-declare -A HASH=([v7]=8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121
-                 [v6]=137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6)
-declare -A CFG=([v7_hash]="7 132 4151" [v7_sig]="7 132 4096"
-                [v6_hash]="4 128 4096" [v6_sig]="4 128 2945")
+#  The circuit hash and the Ligero configuration of each version, by
+#  case statements: the bash of macOS (3.2) has no associative arrays.
+hash_of() {
+   case $1 in
+      v7) echo 8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121 ;;
+      v6) echo 137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6 ;;
+   esac
+}
+cfg_of() {
+   case $1 in
+      v7_hash) echo "7 132 4151" ;;
+      v7_sig)  echo "7 132 4096" ;;
+      v6_hash) echo "4 128 4096" ;;
+      v6_sig)  echo "4 128 2945" ;;
+   esac
+}
 mkdir -p cli/out
 for v in ${1:-v7 v6}; do
    for c in ${2:-hash sig}; do
-      h=${HASH[$v]}
+      h=$(hash_of "$v")
       case $c in hash) f=gf2_128; s=16 ;; sig) f=p256; s=32 ;; esac
-      set -- ${CFG[${v}_$c]}
+      # shellcheck disable=SC2046 # the three numbers are split on purpose
+      set -- $(cfg_of "${v}_$c")
       in=cli/out/mdoc_${v}_${c}_inputs.json
       python3 - "$M/${h}_${c}_witness.bin" "$s" "$in" <<'PY'
 import json, sys
