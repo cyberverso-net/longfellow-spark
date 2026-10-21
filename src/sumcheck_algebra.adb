@@ -572,6 +572,10 @@ package body Sumcheck_Algebra is
             S := S + ((Kv * Pad (H0t.all, Tm.H0)) * Pad (H1t.all, Tm.H1));
          end;
       end loop;
+      pragma Assert
+        (Proof_Only =>
+           Same (S, EBQT_Ref (T, T'Length, Logv, G0, G1, HC0, HC1,
+                              Logw, Alpha, Beta)));
       Result := S;
       Free_Elems (E);
       Free_Elems (H0t);
