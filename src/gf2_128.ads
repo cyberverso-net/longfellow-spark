@@ -23,7 +23,14 @@
 --    Xtime   : Gold, exact bit-level Post proved (multiplication by x
 --              with reduction).
 --    Mul     : Gold, Post proved against the ghost reference Mul_Ref
---              (MSB-first Horner over the bits of B). NOTE: the proof
+--              (MSB-first Horner over the bits of B). Since milestone
+--              M2 (ADR 0065) Mul is the carry-less multiplication of
+--              upstream's generic.rs: three 64 by 64 products of
+--              Clmul64 (Karatsuba) and two folds; the proof goes
+--              through the 256-bit product, linear in B and equal to
+--              Mul_Ref on each single bit. Mul_Serial is the former
+--              bit-by-bit Mul, Gold against Mul_Ref, kept as the
+--              reference the harness compares with. NOTE: the proof
 --              establishes Mul = Mul_Ref for all inputs; that Mul_Ref
 --              itself matches the pinned spec's convention is anchored
 --              by known-answer tests (tests/vectors/gf2_128_mul.txt,
@@ -170,6 +177,13 @@ package GF2_128 is
    function Mul (A, B : Element) return Element with
      Global => null,
      Post   => (Proof_Only => Mul'Result = Mul_Ref (A, B, 128));
+
+   --  The same product bit by bit: 128 steps of Xtime and a masked xor,
+   --  the form of Mul before milestone M2, kept as the reference that
+   --  the harness compares Mul with (ADR 0065).
+   function Mul_Serial (A, B : Element) return Element with
+     Global => null,
+     Post   => (Proof_Only => Mul_Serial'Result = Mul_Ref (A, B, 128));
 
    --  Field squaring, E * E mod Q(x). Thin wrapper over Mul for now.
    function Square (E : Element) return Element with

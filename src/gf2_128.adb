@@ -1,5 +1,7 @@
 pragma SPARK_Mode (On);
 
+with Clmul64;
+
 package body GF2_128 is
 
    function Add (A, B : Element) return Element is
@@ -37,7 +39,7 @@ package body GF2_128 is
                    or Shift_Right (E.Limbs (0), 63)));
    end Xtime;
 
-   function Mul (A, B : Element) return Element is
+   function Mul_Serial (A, B : Element) return Element is
       R : Element := Zero;
       M : Unsigned_64;
    begin
@@ -53,6 +55,423 @@ package body GF2_128 is
          pragma Loop_Invariant (Proof_Only => R = Mul_Ref (A, B, K));
       end loop;
       return R;
+   end Mul_Serial;
+
+   -------------------------------------------------------------------
+   --  The carry-less multiplication of upstream (Phase D, M2, ADR 0065):
+   --  three 64 by 64 carry-less products (Karatsuba), then the two folds
+   --  of gf2_128_reduce. The proof that it is Mul_Ref goes through the
+   --  256-bit product: its reduction Red agrees with Xtime step by step,
+   --  both sides are linear in B, and they agree on each single bit.
+   -------------------------------------------------------------------
+
+   subtype U64 is Unsigned_64;
+
+   function Elem (L, H : U64) return Element is
+     ((Limbs => [0 => L, 1 => H]))
+   with Global => null;
+
+   --  gf2_128_reduce: A + B x^64 modulo Q, the high limb of B folded
+   --  once (x^128 = x^7 + x^2 + x + 1).
+   function Reduce (A, B : Element) return Element is
+     (Elem (A.Limbs (0) xor B.Limbs (1) xor Shift_Left (B.Limbs (1), 1)
+              xor Shift_Left (B.Limbs (1), 2) xor Shift_Left (B.Limbs (1), 7),
+            A.Limbs (1) xor B.Limbs (0) xor Shift_Right (B.Limbs (1), 63)
+              xor Shift_Right (B.Limbs (1), 62)
+              xor Shift_Right (B.Limbs (1), 57)))
+   with Global => null;
+
+   --  A 256-bit polynomial, four words from the lowest.
+   type W4 is record
+      W0, W1, W2, W3 : U64;
+   end record
+   with Ghost => Proof_Only;
+
+   function X4 (A, B : W4) return W4 is
+     ((A.W0 xor B.W0, A.W1 xor B.W1, A.W2 xor B.W2, A.W3 xor B.W3))
+   with Ghost => Proof_Only, Global => null;
+
+   --  The reduction of a 256-bit polynomial by the two folds.
+   function Red (W : W4) return Element is
+     (Reduce (Elem (W.W0, W.W1), Reduce (Elem (0, W.W2), Elem (0, W.W3))))
+   with Ghost => Proof_Only, Global => null;
+
+   function Shl1 (W : W4) return W4 is
+     ((W0 => Shift_Left (W.W0, 1),
+       W1 => Shift_Left (W.W1, 1) or Shift_Right (W.W0, 63),
+       W2 => Shift_Left (W.W2, 1) or Shift_Right (W.W1, 63),
+       W3 => Shift_Left (W.W3, 1) or Shift_Right (W.W2, 63)))
+   with Ghost => Proof_Only, Global => null;
+
+   procedure Lemma_Red_Lin (A, B : W4) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Red (X4 (A, B)) = Add (Red (A), Red (B))
+   is
+   begin
+      null;
+   end Lemma_Red_Lin;
+
+   --  Multiplying by x before or after the reduction.
+   procedure Lemma_Red_Shl1 (W : W4) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => Shift_Right (W.W3, 63) = 0,
+     Post   => Red (Shl1 (W)) = Xtime (Red (W))
+   is
+   begin
+      null;
+   end Lemma_Red_Shl1;
+
+   --  The two folds of gf2_128_mul on the Karatsuba terms T0, T1 (the
+   --  middle term, corrected) and T2 are the reduction of their sum.
+   procedure Lemma_Upstream_Red (T0, T1, T2 : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Reduce (T0, Reduce (T1, T2))
+               = Red ((W0 => T0.Limbs (0),
+                       W1 => T0.Limbs (1) xor T1.Limbs (0),
+                       W2 => T1.Limbs (1) xor T2.Limbs (0),
+                       W3 => T2.Limbs (1)))
+   is
+   begin
+      null;
+   end Lemma_Upstream_Red;
+
+   --  The 128-bit carry-less product of two limbs.
+   function C (X, Y : U64) return Element is
+     (Elem (Clmul64.Lo_Ref (X, Y, 64), Clmul64.Hi_Ref (X, Y, 64)))
+   with Ghost => Proof_Only, Global => null;
+
+   --  The 256-bit product of A by B, laid out as gf2_128_mul does.
+   function Kara (A, B : Element) return W4 is
+     (declare
+        T0 : constant Element := C (A.Limbs (0), B.Limbs (0));
+        T2 : constant Element := C (A.Limbs (1), B.Limbs (1));
+        TM : constant Element :=
+          C (A.Limbs (0) xor A.Limbs (1), B.Limbs (0) xor B.Limbs (1));
+        T1 : constant Element :=
+          Elem (TM.Limbs (0) xor T0.Limbs (0) xor T2.Limbs (0),
+                TM.Limbs (1) xor T0.Limbs (1) xor T2.Limbs (1));
+      begin
+        (W0 => T0.Limbs (0),
+         W1 => T0.Limbs (1) xor T1.Limbs (0),
+         W2 => T1.Limbs (1) xor T2.Limbs (0),
+         W3 => T2.Limbs (1)))
+   with Ghost => Proof_Only, Global => null;
+
+   procedure Lemma_C_Lin_X (X1, X2, Y : U64) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => C (X1 xor X2, Y) = Add (C (X1, Y), C (X2, Y))
+   is
+   begin
+      Clmul64.Lemma_Lo_Lin_X (X1, X2, Y, 64);
+      Clmul64.Lemma_Hi_Lin_X (X1, X2, Y, 64);
+   end Lemma_C_Lin_X;
+
+   procedure Lemma_C_Lin_Y (X, Y1, Y2 : U64) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => C (X, Y1 xor Y2) = Add (C (X, Y1), C (X, Y2))
+   is
+   begin
+      Clmul64.Lemma_Lo_Lin_Y (X, Y1, Y2, 64);
+      Clmul64.Lemma_Hi_Lin_Y (X, Y1, Y2, 64);
+   end Lemma_C_Lin_Y;
+
+   procedure Lemma_Kara_Lin (A, B1, B2 : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Kara (A, Add (B1, B2)) = X4 (Kara (A, B1), Kara (A, B2))
+   is
+   begin
+      Lemma_C_Lin_Y (A.Limbs (0), B1.Limbs (0), B2.Limbs (0));
+      Lemma_C_Lin_Y (A.Limbs (1), B1.Limbs (1), B2.Limbs (1));
+      pragma Assert
+        ((Add (B1, B2).Limbs (0) xor Add (B1, B2).Limbs (1))
+         = ((B1.Limbs (0) xor B1.Limbs (1))
+            xor (B2.Limbs (0) xor B2.Limbs (1))));
+      Lemma_C_Lin_Y (A.Limbs (0) xor A.Limbs (1),
+                     B1.Limbs (0) xor B1.Limbs (1),
+                     B2.Limbs (0) xor B2.Limbs (1));
+   end Lemma_Kara_Lin;
+
+   procedure Lemma_Mul_Ref_Lin (A, B1, B2 : Element; N : Bit_Count) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (A, Add (B1, B2), N)
+               = Add (Mul_Ref (A, B1, N), Mul_Ref (A, B2, N)),
+     Subprogram_Variant => (Decreases => N)
+   is
+   begin
+      if N > 0 then
+         Lemma_Mul_Ref_Lin (A, B1, B2, N - 1);
+         pragma Assert
+           (Xtime (Add (Mul_Ref (A, B1, N - 1), Mul_Ref (A, B2, N - 1)))
+            = Add (Xtime (Mul_Ref (A, B1, N - 1)),
+                   Xtime (Mul_Ref (A, B2, N - 1))));
+         pragma Assert
+           (Bit (Add (B1, B2), 128 - N)
+            = (Bit (B1, 128 - N) /= Bit (B2, 128 - N)));
+      end if;
+   end Lemma_Mul_Ref_Lin;
+
+   procedure Lemma_Mul_Ref_Zero (A : Element; N : Bit_Count) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (A, Zero, N) = Zero,
+     Subprogram_Variant => (Decreases => N)
+   is
+   begin
+      if N > 0 then
+         Lemma_Mul_Ref_Zero (A, N - 1);
+      end if;
+   end Lemma_Mul_Ref_Zero;
+
+   --  The element whose only set bit is J.
+   function E_Bit (J : Bit_Index_128) return Element is
+     (if J < 64 then Elem (Shift_Left (1, J), 0)
+      else Elem (0, Shift_Left (1, J - 64)))
+   with Ghost => Proof_Only, Global => null;
+
+   --  A times x^J.
+   function Xpow (A : Element; J : Natural) return Element is
+     (if J = 0 then A else Xtime (Xpow (A, J - 1)))
+   with Ghost => Proof_Only,
+        Global => null,
+        Subprogram_Variant => (Decreases => J);
+
+   procedure Lemma_Mul_Ref_Bit (A : Element; J : Bit_Index_128;
+                                N : Bit_Count) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (A, E_Bit (J), N)
+               = (if N < 128 - J then Zero else Xpow (A, N - (128 - J))),
+     Subprogram_Variant => (Decreases => N)
+   is
+   begin
+      if N > 0 then
+         Lemma_Mul_Ref_Bit (A, J, N - 1);
+         pragma Assert (Bit (E_Bit (J), 128 - N) = (128 - N = J));
+      end if;
+   end Lemma_Mul_Ref_Bit;
+
+   --  A shifted left by J as a 256-bit polynomial.
+   function Shl_C (A : Element; J : Bit_Index_128) return W4 is
+     (if J < 64
+      then (W0 => Shift_Left (A.Limbs (0), J),
+            W1 => Shift_Left (A.Limbs (1), J)
+                  xor Shift_Right (A.Limbs (0), 64 - J),
+            W2 => Shift_Right (A.Limbs (1), 64 - J),
+            W3 => 0)
+      else (W0 => 0,
+            W1 => Shift_Left (A.Limbs (0), J - 64),
+            W2 => Shift_Left (A.Limbs (1), J - 64)
+                  xor Shift_Right (A.Limbs (0), 128 - J),
+            W3 => Shift_Right (A.Limbs (1), 128 - J)))
+   with Ghost => Proof_Only, Global => null;
+
+   procedure Lemma_Shl_Step (A : Element; J : Natural) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => J < 127,
+     Post   => Shl1 (Shl_C (A, J)) = Shl_C (A, J + 1)
+               and then Shift_Right (Shl_C (A, J).W3, 63) = 0
+   is
+      S  : constant W4 := Shl_C (A, J);
+      T  : constant W4 := Shl_C (A, J + 1);
+      AL : constant U64 := A.Limbs (0);
+      AH : constant U64 := A.Limbs (1);
+   begin
+      if J < 63 then
+         pragma Assert (Shift_Left (S.W0, 1) = T.W0);
+         pragma Assert
+           ((Shift_Left (Shift_Right (AL, 64 - J), 1)
+             or Shift_Right (Shift_Left (AL, J), 63))
+            = Shift_Right (AL, 63 - J));
+         pragma Assert ((Shift_Left (S.W1, 1) or Shift_Right (S.W0, 63))
+                        = T.W1);
+         pragma Assert
+           ((Shift_Left (Shift_Right (AH, 64 - J), 1)
+             or Shift_Right (Shift_Left (AH, J), 63))
+            = Shift_Right (AH, 63 - J));
+         pragma Assert ((Shift_Left (S.W2, 1) or Shift_Right (S.W1, 63))
+                        = T.W2);
+         pragma Assert ((Shift_Left (S.W3, 1) or Shift_Right (S.W2, 63))
+                        = T.W3);
+      elsif J = 63 then
+         pragma Assert (Shl1 (S) = T);
+      else
+         pragma Assert (Shift_Left (S.W0, 1) = T.W0);
+         pragma Assert ((Shift_Left (S.W1, 1) or Shift_Right (S.W0, 63))
+                        = T.W1);
+         pragma Assert
+           ((Shift_Left (Shift_Right (AL, 128 - J), 1)
+             or Shift_Right (Shift_Left (AL, J - 64), 63))
+            = Shift_Right (AL, 127 - J));
+         pragma Assert ((Shift_Left (S.W2, 1) or Shift_Right (S.W1, 63))
+                        = T.W2);
+         pragma Assert
+           ((Shift_Left (Shift_Right (AH, 128 - J), 1)
+             or Shift_Right (Shift_Left (AH, J - 64), 63))
+            = Shift_Right (AH, 127 - J));
+         pragma Assert ((Shift_Left (S.W3, 1) or Shift_Right (S.W2, 63))
+                        = T.W3);
+      end if;
+   end Lemma_Shl_Step;
+
+   procedure Lemma_Red_Shl (A : Element; J : Bit_Index_128) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Red (Shl_C (A, J)) = Xpow (A, J),
+     Subprogram_Variant => (Decreases => J)
+   is
+   begin
+      if J > 0 then
+         Lemma_Red_Shl (A, J - 1);
+         Lemma_Shl_Step (A, J - 1);
+         Lemma_Red_Shl1 (Shl_C (A, J - 1));
+      end if;
+   end Lemma_Red_Shl;
+
+   procedure Lemma_Kara_Bit (A : Element; J : Bit_Index_128) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Kara (A, E_Bit (J)) = Shl_C (A, J)
+   is
+      AL : constant U64 := A.Limbs (0);
+      AH : constant U64 := A.Limbs (1);
+   begin
+      if J < 64 then
+         Lemma_C_Lin_X (AL, AH, Shift_Left (1, J));
+         Clmul64.Lemma_Lo_Bit (AL, J, 64);
+         Clmul64.Lemma_Hi_Bit (AL, J, 64);
+         Clmul64.Lemma_Lo_Bit (AH, J, 64);
+         Clmul64.Lemma_Hi_Bit (AH, J, 64);
+         Clmul64.Lemma_By_Zero (AH, 64);
+      else
+         Lemma_C_Lin_X (AL, AH, Shift_Left (1, J - 64));
+         Clmul64.Lemma_Lo_Bit (AL, J - 64, 64);
+         Clmul64.Lemma_Hi_Bit (AL, J - 64, 64);
+         Clmul64.Lemma_Lo_Bit (AH, J - 64, 64);
+         Clmul64.Lemma_Hi_Bit (AH, J - 64, 64);
+         Clmul64.Lemma_By_Zero (AL, 64);
+      end if;
+   end Lemma_Kara_Bit;
+
+   --  The bits of B below K.
+   function Low128 (B : Element; K : Bit_Count) return Element is
+     (if K = 0 then Zero
+      elsif Bit (B, K - 1) then Add (Low128 (B, K - 1), E_Bit (K - 1))
+      else Low128 (B, K - 1))
+   with Ghost => Proof_Only,
+        Global => null,
+        Subprogram_Variant => (Decreases => K);
+
+   procedure Lemma_Low128_All (B : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Low128 (B, 128) = B
+   is
+   begin
+      for K in 0 .. 127 loop
+         pragma Loop_Invariant
+           (Low128 (B, K)
+            = (if K < 64
+               then Elem (B.Limbs (0) and (Shift_Left (1, K) - 1), 0)
+               else Elem (B.Limbs (0),
+                          B.Limbs (1) and (Shift_Left (1, K - 64) - 1))));
+         pragma Assert
+           (Low128 (B, K + 1)
+            = (if Bit (B, K) then Add (Low128 (B, K), E_Bit (K))
+               else Low128 (B, K)));
+         pragma Assert
+           (Bit (B, K)
+            = ((Shift_Right (B.Limbs (Limb_Index (K / 64)), K mod 64)
+                and 1) = 1));
+         pragma Assert
+           (Low128 (B, K + 1)
+            = (if K + 1 < 64
+               then Elem (B.Limbs (0) and (Shift_Left (1, K + 1) - 1), 0)
+               else Elem (B.Limbs (0),
+                          B.Limbs (1)
+                          and (Shift_Left (1, K + 1 - 64) - 1))));
+      end loop;
+   end Lemma_Low128_All;
+
+   --  Mul_Ref reads B through its bits: equal limbs give equal products
+   --  (the predefined equality of Element compares the limbs, which the
+   --  provers do not identify with the logical equality).
+   procedure Lemma_Mul_Ref_Ext (A, B1, B2 : Element; N : Bit_Count) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => B1 = B2,
+     Post   => Mul_Ref (A, B1, N) = Mul_Ref (A, B2, N),
+     Subprogram_Variant => (Decreases => N)
+   is
+   begin
+      if N > 0 then
+         Lemma_Mul_Ref_Ext (A, B1, B2, N - 1);
+         pragma Assert (Bit (B1, 128 - N) = Bit (B2, 128 - N));
+      end if;
+   end Lemma_Mul_Ref_Ext;
+
+   --  The reduced Karatsuba product is Mul_Ref, by induction over the
+   --  bits of B.
+   procedure Lemma_Main (A, B : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Red (Kara (A, B)) = Mul_Ref (A, B, 128)
+   is
+   begin
+      Clmul64.Lemma_By_Zero (A.Limbs (0), 64);
+      Clmul64.Lemma_By_Zero (A.Limbs (1), 64);
+      Clmul64.Lemma_By_Zero (A.Limbs (0) xor A.Limbs (1), 64);
+      Lemma_Mul_Ref_Zero (A, 128);
+      pragma Assert (Red (Kara (A, Zero)) = Mul_Ref (A, Low128 (B, 0), 128));
+      for K in 0 .. 127 loop
+         pragma Loop_Invariant
+           (Red (Kara (A, Low128 (B, K))) = Mul_Ref (A, Low128 (B, K), 128));
+         if Bit (B, K) then
+            Lemma_Kara_Lin (A, Low128 (B, K), E_Bit (K));
+            Lemma_Red_Lin (Kara (A, Low128 (B, K)), Kara (A, E_Bit (K)));
+            Lemma_Mul_Ref_Lin (A, Low128 (B, K), E_Bit (K), 128);
+            Lemma_Kara_Bit (A, K);
+            Lemma_Red_Shl (A, K);
+            Lemma_Mul_Ref_Bit (A, K, 128);
+         end if;
+         pragma Assert
+           (Red (Kara (A, Low128 (B, K + 1)))
+            = Mul_Ref (A, Low128 (B, K + 1), 128));
+      end loop;
+      pragma Assert
+        (Red (Kara (A, Low128 (B, 128))) = Mul_Ref (A, Low128 (B, 128), 128));
+      Lemma_Low128_All (B);
+      pragma Assert (Low128 (B, 128) = B);
+      pragma Assert (Kara (A, Low128 (B, 128)) = Kara (A, B));
+      Lemma_Mul_Ref_Ext (A, Low128 (B, 128), B, 128);
+   end Lemma_Main;
+
+   function Mul (A, B : Element) return Element is
+      AL : constant U64 := A.Limbs (0);
+      AH : constant U64 := A.Limbs (1);
+      BL : constant U64 := B.Limbs (0);
+      BH : constant U64 := B.Limbs (1);
+      T0 : constant Element :=
+        Elem (Clmul64.Clmul_Lo (AL, BL), Clmul64.Clmul_Hi (AL, BL));
+      T2 : constant Element :=
+        Elem (Clmul64.Clmul_Lo (AH, BH), Clmul64.Clmul_Hi (AH, BH));
+      TM : constant Element :=
+        Elem (Clmul64.Clmul_Lo (AL xor AH, BL xor BH),
+              Clmul64.Clmul_Hi (AL xor AH, BL xor BH));
+      T1 : constant Element :=
+        Elem (TM.Limbs (0) xor T0.Limbs (0) xor T2.Limbs (0),
+              TM.Limbs (1) xor T0.Limbs (1) xor T2.Limbs (1));
+   begin
+      Lemma_Upstream_Red (T0, T1, T2);
+      Lemma_Main (A, B);
+      return Reduce (T0, Reduce (T1, T2));
    end Mul;
 
    function Square (E : Element) return Element is
