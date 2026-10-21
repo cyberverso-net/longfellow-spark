@@ -68,3 +68,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0062](0062-proof-on-demand.md) | The proof on demand, posted as a commit status | Accepted | 2026-10-19 |
 | [0063](0063-milestone-m1-algorithmic-parity.md) | Milestone M1: algorithmic parity with the production verifier and prover | Proposed | 2026-10-21 |
 | [0064](0064-lean-circuit-premises.md) | The circuit premises of upstream's Lean proofs, checked and proved | Accepted | 2026-10-21 |
+| [0065](0065-carry-less-multiplication-in-gf2-128.md) | The carry-less multiplication of upstream in GF(2^128), proved Gold | Proposed | 2026-10-21 |
