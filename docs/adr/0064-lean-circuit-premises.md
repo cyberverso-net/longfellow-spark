@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-21, with the pull request that realises it)
 
 ## Date
 

@@ -66,4 +66,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0060](0060-proving-machine-on-google-cloud.md) | A proving machine on Google Cloud: prove as one job, make check remote | Accepted, amended by 0062 | 2026-10-19 |
 | [0061](0061-readme-as-front-page.md) | The README as a front page, the trust model in the guide | Accepted | 2026-10-19 |
 | [0062](0062-proof-on-demand.md) | The proof on demand, posted as a commit status | Accepted | 2026-10-19 |
-| [0064](0064-lean-circuit-premises.md) | The circuit premises of upstream's Lean proofs, checked and proved | Proposed | 2026-10-21 |
+| [0064](0064-lean-circuit-premises.md) | The circuit premises of upstream's Lean proofs, checked and proved | Accepted | 2026-10-21 |
