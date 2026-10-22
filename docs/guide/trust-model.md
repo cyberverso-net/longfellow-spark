@@ -156,6 +156,7 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 - SPARKlib's functional sequences, used as a ghost model (ADR 0031).
 - That `Same`, the logical equality of each field wrapper, is the equality of its element type. Its body is the predefined `=`, outside SPARK (ADR 0023).
 - That `P256_Field.Eq` is the equality of P-256 elements, as `Same`. Its body is the predefined `=`, outside SPARK. It carries the normal form of a product, which the Lagrange tables need (ADR 0066).
+- The release build relies on the proof instead of checking at run time. The units of `src/` are compiled without run-time checks, because GNATprove proves that none can fail; the units of `cli/src/` keep theirs (ADR 0068). This holds only under the preconditions of the units. The command-line programs establish the preconditions of `Circuit_Reader.Read`, `Zk_Verifier.Verify` and `Zk_Prover.Prove` in code before each call, and `Cli_Random.Fill` changes no state the prover reads.
 
 **Inputs and references.**
 

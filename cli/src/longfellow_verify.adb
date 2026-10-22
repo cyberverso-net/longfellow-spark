@@ -26,6 +26,7 @@ with Ada.Streams.Stream_IO;
 with Ada.Text_IO;
 with Interfaces; use Interfaces;
 with Bytes;      use Bytes;
+with Transcript;
 with GF2_128;
 with P256_Field;
 with Ligero_Geometry;
@@ -299,6 +300,11 @@ procedure Longfellow_Verify is
         or else Ncol = 0
       then
          raise Usage_Error with "missing argument";
+      end if;
+      --  The precondition of the transcript on the label, checked here:
+      --  the library units run without run-time checks (ADR 0068).
+      if Label_Arg'Length > Transcript.Max_Payload then
+         raise Usage_Error with "label too long";
       end if;
    end Parse_Arguments;
 

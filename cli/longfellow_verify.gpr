@@ -2,12 +2,14 @@
 --  the interop harness interop_kat (ADR 0048) and the command-line
 --  prover longfellow_prove of Phase C (ADR 0049), all outside the proof
 --  perimeter. The library sources are compiled here without
---  assertions (the proofs establish what the contracts state; run-time
---  checks stay on), with optimisation: this is the build to run on real
---  circuits and proofs, and the interop test runs on the same binary
---  code the project delivers. The assertion-enabled build of tests/
---  would execute the stage 3 contracts on thousands of inputs and take
---  the better part of an hour on one circuit.
+--  assertions (the proofs establish what the contracts state) and, by
+--  default, without run-time checks in the units of src/, whose absence
+--  of run-time errors is proved (ADR 0068), with optimisation: this is
+--  the build to run on real circuits and proofs, and the interop test
+--  runs on the same binary code the project delivers. The
+--  assertion-enabled build of tests/ would execute the stage 3
+--  contracts on thousands of inputs and take the better part of an
+--  hour on one circuit.
 --
 --  Build:  alr exec -- gprbuild -P cli/longfellow_verify.gpr -p
 --  Run:    cli/bin/longfellow_verify --help
@@ -20,7 +22,7 @@ project Longfellow_Verify is
 
    --  LONGFELLOW_CLI_BUILD, described at package Compiler.
    type Build_Kind is ("o2", "o3", "proved");
-   Build : Build_Kind := external ("LONGFELLOW_CLI_BUILD", "o2");
+   Build : Build_Kind := external ("LONGFELLOW_CLI_BUILD", "proved");
 
    for Source_Dirs use ("src", "../src");
    for Object_Dir use "obj/" & Build;
@@ -30,11 +32,12 @@ project Longfellow_Verify is
      ("longfellow_verify.adb", "interop_kat.adb", "longfellow_prove.adb");
 
    --  The build, chosen with LONGFELLOW_CLI_BUILD:
-   --  o2     -O2, every run-time check on (the build so far);
+   --  o2     -O2, every run-time check on (the build until ADR 0068);
    --  o3     -O3 and inlining across units, every check on;
-   --  proved as o3, with the run-time checks suppressed in the library
-   --         units of src/, whose absence of run-time errors is proved;
-   --         the units of cli/src/, outside the proof, keep them.
+   --  proved the default: as o3, with the run-time checks suppressed
+   --         in the library units of src/, whose absence of run-time
+   --         errors is proved; the units of cli/src/, outside the
+   --         proof, keep them (ADR 0068).
    Common := ("-gnat2022", "-gnatwa", "-gnatW8",
               "-gnaty3aAbBcefhiIklmnOprStux");
    Fast := Common & ("-O3", "-gnatn");

@@ -71,3 +71,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0065](0065-carry-less-multiplication-in-gf2-128.md) | The carry-less multiplication of upstream in GF(2^128), proved Gold | Proposed | 2026-10-21 |
 | [0066](0066-lagrange-tables-by-prefix-and-suffix.md) | The verifier's Lagrange tables by prefix and suffix products, proved | Proposed | 2026-10-22 |
 | [0067](0067-performance-milestones-by-trust.md) | Performance milestones by trust: the Gold limit, then a tested variant | Proposed | 2026-10-22 |
+| [0068](0068-release-build-without-run-time-checks.md) | The release build without run-time checks in the proved units | Proposed | 2026-10-22 |
