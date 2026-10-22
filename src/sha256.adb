@@ -49,9 +49,15 @@ package body Sha256 is
    function Small_1 (X : Unsigned_32) return Unsigned_32 is
      (Rotate_Right (X, 17) xor Rotate_Right (X, 19) xor Shift_Right (X, 10));
 
-   --  Section 6.2.2: one block into the state.
-   procedure Compress (H : in out State; Block : Bytes_64) with
-     Global => null
+   --  Section 6.2.2: one block into the state, the 64 bytes of Data
+   --  from First, read in place so that whole blocks of the input are
+   --  not copied into the context first.
+   procedure Compress (H : in out State; Data : Byte_Array; First : Natural)
+   with
+     Global => null,
+     Inline,
+     Pre    => First >= Data'First and then Data'Last >= First
+               and then Data'Last - First >= 63
    is
       type Schedule is array (Round_Index) of Unsigned_32;
       --  Zeroed first so that flow analysis has it initialised; the
@@ -62,13 +68,15 @@ package body Sha256 is
       --  The first sixteen words are the block, big-endian, the rest
       --  the recurrence of Section 6.2.2 step 1.
       for T in Round_Index range 0 .. 15 loop
+         pragma Loop_Optimize (No_Vector, Unroll);
          W (T) :=
-           Shift_Left (Unsigned_32 (Block (4 * Natural (T))), 24)
-           or Shift_Left (Unsigned_32 (Block (4 * Natural (T) + 1)), 16)
-           or Shift_Left (Unsigned_32 (Block (4 * Natural (T) + 2)), 8)
-           or Unsigned_32 (Block (4 * Natural (T) + 3));
+           Shift_Left (Unsigned_32 (Data (First + 4 * Natural (T))), 24)
+           or Shift_Left (Unsigned_32 (Data (First + 4 * Natural (T) + 1)), 16)
+           or Shift_Left (Unsigned_32 (Data (First + 4 * Natural (T) + 2)), 8)
+           or Unsigned_32 (Data (First + 4 * Natural (T) + 3));
       end loop;
       for T in Round_Index range 16 .. 63 loop
+         pragma Loop_Optimize (No_Vector, Unroll);
          W (T) :=
            Small_1 (W (T - 2)) + W (T - 7) + Small_0 (W (T - 15)) + W (T - 16);
       end loop;
@@ -83,6 +91,7 @@ package body Sha256 is
       HH := H (7);
 
       for T in Round_Index loop
+         pragma Loop_Optimize (No_Vector, Unroll);
          T1 := HH + Sigma_1 (E) + Ch (E, F, G) + K (T) + W (T);
          T2 := Sigma_0 (A) + Maj (A, B, C);
          HH := G;
@@ -109,13 +118,14 @@ package body Sha256 is
    --  postcondition on Fill is what the padding loop of Digest needs.
    procedure Put (Ctx : in out Context; B : Unsigned_8) with
      Global => null,
+     Inline,
      Post   => Ctx.Fill = (if Ctx.Fill'Old = 63 then 0 else Ctx.Fill'Old + 1)
    is
    begin
       Ctx.Block (Ctx.Fill) := B;
       Ctx.Total := Ctx.Total + 1;
       if Ctx.Fill = 63 then
-         Compress (Ctx.H, Ctx.Block);
+         Compress (Ctx.H, Ctx.Block, 0);
          Ctx.Fill := 0;
       else
          Ctx.Fill := Ctx.Fill + 1;
@@ -128,12 +138,44 @@ package body Sha256 is
       Fill  => 0,
       Total => 0);
 
+   procedure Update_Nonempty (Ctx : in out Context; Data : Byte_Array) with
+     Global => null,
+     Pre    => Data'Length > 0;
+
+   --  Bytes one at a time until the buffer is empty, then the whole
+   --  blocks of Data straight into the state, then the rest into the
+   --  buffer.
    procedure Update (Ctx : in out Context; Data : Byte_Array) is
    begin
-      for I in Data'Range loop
-         Put (Ctx, Data (I));
-      end loop;
+      --  The bounds of an empty array need not be in Byte_Index.
+      if Data'Length = 0 then
+         return;
+      end if;
+      Update_Nonempty (Ctx, Data);
    end Update;
+
+   procedure Update_Nonempty (Ctx : in out Context; Data : Byte_Array) is
+      --  The next byte of Data to take; Data'Last + 1 once all are.
+      I : Natural := Data'First;
+   begin
+      while Ctx.Fill /= 0 and then I <= Data'Last loop
+         pragma Loop_Invariant (I in Data'First .. Data'Last);
+         pragma Loop_Variant (Increases => I);
+         Put (Ctx, Data (I));
+         I := I + 1;
+      end loop;
+      while I <= Data'Last and then Data'Last - I >= 63 loop
+         pragma Loop_Invariant (I in Data'First .. Data'Last);
+         pragma Loop_Invariant (Ctx.Fill = 0);
+         pragma Loop_Variant (Increases => I);
+         Compress (Ctx.H, Data, I);
+         Ctx.Total := Ctx.Total + 64;
+         I := I + 64;
+      end loop;
+      for J in I .. Data'Last loop
+         Put (Ctx, Data (J));
+      end loop;
+   end Update_Nonempty;
 
    function Digest (Ctx : Context) return Bytes_32 is
       C      : Context := Ctx;
