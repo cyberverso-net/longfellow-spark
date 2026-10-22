@@ -155,6 +155,7 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 - The SMT solvers: CVC5, Z3 and Alt-Ergo.
 - SPARKlib's functional sequences, used as a ghost model (ADR 0031).
 - That `Same`, the logical equality of each field wrapper, is the equality of its element type. Its body is the predefined `=`, outside SPARK (ADR 0023).
+- That `P256_Field.Eq` is the equality of P-256 elements, as `Same`. Its body is the predefined `=`, outside SPARK. It carries the normal form of a product, which the Lagrange tables need (ADR 0066).
 
 **Inputs and references.**
 

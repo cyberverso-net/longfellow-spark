@@ -15,6 +15,7 @@ pragma SPARK_Mode (On);
 with Bytes;
 with P256_Field;
 with Field_Signature;
+with Proof_Levels;
 
 package Field_P256 is
 
@@ -60,6 +61,13 @@ package Field_P256 is
    is (P256_Field.To_Bytes (E))
    with Global => null;
 
+   --  The associativity of the product (ADR 0066), stated with Same.
+   procedure Lemma_Mul_Assoc (A, B, C : P256_Field.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (P256_Field.Mul (P256_Field.Mul (A, B), C),
+                     P256_Field.Mul (A, P256_Field.Mul (B, C)));
+
    package Sig is new Field_Signature
      (Element    => P256_Field.Element,
       Zero       => P256_Field.Zero,
@@ -73,6 +81,7 @@ package Field_P256 is
       L1_Den_Inv => Minus_One,
       L2_Den_Inv => Half,
       Same       => Same,
+      Lemma_Mul_Assoc => Lemma_Mul_Assoc,
       Serialized_Size  => 32,
       To_Bytes         => P256_Field.To_Bytes,
       From_Bytes       => P256_Field.From_Bytes,

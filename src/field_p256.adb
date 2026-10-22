@@ -5,6 +5,8 @@
 
 pragma SPARK_Mode (On);
 
+with Field_P256.Laws;
+
 package body Field_P256 is
 
    use type P256_Field.Element;
@@ -31,5 +33,12 @@ package body Field_P256 is
    begin
       P256_Field.From_Bytes (B, E, Ok);
    end From_Subfield_Bytes;
+
+   procedure Lemma_Mul_Assoc (A, B, C : P256_Field.Element) is
+   begin
+      P256_Field.Lemma_Mul_Assoc (A, B, C);
+      Laws.Lemma_Same (P256_Field.Mul (P256_Field.Mul (A, B), C),
+                  P256_Field.Mul (A, P256_Field.Mul (B, C)));
+   end Lemma_Mul_Assoc;
 
 end Field_P256;
