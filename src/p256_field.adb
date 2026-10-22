@@ -2,6 +2,15 @@ pragma SPARK_Mode (On);
 
 package body P256_Field is
 
+   --  Outside SPARK on purpose: the provers see only the declaration
+   --  of Eq and its Logical_Equal annotation.
+   function Eq (A, B : Element) return Boolean with
+     SPARK_Mode => Off
+   is
+   begin
+      return A = B;
+   end Eq;
+
    -------------------------------------------------------------------
    --  Lemmas on the model
    -------------------------------------------------------------------
@@ -1730,8 +1739,10 @@ package body P256_Field is
    function Mul (A, B : Element) return Element is
       X : constant Wide_Array := Product (A.Limbs, B.Limbs);
       R : constant Limb_Array := Reduce (X);
+      E : constant Element := Norm ((Limbs => R));
    begin
-      return (Limbs => R);
+      Lemma_To_Int_Eq (E.Limbs, R);
+      return E;
    end Mul;
 
    -------------------------------------------------------------------
@@ -1827,5 +1838,166 @@ package body P256_Field is
    begin
       return (Limbs => [Unsigned_64 (X), 0, 0, 0]);
    end Of_Natural;
+
+   ----------------------------------------------------------------------
+   --  The product is associative (ADR 0066), from
+   --  the integer model: the laws of the remainder, and To_Int one to
+   --  one on four limbs, digit by digit in base 2^64.
+   ----------------------------------------------------------------------
+
+   --  Two words above a digit: c + W x = d + W y with digits below W.
+   procedure Lemma_Digit (C1, C2, X1, X2, W : Big_Integer) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => W > 0 and then C1 >= 0 and then C1 < W
+               and then C2 >= 0 and then C2 < W
+               and then C1 + W * X1 = C2 + W * X2,
+     Post   => C1 = C2 and then X1 = X2
+   is
+      K : constant Big_Integer := X1 - X2;
+   begin
+      pragma Assert (W * K = C2 - C1);
+      if K >= 1 then
+         pragma Assert (W * K >= W);
+      elsif K <= -1 then
+         pragma Assert (W * K <= -W);
+      end if;
+      pragma Assert (K = 0);
+   end Lemma_Digit;
+
+   --  The remainder is the unique digit below M.
+   procedure Lemma_Mod_Unique (A, T, Rm, M : Big_Integer) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => M > 0 and then A >= 0 and then Rm >= 0 and then Rm < M
+               and then A = Rm + M * T,
+     Post   => A mod M = Rm
+   is
+   begin
+      pragma Assert (A = (A / M) * M + A mod M);
+      pragma Assert (A = A mod M + M * (A / M));
+      Lemma_Digit (A mod M, Rm, A / M, T, M);
+   end Lemma_Mod_Unique;
+
+   --  A remainder may be taken early in a product.
+   procedure Lemma_Mod_Mul (X, C, M : Big_Integer) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => X >= 0 and then C >= 0 and then M > 0,
+     Post   => ((X mod M) * C) mod M = (X * C) mod M
+   is
+      Q  : constant Big_Integer := X / M;
+      Rm : constant Big_Integer := X mod M;
+      Q2 : constant Big_Integer := (Rm * C) / M;
+      R2 : constant Big_Integer := (Rm * C) mod M;
+   begin
+      pragma Assert (X = Q * M + Rm);
+      pragma Assert (Rm * C = Q2 * M + R2);
+      pragma Assert (X = Rm + M * Q);
+      pragma Assert (Rm * C = R2 + M * Q2);
+      pragma Assert (X * C = R2 + M * (Q * C + Q2));
+      Lemma_Mod_Unique (X * C, Q * C + Q2, R2, M);
+   end Lemma_Mod_Mul;
+
+   procedure Lemma_Conv_Bounds (X : Unsigned_64) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Conv (X) >= 0 and then Conv (X) < Two_64
+   is
+   begin
+      null;
+   end Lemma_Conv_Bounds;
+
+   procedure Lemma_Conv_Inj (X, Y : Unsigned_64) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => Conv (X) = Conv (Y),
+     Post   => X = Y
+   is
+   begin
+      null;
+   end Lemma_Conv_Inj;
+
+   procedure Lemma_Weights with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Weight (0) = 1
+               and then Weight (1) = Two_64
+               and then Weight (2) = Two_64 * Two_64
+               and then Weight (3) = Two_64 * Two_64 * Two_64
+               and then Two_64 > 0
+   is
+   begin
+      pragma Assert (Weight (1) = Two_64 * Weight (0));
+      pragma Assert (Weight (2) = Two_64 * Weight (1));
+      pragma Assert (Weight (3) = Two_64 * Weight (2));
+   end Lemma_Weights;
+
+   --  The value of four limbs in Horner form.
+   procedure Lemma_Horner (L : Limb_Array) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => To_Int (L)
+               = Conv (L (0))
+                 + Two_64 * (Conv (L (1))
+                             + Two_64 * (Conv (L (2))
+                                         + Two_64 * Conv (L (3))))
+   is
+   begin
+      Lemma_Weights;
+      pragma Assert
+        (To_Int (L) = Conv (L (0)) * Weight (0) + Conv (L (1)) * Weight (1)
+                      + Conv (L (2)) * Weight (2) + Conv (L (3)) * Weight (3));
+   end Lemma_Horner;
+
+   procedure Lemma_Inj (A, B : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => To_Int (A.Limbs) = To_Int (B.Limbs),
+     Post   => A = B
+   is
+      W  : constant Big_Integer := Two_64;
+      A0 : constant Big_Integer := Conv (A.Limbs (0));
+      A1 : constant Big_Integer := Conv (A.Limbs (1));
+      A2 : constant Big_Integer := Conv (A.Limbs (2));
+      A3 : constant Big_Integer := Conv (A.Limbs (3));
+      B0 : constant Big_Integer := Conv (B.Limbs (0));
+      B1 : constant Big_Integer := Conv (B.Limbs (1));
+      B2 : constant Big_Integer := Conv (B.Limbs (2));
+      B3 : constant Big_Integer := Conv (B.Limbs (3));
+   begin
+      Lemma_Weights;
+      Lemma_Horner (A.Limbs);
+      Lemma_Horner (B.Limbs);
+      for I in Limb_Index loop
+         Lemma_Conv_Bounds (A.Limbs (I));
+         Lemma_Conv_Bounds (B.Limbs (I));
+      end loop;
+      Lemma_Digit (A0, B0, A1 + W * (A2 + W * A3), B1 + W * (B2 + W * B3), W);
+      Lemma_Digit (A1, B1, A2 + W * A3, B2 + W * B3, W);
+      Lemma_Digit (A2, B2, A3, B3, W);
+      for I in Limb_Index loop
+         Lemma_Conv_Inj (A.Limbs (I), B.Limbs (I));
+      end loop;
+      pragma Assert (A.Limbs = B.Limbs);
+   end Lemma_Inj;
+
+   procedure Lemma_Mul_Assoc (A, B, C : Element) is
+      X  : constant Big_Integer := To_Int (A.Limbs);
+      Y  : constant Big_Integer := To_Int (B.Limbs);
+      Z  : constant Big_Integer := To_Int (C.Limbs);
+   begin
+      Lemma_To_Int_Bounds (A.Limbs);
+      Lemma_To_Int_Bounds (B.Limbs);
+      Lemma_To_Int_Bounds (C.Limbs);
+      pragma Assert (P > 0);
+      Lemma_Mod_Mul (X * Y, Z, P);
+      Lemma_Mod_Mul (Y * Z, X, P);
+      pragma Assert (To_Int (Mul (Mul (A, B), C).Limbs) = ((X * Y) * Z) mod P);
+      pragma Assert (To_Int (Mul (A, Mul (B, C)).Limbs)
+                     = (((Y * Z) mod P) * X) mod P);
+      pragma Assert ((Y * Z) * X = (X * Y) * Z);
+      Lemma_Inj (Mul (Mul (A, B), C), Mul (A, Mul (B, C)));
+   end Lemma_Mul_Assoc;
 
 end P256_Field;

@@ -19,6 +19,7 @@ with Interfaces; use Interfaces;
 with Bytes;
 with GF2_128;
 with Field_Signature;
+with Proof_Levels;
 
 package Field_GF2_128 is
 
@@ -73,6 +74,13 @@ package Field_GF2_128 is
         Post   => To_Subfield_Bytes'Result'First = 0
                   and then To_Subfield_Bytes'Result'Length = 2;
 
+   --  The associativity of the product (ADR 0066), stated with Same.
+   procedure Lemma_Mul_Assoc (A, B, C : GF2_128.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (GF2_128.Mul (GF2_128.Mul (A, B), C),
+                     GF2_128.Mul (A, GF2_128.Mul (B, C)));
+
    package Sig is new Field_Signature
      (Element    => GF2_128.Element,
       Zero       => GF2_128.Zero,
@@ -86,6 +94,7 @@ package Field_GF2_128 is
       L1_Den_Inv => L1_Den_Inv,
       L2_Den_Inv => L2_Den_Inv,
       Same       => Same,
+      Lemma_Mul_Assoc => Lemma_Mul_Assoc,
       Serialized_Size  => 16,
       To_Bytes         => GF2_128.To_Bytes,
       From_Bytes       => GF2_128.From_Bytes,

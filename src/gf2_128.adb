@@ -456,6 +456,438 @@ package body GF2_128 is
       Lemma_Mul_Ref_Ext (A, Low128 (B, 128), B, 128);
    end Lemma_Main;
 
+   ----------------------------------------------------------------------
+   --  The product is associative (ADR 0066), against
+   --  Mul_Ref: linear in each operand, Xtime moves out of either one
+   --  (through x^128 = x^7 + x^2 + x + 1, checked on the basis), then
+   --  Horner over the bits of the third operand.
+   ----------------------------------------------------------------------
+
+   --  x^7 + x^2 + x + 1, the image of x^128.
+   R128 : constant Element := (Limbs => [0 => Reduction_Low, 1 => 0])
+   with Ghost => Proof_Only;
+
+   --  If C then X else Zero.
+   function Sel (C : Boolean; X : Element) return Element is
+     (if C then X else Zero)
+   with Ghost => Proof_Only, Global => null;
+
+   -------------------------------------------------------------------
+   --  Xtime
+   -------------------------------------------------------------------
+
+   procedure Lemma_Xt_Lin (X, Y : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Xtime (Add (X, Y)) = Add (Xtime (X), Xtime (Y))
+   is
+   begin
+      pragma Assert (Bit (Add (X, Y), 127) = (Bit (X, 127) /= Bit (Y, 127)));
+   end Lemma_Xt_Lin;
+
+   procedure Lemma_Xt_Ext (X, Y : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => X = Y,
+     Post   => Xtime (X) = Xtime (Y)
+   is
+   begin
+      pragma Assert (Bit (X, 127) = Bit (Y, 127));
+   end Lemma_Xt_Ext;
+
+   procedure Lemma_Xt_Zero with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Xtime (Zero) = Zero
+   is
+   begin
+      pragma Assert (not Bit (Zero, 127));
+   end Lemma_Xt_Zero;
+
+   -------------------------------------------------------------------
+   --  Mul_Ref: congruence, zero, linearity
+   -------------------------------------------------------------------
+
+   procedure Lemma_Ext_A (A1, A2, B : Element; N : Bit_Count) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => A1 = A2,
+     Post   => Mul_Ref (A1, B, N) = Mul_Ref (A2, B, N),
+     Subprogram_Variant => (Decreases => N)
+   is
+   begin
+      if N > 0 then
+         Lemma_Ext_A (A1, A2, B, N - 1);
+         Lemma_Xt_Ext (Mul_Ref (A1, B, N - 1), Mul_Ref (A2, B, N - 1));
+      end if;
+   end Lemma_Ext_A;
+
+   procedure Lemma_Zero_A (B : Element; N : Bit_Count) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (Zero, B, N) = Zero,
+     Subprogram_Variant => (Decreases => N)
+   is
+   begin
+      if N > 0 then
+         Lemma_Zero_A (B, N - 1);
+         Lemma_Xt_Ext (Mul_Ref (Zero, B, N - 1), Zero);
+         Lemma_Xt_Zero;
+      end if;
+   end Lemma_Zero_A;
+
+   procedure Lemma_Lin_A (A1, A2, B : Element; N : Bit_Count) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (Add (A1, A2), B, N)
+               = Add (Mul_Ref (A1, B, N), Mul_Ref (A2, B, N)),
+     Subprogram_Variant => (Decreases => N)
+   is
+   begin
+      if N > 0 then
+         Lemma_Lin_A (A1, A2, B, N - 1);
+         Lemma_Xt_Ext (Mul_Ref (Add (A1, A2), B, N - 1),
+                       Add (Mul_Ref (A1, B, N - 1), Mul_Ref (A2, B, N - 1)));
+         Lemma_Xt_Lin (Mul_Ref (A1, B, N - 1), Mul_Ref (A2, B, N - 1));
+      end if;
+   end Lemma_Lin_A;
+
+   --  Xtime moves out of the first operand.
+   procedure Lemma_Xt_A (A, B : Element; N : Bit_Count) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (Xtime (A), B, N) = Xtime (Mul_Ref (A, B, N)),
+     Subprogram_Variant => (Decreases => N)
+   is
+   begin
+      if N > 0 then
+         Lemma_Xt_A (A, B, N - 1);
+         Lemma_Xt_Ext (Mul_Ref (Xtime (A), B, N - 1),
+                       Xtime (Mul_Ref (A, B, N - 1)));
+         Lemma_Xt_Lin (Xtime (Mul_Ref (A, B, N - 1)), A);
+      end if;
+   end Lemma_Xt_A;
+
+   -------------------------------------------------------------------
+   --  Powers of x
+   -------------------------------------------------------------------
+
+   procedure Lemma_Xpow_Ext (X, Y : Element; J : Natural) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => X = Y,
+     Post   => Xpow (X, J) = Xpow (Y, J),
+     Subprogram_Variant => (Decreases => J)
+   is
+   begin
+      if J > 0 then
+         Lemma_Xpow_Ext (X, Y, J - 1);
+         Lemma_Xt_Ext (Xpow (X, J - 1), Xpow (Y, J - 1));
+      end if;
+   end Lemma_Xpow_Ext;
+
+   procedure Lemma_Xpow_Lin (X, Y : Element; J : Natural) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Xpow (Add (X, Y), J) = Add (Xpow (X, J), Xpow (Y, J)),
+     Subprogram_Variant => (Decreases => J)
+   is
+   begin
+      if J > 0 then
+         Lemma_Xpow_Lin (X, Y, J - 1);
+         Lemma_Xt_Ext (Xpow (Add (X, Y), J - 1),
+                       Add (Xpow (X, J - 1), Xpow (Y, J - 1)));
+         Lemma_Xt_Lin (Xpow (X, J - 1), Xpow (Y, J - 1));
+      end if;
+   end Lemma_Xpow_Lin;
+
+   procedure Lemma_Xpow_Add (X : Element; I, J : Natural) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => I <= 1024 and then J <= 1024,
+     Post   => Xpow (Xpow (X, I), J) = Xpow (X, I + J),
+     Subprogram_Variant => (Decreases => J)
+   is
+   begin
+      if J > 0 then
+         Lemma_Xpow_Add (X, I, J - 1);
+         Lemma_Xt_Ext (Xpow (Xpow (X, I), J - 1), Xpow (X, I + J - 1));
+      end if;
+   end Lemma_Xpow_Add;
+
+   --  x^K is the bit K for K < 128, and x^128 is R128.
+   procedure Lemma_Xpow_One (K : Bit_Count) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Xpow (One, K) = (if K < 128 then E_Bit (K) else R128),
+     Subprogram_Variant => (Decreases => K)
+   is
+   begin
+      if K > 0 then
+         Lemma_Xpow_One (K - 1);
+         Lemma_Xt_Ext (Xpow (One, K - 1), E_Bit (K - 1));
+         if K - 1 < 63 then
+            pragma Assert (not Bit (E_Bit (K - 1), 127));
+            pragma Assert (Xtime (E_Bit (K - 1)) = E_Bit (K));
+         elsif K - 1 = 63 then
+            pragma Assert (not Bit (E_Bit (K - 1), 127));
+            pragma Assert (Xtime (E_Bit (K - 1)) = E_Bit (K));
+         elsif K - 1 < 127 then
+            pragma Assert (not Bit (E_Bit (K - 1), 127));
+            pragma Assert (Xtime (E_Bit (K - 1)) = E_Bit (K));
+         else
+            pragma Assert (Bit (E_Bit (127), 127));
+            pragma Assert (Xtime (E_Bit (127)) = R128);
+         end if;
+      end if;
+   end Lemma_Xpow_One;
+
+   --  R128 as the sum of its four bits.
+   procedure Lemma_R128_Bits with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => R128
+               = Add (Add (Add (E_Bit (7), E_Bit (2)), E_Bit (1)), E_Bit (0))
+   is
+   begin
+      null;
+   end Lemma_R128_Bits;
+
+   --  Mul_Ref (A, R128) as the sum of four powers of A.
+   procedure Lemma_Mul_R128 (A : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (A, R128, 128)
+               = Add (Add (Add (Xpow (A, 7), Xpow (A, 2)), Xpow (A, 1)),
+                      Xpow (A, 0))
+   is
+      R7 : constant Element := E_Bit (7);
+      R2 : constant Element := E_Bit (2);
+      R1 : constant Element := E_Bit (1);
+      R0 : constant Element := E_Bit (0);
+   begin
+      Lemma_R128_Bits;
+      Lemma_Mul_Ref_Ext (A, R128, Add (Add (Add (R7, R2), R1), R0), 128);
+      Lemma_Mul_Ref_Lin (A, Add (Add (R7, R2), R1), R0, 128);
+      Lemma_Mul_Ref_Lin (A, Add (R7, R2), R1, 128);
+      Lemma_Mul_Ref_Lin (A, R7, R2, 128);
+      Lemma_Mul_Ref_Bit (A, 7, 128);
+      Lemma_Mul_Ref_Bit (A, 2, 128);
+      Lemma_Mul_Ref_Bit (A, 1, 128);
+      Lemma_Mul_Ref_Bit (A, 0, 128);
+   end Lemma_Mul_R128;
+
+   --  x^128 A = R128 A on one bit of A.
+   procedure Lemma_X128_Bit (I : Bit_Index_128) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Xpow (E_Bit (I), 128) = Mul_Ref (E_Bit (I), R128, 128)
+   is
+      E : constant Element := E_Bit (I);
+      S : constant Element :=
+        Add (Add (Add (Xpow (E, 7), Xpow (E, 2)), Xpow (E, 1)), Xpow (E, 0));
+   begin
+      Lemma_Mul_R128 (E);
+      --  E = x^I, so E x^K = x^K x^I.
+      Lemma_Xpow_One (I);
+      Lemma_Xpow_Ext (Xpow (One, I), E, 128);
+      Lemma_Xpow_Add (One, I, 128);
+      Lemma_Xpow_Add (One, 128, I);
+      Lemma_Xpow_One (128);
+      Lemma_Xpow_Ext (Xpow (One, 128), R128, I);
+      pragma Assert (Xpow (E, 128) = Xpow (R128, I));
+      --  The four powers of E, each x^I times a bit of R128.
+      Lemma_Xpow_Ext (Xpow (One, I), E, 7);
+      Lemma_Xpow_Add (One, I, 7);
+      Lemma_Xpow_Add (One, 7, I);
+      Lemma_Xpow_One (7);
+      Lemma_Xpow_Ext (Xpow (One, 7), E_Bit (7), I);
+      pragma Assert (Xpow (E, 7) = Xpow (E_Bit (7), I));
+      Lemma_Xpow_Ext (Xpow (One, I), E, 2);
+      Lemma_Xpow_Add (One, I, 2);
+      Lemma_Xpow_Add (One, 2, I);
+      Lemma_Xpow_One (2);
+      Lemma_Xpow_Ext (Xpow (One, 2), E_Bit (2), I);
+      pragma Assert (Xpow (E, 2) = Xpow (E_Bit (2), I));
+      Lemma_Xpow_Ext (Xpow (One, I), E, 1);
+      Lemma_Xpow_Add (One, I, 1);
+      Lemma_Xpow_Add (One, 1, I);
+      Lemma_Xpow_One (1);
+      Lemma_Xpow_Ext (Xpow (One, 1), E_Bit (1), I);
+      pragma Assert (Xpow (E, 1) = Xpow (E_Bit (1), I));
+      Lemma_Xpow_Ext (One, E_Bit (0), I);
+      pragma Assert (Xpow (E, 0) = Xpow (E_Bit (0), I));
+      --  Their sum is x^I R128.
+      Lemma_R128_Bits;
+      Lemma_Xpow_Ext (R128, Add (Add (Add (E_Bit (7), E_Bit (2)), E_Bit (1)),
+                              E_Bit (0)), I);
+      Lemma_Xpow_Lin (Add (Add (E_Bit (7), E_Bit (2)), E_Bit (1)),
+                      E_Bit (0), I);
+      Lemma_Xpow_Lin (Add (E_Bit (7), E_Bit (2)), E_Bit (1), I);
+      Lemma_Xpow_Lin (E_Bit (7), E_Bit (2), I);
+      pragma Assert (Xpow (R128, I) = S);
+   end Lemma_X128_Bit;
+
+   procedure Lemma_Xpow_Zero (J : Natural) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Xpow (Zero, J) = Zero,
+     Subprogram_Variant => (Decreases => J)
+   is
+   begin
+      if J > 0 then
+         Lemma_Xpow_Zero (J - 1);
+         Lemma_Xt_Ext (Xpow (Zero, J - 1), Zero);
+         Lemma_Xt_Zero;
+      end if;
+   end Lemma_Xpow_Zero;
+
+   --  x^128 A = R128 A for every A, by induction over the bits of A.
+   procedure Lemma_X128 (A : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Xpow (A, 128) = Mul_Ref (A, R128, 128)
+   is
+   begin
+      Lemma_Xpow_Zero (128);
+      Lemma_Zero_A (R128, 128);
+      for K in 0 .. 127 loop
+         pragma Loop_Invariant
+           (Xpow (Low128 (A, K), 128) = Mul_Ref (Low128 (A, K), R128, 128));
+         if Bit (A, K) then
+            Lemma_X128_Bit (K);
+            Lemma_Xpow_Lin (Low128 (A, K), E_Bit (K), 128);
+            Lemma_Lin_A (Low128 (A, K), E_Bit (K), R128, 128);
+         end if;
+      end loop;
+      Lemma_Low128_All (A);
+      Lemma_Xpow_Ext (Low128 (A, 128), A, 128);
+      Lemma_Ext_A (Low128 (A, 128), A, R128, 128);
+   end Lemma_X128;
+
+   -------------------------------------------------------------------
+   --  Xtime moves out of the second operand
+   -------------------------------------------------------------------
+
+   --  Y shifted left by one, bit 127 dropped.
+   function Shl (Y : Element) return Element is
+     (Elem (Shift_Left (Y.Limbs (0), 1),
+          Shift_Left (Y.Limbs (1), 1) or Shift_Right (Y.Limbs (0), 63)))
+   with Ghost => Proof_Only, Global => null;
+
+   procedure Lemma_Xt_Split (Y : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Xtime (Y) = Add (Shl (Y), Sel (Bit (Y, 127), R128))
+   is
+   begin
+      null;
+   end Lemma_Xt_Split;
+
+   --  Horner over the top N + 1 bits of Y is bit 127 times x^N A plus
+   --  Horner over the top N bits of Shl (Y).
+   procedure Lemma_Top (A, Y : Element; N : Natural) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => N <= 127,
+     Post   => Mul_Ref (A, Y, N + 1)
+               = Add (Sel (Bit (Y, 127), Xpow (A, N)),
+                      Mul_Ref (A, Shl (Y), N)),
+     Subprogram_Variant => (Decreases => N)
+   is
+   begin
+      if N = 0 then
+         Lemma_Xt_Zero;
+      else
+         Lemma_Top (A, Y, N - 1);
+         Lemma_Xt_Ext (Mul_Ref (A, Y, N),
+                       Add (Sel (Bit (Y, 127), Xpow (A, N - 1)),
+                            Mul_Ref (A, Shl (Y), N - 1)));
+         Lemma_Xt_Lin (Sel (Bit (Y, 127), Xpow (A, N - 1)),
+                       Mul_Ref (A, Shl (Y), N - 1));
+         if not Bit (Y, 127) then
+            Lemma_Xt_Zero;
+         end if;
+         pragma Assert (Bit (Shl (Y), 128 - N) = Bit (Y, 127 - N));
+      end if;
+   end Lemma_Top;
+
+   procedure Lemma_Xt_B (A, Y : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (A, Xtime (Y), 128) = Xtime (Mul_Ref (A, Y, 128))
+   is
+      S : constant Element := Shl (Y);
+   begin
+      Lemma_Top (A, Y, 127);
+      pragma Assert (not Bit (S, 0));
+      Lemma_Xt_Ext (Mul_Ref (A, Y, 128),
+                    Add (Sel (Bit (Y, 127), Xpow (A, 127)),
+                         Mul_Ref (A, S, 127)));
+      Lemma_Xt_Lin (Sel (Bit (Y, 127), Xpow (A, 127)), Mul_Ref (A, S, 127));
+      Lemma_Xt_Split (Y);
+      Lemma_Mul_Ref_Ext (A, Xtime (Y), Add (S, Sel (Bit (Y, 127), R128)), 128);
+      Lemma_Mul_Ref_Lin (A, S, Sel (Bit (Y, 127), R128), 128);
+      if Bit (Y, 127) then
+         Lemma_X128 (A);
+      else
+         Lemma_Xt_Zero;
+         Lemma_Mul_Ref_Zero (A, 128);
+      end if;
+   end Lemma_Xt_B;
+
+   -------------------------------------------------------------------
+   --  Associativity
+   -------------------------------------------------------------------
+
+   procedure Lemma_Assoc_Ref (A, B, C : Element; N : Bit_Count) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (Mul_Ref (A, B, 128), C, N)
+               = Mul_Ref (A, Mul_Ref (B, C, N), 128),
+     Subprogram_Variant => (Decreases => N)
+   is
+   begin
+      if N = 0 then
+         Lemma_Mul_Ref_Zero (A, 128);
+      else
+         Lemma_Assoc_Ref (A, B, C, N - 1);
+         Lemma_Xt_Ext (Mul_Ref (Mul_Ref (A, B, 128), C, N - 1),
+                       Mul_Ref (A, Mul_Ref (B, C, N - 1), 128));
+         Lemma_Xt_B (A, Mul_Ref (B, C, N - 1));
+         pragma Assert
+           (Xtime (Mul_Ref (Mul_Ref (A, B, 128), C, N - 1))
+            = Mul_Ref (A, Xtime (Mul_Ref (B, C, N - 1)), 128));
+         if Bit (C, 128 - N) then
+            pragma Assert
+              (Mul_Ref (B, C, N) = Add (Xtime (Mul_Ref (B, C, N - 1)), B));
+            Lemma_Mul_Ref_Ext
+              (A, Mul_Ref (B, C, N), Add (Xtime (Mul_Ref (B, C, N - 1)), B),
+               128);
+            Lemma_Mul_Ref_Lin (A, Xtime (Mul_Ref (B, C, N - 1)), B, 128);
+            pragma Assert
+              (Mul_Ref (Mul_Ref (A, B, 128), C, N)
+               = Add (Xtime (Mul_Ref (Mul_Ref (A, B, 128), C, N - 1)),
+                      Mul_Ref (A, B, 128)));
+         else
+            pragma Assert
+              (Mul_Ref (B, C, N) = Xtime (Mul_Ref (B, C, N - 1)));
+            Lemma_Mul_Ref_Ext
+              (A, Mul_Ref (B, C, N), Xtime (Mul_Ref (B, C, N - 1)), 128);
+            pragma Assert
+              (Mul_Ref (Mul_Ref (A, B, 128), C, N)
+               = Xtime (Mul_Ref (Mul_Ref (A, B, 128), C, N - 1)));
+         end if;
+      end if;
+   end Lemma_Assoc_Ref;
+
+   procedure Lemma_Mul_Assoc (A, B, C : Element) is
+   begin
+      Lemma_Assoc_Ref (A, B, C, 128);
+      Lemma_Ext_A (Mul (A, B), Mul_Ref (A, B, 128), C, 128);
+      Lemma_Mul_Ref_Ext (A, Mul (B, C), Mul_Ref (B, C, 128), 128);
+   end Lemma_Mul_Assoc;
+
    function Mul (A, B : Element) return Element is
       L0, H0, L1, H1, L2, H2 : U64;
    begin

@@ -5,6 +5,8 @@
 
 pragma SPARK_Mode (On);
 
+with Field_GF2_128.Laws;
+
 package body Field_GF2_128 is
 
    use type GF2_128.Element;
@@ -40,5 +42,12 @@ package body Field_GF2_128 is
    begin
       return [0 => Unsigned_8 (V mod 256), 1 => Unsigned_8 (V / 256)];
    end To_Subfield_Bytes;
+
+   procedure Lemma_Mul_Assoc (A, B, C : GF2_128.Element) is
+   begin
+      GF2_128.Lemma_Mul_Assoc (A, B, C);
+      Laws.Lemma_Same (GF2_128.Mul (GF2_128.Mul (A, B), C),
+                  GF2_128.Mul (A, GF2_128.Mul (B, C)));
+   end Lemma_Mul_Assoc;
 
 end Field_GF2_128;

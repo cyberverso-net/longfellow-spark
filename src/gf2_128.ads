@@ -185,6 +185,13 @@ package GF2_128 is
      Global => null,
      Post   => (Proof_Only => Mul_Serial'Result = Mul_Ref (A, B, 128));
 
+   --  The product is associative (ADR 0066), the law the Lagrange
+   --  tables need; proved against Mul_Ref.
+   procedure Lemma_Mul_Assoc (A, B, C : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul (Mul (A, B), C) = Mul (A, Mul (B, C));
+
    --  Field squaring, E * E mod Q(x). Thin wrapper over Mul for now.
    function Square (E : Element) return Element with
      Global => null,

@@ -241,10 +241,34 @@ package P256_Field is
        (Proof_Only =>
           To_Int (Neg'Result.Limbs) = (-To_Int (A.Limbs)) mod P);
 
+   --  The logical equality of elements, for contracts (ADR 0066). As
+   --  Field_P256.Same: the body is the predefined "=", outside SPARK,
+   --  and the provers treat Eq as equality of terms (Logical_Equal).
+   function Eq (A, B : Element) return Boolean with
+     Ghost, Global => null, Annotate => (GNATprove, Logical_Equal);
+
+   --  E rebuilt from its four limbs. The limbs of Limb_Array, a subtype
+   --  of Word_Array, are a map over Natural for the provers; an element
+   --  equal to its Norm is determined by the limbs 0 .. 3, so that two
+   --  such elements with equal limbs are Eq. Executable: Mul returns
+   --  through it, since the provers relate an aggregate only to the
+   --  same aggregate.
+   function Norm (E : Element) return Element is
+     ((Limbs => [E.Limbs (0), E.Limbs (1), E.Limbs (2), E.Limbs (3)]))
+   with Global => null;
+
    function Mul (A, B : Element) return Element with
      Global => null,
      Post   => (Proof_Only => To_Int (Mul'Result.Limbs)
-               = (To_Int (A.Limbs) * To_Int (B.Limbs)) mod P);
+               = (To_Int (A.Limbs) * To_Int (B.Limbs)) mod P
+               and then Eq (Mul'Result, Norm (Mul'Result)));
+
+   --  The product is associative (ADR 0066), the law the Lagrange
+   --  tables need; proved from the model.
+   procedure Lemma_Mul_Assoc (A, B, C : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul (Mul (A, B), C) = Mul (A, Mul (B, C));
 
    function Square (E : Element) return Element is (Mul (E, E)) with
      Global => null,

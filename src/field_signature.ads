@@ -49,10 +49,15 @@
 --  checked there by d * inv (d) = 1, and re-checked at run time by the
 --  harness with the library's multiplication; the verifier never
 --  calls Inv.
+--
+--  One law of the product, as a ghost lemma (ADR 0066): associativity,
+--  Same ((A * B) * C, A * (B * C)). Each field proves it for its own
+--  product; the Lagrange tables of the verifier rest on it.
 
 pragma SPARK_Mode (On);
 
 with Bytes;
+with Proof_Levels;
 
 --  A signature package references none of its formals itself.
 pragma Warnings (Off, "is not referenced");
@@ -66,6 +71,8 @@ generic
    with function Neg (A : Element) return Element;
    L0_Den_Inv, L1_Den_Inv, L2_Den_Inv : Element;
    with function Same (A, B : Element) return Boolean with Ghost;
+   with procedure Lemma_Mul_Assoc (A, B, C : Element)
+     with Ghost => Proof_Only;
    Serialized_Size : Positive;
    with function To_Bytes (E : Element) return Bytes.Byte_Array;
    with procedure From_Bytes
