@@ -3,28 +3,35 @@
 --  ECDSA-related circuits.
 --
 --  Documentation: docs/guide/02-p256-field.md. Decisions implemented
---  here: ADR 0012 (four 64-bit limbs, Unsigned_128 products), 0013
---  (direct representation, Solinas reduction), 0014 (ghost big-integer
---  model, lemma policy), 0015 (canonical form predicate, constant-time
---  conditional subtraction), 0016 (Inv), 0017 (test anchors); frame:
---  ADR 0002, 0003, 0006, 0020. Index: docs/adr/README.md.
+--  here: ADR 0012 (four 64-bit limbs, Unsigned_128 products), 0069
+--  (Montgomery form, the multiplication of upstream; it replaces the
+--  direct representation and the Solinas reduction of ADR 0013), 0014
+--  (ghost big-integer model, lemma policy), 0015 (canonical form
+--  predicate, constant-time conditional subtraction), 0016 (Inv), 0017
+--  (test anchors); frame: ADR 0002, 0003, 0006, 0020. Index:
+--  docs/adr/README.md.
 --
 --  Proof status (Silver = absence of run-time errors, Gold = proved
---  functional contracts against the ghost model To_Int). Stage 2 of
---  Phase A is complete: all verification conditions of this package
---  (3653 checks) are discharged by GNATprove with the project's proof
---  switches (package Prove in longfellow_spark.gpr, ADR 0020: the
---  level 2 provers with a step budget), with no justification and no
---  pragma Assume; see docs/guide/02-p256-field.md for the table.
+--  functional contracts against the ghost model To_Int). All the
+--  verification conditions of this package are discharged by GNATprove
+--  with the project's proof switches (package Prove in
+--  longfellow_spark.gpr, ADR 0020: the level 2 provers with a step
+--  budget), with no justification and no pragma Assume; see
+--  docs/guide/02-p256-field.md for the table.
 --
 --    Is_Canonical : Gold, equals To_Int (L) < P.
---    Add, Sub     : Gold, result value is the sum or difference mod P.
+--    Add, Sub     : Gold, the stored integer is the sum or difference
+--                   mod P, hence so is the element.
 --    Neg          : Gold by composition over Sub.
---    Mul          : Gold, result value is the product mod P, through
---                   the staged Solinas reduction of ADR 0013.
+--    Mul          : Gold, the stored integer is A B 2^-256 mod P, the
+--                   Montgomery product of upstream (ADR 0069), hence
+--                   the element is the product.
 --    Square       : Gold by composition over Mul.
 --    From_Bytes   : Gold, accepts exactly the canonical encodings and
---                   returns their value; To_Bytes round-trips.
+--                   stores their value times 2^256 mod P; To_Bytes
+--                   gives the value back (To_Canonical).
+--    From_Canonical, To_Canonical, Of_Natural : Gold, the conversions
+--                   into and out of the Montgomery form.
 --    Inv          : Silver only (AoRTE), plus known-answer tests
 --                   (tests/vectors/p256_inv.txt). Fermat correctness
 --                   is out of SMT reach by design decision (ADR 0016).
@@ -38,8 +45,12 @@
 --  (values >= p rejected). Curve constants for tests: RFC 5903
 --  Section 3.1 (identical to SEC 2 v2.0 Section 2.4.2).
 --
---  Representation: four 64-bit limbs, little-endian limb order, always
---  in canonical form (value < p, enforced by the type predicate).
+--  Representation (ADR 0069): the element of value x stores the
+--  integer x 2^256 mod p, the Montgomery form, in four 64-bit limbs,
+--  little-endian limb order, always canonical (below p, enforced by
+--  the type predicate). Equal elements have equal limbs. Constants and
+--  parsers outside the package go through From_Canonical and
+--  To_Canonical, never through the limbs.
 --  Partial sums are formed in Unsigned_128 so that no step wraps; the
 --  ghost model To_Int maps word arrays to the integer they denote.
 --
@@ -76,7 +87,6 @@ package P256_Field is
    subtype Limb_Index is Natural range 0 .. 3;
    subtype Limb_Array is Word_Array (Limb_Index);     --  256 bits
    subtype Five_Array is Word_Array (0 .. 4);         --  320 bits
-   subtype Wide_Array is Word_Array (0 .. 7);         --  512 bits
 
    --  p = 2^256 - 2^224 + 2^192 + 2^96 - 1 as limbs (draft-03 Table 1;
    --  RFC 5903 Section 3.1).
@@ -159,6 +169,7 @@ package P256_Field is
      (A, B : Word_Array; R : out Word_Array; Carry : out Unsigned_64)
    with
      Global => null,
+     Inline,
      Pre  => A'First = 0 and then B'First = 0 and then R'First = 0
        and then A'Length = B'Length and then R'Length = A'Length
        and then A'Length in 1 .. Max_Words,
@@ -172,6 +183,7 @@ package P256_Field is
      (A, B : Word_Array; R : out Word_Array; Borrow : out Unsigned_64)
    with
      Global => null,
+     Inline,
      Pre  => A'First = 0 and then B'First = 0 and then R'First = 0
        and then A'Length = B'Length and then R'Length = A'Length
        and then A'Length in 1 .. Max_Words,
@@ -187,6 +199,7 @@ package P256_Field is
 
    function Add_Limbs (A, B : Limb_Array) return Limbs_With_Carry with
      Global => null,
+     Inline,
      Post   => (Proof_Only => Add_Limbs'Result.Carry <= 1
        and then To_Int (Add_Limbs'Result.Limbs)
                   + Conv (Add_Limbs'Result.Carry) * Two_256
@@ -194,6 +207,7 @@ package P256_Field is
 
    function Sub_Limbs (A, B : Limb_Array) return Limbs_With_Carry with
      Global => null,
+     Inline,
      Post   => (Proof_Only => Sub_Limbs'Result.Carry <= 1
        and then To_Int (Sub_Limbs'Result.Limbs)
                 = To_Int (A) - To_Int (B)
@@ -222,8 +236,27 @@ package P256_Field is
    end record
    with Dynamic_Predicate => Is_Canonical (Element.Limbs);
 
+   --  Zero stores 0, One stores 2^256 mod p = 2^256 - p.
    Zero : constant Element := (Limbs => [others => 0]);
-   One  : constant Element := (Limbs => [1, 0, 0, 0]);
+   One  : constant Element :=
+     (Limbs => [16#0000_0000_0000_0001#, 16#FFFF_FFFF_0000_0000#,
+                16#FFFF_FFFF_FFFF_FFFF#, 16#0000_0000_FFFF_FFFE#]);
+
+   --  2^-256 mod p, the factor of the Montgomery product, and K with
+   --  2^256 R_Inv = 1 + K p.
+   RI_Limbs : constant Limb_Array :=
+     [16#0000_0003_0000_0000#, 16#0000_0001_FFFF_FFFE#,
+      16#FFFF_FFFD_0000_0002#, 16#FFFF_FFFE_0000_0003#]
+   with Ghost => Proof_Only;
+   K_Limbs : constant Limb_Array :=
+     [16#0000_0000_0000_0001#, 16#0000_0001_0000_0000#,
+      16#0000_0000_0000_0000#, 16#FFFF_FFFF_0000_0002#]
+   with Ghost => Proof_Only;
+   R_Inv : constant Big_Integer := To_Int (RI_Limbs) with Ghost => Proof_Only;
+
+   procedure Lemma_R_Inv with
+     Ghost => Proof_Only, Global => null,
+     Post => Two_256 * R_Inv = 1 + To_Int (K_Limbs) * P;
 
    function Add (A, B : Element) return Element with
      Global => null,
@@ -257,10 +290,12 @@ package P256_Field is
      ((Limbs => [E.Limbs (0), E.Limbs (1), E.Limbs (2), E.Limbs (3)]))
    with Global => null;
 
+   --  The Montgomery product: the stored integers multiply with the
+   --  factor 2^-256, so that the elements multiply.
    function Mul (A, B : Element) return Element with
      Global => null,
      Post   => (Proof_Only => To_Int (Mul'Result.Limbs)
-               = (To_Int (A.Limbs) * To_Int (B.Limbs)) mod P
+               = (To_Int (A.Limbs) * To_Int (B.Limbs) * R_Inv) mod P
                and then Eq (Mul'Result, Norm (Mul'Result)));
 
    --  The product is associative (ADR 0066), the law the Lagrange
@@ -273,7 +308,7 @@ package P256_Field is
    function Square (E : Element) return Element is (Mul (E, E)) with
      Global => null,
      Post   => (Proof_Only => To_Int (Square'Result.Limbs)
-               = (To_Int (E.Limbs) * To_Int (E.Limbs)) mod P);
+               = (To_Int (E.Limbs) * To_Int (E.Limbs) * R_Inv) mod P);
 
    --  Multiplicative inverse by Fermat: E^(p - 2), computed with a
    --  fixed addition chain (255 squarings, 12 multiplications, no
@@ -305,24 +340,41 @@ package P256_Field is
      Global => null,
      Post   => Limbs_Of_Bytes (Bytes_Of_Limbs'Result) = L;
 
+   --  The element of the integer of L, reduced mod p: its Montgomery
+   --  form. For constants and parsers.
+   function From_Canonical (L : Limb_Array) return Element with
+     Global => null,
+     Post   => (Proof_Only => To_Int (From_Canonical'Result.Limbs)
+               = (To_Int (L) * Two_256) mod P);
+
+   --  The canonical integer of E, below p.
+   function To_Canonical (E : Element) return Limb_Array with
+     Global => null,
+     Post   => (Proof_Only => To_Int (To_Canonical'Result) < P
+               and then To_Int (To_Canonical'Result)
+                        = (To_Int (E.Limbs) * R_Inv) mod P);
+
    --  Ok iff the encoding is canonical (value < p); then E denotes it.
    --  On rejection E is Zero.
    procedure From_Bytes (B : Bytes_32; E : out Element; Ok : out Boolean)
    with
      Global => null,
-     Post   => Ok = Is_Canonical (Limbs_Of_Bytes (B))
-       and then (if Ok then E.Limbs = Limbs_Of_Bytes (B) else E = Zero);
+     Post   =>
+       (Runtime    => Ok = Is_Canonical (Limbs_Of_Bytes (B))
+                      and then (if not Ok then E = Zero),
+        Proof_Only => (if Ok then To_Int (E.Limbs)
+                         = (To_Int (Limbs_Of_Bytes (B)) * Two_256) mod P));
 
    function To_Bytes (E : Element) return Bytes_32 is
-     (Bytes_Of_Limbs (E.Limbs))
+     (Bytes_Of_Limbs (To_Canonical (E)))
    with Global => null,
-        Post   => Limbs_Of_Bytes (To_Bytes'Result) = E.Limbs;
-
+        Post   => Limbs_Of_Bytes (To_Bytes'Result) = To_Canonical (E);
 
    --  The element X for a natural X (stage 5: the Reed-Solomon
    --  evaluation point x of the Ligero code, reed_solomon_eval_point).
    function Of_Natural (X : Natural) return Element with
      Global => null,
-     Post   => Of_Natural'Result.Limbs = [Unsigned_64 (X), 0, 0, 0];
+     Post   => (Proof_Only => To_Int (Of_Natural'Result.Limbs)
+               = (To_Big_Integer (X) * Two_256) mod P);
 
 end P256_Field;

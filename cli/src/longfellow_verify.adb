@@ -167,7 +167,7 @@ procedure Longfellow_Verify is
       if not P256_Field.Is_Canonical (R) then
          raise Usage_Error with "value not below p: " & S;
       end if;
-      return (Limbs => R);
+      return P256_Field.From_Canonical (R);
    end P_To_Element;
 
    function Lower (S : String) return String

@@ -1,6 +1,6 @@
 # Chapter 2: the P-256 base field F_p
 
-Package `P256_Field` (`src/p256_field.ads`, `src/p256_field.adb`). Stage 2 of phase A. Decisions: [ADR 0012](../adr/0012-p256-limb-representation.md) to [ADR 0017](../adr/0017-p256-test-anchors.md). Specification: draft-google-cfrg-libzk-03, Table 1 (p256, FieldID 0x01), Section 7.2.1 (serialisation), Section 3.4.3 (rejection of non-canonical values). Curve constants: RFC 5903 Section 3.1, identical to SEC 2 v2.0 Section 2.4.2.
+Package `P256_Field` (`src/p256_field.ads`, `src/p256_field.adb`). Stage 2 of phase A. Decisions: [ADR 0012](../adr/0012-p256-limb-representation.md) to [ADR 0017](../adr/0017-p256-test-anchors.md), and [ADR 0069](../adr/0069-p256-montgomery-multiplication.md), which replaced the direct representation and the Solinas reduction of ADR 0013 by the Montgomery form and the multiplication of upstream. Specification: draft-google-cfrg-libzk-03, Table 1 (p256, FieldID 0x01), Section 7.2.1 (serialisation), Section 3.4.3 (rejection of non-canonical values). Curve constants: RFC 5903 Section 3.1, identical to SEC 2 v2.0 Section 2.4.2.
 
 ## 1. The mathematics
 
@@ -13,7 +13,7 @@ The ECDSA signatures on mDoc credentials are over the NIST curve P-256, whose po
 
 (draft-03 Table 1 prints it in decimal; RFC 5903 Section 3.1 in hex). The circuits that verify an ECDSA signature inside the zero-knowledge proof compute in this field, so the verifier and prover need its arithmetic. It is the *base* field, in which the curve equation y^2 = x^3 - 3x + b lives; it is not the *scalar* field of order n in which signature scalars live. The draft is inconsistent on this point in two places (Section 3.4.3 and Appendix B.3.2 say "scalar field"), but the prime it prints is p.
 
-The shape of p is a Solinas prime: a sum of a few signed powers of two, all multiples of 2^32. This is what makes reduction cheap (Section 1.5). Unlike GF(2^128), where addition was xor and there were no carries, F_p is the integers modulo p: addition carries, multiplication produces a 512-bit integer, and every result has to be brought back below p.
+The shape of p is a Solinas prime: a sum of a few signed powers of two, all multiples of 2^32. This is what makes reduction cheap (Section 1.5): it needs shifts and additions, not multiplications. Unlike GF(2^128), where addition was xor and there were no carries, F_p is the integers modulo p: addition carries, multiplication produces a 512-bit integer, and every result has to be brought back below p.
 
 ### 1.2 Representation and canonical form
 
@@ -23,49 +23,40 @@ An element is an integer in 0 .. p - 1, stored as four 64-bit limbs in little-en
 
 Every integer below 2^256 has exactly one such representation, and p < 2^256, so elements have exactly one representation each: this is *canonical form*. Keeping every element canonical makes equality a limb comparison and serialisation a byte copy. The package enforces it with a type predicate ([ADR 0015](../adr/0015-p256-canonical-form-and-conditional-subtraction.md)): no `Element` can exist whose value is p or more.
 
+**The Montgomery form** ([ADR 0069](../adr/0069-p256-montgomery-multiplication.md)). The element of value x does not store x. It stores x R mod p, with R = 2^256. The stored integer is still canonical, so the two paragraphs above hold for it: one representation per element, equality as a limb comparison. What changes is the meaning of the limbs. Zero stores 0; One stores R mod p = 2^256 - p; the sum of two stored integers is the stored integer of the sum, since (x R + y R) mod p = (x + y) R mod p. Only the product and the boundaries need care: the bytes, the constants and the parsers convert in and out (Sections 2.3 and 3.8).
+
 Serialisation (Section 7.2.1) writes the 32 bytes of the integer least significant byte first, so limb i occupies bytes 8i .. 8i + 7. An encoding whose integer is p or more is not the encoding of any element and is rejected, as the upstream Rust reference does; the draft's sampling rule (Section 3.4.3) assumes the same canonical range.
 
 ### 1.3 Addition, subtraction, negation
 
 For a, b < p, the integer sum a + b is below 2p, so a + b mod p is either a + b or a + b - p, whichever lies in 0 .. p - 1. The difference a - b lies in -p + 1 .. p - 1, so a - b mod p is a - b if that is non-negative and a - b + p otherwise. Negation is 0 - a. Each operation is therefore a limb-wise add or subtract with carries or borrows across the four limbs, followed by one conditional correction by p.
 
-### 1.4 Multiplication: the 512-bit product
+### 1.4 Multiplication in Montgomery form
 
-The product of two 256-bit integers has up to 512 bits. With four limbs each, the schoolbook product is sixteen 64 x 64 bit partial products, each up to 128 bits, accumulated into eight 64-bit words by columns: column k collects the products L_i * M_j with i + j = k. This is the only step with a genuine multiplication; everything after it is additions and fixed rearrangements.
+The product of two stored integers a = x R and b = y R is x y R^2, one factor R too many. Montgomery's method (1985) computes a b R^-1 mod p directly, which is x y R mod p, the stored integer of the product. It never divides by p. It divides by 2^64, four times, which is a shift by one word.
 
-### 1.5 Reduction: the special form of p
+The method interleaves the product with the reduction, one word of a at a time. With W = 2^64 and an accumulator T, starting at 0:
 
-Reduction replaces a 512-bit integer X by X mod p. Writing X = X_lo + X_hi * 2^256 with both halves below 2^256, the identity
+    for i = 0 .. 3:
+        T := T + a_i b              (one row of the product)
+        r := T mod W                (the low word)
+        T := (T + r p) / W          (exact: the low word becomes zero)
 
-    2^256 = 2^224 - 2^192 - 2^96 + 1   (mod p)
+The division is exact because p = -1 mod W for this prime, so T + r p = r - r = 0 mod W. For a general prime one would multiply r by -p^-1 mod W first; for P-256 that factor is 1. After four rounds T W^4 = a b + Q p for the integer Q = sum of r_i W^i, so T = a b R^-1 mod p. A bound runs through the rounds: if T < 2p before a round, then after it T < (2p + (W - 1)(p - 1) + (W - 1) p) / W < 2p. So one conditional subtraction of p at the end gives the canonical result.
 
-turns the high half into a 256-bit-sized contribution. The NIST formulation (FIPS 186-4 Appendix D.2.3, also SEC 2) does this in one step for all eight high 32-bit words at once. Split X into sixteen 32-bit words c_0 .. c_15 and form nine 256-bit terms from the words c_8 .. c_15 and c_0 .. c_7, each term listing its eight words from most to least significant:
+### 1.5 The reduction step for this p
 
-    T  = (c7, c6, c5, c4, c3, c2, c1, c0)
-    S1 = (c15, c14, c13, c12, c11, 0, 0, 0)
-    S2 = (0, c15, c14, c13, c12, 0, 0, 0)
-    S3 = (c15, c14, 0, 0, 0, c10, c9, c8)
-    S4 = (c8, c13, c15, c14, c13, c11, c10, c9)
-    D1 = (c10, c8, 0, 0, 0, c13, c12, c11)
-    D2 = (c11, c9, 0, 0, c15, c14, c13, c12)
-    D3 = (c12, 0, c10, c9, c8, c15, c14, c13)
-    D4 = (c13, 0, c11, c10, c9, 0, c15, c14)
+Adding r p needs no multiplication, because
 
-Then X = T + 2 S1 + 2 S2 + S3 + S4 - D1 - D2 - D3 - D4 (mod p). The vector generator (`tests/vectors/gen_p256_vectors.py`) does not take this on trust: it shows that the identity is *exact*, not only modular,
+    p = 2^256 - 2^224 + 2^192 + 2^96 - 1.
 
-    X = (S - N) + (q_8 c_8 + q_9 c_9 + ... + q_15 c_15) * p
+So r p is r shifted to 2^256, 2^192 and 2^96, minus r shifted to 2^224, minus r. With r split into its halves r_lo = (r mod 2^32) 2^32 and r_hi = r / 2^32, the shifts by 96 and 224 land on word boundaries:
 
-with S = T + 2 S1 + 2 S2 + S3 + S4, N = D1 + D2 + D3 + D4 and eight fixed integer quotients q_j (q_8 = 1, q_9 = 2^32 + 1, and so on up to q_15, a 225-bit number); it derives the q_j from the table, checks that each is an integer, and verifies the identity on random 512-bit inputs and on the largest product (p - 1)^2. The exactness matters for the proofs: an equality between integers with constant coefficients is linear arithmetic, which SMT solvers handle well, whereas a congruence is not.
+    V = [0, r_lo, r_hi, r, r, 0]       = r (2^96 + 2^192 + 2^256)
+    U = [r, 0, 0, r_lo, r_hi, 0]       = r (1 + 2^224)
+    T + r p = (T + V) - U
 
-The signed sum S - N can be negative. The implementation adds a fixed multiple of p to make it non-negative: with all words at their maximum, S is below 2^259 and N below 2^258, and k = 5 is the smallest k with k p >= N_max, so
-
-    V = S - N + 5 p,     0 <= V < 2^260.
-
-V still has up to four bits above 2^256. One more application of the identity, with V = V_lo + V_hi * 2^256 and V_hi <= 9,
-
-    W = V_lo + V_hi * (2^224 - 2^192 - 2^96 + 1),     W < 2^257 and W < 2 p,
-
-so a single conditional subtraction of p brings W into 0 .. p - 1. All bounds are computed and asserted by the generator and are the input to the proofs of Section 3.
+in six words, least significant first. This is upstream's `p256_reduction_step` (`rust/runtime/algebra/src/p256/p256_64.rs`). Adding V first and subtracting U after keeps every intermediate non-negative.
 
 ### 1.6 Inversion
 
@@ -99,18 +90,18 @@ After an addition the sum is S = s + carry * 2^256 with s the four limbs. Comput
 
 ### 2.3 Canonical test and encoding
 
-`Is_Canonical (L)` is the borrow of L - p computed by the same four-step subtraction: 1 when L < p. It is branch-free and is the executable form of the type predicate. Decoding assembles each limb from eight bytes by shifts and `or`; encoding extracts bytes by shift and mask; `From_Bytes` decodes, tests canonical form, and returns either the limbs or zero through the same masked selection.
+`Is_Canonical (L)` is the borrow of L - p computed by the same four-step subtraction: 1 when L < p. It is branch-free and is the executable form of the type predicate. Decoding assembles each limb from eight bytes by shifts and `or`; encoding extracts bytes by shift and mask; `From_Bytes` decodes, tests canonical form, selects the limbs or zero through the same masked selection, and puts the result in Montgomery form by one multiplication by R^2 mod p: Mont (x, R^2) = x R^2 R^-1 = x R. `To_Bytes` does the reverse with one multiplication by 1: Mont (x R, 1) = x.
 
-### 2.4 The multiplication pipeline
+### 2.4 The multiplication
 
-    1. product    : sixteen 128-bit partial products into eight 64-bit words
-    2. words      : split the eight words into sixteen 32-bit words c_0 .. c_15
-    3. S and N    : form the nine terms of Section 1.5 and add them (five limbs each)
-    4. V          : S + 5 p - N, five limbs, non-negative by the bound on N
-    5. W          : V_lo + V_hi * (2^224 - 2^192 - 2^96 + 1), five limbs, below 2 p
-    6. canonical  : one conditional subtraction of p
+    for each of the four words a_i of A, in a six-word accumulator T:
+      1. row      : a_i times the four limbs of B, five words (Mul_Row)
+      2. add      : T + row
+      3. reduce   : r the low word; T + V (r), then - U (r)
+      4. down     : drop the low word, now zero
+    then          : one conditional subtraction of p from the low five words
 
-Each stage has a postcondition stated on the integer value, so the proof of `Mul` composes six smaller proofs (Section 3).
+Each round is one procedure (`Round`) with a postcondition on the integer value, and the loop over the four rounds carries the invariant T W^i = a_0..i-1 b + Q p (Section 3.6).
 
 ### 2.5 The inversion chain
 
@@ -128,10 +119,9 @@ This section follows `p256_field.ads` and `p256_field.adb` and explains each con
    subtype Limb_Index is Natural range 0 .. 3;
    subtype Limb_Array is Word_Array (Limb_Index);     --  256 bits
    subtype Five_Array is Word_Array (0 .. 4);         --  320 bits
-   subtype Wide_Array is Word_Array (0 .. 7);         --  512 bits
 ```
 
-`Word_Array` is an *unconstrained* array type: its index range is fixed only when a subtype or an object is declared. One ghost model and one pair of add and subtract procedures then serve the 256-bit elements, the 320-bit accumulators of the reduction and the 512-bit product. The three subtypes are the only lengths used.
+`Word_Array` is an *unconstrained* array type: its index range is fixed only when a subtype or an object is declared. One ghost model and one pair of add and subtract procedures then serve the 256-bit elements, the 320-bit rows and the 384-bit accumulator of the multiplication (`Six_Array`, in the body).
 
 ```ada
    type Element is record
@@ -177,10 +167,9 @@ A *lemma* in SPARK is a ghost procedure whose postcondition states a fact and wh
 - `Lemma_To_Int_Bounds` (and `Lemma_Partial_Bounds`, by recursion on N): 0 <= `To_Int (L)` < 2^(64 Length). A recursive lemma carries a `Subprogram_Variant` like a recursive function.
 - `Lemma_Split`: a 128-bit value equals its low half plus 2^64 times its high half. Proved from `X / 2 ** 64` and `X mod 2 ** 64`, which the provers connect both to the shift and mask forms and to the integer model.
 - `Lemma_Mul_Split`: the 128-bit product of two words neither wraps nor exceeds (2^64 - 1)^2, and its value is the product of the values. This is the one place where a nonlinear bound is proved; the provers manage it from the bounds of the factors.
-- `Lemma_Weight_Add`: 2^(64 I) * 2^(64 J) = 2^(64 (I + J)), by recursion on J.
 - `Lemma_Add_Step` and `Lemma_Sub_Step`: one word of addition with carry, or subtraction with borrow, extends the prefix identity from K words to K + 1. The addition and subtraction procedures call them once per iteration, so the loop invariant is the lemma's postcondition.
-- `Lemma_To_Int_Eq`: two limb arrays that are equal element by element have the same `To_Int`. Stated with a precondition `for all I => A (I) = B (I)` rather than `A = B`, and proved by writing `Partial (A, 4)` and `Partial (B, 4)` out over the four limbs. The fact looks trivial, and it is, but the provers reach it from an array equality only through array extensionality, which they applied in some cold runs and not in others; the element-wise statement is proved every time. It exists for the last step of `Stage_Final` (3.6).
-- `Lemma_Shift`, `Lemma_Weight_T32`, `Lemma_P_Poly`, `Lemma_Word_Split`, `Lemma_Word_Sum`, `Lemma_WVal_Bounds`, `Lemma_Term_Bound`, `Lemma_Solinas`, `Lemma_Constants`, `Lemma_Mod_Multiple`: the multiplication lemmas, described with the pipeline in 3.6.
+- `Lemma_To_Int_Eq`: two limb arrays that are equal element by element have the same `To_Int`. Stated with a precondition `for all I => A (I) = B (I)` rather than `A = B`, and proved by writing `Partial (A, 4)` and `Partial (B, 4)` out over the four limbs. The fact looks trivial, and it is, but the provers reach it from an array equality only through array extensionality, which they applied in some cold runs and not in others; the element-wise statement is proved every time. It closes `Mont_Mul` and `Mul` (3.6), and the accepted branch of `From_Bytes` (3.8).
+- `Lemma_R_Inv`, `Lemma_R2`, `Lemma_P1`, `Lemma_VU`, `Lemma_Down`, `Lemma_Ext6`, `Lemma_Six_Split`, `Lemma_Mont_Final`, `Lemma_To_Mont`, `Lemma_Mod_Multiple`: the multiplication lemmas, described in 3.6 and 3.8.
 
 ### 3.4 Add_Words and Sub_Words
 
@@ -208,24 +197,45 @@ which is exactly the postcondition restricted to the words processed so far. `Su
 
 ### 3.5 Add, Sub, Neg, Is_Canonical
 
-`Add` computes the sum with carry, the difference with p, the mask `0 - Ge` where `Ge` is 1 iff the sum is at least p, and the masked selection. The assertions in the body record the case analysis for the prover: if the sum overflowed 2^256 then the low part is below p (because the sum is below 2 p), and in both cases the selected value is the sum or the sum minus p and lies in 0 .. p - 1, which gives the `mod P` of the postcondition. `Sub` is symmetric: subtract, add p back, select by the borrow. `Neg (A)` is `Sub (Zero, A)`, Gold by composition. `Is_Canonical (L)` is the borrow of `Sub_Limbs (L, P_Limbs)`; its postcondition `= (To_Int (L) < P)` is the postcondition of `Sub_Words` read off, and it is what the predicate of `Element` means in the model.
+`Add` computes the sum with carry, the difference with p, the mask `0 - Ge` where `Ge` is 1 iff the sum is at least p, and the masked selection. The assertions in the body record the case analysis for the prover: if the sum overflowed 2^256 then the low part is below p (because the sum is below 2 p), and in both cases the selected value is the sum or the sum minus p and lies in 0 .. p - 1, which gives the `mod P` of the postcondition. These contracts speak of the stored integers, and since the Montgomery form is linear they say the same of the elements. `Sub` is symmetric: subtract, add p back, select by the borrow. `Neg (A)` is `Sub (Zero, A)`, Gold by composition. `Is_Canonical (L)` is the borrow of `Sub_Limbs (L, P_Limbs)`; its postcondition `= (To_Int (L) < P)` is the postcondition of `Sub_Words` read off, and it is what the predicate of `Element` means in the model.
 
-### 3.6 Mul: the pipeline and its proof
+### 3.6 Mul: Montgomery multiplication and its proof
 
-*Stage 1, the product.* `Wide_Mul (X, Y)` is a plain function whose body is the 128-bit multiplication and whose postcondition is the exact value and the bound; callers see only the postcondition, so the provers never reason about a 128-bit multiplication at the call sites. `Mul_Row (X, B)` multiplies one word by the four limbs into five words, with the carry chain of Section 2.1 and four prefix assertions. `Product` forms the four rows, places each at its word offset in eight words, and adds them; `Lemma_Shift` proves that placing five words at offset `Off` in eight zero words multiplies the value by 2^(64 Off), and the final assertions expand `To_Int (A) * To_Int (B)` as the sum of the four shifted rows and bound it below 2^512 so that no carry escapes.
-
-*Stages 2 to 6, the reduction.* The identity of Section 1.5 is a polynomial identity in t = 2^32: p = t^8 - t^7 + t^6 + t^3 - 1, each 2^(32 j) is t^j, and the quotients q_j are small polynomials in t with coefficients 0, 1 or -1 (for instance q_11 = t^3 + t^2 - 1). Proving it as such keeps the provers in the territory they are good at, polynomial normalisation, and away from 256-bit numerals. Accordingly the ghost side defines `T32 (K)` = t^K, proves `Weight (K) = T32 (2 K)` and `P = T32 (8) - T32 (7) + T32 (6) + T32 (3) - 1` (`Lemma_P_Poly`, from the four limb literals), expresses the product as a sum of its sixteen 32-bit words (`Word_Sum`, `Lemma_Word_Sum`), each table term as `Term_Val`, and states `Lemma_Solinas`:
+The contract of `Mul` speaks of the stored integers:
 
 ```ada
-     Post => To_Int (R) = (S_Val (R) - N_Val (R)) + Q_Val (R) * P
-       and then ... bounds on S_Val and N_Val ...
+   function Mul (A, B : Element) return Element with
+     Post => (Proof_Only => To_Int (Mul'Result.Limbs)
+               = (To_Int (A.Limbs) * To_Int (B.Limbs) * R_Inv) mod P
+               and then Eq (Mul'Result, Norm (Mul'Result)));
 ```
 
-with `Q_Val` the explicit quotient. The executable side mirrors it: `Word (R, J)` extracts a 32-bit word (the if-expression selects on the constant slot index from the table, never on data), `Term (R, S)` assembles a 256-bit term from a row of the table, `Add_Term` accumulates terms into five words with a precondition that the sum fits, and `Reduce` runs the six stages with ghost variables `M_V` and `M_W` tracking the exact multiple of p by which each intermediate differs from the product. `Lemma_Mod_Multiple` closes: a value that differs from X by a multiple of p and lies in 0 .. p - 1 is X mod p. `Mul` is `Reduce (Product (A.Limbs, B.Limbs))`; `Square` is `Mul (E, E)`.
+`R_Inv` is 2^-256 mod p, a ghost constant written as four limbs. `Lemma_R_Inv` proves `Two_256 * R_Inv = 1 + K * P` for a second constant K. The provers check it by evaluating the products of the literal limbs; it is the only place where 256-bit numbers are multiplied as numbers. The second conjunct is the normal form of ADR 0066.
 
-*Stage 6, the conditional subtraction.* `Stage_Final` takes the five-word value W of stage 5, which the earlier postconditions bound below 2p, and returns the four-limb canonical result. The executable part is three lines: `Sub_Words` computes W - p with a borrow `Bw`, which is 1 exactly when W < p; `Mask` is all ones when `Bw` is 0 and zero otherwise; `Select_Limbs` picks the low four words of the difference under the mask and of W otherwise, with no branch on data ([ADR 0015](../adr/0015-p256-canonical-form-and-conditional-subtraction.md)). The proof is written branch by branch on `Bw`, in ghost `if` statements that the compiler removes with the rest of the ghost code. In the branch `Bw = 0`, the difference is W - p and lies below p, so its top word times 2^256 is below 2^256 and `Lemma_Div_Bound` makes that word zero; the value of the difference is then the value of its low four words. In the branch `Bw = 1`, the same argument applies to W itself. Each branch then fixes the mask, asserts that the selected array equals the low words of the chosen operand element by element, and calls `Lemma_To_Int_Eq` to carry the equality to `To_Int`. The postcondition, the value is W or W - p according to the comparison and in either case canonical, follows in each branch separately. An earlier version proved the last step with one assertion over the selected array, relying on the provers to connect array equality with equal `To_Int`; it was proved in some cold runs and not in others. The branch-wise form, with the lemma, has been stable on every cold run since.
+*The row.* `Wide_Mul (X, Y)` is a plain function whose body is the 128-bit multiplication and whose postcondition is the exact value and the bound; callers see only the postcondition, so the provers never reason about a 128-bit multiplication at the call sites. `Mul_Row (X, B)` multiplies one word by the four limbs into five words, with the carry chain of Section 2.1 and four prefix assertions.
 
-A ghost variable (`M_V : Big_Integer with Ghost`) exists only for proof and is removed with the other ghost code when assertions are disabled; `pragma Unreferenced` silences the warning for a lemma parameter that appears only in the contract; square-bracket aggregates `[a, b, c]` are the Ada 2022 array notation; `A (0 .. 7)` is a *slice*, a contiguous part of an array.
+*The round.* `Round (T, X, B, R)` takes a six-word accumulator below 2p, and its postcondition is
+
+```ada
+     Post => (Proof_Only => To_Int (T) < 2 * P
+              and then To_Int (T) * Two_64
+                       = To_Int (T'Old) + Conv (X) * To_Int (B) + Conv (R) * P);
+```
+
+The body is four calls: `Add_Words` adds the row, `Add_Words` adds V (r), `Sub_Words` subtracts U (r), and `Down` drops the low word. The proof states, at each call, why no carry leaves the six words and why the subtraction does not borrow. `Lemma_VU` gives V (r) - U (r) = r p. It goes through the 128-bit product r 2^32, whose two halves are the two shifted words; that is how the shifts reach the integer model. The low word is then zero: with p = W P1 - 1 (`Lemma_P1`), the value is W times an integer, and `Lemma_Digit`, the uniqueness of a base-W digit, makes the low word 0. `Lemma_Div_Bound` carries the bound below 2p from T W to T.
+
+*The rounds.* `Mont_Mul` loops over the four words of A with a ghost `Q : Big_Integer` and the invariant
+
+```ada
+   To_Int (T) < 2 * P and then To_Int (T) * Weight (I)
+                               = Partial (A, I) * To_Int (B) + Q * P
+```
+
+After the loop, `Lemma_Six_Split` shows that word 5 is zero and word 4 at most one, and the conditional subtraction of Section 2.2 gives a result below p, equal to T or T - p. It is written branch by branch, with `Lemma_To_Int_Eq` for the selected array, as in `Add`. `Lemma_Mont_Final` closes. From T 2^256 = A B + Q p and 2^256 R_Inv = 1 + K p, the result is A B R_Inv plus a multiple of p, and lies in 0 .. p - 1, so `Lemma_Mod_Multiple` makes it A B R_Inv mod p. `Mul` returns `Norm ((Limbs => Mont_Mul (A.Limbs, B.Limbs)))`; `Square` is `Mul (E, E)`.
+
+*Associativity.* `Lemma_Mul_Assoc` (ADR 0066) now meets the factor R_Inv twice on each side: both products are X Y Z R_Inv^2 mod p, by `Lemma_Mod_Mul` twice, and `Lemma_Inj` turns equal integers into equal elements.
+
+A ghost variable (`Q : Big_Integer with Ghost`) exists only for proof and is removed with the other ghost code when assertions are disabled; square-bracket aggregates `[a, b, c]` are the Ada 2022 array notation; `A (0 .. 7)` is a *slice*, a contiguous part of an array. `Add_Words`, `Sub_Words` and `Mul_Row` are `Inline`, so that the compiler sees their lengths and unrolls the loops.
 
 ### 3.7 Inv
 
@@ -233,36 +243,52 @@ A ghost variable (`M_V : Big_Integer with Ghost`) exists only for proof and is r
 
 ### 3.8 Encoding
 
-`Limb_Of_8` assembles a word from eight bytes by shifts and `or`; `Bytes_Of_Limb` extracts them with `Byte_Of`, and its postcondition is the 64-bit round trip. `Limbs_Of_Bytes` and `Bytes_Of_Limbs` work on four slices of the 32-byte array, so the 256-bit round trip in the postcondition of `Bytes_Of_Limbs` composes from the 64-bit one. `From_Bytes` decodes, tests canonical form with `Sub_Limbs`, and returns the limbs or zero through the masked selection; its postcondition says exactly which encodings are accepted and what they decode to.
+`Limb_Of_8` assembles a word from eight bytes by shifts and `or`; `Bytes_Of_Limb` extracts them with `Byte_Of`, and its postcondition is the 64-bit round trip. `Limbs_Of_Bytes` and `Bytes_Of_Limbs` work on four slices of the 32-byte array, so the 256-bit round trip in the postcondition of `Bytes_Of_Limbs` composes from the 64-bit one. `From_Bytes` decodes, tests canonical form with `Sub_Limbs`, selects the limbs or zero through the masked selection, and stores `Mont_Mul (S, R2)`. `Lemma_R2` proves R2 R_Inv = 2^256 + K2 p for the constant R2 = 2^512 mod p, and `Lemma_To_Mont` turns that into (S R2 R_Inv) mod p = (S 2^256) mod p. The postcondition says which encodings are accepted, that a refused one gives `Zero`, and that an accepted one stores its integer times 2^256 mod p. `To_Canonical (E)` is `Mont_Mul (E.Limbs, [1, 0, 0, 0])`, the integer E R_Inv mod p below p, and `To_Bytes` encodes it. `From_Canonical (L)`, for constants and parsers, and `Of_Natural (X)` are `Mont_Mul` by R2 again.
 
 ## 4. What the proofs guarantee
 
-GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-prover-configuration-step-budget.md): CVC5, Z3 and Alt-Ergo, `--steps=600000`, `--timeout=120`), the whole project (GF(2^128) and P-256 together): 3694 checks, all proved, no justification, no `pragma Assume`; of these, 3653 belong to `P256_Field` (the remaining 41 are Chapter 1's). Maximum steps for a single successful proof: 429702, within the budget of 600000; longest successful attempt 4 to 10 seconds on a ten-core machine, far from the timeout.
+GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-prover-configuration-step-budget.md): CVC5, Z3 and Alt-Ergo, `--steps=600000`, `--timeout=120`).
+
+- `P256_Field` alone, proved from an empty object directory: 2412 checks, all proved.
+- The whole project with the Montgomery form: 20179 checks, all proved.
+- No justification, no `pragma Assume`.
+- Maximum steps for a single successful proof in `P256_Field`: 204295, within the budget of 600000.
 
 | Category | Checks | Discharged by |
 |----------|--------|---------------|
-| Data dependencies (`Global => null`) | 94 | flow analysis |
-| Initialization | 38 | flow analysis |
-| Run-time checks (indices, ranges, overflow, predicates) | 2197 | 82% trivial, the rest CVC5 and Z3 |
-| Assertions (`pragma Assert`, loop invariants, variants) | 273 | CVC5 and Z3, Alt-Ergo about 4%, trivial 1% |
-| Functional contracts (postconditions, lemma postconditions, preconditions at calls) | 1029 | CVC5 and Z3, Alt-Ergo about 1% |
-| Termination | 63 | 55 flow, 8 provers |
+| Data dependencies (`Global => null`) | 71 | flow analysis |
+| Initialization | 26 | flow analysis |
+| Run-time checks (indices, ranges, overflow, predicates) | 1523 | 83% trivial, the rest mostly Z3, then CVC5 |
+| Assertions (`pragma Assert`, loop invariants, variants) | 214 | Z3 and CVC5, Alt-Ergo about 5%, trivial 1% |
+| Functional contracts (postconditions, lemma postconditions, preconditions at calls) | 540 | Z3 and CVC5, Alt-Ergo about 1% |
+| Termination | 38 | 35 flow, 3 Z3 |
 
-Where the checks are, by subprogram (proof checks, excluding flow): the field operations themselves are small (`Add` 45, `Sub` 44, `Neg` 7, `Mul` 10, `Square` 9, `Is_Canonical` 4, `From_Bytes` 3, `To_Bytes` 1, `Inv` and `Square_N` 0); the word primitives and the multiplication pipeline carry more (`Add_Words` 41, `Sub_Words` 66, `Mul_Row` 54, `Product` 132, `Term` 64, `Add_Term` 35, `Sum_S` 15, `Sum_N` 12, `Stage_V` 46, `Stage_W` 63, `Stage_Final` 108, `Reduce` 35); and the lemmas carry the rest, the largest being `Lemma_Unfold_T32` (471, the explicit monomials of t), `Lemma_Term_Bound` (188), `Lemma_Solinas_Identity` (126) and `Lemma_Unfold` (124); `Lemma_To_Int_Eq` has 36. Three solvers are needed: CVC5 and Z3 share almost everything, and which of the two is credited with a check varies from run to run, since the first to answer wins; Alt-Ergo alone closes fifteen checks, polynomial normalisation steps and the bridges between modular words and the integer model, listed in ADR 0020.
+Where the proof checks are, by subprogram (excluding flow):
+
+- The field operations are small: `Add` 45, `Sub` 44, `Neg` 7, `Mul` 13, `Square` 10, `Is_Canonical` 4, `From_Bytes` 54, `From_Canonical` 13, `To_Canonical` 31, `Of_Natural` 23, `To_Bytes` 1, `Inv` and `Square_N` 0.
+- The word primitives and the multiplication carry more: `Add_Words` 41, `Sub_Words` 66, `Mul_Row` 54, `Round` 147, `Mont_Mul` 177.
+- The lemmas carry the rest. The largest are `Lemma_Unfold` (124), `Lemma_VU` (114), `Lemma_Sub_Step` (85), `Lemma_Mul_Assoc` (80), `Lemma_Add_Step` (79), `Lemma_R_Inv` and `Lemma_Mont_Final` (78 each), `Lemma_To_Mont` (75) and `Lemma_R2` (72).
+
+Three solvers are needed. Z3 and CVC5 share almost everything, and which of the two is credited with a check varies from run to run, since the first to answer wins. Alt-Ergo closes a few polynomial normalisation steps and bridges between modular words and the integer model, as listed in ADR 0020.
 
 Four lessons from closing the proofs, recorded here because they are reusable in the next stages:
 
 - The provers evaluate the conversion of a *literal* to `Big_Integer` but treat `**` as opaque, so `Two_64` is `Conv (Unsigned_64'Last) + 1`, not `2 ** 64`.
 - Modular word arithmetic is connected to the integer model only through small lemmas (`Lemma_Split`, `Lemma_Sub128`, `Lemma_Add128`, `Lemma_Ext64`), each proved once from `/`, `mod` and the no-wrap condition.
-- Polynomial identities prove by normalisation when every weight is written out as a monomial in one base (`Lemma_Unfold`, `Lemma_Unfold_T32`); a recursive definition left folded is an atom the normaliser cannot see through.
-- Large contexts time out even when every fact is present. The cure is structural: one function per stage with its own postcondition (`Sum_S`, `Sum_N`, `Stage_V`, `Stage_W`, `Stage_Final`), and one lemma per identity with exactly the hypotheses it needs (`Lemma_Power_Reduction` for t^j = rep_j + q_j p, word by word).
+- Polynomial identities prove by normalisation when every weight is written out as a monomial in one base (`Lemma_Unfold`); a recursive definition left folded is an atom the normaliser cannot see through.
+- Large contexts time out even when every fact is present. The cure is structural: one subprogram per step with its own postcondition (`Round`, then `Mont_Mul`), and one lemma per identity with exactly the hypotheses it needs (`Lemma_VU`, `Lemma_Mont_Final`).
+
+Two more came with the Montgomery form ([ADR 0069](../adr/0069-p256-montgomery-multiplication.md)):
+
+- A shift of a word reaches the integer model most easily through a 128-bit product: r 2^32 as `Unsigned_128`, whose halves are the two shifted words, by `Lemma_Mul_Split` and `Lemma_Split`. Reasoning on `Conv` of `Shift_Left` or `mod 2 ** 32` directly did not close.
+- GNAT 16 stops with an internal error on ghost constants declared in a `declare` block of executable code. The final argument of `Mont_Mul` is therefore a ghost procedure, `Lemma_Mont_Final`, which is also the clearer form.
 
 In plain terms, for every input, not on samples:
 
 - no run-time error occurs anywhere in the package;
 - every `Element` holds an integer in 0 .. p - 1, and `Is_Canonical` decides exactly that;
-- `To_Int (Add (A, B)) = (To_Int (A) + To_Int (B)) mod p`, and likewise for `Sub`, `Neg`, `Mul` and `Square`, where `P`, defined from the limbs, is proved equal to t^8 - t^7 + t^6 + t^3 - 1 with t = 2^32 (`Lemma_P_Poly`);
-- `From_Bytes` accepts an encoding exactly when its integer is below p and then returns that integer's limbs; `To_Bytes` inverts it;
+- `To_Int (Add (A, B)) = (To_Int (A) + To_Int (B)) mod p`, and likewise for `Sub` and `Neg`; `To_Int (Mul (A, B)) = To_Int (A) To_Int (B) 2^-256 mod p`, and likewise for `Square`, so that in the Montgomery form the elements add and multiply as the field does;
+- `From_Bytes` accepts an encoding exactly when its integer x is below p and then stores x 2^256 mod p, a refused encoding gives `Zero`; `To_Canonical` returns the integer back, below p, and `To_Bytes` encodes it;
 - every subprogram terminates.
 
 Reproduce with `make prove`, which runs `gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on` with the switches of `package Prove` in the project file (`--prover=cvc5,z3,altergo --steps=600000 --timeout=120 --memlimit=1000 --report=all`) and prints the summary of `obj/development/gnatprove/gnatprove.out`; a plain `alr exec -- gnatprove -P longfellow_spark.gpr` proves the same thing.
@@ -297,4 +323,4 @@ Until the consolidation after Phase A the test build was slow (about three minut
 - GNATprove's model of `Ada.Numerics.Big_Numbers.Big_Integers` and of the conversions from modular types; the SMT solvers; the compiler, including its 128-bit arithmetic.
 - The target is 64-bit: `Unsigned_128` is required ([ADR 0012](../adr/0012-p256-limb-representation.md)).
 - Constant time is a discipline, scoped to assertion-free builds ([ADR 0006](../adr/0006-constant-time-discipline-and-scope.md)); loop bounds and table indices are compile-time constants, every selection is masked, `From_Bytes` may branch on its Boolean result because encodings are public data. Nothing measures timing.
-- Performance is not a goal: `Mul` costs sixteen 128-bit products plus the reduction, `Inv` 267 multiplications. Montgomery form and specialised squaring remain available as prover-side optimisations behind the same contracts ([ADR 0013](../adr/0013-p256-reduction-strategy.md)).
+- Performance: since [ADR 0069](../adr/0069-p256-montgomery-multiplication.md) `Mul` is upstream's Montgomery multiplication, sixteen 128-bit products and four reduction steps of shifts and additions: about 50 ns on the author's laptop at `-O3`, against 230 ns for the Solinas form it replaced and 13 ns for upstream's generic code. `Inv` costs 267 multiplications. A specialised squaring remains available behind the same contracts.

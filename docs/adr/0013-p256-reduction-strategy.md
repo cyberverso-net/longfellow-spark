@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-09, after review)
+Accepted (2026-10-09, after review) Amended 2026-10-22 by [ADR 0069](0069-p256-montgomery-multiplication.md): the elements are kept in Montgomery form and multiplied by upstream's Montgomery method; the direct representation and the Solinas reduction leave the code.
 
 ## Date
 

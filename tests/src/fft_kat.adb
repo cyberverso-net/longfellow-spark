@@ -96,7 +96,7 @@ procedure FFT_KAT is
          K := 3 - I / 16;
          L (K) := Shift_Left (L (K), 4) or Hex_Digit (S (S'First + I));
       end loop;
-      return (Limbs => L);
+      return P256_Field.From_Canonical (L);
    end To_P256;
 
    procedure Check (Ok : Boolean; What : String) is

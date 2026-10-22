@@ -28,7 +28,7 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 **The two fields** (chapters 1 and 2).
 
 - `GF2_128.Add`, `Xtime`, `Mul` and `Square` are proved. `Mul` and `Square` are proved equal to the ghost reference `Mul_Ref`.
-- `P256_Field.Add`, `Sub`, `Neg`, `Mul`, `Square`, `Is_Canonical`, `From_Bytes` and `To_Bytes` are proved against a ghost integer model, `To_Int`, and a ghost prime `P`.
+- `P256_Field.Add`, `Sub`, `Neg`, `Mul`, `Square`, `Is_Canonical`, `From_Bytes`, `To_Bytes`, `From_Canonical`, `To_Canonical` and `Of_Natural` are proved against a ghost integer model, `To_Int`, and a ghost prime `P`. Elements are stored in Montgomery form, x 2^256 mod p, and `Mul` is proved to be the Montgomery product A B 2^-256 mod p (ADR 0069).
 - `P` is defined from the limbs of p. The proof shows that it equals 2^256 - 2^224 + 2^192 + 2^96 - 1, as a polynomial identity in 2^32.
 
 **The sumcheck algebra** (chapter 3, for each of the two fields).

@@ -49,6 +49,7 @@ An unproved port to Ada of that method takes 26 ns on the same laptop at `-O3`. 
 
 ## Consequences
 
+- ADR 0013 is amended: its direct representation and Solinas reduction leave the code.
 - `P256_Field`'s body is largely rewritten: the product, the reduction and their lemmas. The byte encoding, the canonical check, `Add`, `Sub` and the word primitives stay.
 - The harnesses read elements through `From_Canonical` or `From_Bytes`. `p256_kat` checks `From_Canonical` and `To_Bytes` as inverse on its vectors and on random values.
 - The proofs of the CLI must stay identical byte for byte. The transcript absorbs `To_Bytes`, so the canonical values are what it hashes.

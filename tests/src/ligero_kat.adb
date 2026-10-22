@@ -149,16 +149,17 @@ procedure Ligero_KAT is
       if not P256_Field.Is_Canonical (R) then
          raise Parse_Error with "value not below p: " & S;
       end if;
-      return (Limbs => R);
+      return P256_Field.From_Canonical (R);
    end P_To_Element;
 
    function P_Image (E : P256_Field.Element) return String is
       Hex : constant String := "0123456789abcdef";
       S   : String (1 .. 64);
       V   : Unsigned_64;
+      C : constant P256_Field.Limb_Array := P256_Field.To_Canonical (E);
    begin
       for I in 0 .. 63 loop
-         V := E.Limbs (P256_Field.Limb_Index (3 - I / 16));
+         V := C (P256_Field.Limb_Index (3 - I / 16));
          S (I + 1) :=
            Hex (Integer (Shift_Right (V, 60 - 4 * (I mod 16)) and 15) + 1);
       end loop;
