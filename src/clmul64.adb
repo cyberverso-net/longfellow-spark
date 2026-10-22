@@ -557,6 +557,7 @@ package body Clmul64 is
 
    --  reverse_bits: bit I of the result is bit 63 - I of V.
    function Rev (V : U64) return U64 with
+     Inline,
      Global => null,
      Post   => (Proof_Only =>
                   (for all I in 0 .. 63 =>
@@ -708,5 +709,39 @@ package body Clmul64 is
       Lemma_Hi_Rev (X, Y, 64);
       return Shift_Right (Rev (Clmul_Lo (Rev (X), Rev (Y))), 1);
    end Clmul_Hi;
+
+   procedure Clmul_Kara
+     (A0, A1, B0, B1 : U64;
+      L0, H0, L1, H1, L2, H2 : out U64)
+   is
+      RA0 : constant U64 := Rev (A0);
+      RA1 : constant U64 := Rev (A1);
+      RB0 : constant U64 := Rev (B0);
+      RB1 : constant U64 := Rev (B1);
+      R0  : constant U64 := Clmul_Lo (RA0, RB0);
+      R2  : constant U64 := Clmul_Lo (RA1, RB1);
+      RM  : constant U64 := Clmul_Lo (RA0 xor RA1, RB0 xor RB1);
+   begin
+      Lemma_Hi_Rev (A0, B0, 64);
+      Lemma_Hi_Rev (A1, B1, 64);
+      Lemma_Hi_Rev (A0 xor A1, B0 xor B1, 64);
+      Lemma_Rev_Xor (A0, A1);
+      Lemma_Rev_Xor (B0, B1);
+      pragma Assert
+        (Proof_Only =>
+           Shift_Right (Rev (RM), 1) = Hi_Ref (A0 xor A1, B0 xor B1, 64));
+      Lemma_Rev_Xor (RM, R0);
+      Lemma_Rev_Xor (RM xor R0, R2);
+      L0 := Clmul_Lo (A0, B0);
+      L2 := Clmul_Lo (A1, B1);
+      L1 := Clmul_Lo (A0 xor A1, B0 xor B1) xor L0 xor L2;
+      H0 := Shift_Right (Rev (R0), 1);
+      H2 := Shift_Right (Rev (R2), 1);
+      H1 := Shift_Right (Rev (RM xor R0 xor R2), 1);
+      pragma Assert
+        (Proof_Only =>
+           H1 = (Shift_Right (Rev (RM), 1) xor Shift_Right (Rev (R0), 1)
+                 xor Shift_Right (Rev (R2), 1)));
+   end Clmul_Kara;
 
 end Clmul64;

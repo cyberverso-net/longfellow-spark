@@ -454,24 +454,20 @@ package body GF2_128 is
    end Lemma_Main;
 
    function Mul (A, B : Element) return Element is
-      AL : constant U64 := A.Limbs (0);
-      AH : constant U64 := A.Limbs (1);
-      BL : constant U64 := B.Limbs (0);
-      BH : constant U64 := B.Limbs (1);
-      T0 : constant Element :=
-        Elem (Clmul64.Clmul_Lo (AL, BL), Clmul64.Clmul_Hi (AL, BL));
-      T2 : constant Element :=
-        Elem (Clmul64.Clmul_Lo (AH, BH), Clmul64.Clmul_Hi (AH, BH));
-      TM : constant Element :=
-        Elem (Clmul64.Clmul_Lo (AL xor AH, BL xor BH),
-              Clmul64.Clmul_Hi (AL xor AH, BL xor BH));
-      T1 : constant Element :=
-        Elem (TM.Limbs (0) xor T0.Limbs (0) xor T2.Limbs (0),
-              TM.Limbs (1) xor T0.Limbs (1) xor T2.Limbs (1));
+      L0, H0, L1, H1, L2, H2 : U64;
    begin
-      Lemma_Upstream_Red (T0, T1, T2);
-      Lemma_Main (A, B);
-      return Reduce (T0, Reduce (T1, T2));
+      Clmul64.Clmul_Kara
+        (A.Limbs (0), A.Limbs (1), B.Limbs (0), B.Limbs (1),
+         L0, H0, L1, H1, L2, H2);
+      declare
+         T0 : constant Element := Elem (L0, H0);
+         T1 : constant Element := Elem (L1, H1);
+         T2 : constant Element := Elem (L2, H2);
+      begin
+         Lemma_Upstream_Red (T0, T1, T2);
+         Lemma_Main (A, B);
+         return Reduce (T0, Reduce (T1, T2));
+      end;
    end Mul;
 
    function Square (E : Element) return Element is
