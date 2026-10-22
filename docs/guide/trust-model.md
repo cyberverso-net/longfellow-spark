@@ -28,7 +28,7 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 **The two fields** (chapters 1 and 2).
 
 - `GF2_128.Add`, `Xtime`, `Mul` and `Square` are proved. `Mul` and `Square` are proved equal to the ghost reference `Mul_Ref`.
-- `P256_Field.Add`, `Sub`, `Neg`, `Mul`, `Square`, `Is_Canonical`, `From_Bytes` and `To_Bytes` are proved against a ghost integer model, `To_Int`, and a ghost prime `P`.
+- `P256_Field.Add`, `Sub`, `Neg`, `Mul`, `Square`, `Is_Canonical`, `From_Bytes`, `To_Bytes`, `From_Canonical`, `To_Canonical` and `Of_Natural` are proved against a ghost integer model, `To_Int`, and a ghost prime `P`. Elements are stored in Montgomery form, x 2^256 mod p, and `Mul` is proved to be the Montgomery product A B 2^-256 mod p (ADR 0069).
 - `P` is defined from the limbs of p. The proof shows that it equals 2^256 - 2^224 + 2^192 + 2^96 - 1, as a polynomial identity in 2^32.
 
 **The sumcheck algebra** (chapter 3, for each of the two fields).
@@ -156,6 +156,7 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 - SPARKlib's functional sequences, used as a ghost model (ADR 0031).
 - That `Same`, the logical equality of each field wrapper, is the equality of its element type. Its body is the predefined `=`, outside SPARK (ADR 0023).
 - That `P256_Field.Eq` is the equality of P-256 elements, as `Same`. Its body is the predefined `=`, outside SPARK. It carries the normal form of a product, which the Lagrange tables need (ADR 0066).
+- The release build relies on the proof instead of checking at run time. The units of `src/` are compiled without run-time checks, because GNATprove proves that none can fail; the units of `cli/src/` keep theirs (ADR 0068). This holds only under the preconditions of the units. The command-line programs establish the preconditions of `Circuit_Reader.Read`, `Zk_Verifier.Verify` and `Zk_Prover.Prove` in code before each call, and `Cli_Random.Fill` changes no state the prover reads.
 
 **Inputs and references.**
 

@@ -72,12 +72,15 @@ package Rfft_P256 is
    type Fp2_Array is array (Natural range <>) of Fp2;
 
    --  The root of unity of order 2^31 of the reference (p256/mod.rs,
-   --  P256_ROOT_OF_UNITY_RE and _IM, four little-endian words each).
+   --  P256_ROOT_OF_UNITY_RE and _IM, four little-endian words each, the
+   --  canonical integers, put in the Montgomery form at elaboration).
    Root : constant Fp2 :=
-     (Re => (Limbs => [16#985A_6532_4B24_2562#, 16#9FC9_563B_382A_4A4C#,
-                       16#5CFC_85C6_7990_E337#, 16#F90D_338E_BD84_F566#]),
-      Im => (Limbs => [16#DBF4_174F_60A4_3EAC#, 16#8473_8A64_74D2_32C6#,
-                       16#A04F_C2E2_0106_E340#, 16#B9E8_1E42_BC97_CC4D#]));
+     (Re => P256_Field.From_Canonical
+              ([16#985A_6532_4B24_2562#, 16#9FC9_563B_382A_4A4C#,
+                16#5CFC_85C6_7990_E337#, 16#F90D_338E_BD84_F566#]),
+      Im => P256_Field.From_Canonical
+              ([16#DBF4_174F_60A4_3EAC#, 16#8473_8A64_74D2_32C6#,
+                16#A04F_C2E2_0106_E340#, 16#B9E8_1E42_BC97_CC4D#]));
 
    --  The real-to-half-complex transform of size 2^L (rfft.rs, r2hc).
    procedure R2hc (A : in out Element_Array; L : Log_Size) with

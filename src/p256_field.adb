@@ -155,24 +155,6 @@ package body P256_Field is
            Conv (X) * Conv (Y) <= (Two_64 - 1) * (Two_64 - 1));
    end Lemma_Mul_Split;
 
-   --  Weights multiply: 2^(64 I) * 2^(64 J) = 2^(64 (I + J)).
-   procedure Lemma_Weight_Add (I, J : Natural) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => I <= Max_Words and then J <= Max_Words - I,
-     Post => Weight (I) * Weight (J) = Weight (I + J),
-     Subprogram_Variant => (Decreases => J);
-
-   procedure Lemma_Weight_Add (I, J : Natural) is
-   begin
-      if J > 0 then
-         Lemma_Weight_Add (I, J - 1);
-         pragma Assert (Proof_Only => Weight (J) = Two_64 * Weight (J - 1));
-         pragma Assert
-           (Proof_Only =>
-              Weight (I + J) = Two_64 * Weight (I + J - 1));
-      end if;
-   end Lemma_Weight_Add;
-
    --  One word of addition with carry, against the prefix sums.
    procedure Lemma_Add_Step
      (A, B, R : Word_Array; K : Natural; C_In : Unsigned_64;
@@ -488,6 +470,7 @@ package body P256_Field is
    function Mul_Row (X : Unsigned_64; B : Limb_Array) return Five_Array
    with
      Global => null,
+     Inline,
      Post   => (Proof_Only => To_Int (Mul_Row'Result) = Conv (X) * To_Int (B));
 
    function Mul_Row (X : Unsigned_64; B : Limb_Array) return Five_Array is
@@ -539,882 +522,6 @@ package body P256_Field is
       return R;
    end Mul_Row;
 
-   --  Five words placed at word offset Off within eight zero words
-   --  denote the value shifted by 2^(64 Off); one lemma per offset.
-   procedure Lemma_Shift_0 (X : Five_Array; R : Wide_Array) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => R (0) = X (0)
-       and then R (1) = X (1)
-       and then R (2) = X (2)
-       and then R (3) = X (3)
-       and then R (4) = X (4)
-       and then R (5) = 0
-       and then R (6) = 0
-       and then R (7) = 0,
-     Post => To_Int (R) = To_Int (X) * Weight (0);
-
-   procedure Lemma_Shift_0 (X : Five_Array; R : Wide_Array) is
-   begin
-      Lemma_Unfold;
-      pragma Assert
-        (Proof_Only => To_Int (X)
-           = Conv (X (0)) * Weight (0) + Conv (X (1)) * Weight (1)
-           + Conv (X (2)) * Weight (2) + Conv (X (3)) * Weight (3)
-           + Conv (X (4)) * Weight (4));
-      pragma Assert
-        (Proof_Only => To_Int (R)
-           = Conv (R (0)) * Weight (0) + Conv (R (1)) * Weight (1)
-           + Conv (R (2)) * Weight (2) + Conv (R (3)) * Weight (3)
-           + Conv (R (4)) * Weight (4) + Conv (R (5)) * Weight (5)
-           + Conv (R (6)) * Weight (6) + Conv (R (7)) * Weight (7));
-      pragma Assert
-        (Proof_Only => To_Int (R)
-          = Conv (X (0)) * Weight (0) + Conv (X (1)) * Weight (1)
-          + Conv (X (2)) * Weight (2) + Conv (X (3)) * Weight (3)
-          + Conv (X (4)) * Weight (4));
-   end Lemma_Shift_0;
-
-   procedure Lemma_Shift_1 (X : Five_Array; R : Wide_Array) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => R (0) = 0
-       and then R (1) = X (0)
-       and then R (2) = X (1)
-       and then R (3) = X (2)
-       and then R (4) = X (3)
-       and then R (5) = X (4)
-       and then R (6) = 0
-       and then R (7) = 0,
-     Post => To_Int (R) = To_Int (X) * Weight (1);
-
-   procedure Lemma_Shift_1 (X : Five_Array; R : Wide_Array) is
-   begin
-      Lemma_Unfold;
-      pragma Assert
-        (Proof_Only => To_Int (X)
-           = Conv (X (0)) * Weight (0) + Conv (X (1)) * Weight (1)
-           + Conv (X (2)) * Weight (2) + Conv (X (3)) * Weight (3)
-           + Conv (X (4)) * Weight (4));
-      pragma Assert
-        (Proof_Only => To_Int (R)
-           = Conv (R (0)) * Weight (0) + Conv (R (1)) * Weight (1)
-           + Conv (R (2)) * Weight (2) + Conv (R (3)) * Weight (3)
-           + Conv (R (4)) * Weight (4) + Conv (R (5)) * Weight (5)
-           + Conv (R (6)) * Weight (6) + Conv (R (7)) * Weight (7));
-      pragma Assert
-        (Proof_Only => To_Int (R)
-          = Conv (X (0)) * Weight (1) + Conv (X (1)) * Weight (2)
-          + Conv (X (2)) * Weight (3) + Conv (X (3)) * Weight (4)
-          + Conv (X (4)) * Weight (5));
-   end Lemma_Shift_1;
-
-   procedure Lemma_Shift_2 (X : Five_Array; R : Wide_Array) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => R (0) = 0
-       and then R (1) = 0
-       and then R (2) = X (0)
-       and then R (3) = X (1)
-       and then R (4) = X (2)
-       and then R (5) = X (3)
-       and then R (6) = X (4)
-       and then R (7) = 0,
-     Post => To_Int (R) = To_Int (X) * Weight (2);
-
-   procedure Lemma_Shift_2 (X : Five_Array; R : Wide_Array) is
-   begin
-      Lemma_Unfold;
-      pragma Assert
-        (Proof_Only => To_Int (X)
-           = Conv (X (0)) * Weight (0) + Conv (X (1)) * Weight (1)
-           + Conv (X (2)) * Weight (2) + Conv (X (3)) * Weight (3)
-           + Conv (X (4)) * Weight (4));
-      pragma Assert
-        (Proof_Only => To_Int (R)
-           = Conv (R (0)) * Weight (0) + Conv (R (1)) * Weight (1)
-           + Conv (R (2)) * Weight (2) + Conv (R (3)) * Weight (3)
-           + Conv (R (4)) * Weight (4) + Conv (R (5)) * Weight (5)
-           + Conv (R (6)) * Weight (6) + Conv (R (7)) * Weight (7));
-      pragma Assert
-        (Proof_Only => To_Int (R)
-          = Conv (X (0)) * Weight (2) + Conv (X (1)) * Weight (3)
-          + Conv (X (2)) * Weight (4) + Conv (X (3)) * Weight (5)
-          + Conv (X (4)) * Weight (6));
-   end Lemma_Shift_2;
-
-   procedure Lemma_Shift_3 (X : Five_Array; R : Wide_Array) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => R (0) = 0
-       and then R (1) = 0
-       and then R (2) = 0
-       and then R (3) = X (0)
-       and then R (4) = X (1)
-       and then R (5) = X (2)
-       and then R (6) = X (3)
-       and then R (7) = X (4),
-     Post => To_Int (R) = To_Int (X) * Weight (3);
-
-   procedure Lemma_Shift_3 (X : Five_Array; R : Wide_Array) is
-   begin
-      Lemma_Unfold;
-      pragma Assert
-        (Proof_Only => To_Int (X)
-           = Conv (X (0)) * Weight (0) + Conv (X (1)) * Weight (1)
-           + Conv (X (2)) * Weight (2) + Conv (X (3)) * Weight (3)
-           + Conv (X (4)) * Weight (4));
-      pragma Assert
-        (Proof_Only => To_Int (R)
-           = Conv (R (0)) * Weight (0) + Conv (R (1)) * Weight (1)
-           + Conv (R (2)) * Weight (2) + Conv (R (3)) * Weight (3)
-           + Conv (R (4)) * Weight (4) + Conv (R (5)) * Weight (5)
-           + Conv (R (6)) * Weight (6) + Conv (R (7)) * Weight (7));
-      pragma Assert
-        (Proof_Only => To_Int (R)
-          = Conv (X (0)) * Weight (3) + Conv (X (1)) * Weight (4)
-          + Conv (X (2)) * Weight (5) + Conv (X (3)) * Weight (6)
-          + Conv (X (4)) * Weight (7));
-   end Lemma_Shift_3;
-
-   --  The product of two 256-bit values is below 2^512.
-   procedure Lemma_Product_Bound (A, B : Limb_Array) with
-     Ghost => Proof_Only, Global => null,
-     Post => To_Int (A) * To_Int (B) >= 0
-       and then To_Int (A) * To_Int (B) < Weight (8);
-
-   procedure Lemma_Product_Bound (A, B : Limb_Array) is
-   begin
-      Lemma_Unfold;
-      Lemma_To_Int_Bounds (A);
-      Lemma_To_Int_Bounds (B);
-      Lemma_Weight_Add (4, 4);
-      pragma Assert (Proof_Only => To_Int (A) <= Weight (4) - 1);
-      pragma Assert (Proof_Only => To_Int (B) <= Weight (4) - 1);
-      pragma Assert
-        (Proof_Only =>
-           To_Int (A) * To_Int (B) <= (Weight (4) - 1) * (Weight (4) - 1));
-      pragma Assert
-        (Proof_Only =>
-           (Weight (4) - 1) * (Weight (4) - 1) < Weight (8));
-   end Lemma_Product_Bound;
-
-   --  A * B as eight words, exact.
-   function Product (A, B : Limb_Array) return Wide_Array with
-     Global => null,
-     Post   =>
-       (Proof_Only =>
-          To_Int (Product'Result) = To_Int (A) * To_Int (B));
-
-   function Product (A, B : Limb_Array) return Wide_Array is
-      M0 : constant Five_Array := Mul_Row (A (0), B);
-      M1 : constant Five_Array := Mul_Row (A (1), B);
-      M2 : constant Five_Array := Mul_Row (A (2), B);
-      M3 : constant Five_Array := Mul_Row (A (3), B);
-      R0 : constant Wide_Array :=
-        [M0 (0), M0 (1), M0 (2), M0 (3), M0 (4), 0, 0, 0];
-      R1 : constant Wide_Array :=
-        [0, M1 (0), M1 (1), M1 (2), M1 (3), M1 (4), 0, 0];
-      R2 : constant Wide_Array :=
-        [0, 0, M2 (0), M2 (1), M2 (2), M2 (3), M2 (4), 0];
-      R3 : constant Wide_Array :=
-        [0, 0, 0, M3 (0), M3 (1), M3 (2), M3 (3), M3 (4)];
-      S1, S2, S3 : Wide_Array;
-      C1, C2, C3 : Unsigned_64;
-   begin
-      Lemma_Shift_0 (M0, R0);
-      Lemma_Shift_1 (M1, R1);
-      Lemma_Shift_2 (M2, R2);
-      Lemma_Shift_3 (M3, R3);
-      Add_Words (R0, R1, S1, C1);
-      Add_Words (S1, R2, S2, C2);
-      Add_Words (S2, R3, S3, C3);
-      --  The product of two 256-bit values fits in 512 bits, so no
-      --  carry leaves the top word.
-      Lemma_Unfold;
-      Lemma_To_Int_Bounds (A);
-      Lemma_To_Int_Bounds (B);
-      Lemma_To_Int_Bounds (R0);
-      Lemma_To_Int_Bounds (R1);
-      Lemma_To_Int_Bounds (R2);
-      Lemma_To_Int_Bounds (R3);
-      Lemma_To_Int_Bounds (S1);
-      Lemma_To_Int_Bounds (S2);
-      Lemma_To_Int_Bounds (S3);
-      Lemma_Product_Bound (A, B);
-      pragma Assert
-        (Proof_Only => To_Int (A)
-           = Conv (A (0)) * Weight (0) + Conv (A (1)) * Weight (1)
-           + Conv (A (2)) * Weight (2) + Conv (A (3)) * Weight (3));
-      pragma Assert
-        (Proof_Only => To_Int (A) * To_Int (B)
-           = Conv (A (0)) * To_Int (B) * Weight (0)
-           + Conv (A (1)) * To_Int (B) * Weight (1)
-           + Conv (A (2)) * To_Int (B) * Weight (2)
-           + Conv (A (3)) * To_Int (B) * Weight (3));
-      pragma Assert
-        (Proof_Only =>
-           To_Int (R0) = Conv (A (0)) * To_Int (B) * Weight (0));
-      pragma Assert
-        (Proof_Only =>
-           To_Int (R1) = Conv (A (1)) * To_Int (B) * Weight (1));
-      pragma Assert
-        (Proof_Only =>
-           To_Int (R2) = Conv (A (2)) * To_Int (B) * Weight (2));
-      pragma Assert
-        (Proof_Only =>
-           To_Int (R3) = Conv (A (3)) * To_Int (B) * Weight (3));
-      pragma Assert
-        (Proof_Only => To_Int (R0) + To_Int (R1) + To_Int (R2) + To_Int (R3)
-           = To_Int (A) * To_Int (B));
-      pragma Assert (Proof_Only => To_Int (R0) + To_Int (R1) < Weight (8));
-      pragma Assert (Proof_Only => C1 = 0);
-      pragma Assert (Proof_Only => To_Int (S1) + To_Int (R2) < Weight (8));
-      pragma Assert (Proof_Only => C2 = 0);
-      pragma Assert (Proof_Only => To_Int (S2) + To_Int (R3) < Weight (8));
-      pragma Assert (Proof_Only => C3 = 0);
-      return S3;
-   end Product;
-
-   -------------------------------------------------------------------
-   --  Multiplication, stages 2 to 6: Solinas reduction (ADR 0013).
-   --  The reduction identity is a polynomial identity in t = 2^32, so
-   --  the proofs below speak in powers of t.
-   -------------------------------------------------------------------
-
-   --  t^K, t = 2^32, for K in 0 .. 16.
-   function T32 (K : Natural) return Big_Integer is
-     (if K = 0 then To_Big_Integer (1) else Two_32 * T32 (K - 1))
-   with Ghost => Proof_Only, Global => null,
-        Pre => K <= 16,
-        Subprogram_Variant => (Decreases => K);
-
-   --  Explicit unfolding of t^K for K in 0 .. 16, and of the weights.
-   procedure Lemma_Unfold_T32 with
-     Ghost => Proof_Only, Global => null,
-     Post => T32 (0) = 1
-       and then T32 (1)
-                = Two_32
-       and then T32 (2)
-                = Two_32 * Two_32
-       and then T32 (3)
-                = Two_32 * Two_32 * Two_32
-       and then T32 (4)
-                = Two_32 * Two_32 * Two_32 * Two_32
-       and then T32 (5)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-       and then T32 (6)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-       and then T32 (7)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32
-       and then T32 (8)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32
-       and then T32 (9)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32
-       and then T32 (10)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32
-       and then T32 (11)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-       and then T32 (12)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-       and then T32 (13)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32
-       and then T32 (14)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32
-       and then T32 (15)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32
-       and then T32 (16)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32
-       and then Weight (0) = 1
-       and then Weight (1)
-                = Two_32 * Two_32
-       and then Weight (2)
-                = Two_32 * Two_32 * Two_32 * Two_32
-       and then Weight (3)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-       and then Weight (4)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32
-       and then Weight (5)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32
-       and then Weight (6)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-       and then Weight (7)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32
-       and then Weight (8)
-                = Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32 * Two_32 * Two_32
-                  * Two_32 * Two_32 * Two_32 * Two_32
-       and then Two_256 = Weight (4)
-       and then Two_64 = Two_32 * Two_32
-       and then Two_32 > 5;
-
-   procedure Lemma_Unfold_T32 is
-   begin
-      Lemma_Unfold;
-      pragma Assert (Proof_Only => T32 (1) = Two_32 * T32 (0));
-      pragma Assert (Proof_Only => T32 (2) = Two_32 * T32 (1));
-      pragma Assert (Proof_Only => T32 (3) = Two_32 * T32 (2));
-      pragma Assert (Proof_Only => T32 (4) = Two_32 * T32 (3));
-      pragma Assert (Proof_Only => T32 (5) = Two_32 * T32 (4));
-      pragma Assert (Proof_Only => T32 (6) = Two_32 * T32 (5));
-      pragma Assert (Proof_Only => T32 (7) = Two_32 * T32 (6));
-      pragma Assert (Proof_Only => T32 (8) = Two_32 * T32 (7));
-      pragma Assert (Proof_Only => T32 (9) = Two_32 * T32 (8));
-      pragma Assert (Proof_Only => T32 (10) = Two_32 * T32 (9));
-      pragma Assert (Proof_Only => T32 (11) = Two_32 * T32 (10));
-      pragma Assert (Proof_Only => T32 (12) = Two_32 * T32 (11));
-      pragma Assert (Proof_Only => T32 (13) = Two_32 * T32 (12));
-      pragma Assert (Proof_Only => T32 (14) = Two_32 * T32 (13));
-      pragma Assert (Proof_Only => T32 (15) = Two_32 * T32 (14));
-      pragma Assert (Proof_Only => T32 (16) = Two_32 * T32 (15));
-      pragma Assert (Proof_Only => Weight (1) = Two_64 * Weight (0));
-      pragma Assert (Proof_Only => Weight (1) = Two_32 * Two_32 * Weight (0));
-      pragma Assert (Proof_Only => Weight (2) = Two_64 * Weight (1));
-      pragma Assert (Proof_Only => Weight (2) = Two_32 * Two_32 * Weight (1));
-      pragma Assert (Proof_Only => Weight (3) = Two_64 * Weight (2));
-      pragma Assert (Proof_Only => Weight (3) = Two_32 * Two_32 * Weight (2));
-      pragma Assert (Proof_Only => Weight (4) = Two_64 * Weight (3));
-      pragma Assert (Proof_Only => Weight (4) = Two_32 * Two_32 * Weight (3));
-      pragma Assert (Proof_Only => Weight (5) = Two_64 * Weight (4));
-      pragma Assert (Proof_Only => Weight (5) = Two_32 * Two_32 * Weight (4));
-      pragma Assert (Proof_Only => Weight (6) = Two_64 * Weight (5));
-      pragma Assert (Proof_Only => Weight (6) = Two_32 * Two_32 * Weight (5));
-      pragma Assert (Proof_Only => Weight (7) = Two_64 * Weight (6));
-      pragma Assert (Proof_Only => Weight (7) = Two_32 * Two_32 * Weight (6));
-      pragma Assert (Proof_Only => Weight (8) = Two_64 * Weight (7));
-      pragma Assert (Proof_Only => Weight (8) = Two_32 * Two_32 * Weight (7));
-   end Lemma_Unfold_T32;
-
-   procedure Lemma_Weight_T32 (K : Natural) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => K <= Max_Words,
-     Post => Weight (K) = T32 (2 * K),
-     Subprogram_Variant => (Decreases => K);
-
-   procedure Lemma_Weight_T32 (K : Natural) is
-   begin
-      pragma Assert (Proof_Only => Two_64 = Two_32 * Two_32);
-      if K > 0 then
-         Lemma_Weight_T32 (K - 1);
-         pragma Assert (Proof_Only => T32 (2 * K) = Two_32 * T32 (2 * K - 1));
-         pragma Assert
-           (Proof_Only =>
-              T32 (2 * K - 1) = Two_32 * T32 (2 * K - 2));
-      end if;
-   end Lemma_Weight_T32;
-
-   --  p = t^8 - t^7 + t^6 + t^3 - 1.
-   procedure Lemma_P_Poly with
-     Ghost => Proof_Only, Global => null,
-     Post => P = T32 (8) - T32 (7) + T32 (6) + T32 (3) - 1
-       and then Two_256 = T32 (8)
-       and then P > 0;
-
-   procedure Lemma_P_Poly is
-   begin
-      Lemma_Weight_T32 (0);
-      Lemma_Weight_T32 (1);
-      Lemma_Weight_T32 (2);
-      Lemma_Weight_T32 (3);
-      Lemma_Weight_T32 (4);
-      pragma Assert
-        (Proof_Only =>
-           Conv (16#FFFF_FFFF_FFFF_FFFF#) = Two_64 - 1);
-      pragma Assert
-        (Proof_Only =>
-           Conv (16#0000_0000_FFFF_FFFF#) = Two_32 - 1);
-      pragma Assert
-        (Proof_Only =>
-           Conv (16#FFFF_FFFF_0000_0001#) = (Two_32 - 1) * Two_32 + 1);
-      pragma Assert
-        (Proof_Only => P = (Two_64 - 1) + (Two_32 - 1) * Weight (1)
-             + ((Two_32 - 1) * Two_32 + 1) * Weight (3));
-   end Lemma_P_Poly;
-
-   --  32-bit word J of the 512-bit product, J in 0 .. 15; slot 16 is
-   --  the constant zero word used by the term table.
-   subtype Slot is Natural range 0 .. 16;
-
-   function Word (R : Wide_Array; J : Slot) return Unsigned_64 is
-     (if J = 16 then 0
-      elsif J mod 2 = 0 then R (J / 2) and 16#FFFF_FFFF#
-      else Shift_Right (R (J / 2), 32))
-   with Global => null,
-        Post => Word'Result < 2 ** 32;
-   --  The if-expression selects on the constant table index, never on
-   --  data.
-
-   function WVal (R : Wide_Array; J : Slot) return Big_Integer is
-     (Conv (Word (R, J)))
-   with Ghost => Proof_Only, Global => null;
-
-   procedure Lemma_WVal_Bounds (R : Wide_Array) with
-     Ghost => Proof_Only, Global => null,
-     Post => (for all J in Slot => WVal (R, J) >= 0
-       and then WVal (R, J) < Two_32)
-       and then WVal (R, 16) = 0;
-
-   procedure Lemma_WVal_Bounds (R : Wide_Array) is
-   begin
-      for J in Slot loop
-         pragma Assert (Proof_Only => Word (R, J) < 2 ** 32);
-         pragma Assert (Proof_Only => Conv (Word (R, J)) < Conv (2 ** 32));
-         pragma Loop_Invariant
-           (Proof_Only => (for all K in 0 .. J => WVal (R, K) >= 0
-             and then WVal (R, K) < Two_32));
-      end loop;
-      pragma Assert (Proof_Only => Conv (0) = 0);
-   end Lemma_WVal_Bounds;
-
-   --  A 64-bit word is its two 32-bit halves.
-   procedure Lemma_Word_Split (R : Wide_Array; M : Natural) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => M <= 7,
-     Post => Conv (R (M)) = WVal (R, 2 * M) + WVal (R, 2 * M + 1) * Two_32;
-
-   procedure Lemma_Word_Split (R : Wide_Array; M : Natural) is
-      X : constant Unsigned_64 := R (M);
-   begin
-      pragma Assert
-        (Proof_Only =>
-           X = (X and 16#FFFF_FFFF#) + Shift_Right (X, 32) * 2 ** 32);
-      pragma Assert (Proof_Only => Shift_Right (X, 32) = X / 2 ** 32);
-      pragma Assert (Proof_Only => (X and 16#FFFF_FFFF#) = X mod 2 ** 32);
-      pragma Assert (Proof_Only => Conv (2 ** 32) = Two_32);
-      pragma Assert
-        (Proof_Only =>
-           Conv (X) = Conv (X mod 2 ** 32) + Conv (X / 2 ** 32) * Two_32);
-   end Lemma_Word_Split;
-
-   --  Value of the product in terms of its 32-bit words.
-   function Word_Sum (R : Wide_Array) return Big_Integer is
-     (WVal (R, 0) * T32 (0) + WVal (R, 1) * T32 (1)
-      + WVal (R, 2) * T32 (2) + WVal (R, 3) * T32 (3)
-      + WVal (R, 4) * T32 (4) + WVal (R, 5) * T32 (5)
-      + WVal (R, 6) * T32 (6) + WVal (R, 7) * T32 (7)
-      + WVal (R, 8) * T32 (8) + WVal (R, 9) * T32 (9)
-      + WVal (R, 10) * T32 (10) + WVal (R, 11) * T32 (11)
-      + WVal (R, 12) * T32 (12) + WVal (R, 13) * T32 (13)
-      + WVal (R, 14) * T32 (14) + WVal (R, 15) * T32 (15))
-   with Ghost => Proof_Only, Global => null;
-
-   procedure Lemma_Word_Sum (R : Wide_Array) with
-     Ghost => Proof_Only, Global => null,
-     Post => To_Int (R) = Word_Sum (R);
-
-   --  One 64-bit word of the product in 32-bit words.
-   procedure Lemma_Word_Term (R : Wide_Array; K : Natural) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => K <= 7,
-     Post => Conv (R (K)) * Weight (K)
-             = WVal (R, 2 * K) * T32 (2 * K)
-               + WVal (R, 2 * K + 1) * T32 (2 * K + 1);
-
-   procedure Lemma_Word_Term (R : Wide_Array; K : Natural) is
-   begin
-      Lemma_Word_Split (R, K);
-      Lemma_Weight_T32 (K);
-      pragma Assert (Proof_Only => T32 (2 * K + 1) = Two_32 * T32 (2 * K));
-   end Lemma_Word_Term;
-
-   procedure Lemma_Word_Sum (R : Wide_Array) is
-   begin
-      pragma Assert
-        (Proof_Only => To_Int (R)
-           = Conv (R (0)) * Weight (0) + Conv (R (1)) * Weight (1)
-           + Conv (R (2)) * Weight (2) + Conv (R (3)) * Weight (3)
-           + Conv (R (4)) * Weight (4) + Conv (R (5)) * Weight (5)
-           + Conv (R (6)) * Weight (6) + Conv (R (7)) * Weight (7));
-      for K in 0 .. 7 loop
-         Lemma_Word_Term (R, K);
-         pragma Loop_Invariant
-           (Proof_Only => (for all J in 0 .. K =>
-              Conv (R (J)) * Weight (J)
-              = WVal (R, 2 * J) * T32 (2 * J)
-                + WVal (R, 2 * J + 1) * T32 (2 * J + 1)));
-      end loop;
-   end Lemma_Word_Sum;
-
-   --  A term of the reduction table: eight 32-bit word slots, least
-   --  significant first (FIPS 186-4 D.2.3, see the chapter).
-   type Slots is array (0 .. 7) of Slot;
-
-   T_Slots  : constant Slots := [0, 1, 2, 3, 4, 5, 6, 7];
-   S1_Slots : constant Slots := [16, 16, 16, 11, 12, 13, 14, 15];
-   S2_Slots : constant Slots := [16, 16, 16, 12, 13, 14, 15, 16];
-   S3_Slots : constant Slots := [8, 9, 10, 16, 16, 16, 14, 15];
-   S4_Slots : constant Slots := [9, 10, 11, 13, 14, 15, 13, 8];
-   D1_Slots : constant Slots := [11, 12, 13, 16, 16, 16, 8, 10];
-   D2_Slots : constant Slots := [12, 13, 14, 15, 16, 16, 9, 11];
-   D3_Slots : constant Slots := [13, 14, 15, 8, 9, 10, 16, 12];
-   D4_Slots : constant Slots := [14, 15, 16, 9, 10, 11, 16, 13];
-
-   function Term_Val (R : Wide_Array; S : Slots) return Big_Integer is
-     (WVal (R, S (0)) * T32 (0) + WVal (R, S (1)) * T32 (1)
-      + WVal (R, S (2)) * T32 (2) + WVal (R, S (3)) * T32 (3)
-      + WVal (R, S (4)) * T32 (4) + WVal (R, S (5)) * T32 (5)
-      + WVal (R, S (6)) * T32 (6) + WVal (R, S (7)) * T32 (7))
-   with Ghost => Proof_Only, Global => null;
-
-   procedure Lemma_Term_Bound (R : Wide_Array; S : Slots) with
-     Ghost => Proof_Only, Global => null,
-     Post => Term_Val (R, S) >= 0 and then Term_Val (R, S) < Two_256
-       and then (if S (7) = 16 then Term_Val (R, S) < T32 (7));
-
-   procedure Lemma_Term_Bound (R : Wide_Array; S : Slots) is
-   begin
-      Lemma_WVal_Bounds (R);
-      Lemma_Unfold_T32;
-      pragma Assert
-        (Proof_Only =>
-           T32 (1) = Two_32 * T32 (0) and then T32 (2) = Two_32 * T32 (1)
-           and then T32 (3) = Two_32 * T32 (2)
-           and then T32 (4) = Two_32 * T32 (3)
-           and then T32 (5) = Two_32 * T32 (4)
-           and then T32 (6) = Two_32 * T32 (5)
-           and then T32 (7) = Two_32 * T32 (6)
-           and then T32 (8) = Two_32 * T32 (7));
-      pragma Assert
-        (Proof_Only => Term_Val (R, S)
-           <= (Two_32 - 1) * T32 (0) + (Two_32 - 1) * T32 (1)
-            + (Two_32 - 1) * T32 (2) + (Two_32 - 1) * T32 (3)
-            + (Two_32 - 1) * T32 (4) + (Two_32 - 1) * T32 (5)
-            + (Two_32 - 1) * T32 (6) + (Two_32 - 1) * T32 (7));
-      pragma Assert
-        (Proof_Only => (Two_32 - 1) * T32 (0) + (Two_32 - 1) * T32 (1)
-           + (Two_32 - 1) * T32 (2) + (Two_32 - 1) * T32 (3)
-           + (Two_32 - 1) * T32 (4) + (Two_32 - 1) * T32 (5)
-           + (Two_32 - 1) * T32 (6) + (Two_32 - 1) * T32 (7)
-         = T32 (8) - 1);
-      pragma Assert (Proof_Only => Two_256 = T32 (8));
-      if S (7) = 16 then
-         pragma Assert (Proof_Only => WVal (R, S (7)) = 0);
-         pragma Assert
-           (Proof_Only => Term_Val (R, S)
-              <= (Two_32 - 1) * T32 (0) + (Two_32 - 1) * T32 (1)
-               + (Two_32 - 1) * T32 (2) + (Two_32 - 1) * T32 (3)
-               + (Two_32 - 1) * T32 (4) + (Two_32 - 1) * T32 (5)
-               + (Two_32 - 1) * T32 (6));
-         pragma Assert
-           (Proof_Only => (Two_32 - 1) * T32 (0) + (Two_32 - 1) * T32 (1)
-              + (Two_32 - 1) * T32 (2) + (Two_32 - 1) * T32 (3)
-              + (Two_32 - 1) * T32 (4) + (Two_32 - 1) * T32 (5)
-              + (Two_32 - 1) * T32 (6)
-            = T32 (7) - 1);
-      end if;
-   end Lemma_Term_Bound;
-
-   --  Executable term: limb I is slots 2 I and 2 I + 1.
-   function Term (R : Wide_Array; S : Slots) return Limb_Array with
-     Global => null,
-     Post   => (Proof_Only => To_Int (Term'Result) = Term_Val (R, S));
-
-   function Term (R : Wide_Array; S : Slots) return Limb_Array is
-      L : constant Limb_Array :=
-        [0 => Word (R, S (0)) or Shift_Left (Word (R, S (1)), 32),
-         1 => Word (R, S (2)) or Shift_Left (Word (R, S (3)), 32),
-         2 => Word (R, S (4)) or Shift_Left (Word (R, S (5)), 32),
-         3 => Word (R, S (6)) or Shift_Left (Word (R, S (7)), 32)];
-   begin
-      for I in Limb_Index loop
-         pragma Assert
-           (Proof_Only =>
-              L (I) = Word (R, S (2 * I)) + Word (R, S (2 * I + 1)) * 2 ** 32);
-         pragma Assert (Proof_Only => Conv (2 ** 32) = Two_32);
-         pragma Assert
-           (Proof_Only => Conv (L (I))
-              = WVal (R, S (2 * I)) + WVal (R, S (2 * I + 1)) * Two_32);
-         Lemma_Weight_T32 (I);
-         pragma Assert (Proof_Only => T32 (2 * I + 1) = Two_32 * T32 (2 * I));
-         pragma Loop_Invariant
-           (Proof_Only => (for all K in 0 .. I =>
-              Conv (L (K))
-                = WVal (R, S (2 * K)) + WVal (R, S (2 * K + 1)) * Two_32));
-         pragma Loop_Invariant
-           (Proof_Only => (for all K in 0 .. I => Weight (K) = T32 (2 * K)));
-         pragma Loop_Invariant
-           (Proof_Only =>
-              (for all K in 0 .. I => T32 (2 * K + 1) = Two_32 * T32 (2 * K)));
-      end loop;
-      pragma Assert
-        (Proof_Only => To_Int (L)
-           = Conv (L (0)) * Weight (0) + Conv (L (1)) * Weight (1)
-           + Conv (L (2)) * Weight (2) + Conv (L (3)) * Weight (3));
-      return L;
-   end Term;
-
-   --  The positive and negative sums of the table, the quotient, and
-   --  the exact reduction identity X = (S - N) + Q p, a polynomial
-   --  identity in t (checked numerically by the vector generator).
-   function S_Val (R : Wide_Array) return Big_Integer is
-     (Term_Val (R, T_Slots)
-      + 2 * Term_Val (R, S1_Slots) + 2 * Term_Val (R, S2_Slots)
-      + Term_Val (R, S3_Slots) + Term_Val (R, S4_Slots))
-   with Ghost => Proof_Only, Global => null;
-
-   function N_Val (R : Wide_Array) return Big_Integer is
-     (Term_Val (R, D1_Slots) + Term_Val (R, D2_Slots)
-      + Term_Val (R, D3_Slots) + Term_Val (R, D4_Slots))
-   with Ghost => Proof_Only, Global => null;
-
-   function Q_Val (R : Wide_Array) return Big_Integer is
-     (WVal (R, 8) * T32 (0)
-      + WVal (R, 9) * (T32 (1) + T32 (0))
-      + WVal (R, 10) * (T32 (2) + T32 (1))
-      + WVal (R, 11) * (T32 (3) + T32 (2) - T32 (0))
-      + WVal (R, 12) * (T32 (4) + T32 (3) - T32 (1) - T32 (0))
-      + WVal (R, 13) * (T32 (5) + T32 (4) - T32 (2) - T32 (1) - T32 (0))
-      + WVal (R, 14)
-        * (T32 (6) + T32 (5) - T32 (3) - T32 (2) - T32 (1) - T32 (0))
-      + WVal (R, 15)
-        * (T32 (7) + T32 (6) - T32 (4) - T32 (3) - T32 (2) - T32 (1)))
-   with Ghost => Proof_Only, Global => null;
-
-   --  Representative of t^J modulo p read off the table (the column
-   --  of word J), and the exact quotient, for J in 8 .. 15.
-   function Rep (J : Natural) return Big_Integer is
-     (case J is
-        when 8  => T32 (7) - T32 (6) - T32 (3) + T32 (0),
-        when 9  => -T32 (6) - T32 (4) - T32 (3) + T32 (1) + T32 (0),
-        when 10 => -T32 (7) - T32 (5) - T32 (4) + T32 (2) + T32 (1),
-        when 11 => -T32 (7) - T32 (5) + 2 * T32 (3) + T32 (2) - T32 (0),
-        when 12 => -T32 (7) + 2 * T32 (4) + 2 * T32 (3) - T32 (1) - T32 (0),
-        when 13 => -T32 (7) + T32 (6) + 2 * T32 (5) + 2 * T32 (4) + T32 (3)
-                   - T32 (2) - T32 (1) - T32 (0),
-        when 14 => 3 * T32 (6) + 2 * T32 (5) + T32 (4) - T32 (2) - T32 (1)
-                   - T32 (0),
-        when others => 3 * T32 (7) + 2 * T32 (6) + T32 (5) - T32 (3)
-                       - T32 (2) - T32 (1))
-   with Ghost => Proof_Only, Global => null, Pre => J in 8 .. 15;
-
-   function Quot (J : Natural) return Big_Integer is
-     (case J is
-        when 8  => T32 (0),
-        when 9  => T32 (1) + T32 (0),
-        when 10 => T32 (2) + T32 (1),
-        when 11 => T32 (3) + T32 (2) - T32 (0),
-        when 12 => T32 (4) + T32 (3) - T32 (1) - T32 (0),
-        when 13 => T32 (5) + T32 (4) - T32 (2) - T32 (1) - T32 (0),
-        when 14 => T32 (6) + T32 (5) - T32 (3) - T32 (2) - T32 (1) - T32 (0),
-        when others => T32 (7) + T32 (6) - T32 (4) - T32 (3) - T32 (2)
-                       - T32 (1))
-   with Ghost => Proof_Only, Global => null, Pre => J in 8 .. 15;
-
-   --  t^J = Rep (J) + Quot (J) p: a polynomial identity in t.
-   procedure Lemma_Power_Reduction (J : Natural) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => J in 8 .. 15
-       and then P = T32 (8) - T32 (7) + T32 (6) + T32 (3) - 1,
-     Post => T32 (J) = Rep (J) + Quot (J) * P;
-
-   procedure Lemma_Power_Reduction (J : Natural) is
-   begin
-      Lemma_Unfold_T32;
-      if J = 8 then
-         pragma Assert (Proof_Only => T32 (8) = Rep (8) + Quot (8) * P);
-      elsif J = 9 then
-         pragma Assert (Proof_Only => T32 (9) = Rep (9) + Quot (9) * P);
-      elsif J = 10 then
-         pragma Assert (Proof_Only => T32 (10) = Rep (10) + Quot (10) * P);
-      elsif J = 11 then
-         pragma Assert (Proof_Only => T32 (11) = Rep (11) + Quot (11) * P);
-      elsif J = 12 then
-         pragma Assert (Proof_Only => T32 (12) = Rep (12) + Quot (12) * P);
-      elsif J = 13 then
-         pragma Assert (Proof_Only => T32 (13) = Rep (13) + Quot (13) * P);
-      elsif J = 14 then
-         pragma Assert (Proof_Only => T32 (14) = Rep (14) + Quot (14) * P);
-      else
-         pragma Assert (Proof_Only => T32 (15) = Rep (15) + Quot (15) * P);
-      end if;
-   end Lemma_Power_Reduction;
-
-   --  Regrouping the table by word: S - N = low words + sum of
-   --  WVal (J) Rep (J), and Q = sum of WVal (J) Quot (J).
-   procedure Lemma_Regroup (R : Wide_Array) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => WVal (R, 16) = 0,
-     Post => S_Val (R) - N_Val (R)
-             = WVal (R, 0) * T32 (0) + WVal (R, 1) * T32 (1)
-               + WVal (R, 2) * T32 (2) + WVal (R, 3) * T32 (3)
-               + WVal (R, 4) * T32 (4) + WVal (R, 5) * T32 (5)
-               + WVal (R, 6) * T32 (6) + WVal (R, 7) * T32 (7)
-               + WVal (R, 8) * Rep (8) + WVal (R, 9) * Rep (9)
-               + WVal (R, 10) * Rep (10) + WVal (R, 11) * Rep (11)
-               + WVal (R, 12) * Rep (12) + WVal (R, 13) * Rep (13)
-               + WVal (R, 14) * Rep (14) + WVal (R, 15) * Rep (15)
-       and then Q_Val (R)
-             = WVal (R, 8) * Quot (8) + WVal (R, 9) * Quot (9)
-               + WVal (R, 10) * Quot (10) + WVal (R, 11) * Quot (11)
-               + WVal (R, 12) * Quot (12) + WVal (R, 13) * Quot (13)
-               + WVal (R, 14) * Quot (14) + WVal (R, 15) * Quot (15);
-
-   procedure Lemma_Regroup (R : Wide_Array) is null;
-
-   --  The exact identity, assembled from the word identities.
-   procedure Lemma_Solinas_Identity (R : Wide_Array) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => To_Int (R) = Word_Sum (R)
-       and then WVal (R, 16) = 0
-       and then P = T32 (8) - T32 (7) + T32 (6) + T32 (3) - 1,
-     Post => To_Int (R) = (S_Val (R) - N_Val (R)) + Q_Val (R) * P;
-
-   procedure Lemma_Solinas_Identity (R : Wide_Array) is
-   begin
-      Lemma_Regroup (R);
-      for J in 8 .. 15 loop
-         Lemma_Power_Reduction (J);
-         pragma Loop_Invariant
-           (Proof_Only =>
-              (for all K in 8 .. J => T32 (K) = Rep (K) + Quot (K) * P));
-      end loop;
-      pragma Assert
-        (Proof_Only => (for all K in 8 .. 15 =>
-           WVal (R, K) * T32 (K)
-           = WVal (R, K) * Rep (K) + WVal (R, K) * Quot (K) * P));
-      pragma Assert
-        (Proof_Only => Word_Sum (R)
-           = WVal (R, 0) * T32 (0) + WVal (R, 1) * T32 (1)
-           + WVal (R, 2) * T32 (2) + WVal (R, 3) * T32 (3)
-           + WVal (R, 4) * T32 (4) + WVal (R, 5) * T32 (5)
-           + WVal (R, 6) * T32 (6) + WVal (R, 7) * T32 (7)
-           + (WVal (R, 8) * Rep (8) + WVal (R, 8) * Quot (8) * P)
-           + (WVal (R, 9) * Rep (9) + WVal (R, 9) * Quot (9) * P)
-           + (WVal (R, 10) * Rep (10) + WVal (R, 10) * Quot (10) * P)
-           + (WVal (R, 11) * Rep (11) + WVal (R, 11) * Quot (11) * P)
-           + (WVal (R, 12) * Rep (12) + WVal (R, 12) * Quot (12) * P)
-           + (WVal (R, 13) * Rep (13) + WVal (R, 13) * Quot (13) * P)
-           + (WVal (R, 14) * Rep (14) + WVal (R, 14) * Quot (14) * P)
-           + (WVal (R, 15) * Rep (15) + WVal (R, 15) * Quot (15) * P));
-   end Lemma_Solinas_Identity;
-
-   procedure Lemma_Solinas (R : Wide_Array) with
-     Ghost => Proof_Only, Global => null,
-     Post => To_Int (R) = (S_Val (R) - N_Val (R)) + Q_Val (R) * P
-       and then S_Val (R) >= 0
-       and then S_Val (R) < 5 * Two_256 + 2 * T32 (7)
-       and then N_Val (R) >= 0
-       and then N_Val (R) <= 4 * (Two_256 - 1)
-       and then N_Val (R) <= 5 * P
-       and then S_Val (R) + 5 * P < 10 * Two_256;
-
-   procedure Lemma_Solinas (R : Wide_Array) is
-   begin
-      Lemma_Word_Sum (R);
-      Lemma_WVal_Bounds (R);
-      Lemma_P_Poly;
-      Lemma_Solinas_Identity (R);
-      Lemma_Unfold_T32;
-      Lemma_Term_Bound (R, T_Slots);
-      Lemma_Term_Bound (R, S1_Slots);
-      Lemma_Term_Bound (R, S2_Slots);
-      Lemma_Term_Bound (R, S3_Slots);
-      Lemma_Term_Bound (R, S4_Slots);
-      Lemma_Term_Bound (R, D1_Slots);
-      Lemma_Term_Bound (R, D2_Slots);
-      Lemma_Term_Bound (R, D3_Slots);
-      Lemma_Term_Bound (R, D4_Slots);
-      pragma Assert (Proof_Only => Term_Val (R, S2_Slots) < T32 (7));
-      pragma Assert (Proof_Only => S_Val (R) < 5 * Two_256 + 2 * T32 (7));
-      --  5 p - 4 (2^256 - 1) > 0 and 5 p + 2 t^7 < 5 2^256.
-      pragma Assert (Proof_Only => 5 * P >= 4 * (Two_256 - 1));
-      pragma Assert (Proof_Only => 5 * P + 2 * T32 (7) < 5 * Two_256);
-   end Lemma_Solinas;
-
-   --  Five-word accumulation of a term.
-   procedure Add_Term
-     (Acc : in out Five_Array; R : Wide_Array; S : Slots)
-   with
-     Global => null,
-     Pre  => (Proof_Only => To_Int (Acc) + Term_Val (R, S) < Weight (5)),
-     Post => (Proof_Only => To_Int (Acc) = To_Int (Acc'Old) + Term_Val (R, S));
-
-   procedure Add_Term
-     (Acc : in out Five_Array; R : Wide_Array; S : Slots)
-   is
-      T   : constant Limb_Array := Term (R, S);
-      X   : constant Five_Array := [T (0), T (1), T (2), T (3), 0];
-      Sum : Five_Array;
-      C   : Unsigned_64;
-   begin
-      pragma Assert (Proof_Only => Conv (0) = 0);
-      pragma Assert (Proof_Only => Partial (X, 4) = Partial (T, 4));
-      pragma Assert
-        (Proof_Only =>
-           To_Int (X) = Partial (X, 4) + Conv (X (4)) * Weight (4));
-      pragma Assert (Proof_Only => To_Int (X) = To_Int (T));
-      Add_Words (Acc, X, Sum, C);
-      Lemma_To_Int_Bounds (Sum);
-      pragma Assert (Proof_Only => C = 0);
-      Acc := Sum;
-   end Add_Term;
-
-   Five_P : constant Five_Array :=
-     [16#FFFF_FFFF_FFFF_FFFB#, 16#0000_0004_FFFF_FFFF#, 0,
-      16#FFFF_FFFB_0000_0005#, 16#0000_0000_0000_0004#];
-
-   --  2^256 mod p = 2^224 - 2^192 - 2^96 + 1.
-   C_Limbs : constant Limb_Array :=
-     [16#0000_0000_0000_0001#, 16#FFFF_FFFF_0000_0000#,
-      16#FFFF_FFFF_FFFF_FFFF#, 16#0000_0000_FFFF_FFFE#];
-
-   procedure Lemma_Constants with
-     Ghost => Proof_Only, Global => null,
-     Post => To_Int (Five_P) = 5 * P
-       and then To_Int (C_Limbs) = Two_256 - P;
-
-   procedure Lemma_Constants is
-   begin
-      Lemma_P_Poly;
-      Lemma_Weight_T32 (1);
-      Lemma_Weight_T32 (2);
-      Lemma_Weight_T32 (3);
-      Lemma_Weight_T32 (4);
-      pragma Assert
-        (Proof_Only =>
-           Conv (16#FFFF_FFFF_FFFF_FFFB#) = Two_64 - 5);
-      pragma Assert
-        (Proof_Only =>
-           Conv (16#0000_0004_FFFF_FFFF#) = 5 * Two_32 - 1);
-      pragma Assert
-        (Proof_Only =>
-           Conv (16#FFFF_FFFB_0000_0005#) = (Two_32 - 5) * Two_32 + 5);
-      pragma Assert (Proof_Only => Conv (16#0000_0000_0000_0004#) = 4);
-      pragma Assert
-        (Proof_Only => To_Int (Five_P)
-           = (Two_64 - 5) + (5 * Two_32 - 1) * Weight (1)
-             + ((Two_32 - 5) * Two_32 + 5) * Weight (3) + 4 * Weight (4));
-      pragma Assert (Proof_Only => Conv (16#0000_0000_0000_0001#) = 1);
-      pragma Assert
-        (Proof_Only =>
-           Conv (16#FFFF_FFFF_0000_0000#) = (Two_32 - 1) * Two_32);
-      pragma Assert
-        (Proof_Only =>
-           Conv (16#FFFF_FFFF_FFFF_FFFF#) = Two_64 - 1);
-      pragma Assert
-        (Proof_Only =>
-           Conv (16#0000_0000_FFFF_FFFE#) = Two_32 - 2);
-      pragma Assert
-        (Proof_Only => To_Int (C_Limbs)
-           = 1 + (Two_32 - 1) * Two_32 * Weight (1)
-             + (Two_64 - 1) * Weight (2) + (Two_32 - 2) * Weight (3));
-   end Lemma_Constants;
-
    --  Equal limbs denote equal values (stated element-wise, so that the
    --  proof does not rely on array extensionality).
    procedure Lemma_To_Int_Eq (A, B : Limb_Array) with
@@ -1436,65 +543,6 @@ package body P256_Field is
            = Conv (B (0)) * Weight (0) + Conv (B (1)) * Weight (1)
            + Conv (B (2)) * Weight (2) + Conv (B (3)) * Weight (3));
    end Lemma_To_Int_Eq;
-
-   --  The low four words of a five-word value, and a four-word value
-   --  extended by a zero word.
-   function Low (V : Five_Array) return Limb_Array is
-     [V (0), V (1), V (2), V (3)]
-   with Global => null;
-
-   function Ext (L : Limb_Array) return Five_Array is
-     [L (0), L (1), L (2), L (3), 0]
-   with Global => null;
-
-   procedure Lemma_Low (V : Five_Array) with
-     Ghost => Proof_Only, Global => null,
-     Post => To_Int (V) = To_Int (Low (V)) + Conv (V (4)) * Two_256
-       and then To_Int (Low (V)) >= 0
-       and then To_Int (Low (V)) < Two_256;
-
-   procedure Lemma_Low (V : Five_Array) is
-      L : constant Limb_Array := Low (V);
-   begin
-      Lemma_Unfold;
-      Lemma_To_Int_Bounds (L);
-      pragma Assert
-        (Proof_Only => L (0) = V (0) and then L (1) = V (1)
-         and then L (2) = V (2) and then L (3) = V (3));
-      pragma Assert
-        (Proof_Only => Partial (V, 4)
-           = Conv (V (0)) * Weight (0) + Conv (V (1)) * Weight (1)
-           + Conv (V (2)) * Weight (2) + Conv (V (3)) * Weight (3));
-      pragma Assert
-        (Proof_Only => Partial (L, 4)
-           = Conv (L (0)) * Weight (0) + Conv (L (1)) * Weight (1)
-           + Conv (L (2)) * Weight (2) + Conv (L (3)) * Weight (3));
-      pragma Assert (Proof_Only => Partial (V, 5)
-        = Partial (V, 4) + Conv (V (4)) * Weight (4));
-   end Lemma_Low;
-
-   procedure Lemma_Ext (L : Limb_Array) with
-     Ghost => Proof_Only, Global => null,
-     Post => To_Int (Ext (L)) = To_Int (L);
-
-   procedure Lemma_Ext (L : Limb_Array) is
-      V : constant Five_Array := Ext (L);
-   begin
-      Lemma_Unfold;
-      pragma Assert
-        (Proof_Only => V (0) = L (0) and then V (1) = L (1)
-         and then V (2) = L (2) and then V (3) = L (3) and then V (4) = 0);
-      pragma Assert
-        (Proof_Only => Partial (V, 4)
-           = Conv (V (0)) * Weight (0) + Conv (V (1)) * Weight (1)
-           + Conv (V (2)) * Weight (2) + Conv (V (3)) * Weight (3));
-      pragma Assert
-        (Proof_Only => Partial (L, 4)
-           = Conv (L (0)) * Weight (0) + Conv (L (1)) * Weight (1)
-           + Conv (L (2)) * Weight (2) + Conv (L (3)) * Weight (3));
-      pragma Assert (Proof_Only => Partial (V, 5)
-        = Partial (V, 4) + Conv (V (4)) * Weight (4));
-   end Lemma_Ext;
 
    --  If A * B < K * B with B > 0 then A < K.
    procedure Lemma_Div_Bound (A, B, K : Big_Integer) with
@@ -1524,320 +572,6 @@ package body P256_Field is
       pragma Assert (Proof_Only => (R - M * P) mod P = R mod P);
       pragma Assert (Proof_Only => R mod P = R);
    end Lemma_Mod_Multiple;
-
-   --  Stage 3: the positive sum S = T + 2 S1 + 2 S2 + S3 + S4.
-   function Sum_S (X : Wide_Array) return Five_Array with
-     Global => null,
-     Post   => (Proof_Only => To_Int (Sum_S'Result) = S_Val (X));
-
-   function Sum_S (X : Wide_Array) return Five_Array is
-      S : Five_Array := [others => 0];
-   begin
-      Lemma_Unfold;
-      Lemma_Solinas (X);
-      Lemma_Term_Bound (X, T_Slots);
-      Lemma_Term_Bound (X, S1_Slots);
-      Lemma_Term_Bound (X, S2_Slots);
-      Lemma_Term_Bound (X, S3_Slots);
-      Lemma_Term_Bound (X, S4_Slots);
-      pragma Assert (Proof_Only => To_Int (S) = 0);
-      Add_Term (S, X, T_Slots);
-      Add_Term (S, X, S1_Slots);
-      Add_Term (S, X, S1_Slots);
-      Add_Term (S, X, S2_Slots);
-      Add_Term (S, X, S2_Slots);
-      Add_Term (S, X, S3_Slots);
-      Add_Term (S, X, S4_Slots);
-      return S;
-   end Sum_S;
-
-   --  Stage 3: the negative sum N = D1 + D2 + D3 + D4.
-   function Sum_N (X : Wide_Array) return Five_Array with
-     Global => null,
-     Post   => (Proof_Only => To_Int (Sum_N'Result) = N_Val (X));
-
-   function Sum_N (X : Wide_Array) return Five_Array is
-      N : Five_Array := [others => 0];
-   begin
-      Lemma_Unfold;
-      Lemma_Term_Bound (X, D1_Slots);
-      Lemma_Term_Bound (X, D2_Slots);
-      Lemma_Term_Bound (X, D3_Slots);
-      Lemma_Term_Bound (X, D4_Slots);
-      pragma Assert (Proof_Only => To_Int (N) = 0);
-      Add_Term (N, X, D1_Slots);
-      Add_Term (N, X, D2_Slots);
-      Add_Term (N, X, D3_Slots);
-      Add_Term (N, X, D4_Slots);
-      return N;
-   end Sum_N;
-
-   --  Stage 4: V = S + 5 p - N, exact and below 10 2^256.
-   function Stage_V (S, N : Five_Array) return Five_Array with
-     Global => null,
-     Pre    => (Proof_Only => To_Int (S) >= 0
-       and then To_Int (S) + 5 * P < 10 * Two_256
-       and then To_Int (N) >= 0
-       and then To_Int (N) <= 5 * P),
-     Post   =>
-       (Proof_Only =>
-          To_Int (Stage_V'Result) = To_Int (S) - To_Int (N) + 5 * P
-  and then To_Int (Stage_V'Result) < 10 * Two_256);
-
-   function Stage_V (S, N : Five_Array) return Five_Array is
-      Tmp, V : Five_Array;
-      C, Bw  : Unsigned_64;
-   begin
-      Lemma_Unfold;
-      Lemma_Constants;
-      Lemma_P_Poly;
-      pragma Assert (Proof_Only => 10 * Two_256 < Weight (5));
-      Add_Words (S, Five_P, Tmp, C);
-      Lemma_To_Int_Bounds (Tmp);
-      pragma Assert (Proof_Only => C = 0);
-      pragma Assert (Proof_Only => To_Int (Tmp) = To_Int (S) + 5 * P);
-      Sub_Words (Tmp, N, V, Bw);
-      pragma Assert (Proof_Only => Bw = 0);
-      return V;
-   end Stage_V;
-
-   --  Stage 5: W = V_lo + V_hi (2^256 - p), which equals V - V_hi p and
-   --  is below 2 p.
-   function Stage_W (V : Five_Array) return Five_Array with
-     Global => null,
-     Pre    => (Proof_Only => To_Int (V) < 10 * Two_256),
-     Post   =>
-       (Proof_Only =>
-          To_Int (Stage_W'Result) = To_Int (V) - Conv (V (4)) * P
-  and then To_Int (Stage_W'Result) >= 0
-  and then To_Int (Stage_W'Result) < 2 * P);
-
-   function Stage_W (V : Five_Array) return Five_Array is
-      V_Lo : constant Limb_Array := Low (V);
-      Fold : Five_Array;
-      W    : Five_Array;
-      C    : Unsigned_64;
-   begin
-      Lemma_Unfold;
-      Lemma_Constants;
-      Lemma_P_Poly;
-      Lemma_Low (V);
-      pragma Assert (Proof_Only => Conv (V (4)) * Two_256 < 10 * Two_256);
-      Lemma_Div_Bound (Conv (V (4)), Two_256, 10);
-      pragma Assert (Proof_Only => Conv (V (4)) <= 9);
-      Fold := Mul_Row (V (4), C_Limbs);
-      pragma Assert
-        (Proof_Only =>
-           To_Int (Fold) = Conv (V (4)) * (Two_256 - P));
-      pragma Assert (Proof_Only => To_Int (Fold) <= 9 * (Two_256 - P));
-      Lemma_Ext (V_Lo);
-      Add_Words (Ext (V_Lo), Fold, W, C);
-      Lemma_To_Int_Bounds (W);
-      pragma Assert (Proof_Only => Two_256 + 9 * (Two_256 - P) < Weight (5));
-      pragma Assert (Proof_Only => C = 0);
-      pragma Assert (Proof_Only => To_Int (W) = To_Int (V_Lo) + To_Int (Fold));
-      pragma Assert (Proof_Only => Two_256 + 9 * (Two_256 - P) < 2 * P);
-      return W;
-   end Stage_W;
-
-   --  Stage 6: one conditional subtraction of p, in constant time.
-   function Stage_Final (W : Five_Array) return Limb_Array with
-     Global => null,
-     Pre    => (Proof_Only => To_Int (W) >= 0 and then To_Int (W) < 2 * P),
-     Post   => (Proof_Only => To_Int (Stage_Final'Result) >= 0
-       and then To_Int (Stage_Final'Result) < P
-       and then (if To_Int (W) < P then To_Int (Stage_Final'Result)
-         = To_Int (W)
-                 else To_Int (Stage_Final'Result) = To_Int (W) - P));
-
-   function Stage_Final (W : Five_Array) return Limb_Array is
-      Diff : Five_Array;
-      Bw   : Unsigned_64;
-      Mask : Unsigned_64;
-   begin
-      Lemma_Unfold;
-      Lemma_P_Poly;
-      Lemma_Ext (P_Limbs);
-      Sub_Words (W, Ext (P_Limbs), Diff, Bw);
-      pragma Assert (Proof_Only => To_Int (Ext (P_Limbs)) = P);
-      --  Bw = 1 iff W < p. Keep W then, else W - p; in both cases the
-      --  value is below p, so the top word is zero.
-      Mask := 0 - (1 - Bw);
-      Lemma_Low (W);
-      Lemma_Low (Diff);
-      pragma Assert
-        (Proof_Only =>
-           (if Bw = 0 then To_Int (Diff) = To_Int (W) - P));
-      pragma Assert
-        (Proof_Only =>
-           (if Bw = 0 then To_Int (Diff) < P else To_Int (W) < P));
-      pragma Assert (Proof_Only => P < Two_256);
-      if Bw = 0 then
-         pragma Assert (Proof_Only => Conv (Diff (4)) * Two_256 < 1 * Two_256);
-         Lemma_Div_Bound (Conv (Diff (4)), Two_256, 1);
-         pragma Assert (Proof_Only => Conv (Diff (4)) = 0);
-         pragma Assert (Proof_Only => To_Int (Diff) = To_Int (Low (Diff)));
-      else
-         pragma Assert (Proof_Only => Conv (W (4)) * Two_256 < 1 * Two_256);
-         Lemma_Div_Bound (Conv (W (4)), Two_256, 1);
-         pragma Assert (Proof_Only => Conv (W (4)) = 0);
-         pragma Assert (Proof_Only => To_Int (W) = To_Int (Low (W)));
-      end if;
-      declare
-         R : constant Limb_Array := Select_Limbs (Low (W), Low (Diff), Mask);
-      begin
-         Lemma_To_Int_Bounds (R);
-         if Bw = 0 then
-            pragma Assert (Proof_Only => Mask = Unsigned_64'Last);
-            pragma Assert (Proof_Only => R = Low (Diff));
-            pragma Assert
-              (Proof_Only =>
-                 (for all I in Limb_Index => R (I) = Low (Diff) (I)));
-            Lemma_To_Int_Eq (R, Low (Diff));
-            pragma Assert (Proof_Only => To_Int (R) = To_Int (Diff));
-            pragma Assert (Proof_Only => To_Int (R) = To_Int (W) - P);
-         else
-            pragma Assert (Proof_Only => Mask = 0);
-            pragma Assert (Proof_Only => R = Low (W));
-            pragma Assert
-              (Proof_Only =>
-                 (for all I in Limb_Index => R (I) = Low (W) (I)));
-            Lemma_To_Int_Eq (R, Low (W));
-            pragma Assert (Proof_Only => To_Int (R) = To_Int (W));
-         end if;
-         pragma Assert (Proof_Only => To_Int (R) >= 0 and then To_Int (R) < P);
-         return R;
-      end;
-   end Stage_Final;
-
-   --  Reduce an eight-word product to a canonical element.
-   function Reduce (X : Wide_Array) return Limb_Array with
-     Global => null,
-     Post   => (Proof_Only => To_Int (Reduce'Result) = To_Int (X) mod P);
-
-   function Reduce (X : Wide_Array) return Limb_Array is
-      S, N, V, W : Five_Array;
-      R : Limb_Array;
-      M : Big_Integer with Ghost => Proof_Only;
-   begin
-      Lemma_Solinas (X);
-      Lemma_P_Poly;
-      S := Sum_S (X);
-      N := Sum_N (X);
-      V := Stage_V (S, N);
-      W := Stage_W (V);
-      R := Stage_Final (W);
-      --  V = X + (5 - Q) p, W = V - V_hi p, R = W or W - p.
-      M := 5 - Q_Val (X) - Conv (V (4));
-      pragma Assert (Proof_Only => To_Int (W) = To_Int (X) + M * P);
-      M := (if To_Int (W) < P then M else M - 1);
-      pragma Assert (Proof_Only => To_Int (R) = To_Int (X) + M * P);
-      Lemma_Mod_Multiple (To_Int (X), To_Int (R), M);
-      return R;
-   end Reduce;
-
-   function Mul (A, B : Element) return Element is
-      X : constant Wide_Array := Product (A.Limbs, B.Limbs);
-      R : constant Limb_Array := Reduce (X);
-      E : constant Element := Norm ((Limbs => R));
-   begin
-      Lemma_To_Int_Eq (E.Limbs, R);
-      return E;
-   end Mul;
-
-   -------------------------------------------------------------------
-   --  Inversion (ADR 0016)
-   -------------------------------------------------------------------
-
-   --  E^(2^N): N successive squarings. Local helper.
-   function Square_N (E : Element; N : Positive) return Element with
-     Global => null;
-
-   function Square_N (E : Element; N : Positive) return Element is
-      R : Element := E;
-   begin
-      for I in 1 .. N loop
-         R := Square (R);
-      end loop;
-      return R;
-   end Square_N;
-
-   function Inv (E : Element) return Element is
-      --  X_k denotes E^(2^k - 1); the exponent p - 2 is then assembled
-      --  32-bit word by word:
-      --    ffffffff 00000001 00000000 00000000 00000000 ffffffff
-      --    ffffffff fffffffd.
-      X1  : constant Element := E;
-      X2  : constant Element := Mul (Square_N (X1, 1), X1);
-      X3  : constant Element := Mul (Square_N (X2, 1), X1);
-      X6  : constant Element := Mul (Square_N (X3, 3), X3);
-      X12 : constant Element := Mul (Square_N (X6, 6), X6);
-      X15 : constant Element := Mul (Square_N (X12, 3), X3);
-      X30 : constant Element := Mul (Square_N (X15, 15), X15);
-      X32 : constant Element := Mul (Square_N (X30, 2), X2);
-      R0  : constant Element := Mul (Square_N (X32, 32), X1);  --  00000001
-      R1  : constant Element := Square_N (R0, 96);   --  three zero words
-      R2  : constant Element := Mul (Square_N (R1, 32), X32);  --  ffffffff
-      R3  : constant Element := Mul (Square_N (R2, 32), X32);  --  ffffffff
-      R4  : constant Element := Mul (Square_N (R3, 30), X30);  --  30 ones
-   begin
-      return Mul (Square_N (R4, 2), X1);                        --  01
-   end Inv;
-
-   -------------------------------------------------------------------
-   --  Encoding
-   -------------------------------------------------------------------
-
-   function Limb_Of_8 (B : Bytes_8) return Unsigned_64 is
-     (Unsigned_64 (B (0))
-      or Shift_Left (Unsigned_64 (B (1)), 8)
-      or Shift_Left (Unsigned_64 (B (2)), 16)
-      or Shift_Left (Unsigned_64 (B (3)), 24)
-      or Shift_Left (Unsigned_64 (B (4)), 32)
-      or Shift_Left (Unsigned_64 (B (5)), 40)
-      or Shift_Left (Unsigned_64 (B (6)), 48)
-      or Shift_Left (Unsigned_64 (B (7)), 56));
-
-   function Byte_Of (L : Unsigned_64; K : Natural) return Unsigned_8 is
-     (Unsigned_8 (Shift_Right (L, 8 * K) and 16#FF#))
-   with Global => null, Pre => K <= 7;
-
-   function Bytes_Of_Limb (L : Unsigned_64) return Bytes_8 is
-     [Byte_Of (L, 0), Byte_Of (L, 1), Byte_Of (L, 2), Byte_Of (L, 3),
-      Byte_Of (L, 4), Byte_Of (L, 5), Byte_Of (L, 6), Byte_Of (L, 7)]
-   with Global => null, Post => Limb_Of_8 (Bytes_Of_Limb'Result) = L;
-
-   function Limbs_Of_Bytes (B : Bytes_32) return Limb_Array is
-     [Limb_Of_8 (B (0 .. 7)), Limb_Of_8 (B (8 .. 15)),
-      Limb_Of_8 (B (16 .. 23)), Limb_Of_8 (B (24 .. 31))];
-
-   function Bytes_Of_Limbs (L : Limb_Array) return Bytes_32 is
-      R : Bytes_32 := [others => 0];
-   begin
-      R (0 .. 7)   := Bytes_Of_Limb (L (0));
-      R (8 .. 15)  := Bytes_Of_Limb (L (1));
-      R (16 .. 23) := Bytes_Of_Limb (L (2));
-      R (24 .. 31) := Bytes_Of_Limb (L (3));
-      return R;
-   end Bytes_Of_Limbs;
-
-   procedure From_Bytes (B : Bytes_32; E : out Element; Ok : out Boolean)
-   is
-      L    : constant Limb_Array := Limbs_Of_Bytes (B);
-      D    : constant Limbs_With_Carry := Sub_Limbs (L, P_Limbs);
-      --  Keep L when it is below p, otherwise zero (public data, but
-      --  the selection is masked anyway).
-      Mask : constant Unsigned_64 := 0 - D.Carry;
-   begin
-      Ok := D.Carry = 1;
-      E  := (Limbs => Select_Limbs ([others => 0], L, Mask));
-   end From_Bytes;
-
-
-   function Of_Natural (X : Natural) return Element is
-   begin
-      return (Limbs => [Unsigned_64 (X), 0, 0, 0]);
-   end Of_Natural;
 
    ----------------------------------------------------------------------
    --  The product is associative (ADR 0066), from
@@ -1982,21 +716,609 @@ package body P256_Field is
       pragma Assert (A.Limbs = B.Limbs);
    end Lemma_Inj;
 
+   -------------------------------------------------------------------
+   --  Multiplication in Montgomery form (ADR 0069)
+   -------------------------------------------------------------------
+
+   procedure Lemma_R_Inv is
+      W : constant Big_Integer := Two_64;
+   begin
+      pragma Assert (Proof_Only => Weight (1) = W * Weight (0));
+      pragma Assert (Proof_Only => Weight (2) = W * Weight (1));
+      pragma Assert (Proof_Only => Weight (3) = W * Weight (2));
+      pragma Assert (Proof_Only => Weight (4) = W * Weight (3));
+      pragma Assert (Proof_Only => W = 18446744073709551616);
+      pragma Assert (Proof_Only => Two_256 = W * W * W * W);
+      pragma Assert (Proof_Only => To_Int (RI_Limbs)
+        = Conv (RI_Limbs (0)) + Conv (RI_Limbs (1)) * W
+          + Conv (RI_Limbs (2)) * W * W + Conv (RI_Limbs (3)) * W * W * W);
+      pragma Assert (Proof_Only => To_Int (K_Limbs)
+        = Conv (K_Limbs (0)) + Conv (K_Limbs (1)) * W
+          + Conv (K_Limbs (2)) * W * W + Conv (K_Limbs (3)) * W * W * W);
+      pragma Assert (Proof_Only => P
+        = Conv (P_Limbs (0)) + Conv (P_Limbs (1)) * W
+          + Conv (P_Limbs (2)) * W * W + Conv (P_Limbs (3)) * W * W * W);
+   end Lemma_R_Inv;
+
+   -------------------------------------------------------------------
+   --  Montgomery multiplication (ADR 0069)
+   -------------------------------------------------------------------
+
+   subtype Six_Array is Word_Array (0 .. 5);
+
+   --  p as W P1 - 1 with W = 2^64, P1 = (p + 1) / 2^64; and p < 2^256.
+   P1_Limbs : constant Limb_Array :=
+     [16#0000000100000000#, 16#0000000000000000#,
+      16#FFFFFFFF00000001#, 16#0000000000000000#];
+
+   procedure Lemma_P1 with
+     Ghost => Proof_Only, Global => null,
+     Post => P = Two_64 * To_Int (P1_Limbs) - 1 and then P > 0
+       and then P < Two_256 and then To_Int (P1_Limbs) >= 0;
+
+   procedure Lemma_P1 is
+      W : constant Big_Integer := Two_64;
+   begin
+      Lemma_Unfold;
+      pragma Assert (Proof_Only => W = 18446744073709551616);
+      pragma Assert (Proof_Only => To_Int (P1_Limbs)
+        = Conv (P1_Limbs (0)) + Conv (P1_Limbs (1)) * W
+          + Conv (P1_Limbs (2)) * W * W + Conv (P1_Limbs (3)) * W * W * W);
+      pragma Assert (Proof_Only => P
+        = Conv (P_Limbs (0)) + Conv (P_Limbs (1)) * W
+          + Conv (P_Limbs (2)) * W * W + Conv (P_Limbs (3)) * W * W * W);
+   end Lemma_P1;
+
+   --  Six words: the low word and the five above it, one word down.
+   function Down (S : Six_Array) return Six_Array is
+     [S (1), S (2), S (3), S (4), S (5), 0]
+   with Global => null;
+
+   procedure Lemma_Down (S : Six_Array) with
+     Ghost => Proof_Only, Global => null,
+     Post => To_Int (S) = Conv (S (0)) + Two_64 * To_Int (Down (S));
+
+   procedure Lemma_Down (S : Six_Array) is
+      D : constant Six_Array := Down (S);
+   begin
+      Lemma_Unfold;
+      pragma Assert (Proof_Only => To_Int (S)
+        = Conv (S (0)) + Conv (S (1)) * Weight (1) + Conv (S (2)) * Weight (2)
+          + Conv (S (3)) * Weight (3) + Conv (S (4)) * Weight (4)
+          + Conv (S (5)) * Weight (5));
+      pragma Assert (Proof_Only => To_Int (D)
+        = Conv (D (0)) + Conv (D (1)) * Weight (1) + Conv (D (2)) * Weight (2)
+          + Conv (D (3)) * Weight (3) + Conv (D (4)) * Weight (4)
+          + Conv (D (5)) * Weight (5));
+   end Lemma_Down;
+
+   function Ext6 (V : Five_Array) return Six_Array is
+     [V (0), V (1), V (2), V (3), V (4), 0]
+   with Global => null;
+
+   procedure Lemma_Ext6 (V : Five_Array) with
+     Ghost => Proof_Only, Global => null,
+     Post => To_Int (Ext6 (V)) = To_Int (V);
+
+   procedure Lemma_Ext6 (V : Five_Array) is
+      X : constant Six_Array := Ext6 (V);
+   begin
+      Lemma_Unfold;
+      pragma Assert (Proof_Only => To_Int (X)
+        = Conv (X (0)) + Conv (X (1)) * Weight (1) + Conv (X (2)) * Weight (2)
+          + Conv (X (3)) * Weight (3) + Conv (X (4)) * Weight (4)
+          + Conv (X (5)) * Weight (5));
+      pragma Assert (Proof_Only => To_Int (V)
+        = Conv (V (0)) + Conv (V (1)) * Weight (1) + Conv (V (2)) * Weight (2)
+          + Conv (V (3)) * Weight (3) + Conv (V (4)) * Weight (4));
+   end Lemma_Ext6;
+
+   --  The shifted copies of R that add up to R p: V carries
+   --  R (2^96 + 2^192 + 2^256), U carries R (1 + 2^224).
+   function V_Of (R : Unsigned_64) return Six_Array is
+     [0, Shift_Left (R, 32), Shift_Right (R, 32), R, R, 0]
+   with Global => null;
+
+   function U_Of (R : Unsigned_64) return Six_Array is
+     [R, 0, 0, Shift_Left (R, 32), Shift_Right (R, 32), 0]
+   with Global => null;
+
+   procedure Lemma_VU (R : Unsigned_64) with
+     Ghost => Proof_Only, Global => null,
+     Post => To_Int (V_Of (R)) - To_Int (U_Of (R)) = Conv (R) * P
+       and then To_Int (V_Of (R)) <= Conv (R) * (Two_64 * Two_256)
+       and then To_Int (U_Of (R)) >= 0;
+
+   procedure Lemma_VU (R : Unsigned_64) is
+      V  : constant Six_Array := V_Of (R);
+      U  : constant Six_Array := U_Of (R);
+      Lo_R : constant Unsigned_64 := Shift_Left (R, 32);
+      Hi_R : constant Unsigned_64 := Shift_Right (R, 32);
+      X    : constant Unsigned_128 :=
+        Unsigned_128 (R) * Unsigned_128 (Unsigned_64'(2 ** 32));
+      W  : constant Big_Integer := Two_64;
+      T  : constant Big_Integer := Two_32;
+   begin
+      Lemma_Unfold;
+      --  R 2^32 as a 128-bit value: its halves are Lo and Hi.
+      Lemma_Mul_Split (R, 2 ** 32);
+      Lemma_Split (X);
+      pragma Assert (Proof_Only => Lo (X) = Lo_R and then Hi (X) = Hi_R);
+      pragma Assert (Proof_Only => Conv (2 ** 32) = T);
+      pragma Assert
+        (Proof_Only => Conv (Lo_R) + Conv (Hi_R) * W = Conv (R) * T);
+      pragma Assert (Proof_Only => To_Int (V)
+        = Conv (Lo_R) * W + Conv (Hi_R) * W * W + Conv (R) * W * W * W
+          + Conv (R) * W * W * W * W);
+      pragma Assert (Proof_Only => To_Int (U)
+        = Conv (R) + Conv (Lo_R) * W * W * W + Conv (Hi_R) * W * W * W * W);
+      pragma Assert (Proof_Only => W = 18446744073709551616);
+      pragma Assert (Proof_Only => T = 4294967296);
+      pragma Assert (Proof_Only => P
+        = Conv (P_Limbs (0)) + Conv (P_Limbs (1)) * W
+          + Conv (P_Limbs (2)) * W * W + Conv (P_Limbs (3)) * W * W * W);
+      pragma Assert (Proof_Only => P
+        = W * W * W * W - T * W * W * W + W * W * W + T * W - 1);
+      pragma Assert (Proof_Only =>
+        To_Int (V) = Conv (R) * (T * W + W * W * W + W * W * W * W));
+      pragma Assert (Proof_Only =>
+        To_Int (U) = Conv (R) * (1 + T * W * W * W));
+      pragma Assert (Proof_Only => Conv (R) >= 0);
+   end Lemma_VU;
+
+   --  One round: T + X B, then R p added with R the low word, which
+   --  clears it, then one word down. The value divided by 2^64 stays
+   --  below 2 p.
+   procedure Round
+     (T : in out Six_Array; X : Unsigned_64; B : Limb_Array;
+      R : out Unsigned_64)
+   with
+     Global => null,
+     Inline,
+     Pre    => (Proof_Only => To_Int (B) < P and then To_Int (T) < 2 * P),
+     Post   => (Proof_Only => To_Int (T) < 2 * P
+                and then To_Int (T) * Two_64
+                         = To_Int (T'Old) + Conv (X) * To_Int (B)
+                           + Conv (R) * P);
+
+   procedure Round
+     (T : in out Six_Array; X : Unsigned_64; B : Limb_Array;
+      R : out Unsigned_64)
+   is
+      Row : constant Five_Array := Mul_Row (X, B);
+      S, S2, S3 : Six_Array;
+      C, C2, Bw : Unsigned_64;
+      T0 : constant Six_Array := T with Ghost => Proof_Only;
+   begin
+      Lemma_Unfold;
+      Lemma_P1;
+      Lemma_To_Int_Bounds (T);
+      Lemma_To_Int_Bounds (B);
+      Lemma_Conv_Bounds (X);
+      Lemma_Ext6 (Row);
+      Add_Words (T, Ext6 (Row), S, C);
+      pragma Assert (Proof_Only => Conv (X) * To_Int (B) <= (Two_64 - 1) * P);
+      pragma Assert
+        (Proof_Only => To_Int (T) + To_Int (Ext6 (Row)) < Weight (6));
+      Lemma_To_Int_Bounds (S);
+      pragma Assert (Proof_Only => C = 0);
+      pragma Assert
+        (Proof_Only => To_Int (S) = To_Int (T0) + Conv (X) * To_Int (B));
+      R := S (0);
+      Lemma_VU (R);
+      Lemma_Conv_Bounds (R);
+      Add_Words (S, V_Of (R), S2, C2);
+      pragma Assert
+        (Proof_Only => To_Int (S) + To_Int (V_Of (R)) < Weight (6));
+      Lemma_To_Int_Bounds (S2);
+      pragma Assert (Proof_Only => C2 = 0);
+      Sub_Words (S2, U_Of (R), S3, Bw);
+      pragma Assert (Proof_Only => To_Int (S2) - To_Int (U_Of (R))
+                     = To_Int (S) + Conv (R) * P);
+      pragma Assert (Proof_Only => Bw = 0);
+      pragma Assert (Proof_Only => To_Int (S3) = To_Int (S) + Conv (R) * P);
+      --  The low word of S3 is zero: S = R + W s', p = W P1 - 1.
+      Lemma_Down (S);
+      Lemma_Down (S3);
+      Lemma_Conv_Bounds (S3 (0));
+      pragma Assert (Proof_Only => Conv (S (0)) = Conv (R));
+      pragma Assert (Proof_Only => To_Int (S3)
+        = Conv (R) + Two_64 * To_Int (Down (S)) + Conv (R) * P);
+      pragma Assert (Proof_Only =>
+        Conv (R) * P = Conv (R) * (Two_64 * To_Int (P1_Limbs)) - Conv (R));
+      pragma Assert (Proof_Only => To_Int (S3)
+        = Two_64 * To_Int (Down (S))
+          + Conv (R) * (Two_64 * To_Int (P1_Limbs)));
+      pragma Assert (Proof_Only => To_Int (S3)
+        = Two_64 * (To_Int (Down (S)) + Conv (R) * To_Int (P1_Limbs)));
+      Lemma_Digit (Conv (S3 (0)), To_Big_Integer (0),
+                   To_Int (Down (S3)),
+                   To_Int (Down (S)) + Conv (R) * To_Int (P1_Limbs), Two_64);
+      T := Down (S3);
+      pragma Assert (Proof_Only => To_Int (T) * Two_64 = To_Int (S3));
+      --  Bound: T W = T0 + X B + R p < 2 p + (W - 1) p + (W - 1) p.
+      pragma Assert (Proof_Only => Conv (R) * P <= (Two_64 - 1) * P);
+      pragma Assert (Proof_Only => To_Int (T) * Two_64 < (2 * P) * Two_64);
+      Lemma_To_Int_Bounds (T);
+      Lemma_Div_Bound (To_Int (T), Two_64, 2 * P);
+   end Round;
+
+   --  Six words as their low four and the two above.
+   procedure Lemma_Six_Split (T : Six_Array; L : Limb_Array) with
+     Ghost => Proof_Only, Global => null,
+     Pre  => (for all I in Limb_Index => L (I) = T (I)),
+     Post => To_Int (T)
+             = To_Int (L) + Conv (T (4)) * Weight (4)
+               + Conv (T (5)) * Weight (5);
+
+   procedure Lemma_Six_Split (T : Six_Array; L : Limb_Array) is
+   begin
+      pragma Assert (Proof_Only => To_Int (T)
+        = Conv (T (0)) * Weight (0) + Conv (T (1)) * Weight (1)
+          + Conv (T (2)) * Weight (2) + Conv (T (3)) * Weight (3)
+          + Conv (T (4)) * Weight (4) + Conv (T (5)) * Weight (5));
+      pragma Assert (Proof_Only => To_Int (L)
+        = Conv (L (0)) * Weight (0) + Conv (L (1)) * Weight (1)
+          + Conv (L (2)) * Weight (2) + Conv (L (3)) * Weight (3));
+   end Lemma_Six_Split;
+
+   --  The last step of Mont_Mul: T 2^256 = A B + Q p and Res = T - G p
+   --  in 0 .. p - 1 give Res = A B 2^-256 mod p.
+   procedure Lemma_Mont_Final
+     (A, B : Limb_Array; Tv, Q, G : Big_Integer; Res : Limb_Array)
+   with
+     Ghost => Proof_Only, Global => null,
+     Pre  => Tv * Two_256 = To_Int (A) * To_Int (B) + Q * P
+       and then To_Int (Res) = Tv - G * P
+       and then To_Int (Res) >= 0 and then To_Int (Res) < P,
+     Post => To_Int (Res) = (To_Int (A) * To_Int (B) * R_Inv) mod P;
+
+   procedure Lemma_Mont_Final
+     (A, B : Limb_Array; Tv, Q, G : Big_Integer; Res : Limb_Array)
+   is
+      X : constant Big_Integer := To_Int (A) * To_Int (B);
+      K : constant Big_Integer := To_Int (K_Limbs);
+   begin
+      Lemma_R_Inv;
+      Lemma_P1;
+      pragma Assert (Tv = Tv * (Two_256 * R_Inv) - Tv * K * P);
+      pragma Assert (Tv * (Two_256 * R_Inv) = (Tv * Two_256) * R_Inv);
+      pragma Assert (Tv = X * R_Inv + (Q * R_Inv - Tv * K) * P);
+      pragma Assert (To_Int (Res) = X * R_Inv + (Q * R_Inv - Tv * K - G) * P);
+      Lemma_Mod_Multiple (X * R_Inv, To_Int (Res), Q * R_Inv - Tv * K - G);
+   end Lemma_Mont_Final;
+
+   --  The Montgomery product of upstream (fp_generic.rs montgomery_mul,
+   --  p256_64.rs p256_reduction_step): A B 2^-256 mod p, B below p.
+   function Mont_Mul (A, B : Limb_Array) return Limb_Array with
+     Global => null,
+     Pre    => (Proof_Only => To_Int (B) < P),
+     Post   => (Proof_Only => To_Int (Mont_Mul'Result) < P
+                and then To_Int (Mont_Mul'Result)
+                         = (To_Int (A) * To_Int (B) * R_Inv) mod P);
+
+   function Mont_Mul (A, B : Limb_Array) return Limb_Array is
+      T    : Six_Array := [others => 0];
+      R    : Unsigned_64;
+      Q    : Big_Integer := To_Big_Integer (0) with Ghost => Proof_Only;
+      L    : Limb_Array;
+      D    : Limbs_With_Carry;
+      Ge   : Unsigned_64;
+      Mask : Unsigned_64;
+      Res  : Limb_Array;
+   begin
+      Lemma_Unfold;
+      Lemma_P1;
+      pragma Assert (Proof_Only => To_Int (T) = 0);
+      for I in Limb_Index loop
+         pragma Loop_Invariant
+           (Proof_Only => To_Int (T) < 2 * P and then Q >= 0
+            and then To_Int (T) * Weight (I)
+                     = Partial (A, I) * To_Int (B) + Q * P);
+         Round (T, A (I), B, R);
+         pragma Assert (Proof_Only =>
+           Partial (A, I + 1) = Partial (A, I) + Conv (A (I)) * Weight (I));
+         pragma Assert (Proof_Only => Weight (I + 1) = Two_64 * Weight (I));
+         Lemma_Conv_Bounds (R);
+         Q := Q + Conv (R) * Weight (I);
+         pragma Assert (Proof_Only =>
+           To_Int (T) * Weight (I + 1)
+           = Partial (A, I + 1) * To_Int (B) + Q * P);
+      end loop;
+      pragma Assert (Proof_Only =>
+        To_Int (T) * Two_256 = To_Int (A) * To_Int (B) + Q * P);
+      --  T < 2 p < 2^257: word 5 is zero and word 4 at most one.
+      L := [T (0), T (1), T (2), T (3)];
+      Lemma_Six_Split (T, L);
+      Lemma_To_Int_Bounds (L);
+      Lemma_Conv_Bounds (T (4));
+      Lemma_Conv_Bounds (T (5));
+      pragma Assert (Proof_Only => Weight (5) = Two_256 * Two_64);
+      pragma Assert (Proof_Only => 2 * P < 2 * Two_256);
+      pragma Assert (Proof_Only => Conv (T (5)) * Weight (5) <= To_Int (T));
+      pragma Assert (Proof_Only => Conv (T (5)) * Weight (5) < 1 * Weight (5));
+      Lemma_Div_Bound (Conv (T (5)), Weight (5), To_Big_Integer (1));
+      pragma Assert (Proof_Only => T (5) = 0);
+      pragma Assert (Proof_Only => Conv (T (4)) * Two_256 <= To_Int (T));
+      pragma Assert (Proof_Only => Conv (T (4)) * Two_256 < 2 * Two_256);
+      Lemma_Div_Bound (Conv (T (4)), Two_256, To_Big_Integer (2));
+      pragma Assert (Proof_Only => T (5) = 0 and then T (4) <= 1);
+      D    := Sub_Limbs (L, P_Limbs);
+      Ge   := T (4) or (1 - D.Carry);
+      Mask := 0 - Ge;
+      Res  := Select_Limbs (L, D.Limbs, Mask);
+      Lemma_To_Int_Bounds (D.Limbs);
+      pragma Assert (Proof_Only => (if T (4) = 1 then D.Carry = 1));
+      pragma Assert
+        (Proof_Only => To_Int (T) = To_Int (L) + Conv (T (4)) * Two_256);
+      if Ge = 1 then
+         pragma Assert (Proof_Only => Res = D.Limbs);
+         Lemma_To_Int_Eq (Res, D.Limbs);
+         if T (4) = 1 then
+            pragma Assert (Proof_Only => To_Int (D.Limbs)
+                           = To_Int (L) - P + Two_256);
+         else
+            pragma Assert (Proof_Only => D.Carry = 0);
+            pragma Assert (Proof_Only => To_Int (D.Limbs) = To_Int (L) - P);
+         end if;
+         pragma Assert (Proof_Only => To_Int (Res) = To_Int (T) - P);
+      else
+         pragma Assert (Proof_Only => Res = L);
+         Lemma_To_Int_Eq (Res, L);
+         pragma Assert (Proof_Only => T (4) = 0);
+         pragma Assert (Proof_Only => To_Int (Res) = To_Int (T));
+      end if;
+      pragma Assert
+        (Proof_Only => (if Ge = 1 then To_Int (Res) = To_Int (T) - P
+                        else To_Int (Res) = To_Int (T)));
+      pragma Assert
+        (Proof_Only => To_Int (Res) >= 0 and then To_Int (Res) < P);
+      Lemma_Mont_Final
+        (A, B, To_Int (T), Q,
+         (if Ge = 1 then To_Big_Integer (1) else To_Big_Integer (0)), Res);
+      return Res;
+   end Mont_Mul;
+
+   function Mul (A, B : Element) return Element is
+      R : constant Limb_Array := Mont_Mul (A.Limbs, B.Limbs);
+      E : constant Element := Norm ((Limbs => R));
+   begin
+      Lemma_To_Int_Eq (E.Limbs, R);
+      return E;
+   end Mul;
+
+   -------------------------------------------------------------------
+   --  Inversion (ADR 0016)
+   -------------------------------------------------------------------
+
+   --  E^(2^N): N successive squarings. Local helper.
+   function Square_N (E : Element; N : Positive) return Element with
+     Global => null;
+
+   function Square_N (E : Element; N : Positive) return Element is
+      R : Element := E;
+   begin
+      for I in 1 .. N loop
+         R := Square (R);
+      end loop;
+      return R;
+   end Square_N;
+
+   function Inv (E : Element) return Element is
+      --  X_k denotes E^(2^k - 1); the exponent p - 2 is then assembled
+      --  32-bit word by word:
+      --    ffffffff 00000001 00000000 00000000 00000000 ffffffff
+      --    ffffffff fffffffd.
+      X1  : constant Element := E;
+      X2  : constant Element := Mul (Square_N (X1, 1), X1);
+      X3  : constant Element := Mul (Square_N (X2, 1), X1);
+      X6  : constant Element := Mul (Square_N (X3, 3), X3);
+      X12 : constant Element := Mul (Square_N (X6, 6), X6);
+      X15 : constant Element := Mul (Square_N (X12, 3), X3);
+      X30 : constant Element := Mul (Square_N (X15, 15), X15);
+      X32 : constant Element := Mul (Square_N (X30, 2), X2);
+      R0  : constant Element := Mul (Square_N (X32, 32), X1);  --  00000001
+      R1  : constant Element := Square_N (R0, 96);   --  three zero words
+      R2  : constant Element := Mul (Square_N (R1, 32), X32);  --  ffffffff
+      R3  : constant Element := Mul (Square_N (R2, 32), X32);  --  ffffffff
+      R4  : constant Element := Mul (Square_N (R3, 30), X30);  --  30 ones
+   begin
+      return Mul (Square_N (R4, 2), X1);                        --  01
+   end Inv;
+
+   -------------------------------------------------------------------
+   --  Encoding
+   -------------------------------------------------------------------
+
+   function Limb_Of_8 (B : Bytes_8) return Unsigned_64 is
+     (Unsigned_64 (B (0))
+      or Shift_Left (Unsigned_64 (B (1)), 8)
+      or Shift_Left (Unsigned_64 (B (2)), 16)
+      or Shift_Left (Unsigned_64 (B (3)), 24)
+      or Shift_Left (Unsigned_64 (B (4)), 32)
+      or Shift_Left (Unsigned_64 (B (5)), 40)
+      or Shift_Left (Unsigned_64 (B (6)), 48)
+      or Shift_Left (Unsigned_64 (B (7)), 56));
+
+   function Byte_Of (L : Unsigned_64; K : Natural) return Unsigned_8 is
+     (Unsigned_8 (Shift_Right (L, 8 * K) and 16#FF#))
+   with Global => null, Pre => K <= 7;
+
+   function Bytes_Of_Limb (L : Unsigned_64) return Bytes_8 is
+     [Byte_Of (L, 0), Byte_Of (L, 1), Byte_Of (L, 2), Byte_Of (L, 3),
+      Byte_Of (L, 4), Byte_Of (L, 5), Byte_Of (L, 6), Byte_Of (L, 7)]
+   with Global => null, Post => Limb_Of_8 (Bytes_Of_Limb'Result) = L;
+
+   function Limbs_Of_Bytes (B : Bytes_32) return Limb_Array is
+     [Limb_Of_8 (B (0 .. 7)), Limb_Of_8 (B (8 .. 15)),
+      Limb_Of_8 (B (16 .. 23)), Limb_Of_8 (B (24 .. 31))];
+
+   function Bytes_Of_Limbs (L : Limb_Array) return Bytes_32 is
+      R : Bytes_32 := [others => 0];
+   begin
+      R (0 .. 7)   := Bytes_Of_Limb (L (0));
+      R (8 .. 15)  := Bytes_Of_Limb (L (1));
+      R (16 .. 23) := Bytes_Of_Limb (L (2));
+      R (24 .. 31) := Bytes_Of_Limb (L (3));
+      return R;
+   end Bytes_Of_Limbs;
+
+   -------------------------------------------------------------------
+   --  Into and out of the Montgomery form (ADR 0069)
+   -------------------------------------------------------------------
+
+   --  R2 = 2^512 mod p: Mont_Mul (L, R2) is L 2^256 mod p. K2 with
+   --  R2 2^-256 = 2^256 + K2 p.
+   R2_Limbs : constant Limb_Array :=
+     [16#0000_0000_0000_0003#, 16#FFFF_FFFB_FFFF_FFFF#,
+      16#FFFF_FFFF_FFFF_FFFE#, 16#0000_0004_FFFF_FFFD#];
+   K2_Limbs : constant Limb_Array :=
+     [16#FFFF_FFF7_0000_0000#, 16#FFFF_FFFD_0000_0005#,
+      16#0000_000B_FFFF_FFFA#, 16#0000_0004_FFFF_FFF9#]
+   with Ghost => Proof_Only;
+
+   procedure Lemma_R2 with
+     Ghost => Proof_Only, Global => null,
+     Post => To_Int (R2_Limbs) < P and then R_Inv >= 0
+       and then To_Int (R2_Limbs) * R_Inv = Two_256 + To_Int (K2_Limbs) * P;
+
+   procedure Lemma_R2 is
+      W : constant Big_Integer := Two_64;
+   begin
+      Lemma_Unfold;
+      pragma Assert (W = 18446744073709551616);
+      pragma Assert (Two_256 = W * W * W * W);
+      pragma Assert (To_Int (R2_Limbs)
+        = Conv (R2_Limbs (0)) + Conv (R2_Limbs (1)) * W
+          + Conv (R2_Limbs (2)) * W * W + Conv (R2_Limbs (3)) * W * W * W);
+      pragma Assert (To_Int (K2_Limbs)
+        = Conv (K2_Limbs (0)) + Conv (K2_Limbs (1)) * W
+          + Conv (K2_Limbs (2)) * W * W + Conv (K2_Limbs (3)) * W * W * W);
+      pragma Assert (R_Inv
+        = Conv (RI_Limbs (0)) + Conv (RI_Limbs (1)) * W
+          + Conv (RI_Limbs (2)) * W * W + Conv (RI_Limbs (3)) * W * W * W);
+      pragma Assert (P
+        = Conv (P_Limbs (0)) + Conv (P_Limbs (1)) * W
+          + Conv (P_Limbs (2)) * W * W + Conv (P_Limbs (3)) * W * W * W);
+   end Lemma_R2;
+
+   --  Mont_Mul by R2 is the Montgomery form: X R2 2^-256 = X 2^256
+   --  mod p.
+   procedure Lemma_To_Mont (X : Big_Integer) with
+     Ghost => Proof_Only, Global => null,
+     Pre  => X >= 0,
+     Post => (X * To_Int (R2_Limbs) * R_Inv) mod P = (X * Two_256) mod P;
+
+   procedure Lemma_To_Mont (X : Big_Integer) is
+      R2 : constant Big_Integer := To_Int (R2_Limbs);
+      K2 : constant Big_Integer := To_Int (K2_Limbs);
+      V  : constant Big_Integer := X * R2 * R_Inv;
+   begin
+      Lemma_R2;
+      Lemma_P1;
+      Lemma_To_Int_Bounds (R2_Limbs);
+      pragma Assert (V = X * (R2 * R_Inv));
+      pragma Assert (V = X * Two_256 + X * K2 * P);
+      pragma Assert (V >= 0);
+      pragma Assert (V = (V / P) * P + V mod P);
+      pragma Assert (V mod P = X * Two_256 + (X * K2 - V / P) * P);
+      pragma Assert (V mod P >= 0 and then V mod P < P);
+      Lemma_Mod_Multiple (X * Two_256, V mod P, X * K2 - V / P);
+   end Lemma_To_Mont;
+
+   function From_Canonical (L : Limb_Array) return Element is
+      R : constant Limb_Array := Mont_Mul (L, R2_Limbs);
+   begin
+      Lemma_R2;
+      Lemma_To_Int_Bounds (L);
+      Lemma_To_Mont (To_Int (L));
+      return (Limbs => R);
+   end From_Canonical;
+
+   function To_Canonical (E : Element) return Limb_Array is
+      One_L : constant Limb_Array := [1, 0, 0, 0];
+   begin
+      Lemma_Unfold;
+      pragma Assert (Proof_Only => To_Int (One_L)
+        = Conv (One_L (0)) * Weight (0) + Conv (One_L (1)) * Weight (1)
+          + Conv (One_L (2)) * Weight (2) + Conv (One_L (3)) * Weight (3));
+      pragma Assert (Proof_Only => To_Int (One_L) = 1);
+      return Mont_Mul (E.Limbs, One_L);
+   end To_Canonical;
+
+   procedure From_Bytes (B : Bytes_32; E : out Element; Ok : out Boolean)
+   is
+      L    : constant Limb_Array := Limbs_Of_Bytes (B);
+      D    : constant Limbs_With_Carry := Sub_Limbs (L, P_Limbs);
+      --  L when it is below p, otherwise zero (public data, but the
+      --  selection is masked anyway); then into the Montgomery form.
+      Mask : constant Unsigned_64 := 0 - D.Carry;
+      S    : constant Limb_Array := Select_Limbs ([others => 0], L, Mask);
+      R    : constant Limb_Array := Mont_Mul (S, R2_Limbs);
+   begin
+      Lemma_R2;
+      Lemma_To_Int_Bounds (S);
+      Lemma_To_Mont (To_Int (S));
+      Ok := D.Carry = 1;
+      E  := (Limbs => R);
+      if Ok then
+         Lemma_To_Int_Eq (S, L);
+      else
+         Lemma_Unfold;
+         pragma Assert (Proof_Only => To_Int (S)
+           = Conv (S (0)) * Weight (0) + Conv (S (1)) * Weight (1)
+             + Conv (S (2)) * Weight (2) + Conv (S (3)) * Weight (3));
+         pragma Assert (Proof_Only => To_Int (S) = 0);
+         pragma Assert (Proof_Only => To_Int (E.Limbs) = 0);
+         pragma Assert (Proof_Only => To_Int (Zero.Limbs)
+           = Conv (Zero.Limbs (0)) * Weight (0)
+             + Conv (Zero.Limbs (1)) * Weight (1)
+             + Conv (Zero.Limbs (2)) * Weight (2)
+             + Conv (Zero.Limbs (3)) * Weight (3));
+         Lemma_Inj (E, Zero);
+      end if;
+   end From_Bytes;
+
+   function Of_Natural (X : Natural) return Element is
+      L : constant Limb_Array := [Unsigned_64 (X), 0, 0, 0];
+   begin
+      Lemma_Unfold;
+      pragma Assert (Proof_Only => To_Int (L)
+        = Conv (L (0)) * Weight (0) + Conv (L (1)) * Weight (1)
+          + Conv (L (2)) * Weight (2) + Conv (L (3)) * Weight (3));
+      pragma Assert (Proof_Only => Conv (L (0)) = To_Big_Integer (X));
+      return From_Canonical (L);
+   end Of_Natural;
+
+   ----------------------------------------------------------------------
+   --  The product is associative (ADR 0066), from the integer model:
+   --  the factor 2^-256 comes twice on each side.
+   ----------------------------------------------------------------------
+
    procedure Lemma_Mul_Assoc (A, B, C : Element) is
       X  : constant Big_Integer := To_Int (A.Limbs);
       Y  : constant Big_Integer := To_Int (B.Limbs);
       Z  : constant Big_Integer := To_Int (C.Limbs);
+      M1 : constant Big_Integer := To_Int (Mul (A, B).Limbs);
+      M2 : constant Big_Integer := To_Int (Mul (B, C).Limbs);
    begin
       Lemma_To_Int_Bounds (A.Limbs);
       Lemma_To_Int_Bounds (B.Limbs);
       Lemma_To_Int_Bounds (C.Limbs);
+      Lemma_R2;
       pragma Assert (P > 0);
-      Lemma_Mod_Mul (X * Y, Z, P);
-      Lemma_Mod_Mul (Y * Z, X, P);
-      pragma Assert (To_Int (Mul (Mul (A, B), C).Limbs) = ((X * Y) * Z) mod P);
-      pragma Assert (To_Int (Mul (A, Mul (B, C)).Limbs)
-                     = (((Y * Z) mod P) * X) mod P);
-      pragma Assert ((Y * Z) * X = (X * Y) * Z);
+      pragma Assert (M1 = (X * Y * R_Inv) mod P);
+      pragma Assert (M2 = (Y * Z * R_Inv) mod P);
+      Lemma_Mod_Mul (X * Y * R_Inv, Z * R_Inv, P);
+      Lemma_Mod_Mul (Y * Z * R_Inv, X * R_Inv, P);
+      pragma Assert
+        (To_Int (Mul (Mul (A, B), C).Limbs) = (M1 * Z * R_Inv) mod P);
+      pragma Assert (M1 * Z * R_Inv = M1 * (Z * R_Inv));
+      pragma Assert
+        (To_Int (Mul (A, Mul (B, C)).Limbs) = (X * M2 * R_Inv) mod P);
+      pragma Assert (X * M2 * R_Inv = M2 * (X * R_Inv));
+      pragma Assert ((X * Y * R_Inv) * (Z * R_Inv)
+                     = (Y * Z * R_Inv) * (X * R_Inv));
       Lemma_Inj (Mul (Mul (A, B), C), Mul (A, Mul (B, C)));
    end Lemma_Mul_Assoc;
 

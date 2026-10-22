@@ -159,7 +159,7 @@ procedure Circuit_KAT is
       if not P256_Field.Is_Canonical (R) then
          raise Parse_Error with "value not below p: " & S;
       end if;
-      return (Limbs => R);
+      return P256_Field.From_Canonical (R);
    end P_To_Element;
 
    function Status_Name (St : Circuit_Status.Status) return String is

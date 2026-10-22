@@ -27,17 +27,21 @@ package Field_P256 is
    function Same (A, B : P256_Field.Element) return Boolean with
      Ghost, Global => null, Annotate => (GNATprove, Logical_Equal);
 
-   P2 : constant P256_Field.Element := (Limbs => [2, 0, 0, 0]);
+   --  The constants are written as their canonical integers and put in
+   --  the Montgomery form of P256_Field at elaboration (ADR 0069).
+   P2 : constant P256_Field.Element := P256_Field.Of_Natural (2);
 
    --  (p + 1) / 2 = 1 / 2
    Half : constant P256_Field.Element :=
-     (Limbs => [16#0000000000000000#, 16#0000000080000000#,
-                16#8000000000000000#, 16#7FFFFFFF80000000#]);
+     P256_Field.From_Canonical
+       ([16#0000000000000000#, 16#0000000080000000#,
+         16#8000000000000000#, 16#7FFFFFFF80000000#]);
 
    --  p - 1 = -1 = 1 / (-1)
    Minus_One : constant P256_Field.Element :=
-     (Limbs => [16#FFFFFFFFFFFFFFFE#, 16#00000000FFFFFFFF#,
-                16#0000000000000000#, 16#FFFFFFFF00000001#]);
+     P256_Field.From_Canonical
+       ([16#FFFFFFFFFFFFFFFE#, 16#00000000FFFFFFFF#,
+         16#0000000000000000#, 16#FFFFFFFF00000001#]);
 
    --  Inv checked at run time (ADR 0037): Ok exactly when R * D = One,
    --  which the body computes and compares; nothing is assumed of Inv.

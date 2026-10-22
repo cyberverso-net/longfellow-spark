@@ -16,7 +16,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0010](0010-assertion-enabled-test-project.md) | Test project compiling the library with assertions | Accepted, amended by 0044 | 2026-10-08 |
 | [0011](0011-circuits-as-data.md) | Circuits are data | Accepted | 2026-10-06 |
 | [0012](0012-p256-limb-representation.md) | P-256 base field: limb representation | Accepted | 2026-10-09 |
-| [0013](0013-p256-reduction-strategy.md) | P-256 base field: reduction strategy | Accepted | 2026-10-09 |
+| [0013](0013-p256-reduction-strategy.md) | P-256 base field: reduction strategy | Accepted, amended by 0069 | 2026-10-09 |
 | [0014](0014-p256-functional-specification-and-ghost-model.md) | P-256 base field: functional specification and ghost model | Accepted, amended by 0044 | 2026-10-09 |
 | [0015](0015-p256-canonical-form-and-conditional-subtraction.md) | P-256 base field: canonical form and conditional subtraction | Accepted | 2026-10-09 |
 | [0016](0016-p256-inversion.md) | P-256 base field: inversion | Accepted | 2026-10-09 |
@@ -71,3 +71,5 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0065](0065-carry-less-multiplication-in-gf2-128.md) | The carry-less multiplication of upstream in GF(2^128), proved Gold | Proposed | 2026-10-21 |
 | [0066](0066-lagrange-tables-by-prefix-and-suffix.md) | The verifier's Lagrange tables by prefix and suffix products, proved | Proposed | 2026-10-22 |
 | [0067](0067-performance-milestones-by-trust.md) | Performance milestones by trust: the Gold limit, then a tested variant | Proposed | 2026-10-22 |
+| [0068](0068-release-build-without-run-time-checks.md) | The release build without run-time checks in the proved units | Proposed | 2026-10-22 |
+| [0069](0069-p256-montgomery-multiplication.md) | P-256 in Montgomery form, with the multiplication of upstream | Proposed | 2026-10-22 |

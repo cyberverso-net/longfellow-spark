@@ -29,7 +29,9 @@
 --  lines are a chained run: state is carried from line to line, and
 --  the three write lines count as setup, not as cases. The sha256 case
 --  is checked twice: in one Update, and byte by byte through separate
---  Update calls, so that the block boundary handling is exercised.
+--  Update calls, so that the block boundary handling is exercised;
+--  with the default files, the one million 'a' of FIPS 180-2 Appendix
+--  B.3 also runs, in Updates of 1000 bytes.
 --
 --  Exit status: success only if at least one case ran and none failed.
 
@@ -188,6 +190,29 @@ procedure Transcript_KAT is
          end if;
       end;
    end Check_Sha256;
+
+   --  FIPS 180-2 Appendix B.3: one million bytes 'a', as 1000 Updates
+   --  of 1000 bytes, so that every Update after the first starts with
+   --  a partly filled block and then takes whole blocks from the input.
+   procedure Check_Sha256_Million is
+      Want : constant Bytes_32 :=
+        [16#CD#, 16#C7#, 16#6E#, 16#5C#, 16#99#, 16#14#, 16#FB#, 16#92#,
+         16#81#, 16#A1#, 16#C7#, 16#E2#, 16#84#, 16#D7#, 16#3E#, 16#67#,
+         16#F1#, 16#80#, 16#9A#, 16#48#, 16#A4#, 16#97#, 16#20#, 16#0E#,
+         16#04#, 16#6D#, 16#39#, 16#CC#, 16#C7#, 16#11#, 16#2C#, 16#D0#];
+      Chunk : constant Byte_Array (0 .. 999) := [others => 16#61#];
+      Ctx   : Sha256.Context := Sha256.Initial;
+   begin
+      for K in 1 .. 1000 loop
+         Sha256.Update (Ctx, Chunk);
+      end loop;
+      if Sha256.Digest (Ctx) /= Want then
+         Report_Failure ("sha256 of one million 'a' got "
+                         & Image (Sha256.Digest (Ctx)));
+      else
+         Passed := Passed + 1;
+      end if;
+   end Check_Sha256_Million;
 
    procedure Check_Aes256 (Key, Block, Want : Byte_Array) is
    begin
@@ -419,6 +444,7 @@ procedure Transcript_KAT is
 begin
    if Ada.Command_Line.Argument_Count = 0 then
       Run_File (Default_Sha256);
+      Check_Sha256_Million;
       Run_File (Default_Aes256);
       Run_File (Default_Fs);
    else

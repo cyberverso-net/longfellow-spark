@@ -81,7 +81,7 @@ procedure P256_KAT is
       if not Is_Canonical (L) then
          raise Parse_Error with "value not below p: " & S;
       end if;
-      return (Limbs => L);
+      return From_Canonical (L);
    end To_Element;
 
    --  64 hex digits in memory order: byte 0 first.
@@ -183,7 +183,7 @@ procedure P256_KAT is
             begin
                Check (Got = Want,
                       Op & " " & F (2) & " " & F (3) & " expected " & F (4)
-                      & " got " & Image (Got.Limbs));
+                      & " got " & Image (To_Canonical (Got)));
             end;
          elsif Op = "mul" then
             if Count /= 4 then
@@ -197,7 +197,7 @@ procedure P256_KAT is
             begin
                Check (Got = Want,
                       "mul " & F (2) & " " & F (3) & " expected " & F (4)
-                      & " got " & Image (Got.Limbs));
+                      & " got " & Image (To_Canonical (Got)));
             end;
          elsif Op = "square" then
             if Count /= 3 then
@@ -210,7 +210,7 @@ procedure P256_KAT is
             begin
                Check (Got = Want,
                       "square " & F (2) & " expected " & F (3)
-                      & " got " & Image (Got.Limbs));
+                      & " got " & Image (To_Canonical (Got)));
             end;
          elsif Op = "inv" then
             if Count /= 3 then
@@ -223,7 +223,7 @@ procedure P256_KAT is
             begin
                if Got /= Want then
                   Report_Failure ("inv " & F (2) & " expected " & F (3)
-                                  & " got " & Image (Got.Limbs));
+                                  & " got " & Image (To_Canonical (Got)));
                elsif A /= Zero and then Mul (A, Got) /= One then
                   Report_Failure ("inv " & F (2)
                                   & " times its input is not one");
@@ -242,7 +242,7 @@ procedure P256_KAT is
             begin
                Check (Got = Want,
                       "neg " & F (2) & " expected " & F (3)
-                      & " got " & Image (Got.Limbs));
+                      & " got " & Image (To_Canonical (Got)));
             end;
          elsif Op = "frombytes" then
             if Count /= 4 then
@@ -259,9 +259,9 @@ procedure P256_KAT is
                if Ok /= Want_Ok then
                   Report_Failure ("frombytes " & F (2) & " expected ok="
                                   & F (3) & " got " & Ok'Image);
-               elsif E.Limbs /= Want then
+               elsif To_Canonical (E) /= Want then
                   Report_Failure ("frombytes " & F (2) & " expected value "
-                                  & F (4) & " got " & Image (E.Limbs));
+                                  & F (4) & " got " & Image (To_Canonical (E)));
                elsif Ok and then To_Bytes (E) /= B then
                   Report_Failure ("to_bytes round trip failed for " & F (2));
                else
