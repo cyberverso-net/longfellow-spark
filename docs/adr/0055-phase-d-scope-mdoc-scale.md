@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-19, block 1 of Phase D). The performance target was replaced by milestones on 2026-10-21, at the close of block 4, with the author.
+Proposed (2026-10-19, block 1 of Phase D). The performance target was replaced by milestones on 2026-10-21, at the close of block 4, with the author. Amended 2026-10-22 by [ADR 0067](0067-performance-milestones-by-trust.md): M2 is the Gold limit, compared with upstream's generic code, and M3 a tested variant chosen at build time, compared with upstream's hardware figures; the upstream figures quoted below are the `_v1` (LFC1) rows, and the comparable ones are the `_v2` rows, 0.69 s and 3.84 s.
 
 ## Date
 
