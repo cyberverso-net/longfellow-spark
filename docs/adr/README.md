@@ -72,3 +72,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0066](0066-lagrange-tables-by-prefix-and-suffix.md) | The verifier's Lagrange tables by prefix and suffix products, proved | Proposed | 2026-10-22 |
 | [0067](0067-performance-milestones-by-trust.md) | Performance milestones by trust: the Gold limit, then a tested variant | Proposed | 2026-10-22 |
 | [0068](0068-release-build-without-run-time-checks.md) | The release build without run-time checks in the proved units | Proposed | 2026-10-22 |
+| [0069](0069-p256-montgomery-multiplication.md) | P-256 in Montgomery form, with the multiplication of upstream | Proposed | 2026-10-22 |
