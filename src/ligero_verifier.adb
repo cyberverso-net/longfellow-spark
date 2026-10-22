@@ -493,6 +493,15 @@ package body Ligero_Verifier is
       Az : constant Natural := Ay + G.Num_Quad_Rows * WR;
       W  : Natural;
    begin
+      --  The three quadratic blocks end where the vector ends; the
+      --  distribution of WR over the row counts, stated once here
+      --  rather than found again inside the loop.
+      pragma Assert
+        (Proof_Only =>
+           Vector_Len (G)
+           = (G.Num_Witness_Rows + 3 * G.Num_Quad_Rows) * WR);
+      pragma Assert
+        (Proof_Only => Az + G.Num_Quad_Rows * WR = Vector_Len (G));
       A_Full := [others => Zero];
       for K in 0 .. A.Count - 1 loop
          W := A.Witness (K);

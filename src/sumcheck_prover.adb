@@ -756,6 +756,13 @@ package body Sumcheck_Prover is
          T (T'First + W) := Tm;
          W := W + 1;
       end loop;
+      --  The halved hand of the postcondition, from the invariant on
+      --  its own, as a smaller goal than the whole conjunction.
+      pragma Assert
+        (Proof_Only =>
+           (for all K in 0 .. W - 1 =>
+              Hand_Index (T (T'First + K), H)
+              = Hand_Index (T0 (T'First + Rd (T0, H, K)), H) / 2));
       N := W;
    end Bind_H;
 
