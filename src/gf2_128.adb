@@ -208,6 +208,9 @@ package body GF2_128 is
       if N > 0 then
          Lemma_Mul_Ref_Lin (A, B1, B2, N - 1);
          pragma Assert
+           (Xtime (Mul_Ref (A, Add (B1, B2), N - 1))
+            = Xtime (Add (Mul_Ref (A, B1, N - 1), Mul_Ref (A, B2, N - 1))));
+         pragma Assert
            (Xtime (Add (Mul_Ref (A, B1, N - 1), Mul_Ref (A, B2, N - 1)))
             = Add (Xtime (Mul_Ref (A, B1, N - 1)),
                    Xtime (Mul_Ref (A, B2, N - 1))));
