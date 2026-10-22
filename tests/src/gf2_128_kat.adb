@@ -181,13 +181,15 @@ procedure GF2_128_KAT is
                Want : constant Element :=
                  To_Element (Line (Fields (4).Lo .. Fields (4).Hi));
                Got  : constant Element := Mul (A, B);
+               Ser  : constant Element := Mul_Serial (A, B);
             begin
-               if Got = Want then
+               if Got = Want and then Ser = Want then
                   Passed := Passed + 1;
                else
                   Report_Failure
                     ("mul " & Image (A) & " " & Image (B)
-                     & " expected " & Image (Want) & " got " & Image (Got));
+                     & " expected " & Image (Want) & " got " & Image (Got)
+                     & ", serial " & Image (Ser));
                end if;
             end;
          elsif Op = "square" then
@@ -329,6 +331,45 @@ procedure GF2_128_KAT is
             & Ada.Exceptions.Exception_Message (E));
    end Check_Case;
 
+   --  Phase D, M2: the carry-less Mul against the bit-by-bit
+   --  reference on pseudo-random operands (xorshift64), with every
+   --  fourth operand forced to all ones in one limb, the case where a
+   --  digit of the integer products reaches 16.
+   procedure Check_Random (Count : Positive) is
+      S : Unsigned_64 := 16#9E37_79B9_7F4A_7C15#;
+      function Next return Unsigned_64 is
+      begin
+         S := S xor Shift_Left (S, 13);
+         S := S xor Shift_Right (S, 7);
+         S := S xor Shift_Left (S, 17);
+         return S;
+      end Next;
+      Bad : Natural := 0;
+   begin
+      for I in 1 .. Count loop
+         declare
+            A : Element := (Limbs => [0 => Next, 1 => Next]);
+            B : constant Element := (Limbs => [0 => Next, 1 => Next]);
+         begin
+            if I mod 4 = 0 then
+               A.Limbs (Limb_Index (I / 4 mod 2)) := Unsigned_64'Last;
+            end if;
+            if Mul (A, B) /= Mul_Serial (A, B) then
+               Bad := Bad + 1;
+               if Bad <= 3 then
+                  Report_Failure
+                    ("random mul " & Image (A) & " " & Image (B)
+                     & ": " & Image (Mul (A, B)) & " /= serial "
+                     & Image (Mul_Serial (A, B)));
+               end if;
+            end if;
+         end;
+      end loop;
+      if Bad = 0 then
+         Passed := Passed + 1;
+      end if;
+   end Check_Random;
+
    procedure Run_File (Path : String) is
       File : TIO.File_Type;
    begin
@@ -354,6 +395,7 @@ begin
       Run_File (Default_Square);
       Run_File (Default_Inv);
       Run_File (Default_Bytes);
+      Check_Random (200_000);
    else
       for I in 1 .. Ada.Command_Line.Argument_Count loop
          Run_File (Ada.Command_Line.Argument (I));
