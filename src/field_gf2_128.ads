@@ -81,6 +81,55 @@ package Field_GF2_128 is
      Post   => Same (GF2_128.Mul (GF2_128.Mul (A, B), C),
                      GF2_128.Mul (A, GF2_128.Mul (B, C)));
 
+   --  The other ring laws (ADR 0070), stated with Same.
+   procedure Lemma_Mul_Comm (A, B : GF2_128.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (GF2_128.Mul (A, B), GF2_128.Mul (B, A));
+
+   procedure Lemma_Mul_One (A : GF2_128.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (GF2_128.Mul (A, GF2_128.One), A);
+
+   procedure Lemma_Mul_Distrib (A, B, C : GF2_128.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (GF2_128.Mul (A, GF2_128.Add (B, C)),
+                     GF2_128.Add (GF2_128.Mul (A, B), GF2_128.Mul (A, C)));
+
+   procedure Lemma_Mul_Distrib_Sub (A, B, C : GF2_128.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (GF2_128.Mul (A, GF2_128.Sub (B, C)),
+                     GF2_128.Sub (GF2_128.Mul (A, B), GF2_128.Mul (A, C)));
+
+   procedure Lemma_Add_Assoc (A, B, C : GF2_128.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (GF2_128.Add (GF2_128.Add (A, B), C),
+                     GF2_128.Add (A, GF2_128.Add (B, C)));
+
+   procedure Lemma_Add_Comm (A, B : GF2_128.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (GF2_128.Add (A, B), GF2_128.Add (B, A));
+
+   procedure Lemma_Add_Zero (A : GF2_128.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (GF2_128.Add (A, GF2_128.Zero), A);
+
+   procedure Lemma_Add_Neg (A : GF2_128.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (GF2_128.Add (A, GF2_128.Neg (A)), GF2_128.Zero);
+
+   procedure Lemma_Sub_Def (A, B : GF2_128.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (GF2_128.Sub (A, B), GF2_128.Add (A, GF2_128.Neg (B)));
+
    package Sig is new Field_Signature
      (Element    => GF2_128.Element,
       Zero       => GF2_128.Zero,
@@ -95,6 +144,15 @@ package Field_GF2_128 is
       L2_Den_Inv => L2_Den_Inv,
       Same       => Same,
       Lemma_Mul_Assoc => Lemma_Mul_Assoc,
+      Lemma_Mul_Comm  => Lemma_Mul_Comm,
+      Lemma_Mul_One   => Lemma_Mul_One,
+      Lemma_Mul_Distrib     => Lemma_Mul_Distrib,
+      Lemma_Mul_Distrib_Sub => Lemma_Mul_Distrib_Sub,
+      Lemma_Add_Assoc => Lemma_Add_Assoc,
+      Lemma_Add_Comm  => Lemma_Add_Comm,
+      Lemma_Add_Zero  => Lemma_Add_Zero,
+      Lemma_Add_Neg   => Lemma_Add_Neg,
+      Lemma_Sub_Def   => Lemma_Sub_Def,
       Serialized_Size  => 16,
       To_Bytes         => GF2_128.To_Bytes,
       From_Bytes       => GF2_128.From_Bytes,

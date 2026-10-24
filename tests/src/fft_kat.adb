@@ -283,6 +283,45 @@ procedure FFT_KAT is
              "Rfft_P256 /= Lagrange for n =" & N'Image & ", m =" & M'Image);
    end Against_Lagrange_P256;
 
+   --  The extension to the first D points is the prefix of the
+   --  extension to M points: the prover extends its witness rows to
+   --  dblock = 2 n - 1 columns only, for y_dot (ADR 0070).
+   procedure Prefix (N, D, M : Positive) is
+      Row   : Additive_Fft.Element_Array (0 .. N - 1);
+      Short : Additive_Fft.Element_Array (0 .. D - 1);
+      Long  : Additive_Fft.Element_Array (0 .. M - 1);
+      Same  : Boolean := True;
+   begin
+      for X in 0 .. N - 1 loop
+         Row (X) := (Limbs => [0 => Next, 1 => Next]);
+      end loop;
+      Additive_Fft.Extend (Row, Short);
+      Additive_Fft.Extend (Row, Long);
+      for X in 0 .. D - 1 loop
+         Same := Same and then Short (X) = Long (X);
+      end loop;
+      Check (Same, "Extend to" & D'Image & " /= prefix of" & M'Image
+             & " for n =" & N'Image);
+   end Prefix;
+
+   procedure Prefix_P256 (N, D, M : Positive) is
+      Row   : Rfft_P256.Element_Array (0 .. N - 1);
+      Short : Rfft_P256.Element_Array (0 .. D - 1);
+      Long  : Rfft_P256.Element_Array (0 .. M - 1);
+      Same  : Boolean := True;
+   begin
+      for X in 0 .. N - 1 loop
+         Row (X) := P256_Field.Of_Natural (Natural (Next mod 2**30));
+      end loop;
+      Rfft_P256.Extend (Row, Short);
+      Rfft_P256.Extend (Row, Long);
+      for X in 0 .. D - 1 loop
+         Same := Same and then Short (X) = Long (X);
+      end loop;
+      Check (Same, "Rfft_P256 to" & D'Image & " /= prefix of" & M'Image
+             & " for n =" & N'Image);
+   end Prefix_P256;
+
    type Shape is record
       N, M : Positive;
    end record;
@@ -314,6 +353,21 @@ begin
    for S of Shapes_P256 loop
       Against_Lagrange_P256 (S.N, S.M);
    end loop;
+   --  dblock against the full code word: small rows, the Phase C
+   --  geometries, and rows of the mdoc circuits over 4151 columns.
+   for S of Shapes loop
+      if 2 * S.N - 1 <= S.M then
+         Prefix (S.N, 2 * S.N - 1, S.M);
+      end if;
+   end loop;
+   Prefix (1000, 1999, 4151);
+   Prefix (1383, 2765, 4151);
+   for S of Shapes_P256 loop
+      if 2 * S.N - 1 <= S.M then
+         Prefix_P256 (S.N, 2 * S.N - 1, S.M);
+      end if;
+   end loop;
+   Prefix_P256 (1000, 1999, 4151);
    TIO.Put_Line ("passed" & Passed'Image & ", failed" & Failed'Image);
    if Failed > 0 or else Passed = 0 then
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);

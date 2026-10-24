@@ -17,7 +17,7 @@ The shape of p is a Solinas prime: a sum of a few signed powers of two, all mult
 
 ### 1.2 Representation and canonical form
 
-An element is an integer in 0 .. p - 1, stored as four 64-bit limbs in little-endian limb order: `Limbs (0)` is the least significant word, so the value is
+An element is an integer in 0 .. p - 1, stored as four 64-bit limbs in little-endian limb order: `L0` is the least significant word, so the value of the limbs L = `Limbs (E)` is
 
     To_Int (L) = L(0) + L(1) * 2^64 + L(2) * 2^128 + L(3) * 2^192.
 
@@ -124,13 +124,31 @@ This section follows `p256_field.ads` and `p256_field.adb` and explains each con
 `Word_Array` is an *unconstrained* array type: its index range is fixed only when a subtype or an object is declared. One ghost model and one pair of add and subtract procedures then serve the 256-bit elements, the 320-bit rows and the 384-bit accumulator of the multiplication (`Six_Array`, in the body).
 
 ```ada
+   function Canonical_Limbs (L0, L1, L2, L3 : Unsigned_64) return Boolean
+   is (Is_Canonical ([L0, L1, L2, L3]))
+   with Post => (if L3 < 16#FFFF_FFFF_0000_0001# then Canonical_Limbs'Result),
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
+
    type Element is record
-      Limbs : Limb_Array;
+      L0, L1, L2, L3 : Unsigned_64;
    end record
-   with Dynamic_Predicate => Is_Canonical (Element.Limbs);
+   with Dynamic_Predicate =>
+     Canonical_Limbs (Element.L0, Element.L1, Element.L2, Element.L3);
+
+   function Limbs (E : Element) return Limb_Array is
+     ([E.L0, E.L1, E.L2, E.L3])
+   with Post => Limbs'Result (0) = E.L0 and then ... ,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
 ```
 
-A `Dynamic_Predicate` is a Boolean condition attached to a type: every value of the type must satisfy it, and GNATprove generates a check wherever a value of the type is created or assigned. Inside the aspect, the type name denotes the value being checked. Here the predicate is the executable, branch-free test `Is_Canonical`, so no `Element` can ever hold a value of p or more ([ADR 0015](../adr/0015-p256-canonical-form-and-conditional-subtraction.md)). The constants `Zero` and `One` are checked against it at elaboration.
+The four limbs are scalar components, not an array ([ADR 0070](../adr/0070-sumcheck-and-ligero-kernels-as-upstream.md)). For the provers an array component is a map over all of `Natural`, so two elements with the same four limbs would not be equal as values; a record of scalars is a datatype, and equal limbs give equal elements with no further fact. The ring laws of the field (end of Section 3.6) rest on this. The memory layout is that of an array of four words, the `limb_` array of upstream's `Nat`. `Limbs (E)` gives the array for the arithmetic, which stays on `Limb_Array`.
+
+Two bodies are hidden from the provers, so that no aggregate sits in the context of every proof on P-256:
+
+- `Limbs`: the provers see its postcondition, limb by limb.
+- `Canonical_Limbs`, the predicate: elsewhere it is an opaque fact that every element carries. Its postcondition covers a top limb below that of p, enough for `Zero` and `One`. The body is visible only in `Of_Limbs`, which builds an element, and in the ghost lemma `Lemma_Canonical`, which turns the predicate into `To_Int (Limbs (A)) < P`. `Add`, `Sub` and `Mul` call this lemma on their operands.
+
+A `Dynamic_Predicate` is a Boolean condition attached to a type: every value of the type must satisfy it, and GNATprove generates a check wherever a value of the type is created or assigned. Inside the aspect, the type name denotes the value being checked. Here the predicate is the executable, branch-free test `Is_Canonical` on the four limbs, so no `Element` can ever hold a value of p or more ([ADR 0015](../adr/0015-p256-canonical-form-and-conditional-subtraction.md)). The constants `Zero` and `One` are checked against it at elaboration.
 
 ### 3.2 The ghost model
 
@@ -205,12 +223,11 @@ The contract of `Mul` speaks of the stored integers:
 
 ```ada
    function Mul (A, B : Element) return Element with
-     Post => (Proof_Only => To_Int (Mul'Result.Limbs)
-               = (To_Int (A.Limbs) * To_Int (B.Limbs) * R_Inv) mod P
-               and then Eq (Mul'Result, Norm (Mul'Result)));
+     Post => (Proof_Only => To_Int (Limbs (Mul'Result))
+               = (To_Int (Limbs (A)) * To_Int (Limbs (B)) * R_Inv) mod P);
 ```
 
-`R_Inv` is 2^-256 mod p, a ghost constant written as four limbs. `Lemma_R_Inv` proves `Two_256 * R_Inv = 1 + K * P` for a second constant K. The provers check it by evaluating the products of the literal limbs; it is the only place where 256-bit numbers are multiplied as numbers. The second conjunct is the normal form of ADR 0066.
+`R_Inv` is 2^-256 mod p, a ghost constant written as four limbs. `Lemma_R_Inv` proves `Two_256 * R_Inv = 1 + K * P` for a second constant K. The provers check it by evaluating the products of the literal limbs; it is the only place where 256-bit numbers are multiplied as numbers. `Add`, `Sub`, `Mul`, `From_Bytes` and `From_Canonical` compute on the limbs alone (`Add_Mod`, `Sub_Mod`, `Mont_Mul`) and build the element with `Of_Limbs`.
 
 *The row.* `Wide_Mul (X, Y)` is a plain function whose body is the 128-bit multiplication and whose postcondition is the exact value and the bound; callers see only the postcondition, so the provers never reason about a 128-bit multiplication at the call sites. `Mul_Row (X, B)` multiplies one word by the four limbs into five words, with the carry chain of Section 2.1 and four prefix assertions.
 
@@ -231,9 +248,11 @@ The body is four calls: `Add_Words` adds the row, `Add_Words` adds V (r), `Sub_W
                                = Partial (A, I) * To_Int (B) + Q * P
 ```
 
-After the loop, `Lemma_Six_Split` shows that word 5 is zero and word 4 at most one, and the conditional subtraction of Section 2.2 gives a result below p, equal to T or T - p. It is written branch by branch, with `Lemma_To_Int_Eq` for the selected array, as in `Add`. `Lemma_Mont_Final` closes. From T 2^256 = A B + Q p and 2^256 R_Inv = 1 + K p, the result is A B R_Inv plus a multiple of p, and lies in 0 .. p - 1, so `Lemma_Mod_Multiple` makes it A B R_Inv mod p. `Mul` returns `Norm ((Limbs => Mont_Mul (A.Limbs, B.Limbs)))`; `Square` is `Mul (E, E)`.
+After the loop, `Lemma_Six_Split` shows that word 5 is zero and word 4 at most one, and the conditional subtraction of Section 2.2 gives a result below p, equal to T or T - p. It is written branch by branch, with `Lemma_To_Int_Eq` for the selected array, as in `Add`. `Lemma_Mont_Final` closes. From T 2^256 = A B + Q p and 2^256 R_Inv = 1 + K p, the result is A B R_Inv plus a multiple of p, and lies in 0 .. p - 1, so `Lemma_Mod_Multiple` makes it A B R_Inv mod p. `Mul` returns `Of_Limbs (Mont_Mul (Limbs (A), Limbs (B)))`; `Square` is `Mul (E, E)`.
 
 *Associativity.* `Lemma_Mul_Assoc` (ADR 0066) now meets the factor R_Inv twice on each side: both products are X Y Z R_Inv^2 mod p, by `Lemma_Mod_Mul` twice, and `Lemma_Inj` turns equal integers into equal elements.
+
+*The other ring laws* (ADR 0070): commutativity, `One` as unit, distributivity over `Add` and `Sub`, and the laws of `Add`, `Neg` and `Sub` that the sumcheck kernels use. Each is proved the same way: the two sides have the same integer mod p, and `Lemma_Inj` makes them equal elements. `Field_P256` restates them with `Same`, through `Laws.Lemma_Same`, which needs nothing more than `X = Y` since the limbs are scalar components.
 
 A ghost variable (`Q : Big_Integer with Ghost`) exists only for proof and is removed with the other ghost code when assertions are disabled; square-bracket aggregates `[a, b, c]` are the Ada 2022 array notation; `A (0 .. 7)` is a *slice*, a contiguous part of an array. `Add_Words`, `Sub_Words` and `Mul_Row` are `Inline`, so that the compiler sees their lengths and unrolls the loops.
 
@@ -243,14 +262,14 @@ A ghost variable (`Q : Big_Integer with Ghost`) exists only for proof and is rem
 
 ### 3.8 Encoding
 
-`Limb_Of_8` assembles a word from eight bytes by shifts and `or`; `Bytes_Of_Limb` extracts them with `Byte_Of`, and its postcondition is the 64-bit round trip. `Limbs_Of_Bytes` and `Bytes_Of_Limbs` work on four slices of the 32-byte array, so the 256-bit round trip in the postcondition of `Bytes_Of_Limbs` composes from the 64-bit one. `From_Bytes` decodes, tests canonical form with `Sub_Limbs`, selects the limbs or zero through the masked selection, and stores `Mont_Mul (S, R2)`. `Lemma_R2` proves R2 R_Inv = 2^256 + K2 p for the constant R2 = 2^512 mod p, and `Lemma_To_Mont` turns that into (S R2 R_Inv) mod p = (S 2^256) mod p. The postcondition says which encodings are accepted, that a refused one gives `Zero`, and that an accepted one stores its integer times 2^256 mod p. `To_Canonical (E)` is `Mont_Mul (E.Limbs, [1, 0, 0, 0])`, the integer E R_Inv mod p below p, and `To_Bytes` encodes it. `From_Canonical (L)`, for constants and parsers, and `Of_Natural (X)` are `Mont_Mul` by R2 again.
+`Limb_Of_8` assembles a word from eight bytes by shifts and `or`; `Bytes_Of_Limb` extracts them with `Byte_Of`, and its postcondition is the 64-bit round trip. `Limbs_Of_Bytes` and `Bytes_Of_Limbs` work on four slices of the 32-byte array, so the 256-bit round trip in the postcondition of `Bytes_Of_Limbs` composes from the 64-bit one. `From_Bytes` decodes, tests canonical form with `Sub_Limbs`, selects the limbs or zero through the masked selection, and stores `Mont_Mul (S, R2)`. `Lemma_R2` proves R2 R_Inv = 2^256 + K2 p for the constant R2 = 2^512 mod p, and `Lemma_To_Mont` turns that into (S R2 R_Inv) mod p = (S 2^256) mod p. The postcondition says which encodings are accepted, that a refused one gives `Zero`, and that an accepted one stores its integer times 2^256 mod p. `To_Canonical (E)` is `Mont_Mul (Limbs (E), [1, 0, 0, 0])`, the integer E R_Inv mod p below p, and `To_Bytes` encodes it. `From_Canonical (L)`, for constants and parsers, and `Of_Natural (X)` are `Mont_Mul` by R2 again.
 
 ## 4. What the proofs guarantee
 
 GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-prover-configuration-step-budget.md): CVC5, Z3 and Alt-Ergo, `--steps=600000`, `--timeout=120`).
 
-- `P256_Field` alone, proved from an empty object directory: 2412 checks, all proved.
-- The whole project with the Montgomery form: 20179 checks, all proved.
+- `P256_Field` alone, proved from an empty object directory: 2897 checks, all proved.
+- The whole project with the scalar limbs of ADR 0070: 21322 checks, all proved.
 - No justification, no `pragma Assume`.
 - Maximum steps for a single successful proof in `P256_Field`: 204295, within the budget of 600000.
 

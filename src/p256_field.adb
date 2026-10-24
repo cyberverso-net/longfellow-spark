@@ -2,14 +2,11 @@ pragma SPARK_Mode (On);
 
 package body P256_Field is
 
-   --  Outside SPARK on purpose: the provers see only the declaration
-   --  of Eq and its Logical_Equal annotation.
-   function Eq (A, B : Element) return Boolean with
-     SPARK_Mode => Off
-   is
-   begin
-      return A = B;
-   end Eq;
+   --  Equal limbs, equal integers (body below).
+   procedure Lemma_To_Int_Eq (A, B : Limb_Array) with
+     Ghost => Proof_Only, Global => null,
+     Pre  => (for all I in Limb_Index => A (I) = B (I)),
+     Post => To_Int (A) = To_Int (B);
 
    -------------------------------------------------------------------
    --  Lemmas on the model
@@ -355,8 +352,17 @@ package body P256_Field is
    --  Addition and subtraction
    -------------------------------------------------------------------
 
-   function Add (A, B : Element) return Element is
-      S  : constant Limbs_With_Carry := Add_Limbs (A.Limbs, B.Limbs);
+   --  The arithmetic on the limbs alone, so that the predicates of the
+   --  elements stay out of its proof (ADR 0070).
+   function Add_Mod (X, Y : Limb_Array) return Limb_Array with
+     Global => null,
+     Pre    => (Proof_Only => To_Int (X) < P and then To_Int (Y) < P),
+     Post   => (Proof_Only => To_Int (Add_Mod'Result)
+                              = (To_Int (X) + To_Int (Y)) mod P
+                              and then To_Int (Add_Mod'Result) < P);
+
+   function Add_Mod (X, Y : Limb_Array) return Limb_Array is
+      S  : constant Limbs_With_Carry := Add_Limbs (X, Y);
       D  : constant Limbs_With_Carry := Sub_Limbs (S.Limbs, P_Limbs);
       --  The sum is at least p iff it overflowed 2^256 or the
       --  subtraction did not borrow.
@@ -366,46 +372,98 @@ package body P256_Field is
    begin
       Lemma_To_Int_Bounds (S.Limbs);
       Lemma_To_Int_Bounds (D.Limbs);
-      pragma Assert
-        (Proof_Only =>
-           To_Int (A.Limbs) < P and then To_Int (B.Limbs) < P);
-      Lemma_To_Int_Bounds (A.Limbs);
-      Lemma_To_Int_Bounds (B.Limbs);
+      Lemma_To_Int_Bounds (X);
+      Lemma_To_Int_Bounds (Y);
       pragma Assert (Proof_Only => Ge <= 1);
       --  Sum below 2 p: if it overflowed, the low part is below p.
       pragma Assert (Proof_Only => (if S.Carry = 1 then D.Carry = 1));
       pragma Assert
         (Proof_Only => (if Ge = 1 then
-           To_Int (R) = To_Int (A.Limbs) + To_Int (B.Limbs) - P
+           To_Int (R) = To_Int (X) + To_Int (Y) - P
          else
-           To_Int (R) = To_Int (A.Limbs) + To_Int (B.Limbs)));
+           To_Int (R) = To_Int (X) + To_Int (Y)));
       pragma Assert (Proof_Only => To_Int (R) >= 0 and then To_Int (R) < P);
-      return (Limbs => R);
-   end Add;
+      return R;
+   end Add_Mod;
 
-   function Sub (A, B : Element) return Element is
-      D    : constant Limbs_With_Carry := Sub_Limbs (A.Limbs, B.Limbs);
+   function Sub_Mod (X, Y : Limb_Array) return Limb_Array with
+     Global => null,
+     Pre    => (Proof_Only => To_Int (X) < P and then To_Int (Y) < P),
+     Post   => (Proof_Only => To_Int (Sub_Mod'Result)
+                              = (To_Int (X) - To_Int (Y)) mod P
+                              and then To_Int (Sub_Mod'Result) < P);
+
+   function Sub_Mod (X, Y : Limb_Array) return Limb_Array is
+      D    : constant Limbs_With_Carry := Sub_Limbs (X, Y);
       F    : constant Limbs_With_Carry := Add_Limbs (D.Limbs, P_Limbs);
       Mask : constant Unsigned_64 := 0 - D.Carry;
       R    : constant Limb_Array := Select_Limbs (D.Limbs, F.Limbs, Mask);
    begin
       Lemma_To_Int_Bounds (D.Limbs);
       Lemma_To_Int_Bounds (F.Limbs);
-      pragma Assert
-        (Proof_Only =>
-           To_Int (A.Limbs) < P and then To_Int (B.Limbs) < P);
-      Lemma_To_Int_Bounds (A.Limbs);
-      Lemma_To_Int_Bounds (B.Limbs);
+      Lemma_To_Int_Bounds (X);
+      Lemma_To_Int_Bounds (Y);
       --  If the difference borrowed, adding p back overflows 2^256
-      --  exactly once and yields A - B + p.
+      --  exactly once and yields X - Y + p.
       pragma Assert (Proof_Only => (if D.Carry = 1 then F.Carry = 1));
       pragma Assert
         (Proof_Only => (if D.Carry = 1 then
-           To_Int (R) = To_Int (A.Limbs) - To_Int (B.Limbs) + P
+           To_Int (R) = To_Int (X) - To_Int (Y) + P
          else
-           To_Int (R) = To_Int (A.Limbs) - To_Int (B.Limbs)));
+           To_Int (R) = To_Int (X) - To_Int (Y)));
       pragma Assert (Proof_Only => To_Int (R) >= 0 and then To_Int (R) < P);
-      return (Limbs => R);
+      return R;
+   end Sub_Mod;
+
+   --  The element of canonical limbs R.
+   function Of_Limbs (R : Limb_Array) return Element with
+     Global => null,
+     Pre    => (Proof_Only => To_Int (R) < P),
+     Post   => (Proof_Only => To_Int (Limbs (Of_Limbs'Result)) = To_Int (R));
+
+   function Of_Limbs (R : Limb_Array) return Element is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Canonical_Limbs);
+      A : constant Limb_Array := [R (0), R (1), R (2), R (3)]
+      with Ghost => Proof_Only;
+   begin
+      Lemma_To_Int_Eq (A, R);
+      pragma Assert (Proof_Only => Is_Canonical (A));
+      declare
+         E : constant Element :=
+           (L0 => R (0), L1 => R (1), L2 => R (2), L3 => R (3));
+      begin
+         Lemma_To_Int_Eq (Limbs (E), R);
+         return E;
+      end;
+   end Of_Limbs;
+
+   --  The predicate of an element, as the bound of its integer.
+   procedure Lemma_Canonical (A : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => To_Int (Limbs (A)) < P
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Canonical_Limbs);
+      L : constant Limb_Array := [A.L0, A.L1, A.L2, A.L3];
+   begin
+      pragma Assert (Is_Canonical (L));
+      Lemma_To_Int_Eq (L, Limbs (A));
+   end Lemma_Canonical;
+
+   function Add (A, B : Element) return Element is
+   begin
+      Lemma_Canonical (A);
+      Lemma_Canonical (B);
+      return Of_Limbs (Add_Mod (Limbs (A), Limbs (B)));
+   end Add;
+
+   function Sub (A, B : Element) return Element is
+   begin
+      Lemma_Canonical (A);
+      Lemma_Canonical (B);
+      return Of_Limbs (Sub_Mod (Limbs (A), Limbs (B)));
    end Sub;
 
    -------------------------------------------------------------------
@@ -524,11 +582,6 @@ package body P256_Field is
 
    --  Equal limbs denote equal values (stated element-wise, so that the
    --  proof does not rely on array extensionality).
-   procedure Lemma_To_Int_Eq (A, B : Limb_Array) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => (for all I in Limb_Index => A (I) = B (I)),
-     Post => To_Int (A) = To_Int (B);
-
    procedure Lemma_To_Int_Eq (A, B : Limb_Array) is
    begin
       pragma Assert
@@ -687,33 +740,33 @@ package body P256_Field is
    procedure Lemma_Inj (A, B : Element) with
      Ghost  => Proof_Only,
      Global => null,
-     Pre    => To_Int (A.Limbs) = To_Int (B.Limbs),
+     Pre    => To_Int (Limbs (A)) = To_Int (Limbs (B)),
      Post   => A = B
    is
       W  : constant Big_Integer := Two_64;
-      A0 : constant Big_Integer := Conv (A.Limbs (0));
-      A1 : constant Big_Integer := Conv (A.Limbs (1));
-      A2 : constant Big_Integer := Conv (A.Limbs (2));
-      A3 : constant Big_Integer := Conv (A.Limbs (3));
-      B0 : constant Big_Integer := Conv (B.Limbs (0));
-      B1 : constant Big_Integer := Conv (B.Limbs (1));
-      B2 : constant Big_Integer := Conv (B.Limbs (2));
-      B3 : constant Big_Integer := Conv (B.Limbs (3));
+      A0 : constant Big_Integer := Conv (Limbs (A) (0));
+      A1 : constant Big_Integer := Conv (Limbs (A) (1));
+      A2 : constant Big_Integer := Conv (Limbs (A) (2));
+      A3 : constant Big_Integer := Conv (Limbs (A) (3));
+      B0 : constant Big_Integer := Conv (Limbs (B) (0));
+      B1 : constant Big_Integer := Conv (Limbs (B) (1));
+      B2 : constant Big_Integer := Conv (Limbs (B) (2));
+      B3 : constant Big_Integer := Conv (Limbs (B) (3));
    begin
       Lemma_Weights;
-      Lemma_Horner (A.Limbs);
-      Lemma_Horner (B.Limbs);
+      Lemma_Horner (Limbs (A));
+      Lemma_Horner (Limbs (B));
       for I in Limb_Index loop
-         Lemma_Conv_Bounds (A.Limbs (I));
-         Lemma_Conv_Bounds (B.Limbs (I));
+         Lemma_Conv_Bounds (Limbs (A) (I));
+         Lemma_Conv_Bounds (Limbs (B) (I));
       end loop;
       Lemma_Digit (A0, B0, A1 + W * (A2 + W * A3), B1 + W * (B2 + W * B3), W);
       Lemma_Digit (A1, B1, A2 + W * A3, B2 + W * B3, W);
       Lemma_Digit (A2, B2, A3, B3, W);
       for I in Limb_Index loop
-         Lemma_Conv_Inj (A.Limbs (I), B.Limbs (I));
+         Lemma_Conv_Inj (Limbs (A) (I), Limbs (B) (I));
       end loop;
-      pragma Assert (A.Limbs = B.Limbs);
+      pragma Assert (Limbs (A) = Limbs (B));
    end Lemma_Inj;
 
    -------------------------------------------------------------------
@@ -1080,11 +1133,10 @@ package body P256_Field is
    end Mont_Mul;
 
    function Mul (A, B : Element) return Element is
-      R : constant Limb_Array := Mont_Mul (A.Limbs, B.Limbs);
-      E : constant Element := Norm ((Limbs => R));
    begin
-      Lemma_To_Int_Eq (E.Limbs, R);
-      return E;
+      Lemma_Canonical (A);
+      Lemma_Canonical (B);
+      return Of_Limbs (Mont_Mul (Limbs (A), Limbs (B)));
    end Mul;
 
    -------------------------------------------------------------------
@@ -1232,7 +1284,7 @@ package body P256_Field is
       Lemma_R2;
       Lemma_To_Int_Bounds (L);
       Lemma_To_Mont (To_Int (L));
-      return (Limbs => R);
+      return Of_Limbs (R);
    end From_Canonical;
 
    function To_Canonical (E : Element) return Limb_Array is
@@ -1243,7 +1295,7 @@ package body P256_Field is
         = Conv (One_L (0)) * Weight (0) + Conv (One_L (1)) * Weight (1)
           + Conv (One_L (2)) * Weight (2) + Conv (One_L (3)) * Weight (3));
       pragma Assert (Proof_Only => To_Int (One_L) = 1);
-      return Mont_Mul (E.Limbs, One_L);
+      return Mont_Mul (Limbs (E), One_L);
    end To_Canonical;
 
    procedure From_Bytes (B : Bytes_32; E : out Element; Ok : out Boolean)
@@ -1260,7 +1312,7 @@ package body P256_Field is
       Lemma_To_Int_Bounds (S);
       Lemma_To_Mont (To_Int (S));
       Ok := D.Carry = 1;
-      E  := (Limbs => R);
+      E  := Of_Limbs (R);
       if Ok then
          Lemma_To_Int_Eq (S, L);
       else
@@ -1269,12 +1321,12 @@ package body P256_Field is
            = Conv (S (0)) * Weight (0) + Conv (S (1)) * Weight (1)
              + Conv (S (2)) * Weight (2) + Conv (S (3)) * Weight (3));
          pragma Assert (Proof_Only => To_Int (S) = 0);
-         pragma Assert (Proof_Only => To_Int (E.Limbs) = 0);
-         pragma Assert (Proof_Only => To_Int (Zero.Limbs)
-           = Conv (Zero.Limbs (0)) * Weight (0)
-             + Conv (Zero.Limbs (1)) * Weight (1)
-             + Conv (Zero.Limbs (2)) * Weight (2)
-             + Conv (Zero.Limbs (3)) * Weight (3));
+         pragma Assert (Proof_Only => To_Int (Limbs (E)) = 0);
+         pragma Assert (Proof_Only => To_Int (Limbs (Zero))
+           = Conv (Limbs (Zero) (0)) * Weight (0)
+             + Conv (Limbs (Zero) (1)) * Weight (1)
+             + Conv (Limbs (Zero) (2)) * Weight (2)
+             + Conv (Limbs (Zero) (3)) * Weight (3));
          Lemma_Inj (E, Zero);
       end if;
    end From_Bytes;
@@ -1296,15 +1348,15 @@ package body P256_Field is
    ----------------------------------------------------------------------
 
    procedure Lemma_Mul_Assoc (A, B, C : Element) is
-      X  : constant Big_Integer := To_Int (A.Limbs);
-      Y  : constant Big_Integer := To_Int (B.Limbs);
-      Z  : constant Big_Integer := To_Int (C.Limbs);
-      M1 : constant Big_Integer := To_Int (Mul (A, B).Limbs);
-      M2 : constant Big_Integer := To_Int (Mul (B, C).Limbs);
+      X  : constant Big_Integer := To_Int (Limbs (A));
+      Y  : constant Big_Integer := To_Int (Limbs (B));
+      Z  : constant Big_Integer := To_Int (Limbs (C));
+      M1 : constant Big_Integer := To_Int (Limbs (Mul (A, B)));
+      M2 : constant Big_Integer := To_Int (Limbs (Mul (B, C)));
    begin
-      Lemma_To_Int_Bounds (A.Limbs);
-      Lemma_To_Int_Bounds (B.Limbs);
-      Lemma_To_Int_Bounds (C.Limbs);
+      Lemma_To_Int_Bounds (Limbs (A));
+      Lemma_To_Int_Bounds (Limbs (B));
+      Lemma_To_Int_Bounds (Limbs (C));
       Lemma_R2;
       pragma Assert (P > 0);
       pragma Assert (M1 = (X * Y * R_Inv) mod P);
@@ -1312,14 +1364,220 @@ package body P256_Field is
       Lemma_Mod_Mul (X * Y * R_Inv, Z * R_Inv, P);
       Lemma_Mod_Mul (Y * Z * R_Inv, X * R_Inv, P);
       pragma Assert
-        (To_Int (Mul (Mul (A, B), C).Limbs) = (M1 * Z * R_Inv) mod P);
+        (To_Int (Limbs (Mul (Mul (A, B), C))) = (M1 * Z * R_Inv) mod P);
       pragma Assert (M1 * Z * R_Inv = M1 * (Z * R_Inv));
       pragma Assert
-        (To_Int (Mul (A, Mul (B, C)).Limbs) = (X * M2 * R_Inv) mod P);
+        (To_Int (Limbs (Mul (A, Mul (B, C)))) = (X * M2 * R_Inv) mod P);
       pragma Assert (X * M2 * R_Inv = M2 * (X * R_Inv));
       pragma Assert ((X * Y * R_Inv) * (Z * R_Inv)
                      = (Y * Z * R_Inv) * (X * R_Inv));
       Lemma_Inj (Mul (Mul (A, B), C), Mul (A, Mul (B, C)));
    end Lemma_Mul_Assoc;
+
+   ----------------------------------------------------------------------
+   --  The other ring laws (ADR 0070). Every stored integer is below P
+   --  (the predicate), so a sum of two is below 2 P and a difference
+   --  above -P: one correction by P gives the remainder.
+   ----------------------------------------------------------------------
+
+   procedure Lemma_Mod_Small (V : Big_Integer) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => P > 0 and then V >= -P and then V < 2 * P,
+     Post   => V mod P = (if V < 0 then V + P elsif V < P then V else V - P)
+   is
+   begin
+      if V < 0 then
+         Lemma_Mod_Multiple (V, V + P, 1);
+      elsif V < P then
+         Lemma_Mod_Multiple (V, V, 0);
+      else
+         Lemma_Mod_Multiple (V, V - P, -1);
+      end if;
+   end Lemma_Mod_Small;
+
+   --  A remainder may be taken early in a sum.
+   procedure Lemma_Mod_Add (X, Y : Big_Integer) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => P > 0 and then X >= 0 and then Y >= 0,
+     Post   => (X mod P + Y mod P) mod P = (X + Y) mod P
+   is
+      S : constant Big_Integer := X mod P + Y mod P;
+   begin
+      pragma Assert (X = X mod P + P * (X / P));
+      pragma Assert (Y = Y mod P + P * (Y / P));
+      pragma Assert (S = S mod P + P * (S / P));
+      pragma Assert
+        (X + Y = S mod P + P * (S / P + X / P + Y / P));
+      Lemma_Mod_Unique (X + Y, S / P + X / P + Y / P, S mod P, P);
+   end Lemma_Mod_Add;
+
+   procedure Lemma_Bounds (A : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => To_Int (Limbs (A)) >= 0 and then To_Int (Limbs (A)) < P
+               and then P > 0
+   is
+   begin
+      Lemma_Canonical (A);
+      Lemma_To_Int_Bounds (Limbs (A));
+      Lemma_P1;
+   end Lemma_Bounds;
+
+   procedure Lemma_Zero_One with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => To_Int (Limbs (Zero)) = 0
+               and then To_Int (Limbs (One)) = Two_256 - P
+   is
+      W : constant Big_Integer := Two_64;
+   begin
+      Lemma_Unfold;
+      pragma Assert (W = 18446744073709551616);
+      pragma Assert (Two_256 = W * W * W * W);
+      pragma Assert (To_Int (Limbs (Zero))
+        = Conv (Limbs (Zero) (0)) + Conv (Limbs (Zero) (1)) * W
+          + Conv (Limbs (Zero) (2)) * W * W
+          + Conv (Limbs (Zero) (3)) * W * W * W);
+      pragma Assert (To_Int (Limbs (One))
+        = Conv (Limbs (One) (0)) + Conv (Limbs (One) (1)) * W
+          + Conv (Limbs (One) (2)) * W * W
+          + Conv (Limbs (One) (3)) * W * W * W);
+      pragma Assert (P
+        = Conv (P_Limbs (0)) + Conv (P_Limbs (1)) * W
+          + Conv (P_Limbs (2)) * W * W + Conv (P_Limbs (3)) * W * W * W);
+   end Lemma_Zero_One;
+
+   procedure Lemma_Mul_Comm (A, B : Element) is
+      X : constant Big_Integer := To_Int (Limbs (A));
+      Y : constant Big_Integer := To_Int (Limbs (B));
+   begin
+      pragma Assert (X * Y * R_Inv = Y * X * R_Inv);
+      Lemma_Inj (Mul (A, B), Mul (B, A));
+   end Lemma_Mul_Comm;
+
+   procedure Lemma_Mul_One (A : Element) is
+      X : constant Big_Integer := To_Int (Limbs (A));
+      K : constant Big_Integer := To_Int (K_Limbs);
+      V : constant Big_Integer := X * To_Int (Limbs (One)) * R_Inv;
+   begin
+      Lemma_Bounds (A);
+      Lemma_Zero_One;
+      Lemma_R_Inv;
+      Lemma_R2;
+      pragma Assert (V = X * (Two_256 * R_Inv) - X * R_Inv * P);
+      pragma Assert (V = X + (X * K - X * R_Inv) * P);
+      pragma Assert (V >= 0);
+      Lemma_Mod_Unique (V, X * K - X * R_Inv, X, P);
+      Lemma_Inj (Mul (A, One), A);
+   end Lemma_Mul_One;
+
+   --  The core of distributivity, on the stored integers: X times the
+   --  reduced sum is the reduced sum of the two products.
+   procedure Lemma_Distrib_Int (X, Y, Z : Big_Integer) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => P > 0 and then X >= 0 and then Y >= 0 and then Z >= 0
+               and then R_Inv >= 0,
+     Post   => (X * ((Y + Z) mod P) * R_Inv) mod P
+               = ((X * Y * R_Inv) mod P + (X * Z * R_Inv) mod P) mod P
+   is
+   begin
+      Lemma_Mod_Mul (Y + Z, X * R_Inv, P);
+      pragma Assert (X * ((Y + Z) mod P) * R_Inv
+                     = ((Y + Z) mod P) * (X * R_Inv));
+      pragma Assert ((Y + Z) * (X * R_Inv) = X * Y * R_Inv + X * Z * R_Inv);
+      pragma Assert (X * Y * R_Inv >= 0 and then X * Z * R_Inv >= 0);
+      Lemma_Mod_Add (X * Y * R_Inv, X * Z * R_Inv);
+   end Lemma_Distrib_Int;
+
+   procedure Lemma_Mul_Distrib (A, B, C : Element) is
+      X : constant Big_Integer := To_Int (Limbs (A));
+      Y : constant Big_Integer := To_Int (Limbs (B));
+      Z : constant Big_Integer := To_Int (Limbs (C));
+   begin
+      Lemma_Bounds (A);
+      Lemma_Bounds (B);
+      Lemma_Bounds (C);
+      Lemma_R2;
+      Lemma_Distrib_Int (X, Y, Z);
+      Lemma_Inj (Mul (A, Add (B, C)), Add (Mul (A, B), Mul (A, C)));
+   end Lemma_Mul_Distrib;
+
+   procedure Lemma_Mul_Distrib_Sub (A, B, C : Element) is
+      X  : constant Big_Integer := To_Int (Limbs (A));
+      Y  : constant Big_Integer := To_Int (Limbs (B));
+      Z  : constant Big_Integer := To_Int (Limbs (C));
+      D  : constant Big_Integer := (Y - Z) mod P;
+      MD : constant Big_Integer := (X * D * R_Inv) mod P;
+      MZ : constant Big_Integer := (X * Z * R_Inv) mod P;
+   begin
+      Lemma_Bounds (A);
+      Lemma_Bounds (B);
+      Lemma_Bounds (C);
+      Lemma_R2;
+      Lemma_Mod_Small (Y - Z);
+      pragma Assert (D >= 0 and then D < P);
+      Lemma_Mod_Small (D + Z);
+      pragma Assert ((D + Z) mod P = Y);
+      Lemma_Distrib_Int (X, D, Z);
+      pragma Assert (To_Int (Limbs (Mul (A, B))) = (MD + MZ) mod P);
+      Lemma_Mod_Small (MD + MZ);
+      Lemma_Mod_Small ((MD + MZ) mod P - MZ);
+      Lemma_Inj (Mul (A, Sub (B, C)), Sub (Mul (A, B), Mul (A, C)));
+   end Lemma_Mul_Distrib_Sub;
+
+   procedure Lemma_Add_Assoc (A, B, C : Element) is
+      X : constant Big_Integer := To_Int (Limbs (A));
+      Y : constant Big_Integer := To_Int (Limbs (B));
+      Z : constant Big_Integer := To_Int (Limbs (C));
+   begin
+      Lemma_Bounds (A);
+      Lemma_Bounds (B);
+      Lemma_Bounds (C);
+      Lemma_Mod_Small (X + Y);
+      Lemma_Mod_Small (Y + Z);
+      Lemma_Mod_Small ((X + Y) mod P + Z);
+      Lemma_Mod_Small (X + (Y + Z) mod P);
+      Lemma_Inj (Add (Add (A, B), C), Add (A, Add (B, C)));
+   end Lemma_Add_Assoc;
+
+   procedure Lemma_Add_Comm (A, B : Element) is
+   begin
+      pragma Assert (To_Int (Limbs (A)) + To_Int (Limbs (B))
+                     = To_Int (Limbs (B)) + To_Int (Limbs (A)));
+      Lemma_Inj (Add (A, B), Add (B, A));
+   end Lemma_Add_Comm;
+
+   procedure Lemma_Add_Zero (A : Element) is
+   begin
+      Lemma_Bounds (A);
+      Lemma_Zero_One;
+      Lemma_Mod_Small (To_Int (Limbs (A)));
+      Lemma_Inj (Add (A, Zero), A);
+   end Lemma_Add_Zero;
+
+   procedure Lemma_Add_Neg (A : Element) is
+      X : constant Big_Integer := To_Int (Limbs (A));
+   begin
+      Lemma_Bounds (A);
+      Lemma_Zero_One;
+      Lemma_Mod_Small (-X);
+      Lemma_Mod_Small (X + (-X) mod P);
+      Lemma_Inj (Add (A, Neg (A)), Zero);
+   end Lemma_Add_Neg;
+
+   procedure Lemma_Sub_Def (A, B : Element) is
+      X : constant Big_Integer := To_Int (Limbs (A));
+      Y : constant Big_Integer := To_Int (Limbs (B));
+   begin
+      Lemma_Bounds (A);
+      Lemma_Bounds (B);
+      Lemma_Mod_Small (X - Y);
+      Lemma_Mod_Small (-Y);
+      Lemma_Mod_Small (X + (-Y) mod P);
+      Lemma_Inj (Sub (A, B), Add (A, Neg (B)));
+   end Lemma_Sub_Def;
 
 end P256_Field;

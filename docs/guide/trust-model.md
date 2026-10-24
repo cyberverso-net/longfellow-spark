@@ -37,7 +37,7 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 - `Eval_Circuit` carries the semantics of the Z assertions. `Symbolic_Round` is the draft's formula by definition.
 - `Verifier_Core` is Silver. It is proved to emit only terms the Ligero verifier can index, with the right pad indices for the quadratic triples.
 - `Input_Constraint` is Gold against the formula of Section 6.7. Term W of the constraint has witness W and coefficient `Eq2 (npublic + W)`. The constant is the public binding, summed over the public inputs in order, minus the final claim. The last terms are the claim pads, built with the operations of `Expression` (Phase D, ADR 0056).
-- These are structural proofs. They say nothing about the laws of the field. That `Bindeq` agrees with `Eq`, that the Lagrange basis interpolates, and that the constraints are the upstream verifier's, are all tested.
+- These are structural proofs. Their contracts say nothing about the laws of the field. That `Bindeq` agrees with `Eq`, that the Lagrange basis interpolates, and that the constraints are the upstream verifier's, are all tested. Some bodies use the ring laws of the field, each proved by the field, to reach their references with fewer products (ADR 0070).
 
 **The transcript** (chapter 4).
 
@@ -155,7 +155,6 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 - The SMT solvers: CVC5, Z3 and Alt-Ergo.
 - SPARKlib's functional sequences, used as a ghost model (ADR 0031).
 - That `Same`, the logical equality of each field wrapper, is the equality of its element type. Its body is the predefined `=`, outside SPARK (ADR 0023).
-- That `P256_Field.Eq` is the equality of P-256 elements, as `Same`. Its body is the predefined `=`, outside SPARK. It carries the normal form of a product, which the Lagrange tables need (ADR 0066).
 - The release build relies on the proof instead of checking at run time. The units of `src/` are compiled without run-time checks, because GNATprove proves that none can fail; the units of `cli/src/` keep theirs (ADR 0068). This holds only under the preconditions of the units. The command-line programs establish the preconditions of `Circuit_Reader.Read`, `Zk_Verifier.Verify` and `Zk_Prover.Prove` in code before each call, and `Cli_Random.Fill` changes no state the prover reads.
 
 **Inputs and references.**

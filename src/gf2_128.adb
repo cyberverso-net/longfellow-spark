@@ -888,6 +888,129 @@ package body GF2_128 is
       Lemma_Mul_Ref_Ext (A, Mul (B, C), Mul_Ref (B, C, 128), 128);
    end Lemma_Mul_Assoc;
 
+   -------------------------------------------------------------------
+   --  Commutativity (ADR 0070): x^J times B is x^J (A B) with A = One,
+   --  One is the unit of Mul_Ref on the left, so a single bit commutes
+   --  with any element, then linearity over the bits of B.
+   -------------------------------------------------------------------
+
+   --  x^J moves out of the first operand.
+   procedure Lemma_Xpow_A (A, B : Element; J : Natural) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (Xpow (A, J), B, 128) = Xpow (Mul_Ref (A, B, 128), J),
+     Subprogram_Variant => (Decreases => J)
+   is
+   begin
+      if J > 0 then
+         Lemma_Xpow_A (A, B, J - 1);
+         Lemma_Xt_A (Xpow (A, J - 1), B, 128);
+         Lemma_Ext_A (Xpow (A, J), Xtime (Xpow (A, J - 1)), B, 128);
+         Lemma_Xt_Ext (Mul_Ref (Xpow (A, J - 1), B, 128),
+                       Xpow (Mul_Ref (A, B, 128), J - 1));
+      end if;
+   end Lemma_Xpow_A;
+
+   --  One is the unit on the left.
+   procedure Lemma_One_Ref (B : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (One, B, 128) = B
+   is
+   begin
+      Lemma_Mul_Ref_Zero (One, 128);
+      pragma Assert (Mul_Ref (One, Low128 (B, 0), 128) = Low128 (B, 0));
+      for K in 0 .. 127 loop
+         pragma Loop_Invariant
+           (Mul_Ref (One, Low128 (B, K), 128) = Low128 (B, K));
+         if Bit (B, K) then
+            Lemma_Mul_Ref_Ext
+              (One, Low128 (B, K + 1), Add (Low128 (B, K), E_Bit (K)), 128);
+            Lemma_Mul_Ref_Lin (One, Low128 (B, K), E_Bit (K), 128);
+            Lemma_Mul_Ref_Bit (One, K, 128);
+            Lemma_Xpow_One (K);
+         else
+            Lemma_Mul_Ref_Ext (One, Low128 (B, K + 1), Low128 (B, K), 128);
+         end if;
+         pragma Assert
+           (Mul_Ref (One, Low128 (B, K + 1), 128) = Low128 (B, K + 1));
+      end loop;
+      Lemma_Low128_All (B);
+      Lemma_Mul_Ref_Ext (One, Low128 (B, 128), B, 128);
+   end Lemma_One_Ref;
+
+   --  A single bit commutes: both sides are x^K A.
+   procedure Lemma_Bit_Comm (A : Element; K : Bit_Index_128) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (E_Bit (K), A, 128) = Mul_Ref (A, E_Bit (K), 128)
+   is
+   begin
+      Lemma_Xpow_One (K);
+      Lemma_Ext_A (E_Bit (K), Xpow (One, K), A, 128);
+      Lemma_Xpow_A (One, A, K);
+      Lemma_One_Ref (A);
+      Lemma_Xpow_Ext (Mul_Ref (One, A, 128), A, K);
+      Lemma_Mul_Ref_Bit (A, K, 128);
+   end Lemma_Bit_Comm;
+
+   procedure Lemma_Comm_Ref (A, B : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul_Ref (A, B, 128) = Mul_Ref (B, A, 128)
+   is
+   begin
+      Lemma_Mul_Ref_Zero (A, 128);
+      Lemma_Zero_A (A, 128);
+      pragma Assert
+        (Mul_Ref (A, Low128 (B, 0), 128) = Mul_Ref (Low128 (B, 0), A, 128));
+      for K in 0 .. 127 loop
+         pragma Loop_Invariant
+           (Mul_Ref (A, Low128 (B, K), 128) = Mul_Ref (Low128 (B, K), A, 128));
+         if Bit (B, K) then
+            Lemma_Mul_Ref_Ext
+              (A, Low128 (B, K + 1), Add (Low128 (B, K), E_Bit (K)), 128);
+            Lemma_Mul_Ref_Lin (A, Low128 (B, K), E_Bit (K), 128);
+            Lemma_Ext_A
+              (Low128 (B, K + 1), Add (Low128 (B, K), E_Bit (K)), A, 128);
+            Lemma_Lin_A (Low128 (B, K), E_Bit (K), A, 128);
+            Lemma_Bit_Comm (A, K);
+         else
+            Lemma_Mul_Ref_Ext (A, Low128 (B, K + 1), Low128 (B, K), 128);
+            Lemma_Ext_A (Low128 (B, K + 1), Low128 (B, K), A, 128);
+         end if;
+         pragma Assert
+           (Mul_Ref (A, Low128 (B, K + 1), 128)
+            = Mul_Ref (Low128 (B, K + 1), A, 128));
+      end loop;
+      Lemma_Low128_All (B);
+      Lemma_Mul_Ref_Ext (A, Low128 (B, 128), B, 128);
+      Lemma_Ext_A (Low128 (B, 128), B, A, 128);
+   end Lemma_Comm_Ref;
+
+   procedure Lemma_Mul_Comm (A, B : Element) is
+   begin
+      Lemma_Comm_Ref (A, B);
+   end Lemma_Mul_Comm;
+
+   procedure Lemma_Mul_One (A : Element) is
+   begin
+      pragma Assert (E_Bit (0) = One);
+      Lemma_Mul_Ref_Bit (A, 0, 128);
+      Lemma_Mul_Ref_Ext (A, One, E_Bit (0), 128);
+   end Lemma_Mul_One;
+
+   procedure Lemma_Mul_Distrib (A, B, C : Element) is
+   begin
+      Lemma_Mul_Ref_Lin (A, B, C, 128);
+   end Lemma_Mul_Distrib;
+
+   procedure Lemma_Mul_Distrib_Sub (A, B, C : Element) is
+   begin
+      Lemma_Mul_Ref_Lin (A, B, C, 128);
+      Lemma_Mul_Ref_Ext (A, Sub (B, C), Add (B, C), 128);
+   end Lemma_Mul_Distrib_Sub;
+
    function Mul (A, B : Element) return Element is
       L0, H0, L1, H1, L2, H2 : U64;
    begin
