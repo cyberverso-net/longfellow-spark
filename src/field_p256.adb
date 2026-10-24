@@ -9,8 +9,6 @@ with Field_P256.Laws;
 
 package body Field_P256 is
 
-   use type P256_Field.Element;
-
    function Same (A, B : P256_Field.Element) return Boolean with
      SPARK_Mode => Off
    is
@@ -40,5 +38,70 @@ package body Field_P256 is
       Laws.Lemma_Same (P256_Field.Mul (P256_Field.Mul (A, B), C),
                   P256_Field.Mul (A, P256_Field.Mul (B, C)));
    end Lemma_Mul_Assoc;
+
+   procedure Lemma_Mul_Comm (X, Y : P256_Field.Element) is
+   begin
+      P256_Field.Lemma_Mul_Comm (X, Y);
+      Laws.Lemma_Same (P256_Field.Mul (X, Y),
+                       P256_Field.Mul (Y, X));
+   end Lemma_Mul_Comm;
+
+   procedure Lemma_Mul_One (A : P256_Field.Element) is
+   begin
+      P256_Field.Lemma_Mul_One (A);
+      Laws.Lemma_Same (P256_Field.Mul (A, P256_Field.One),
+                       A);
+   end Lemma_Mul_One;
+
+   procedure Lemma_Mul_Distrib (A, B, C : P256_Field.Element) is
+   begin
+      P256_Field.Lemma_Mul_Distrib (A, B, C);
+      Laws.Lemma_Same (P256_Field.Mul (A, P256_Field.Add (B, C)),
+                       P256_Field.Add (P256_Field.Mul (A, B),
+                                     P256_Field.Mul (A, C)));
+   end Lemma_Mul_Distrib;
+
+   procedure Lemma_Mul_Distrib_Sub (A, B, C : P256_Field.Element) is
+   begin
+      P256_Field.Lemma_Mul_Distrib_Sub (A, B, C);
+      Laws.Lemma_Same (P256_Field.Mul (A, P256_Field.Sub (B, C)),
+                       P256_Field.Sub (P256_Field.Mul (A, B),
+                                     P256_Field.Mul (A, C)));
+   end Lemma_Mul_Distrib_Sub;
+
+   procedure Lemma_Add_Assoc (A, B, C : P256_Field.Element) is
+   begin
+      P256_Field.Lemma_Add_Assoc (A, B, C);
+      Laws.Lemma_Same (P256_Field.Add (P256_Field.Add (A, B), C),
+                       P256_Field.Add (A, P256_Field.Add (B, C)));
+   end Lemma_Add_Assoc;
+
+   procedure Lemma_Add_Comm (X, Y : P256_Field.Element) is
+   begin
+      P256_Field.Lemma_Add_Comm (X, Y);
+      Laws.Lemma_Same (P256_Field.Add (X, Y),
+                       P256_Field.Add (Y, X));
+   end Lemma_Add_Comm;
+
+   procedure Lemma_Add_Zero (A : P256_Field.Element) is
+   begin
+      P256_Field.Lemma_Add_Zero (A);
+      Laws.Lemma_Same (P256_Field.Add (A, P256_Field.Zero),
+                       A);
+   end Lemma_Add_Zero;
+
+   procedure Lemma_Add_Neg (A : P256_Field.Element) is
+   begin
+      P256_Field.Lemma_Add_Neg (A);
+      Laws.Lemma_Same (P256_Field.Add (A, P256_Field.Neg (A)),
+                       P256_Field.Zero);
+   end Lemma_Add_Neg;
+
+   procedure Lemma_Sub_Def (A, B : P256_Field.Element) is
+   begin
+      P256_Field.Lemma_Sub_Def (A, B);
+      Laws.Lemma_Same (P256_Field.Sub (A, B),
+                       P256_Field.Add (A, P256_Field.Neg (B)));
+   end Lemma_Sub_Def;
 
 end Field_P256;

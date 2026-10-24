@@ -192,6 +192,29 @@ package GF2_128 is
      Global => null,
      Post   => Mul (Mul (A, B), C) = Mul (A, Mul (B, C));
 
+   --  The other laws of the product the sumcheck kernels need (ADR
+   --  0070), proved against Mul_Ref: commutativity, One as the unit,
+   --  and distributivity over Add.
+   procedure Lemma_Mul_Comm (A, B : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul (A, B) = Mul (B, A);
+
+   procedure Lemma_Mul_One (A : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul (A, One) = A;
+
+   procedure Lemma_Mul_Distrib (A, B, C : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul (A, Add (B, C)) = Add (Mul (A, B), Mul (A, C));
+
+   procedure Lemma_Mul_Distrib_Sub (A, B, C : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul (A, Sub (B, C)) = Sub (Mul (A, B), Mul (A, C));
+
    --  Field squaring, E * E mod Q(x). Thin wrapper over Mul for now.
    function Square (E : Element) return Element with
      Global => null,

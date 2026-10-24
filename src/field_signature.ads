@@ -50,9 +50,21 @@
 --  harness with the library's multiplication; the verifier never
 --  calls Inv.
 --
---  One law of the product, as a ghost lemma (ADR 0066): associativity,
---  Same ((A * B) * C, A * (B * C)). Each field proves it for its own
---  product; the Lagrange tables of the verifier rest on it.
+--  The laws of a commutative ring, as ghost lemmas stated with Same.
+--  Each field proves them for its own operations.
+--    Lemma_Mul_Assoc       (A * B) * C = A * (B * C) (ADR 0066), for
+--                          the Lagrange tables of the verifier;
+--    Lemma_Mul_Comm        A * B = B * A;
+--    Lemma_Mul_One         A * One = A;
+--    Lemma_Mul_Distrib     A * (B + C) = A * B + A * C;
+--    Lemma_Mul_Distrib_Sub A * (B - C) = A * B - A * C;
+--    Lemma_Add_Assoc       (A + B) + C = A + (B + C);
+--    Lemma_Add_Comm        A + B = B + A;
+--    Lemma_Add_Zero        A + Zero = A;
+--    Lemma_Add_Neg         A + Neg (A) = Zero;
+--    Lemma_Sub_Def         A - B = A + Neg (B).
+--  All but the first are for the kernels of the sumcheck in upstream's
+--  form (ADR 0070).
 
 pragma SPARK_Mode (On);
 
@@ -72,6 +84,24 @@ generic
    L0_Den_Inv, L1_Den_Inv, L2_Den_Inv : Element;
    with function Same (A, B : Element) return Boolean with Ghost;
    with procedure Lemma_Mul_Assoc (A, B, C : Element)
+     with Ghost => Proof_Only;
+   with procedure Lemma_Mul_Comm (A, B : Element)
+     with Ghost => Proof_Only;
+   with procedure Lemma_Mul_One (A : Element)
+     with Ghost => Proof_Only;
+   with procedure Lemma_Mul_Distrib (A, B, C : Element)
+     with Ghost => Proof_Only;
+   with procedure Lemma_Mul_Distrib_Sub (A, B, C : Element)
+     with Ghost => Proof_Only;
+   with procedure Lemma_Add_Assoc (A, B, C : Element)
+     with Ghost => Proof_Only;
+   with procedure Lemma_Add_Comm (A, B : Element)
+     with Ghost => Proof_Only;
+   with procedure Lemma_Add_Zero (A : Element)
+     with Ghost => Proof_Only;
+   with procedure Lemma_Add_Neg (A : Element)
+     with Ghost => Proof_Only;
+   with procedure Lemma_Sub_Def (A, B : Element)
      with Ghost => Proof_Only;
    Serialized_Size : Positive;
    with function To_Bytes (E : Element) return Bytes.Byte_Array;
