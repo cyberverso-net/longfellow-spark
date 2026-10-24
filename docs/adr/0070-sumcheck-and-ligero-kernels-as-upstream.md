@@ -88,6 +88,12 @@ Each is a ghost lemma, `Proof_Only`. A new generic, `Ring_Laws`, derives from th
 ## Consequences
 
 - Estimated saving on the hash circuit: about 38 M products in the prover, about 1.3 s on the VM. The verifier also gains through `Eval_Bound_Quad_T`.
+- Measured after the merge (2026-10-24, main at e272161 against 0b4dccb, the reference VM, three runs each, proved build):
+  - products on the hash circuit: the prover from 196.4 M to 143.1 M, the verifier from 81.9 M to 59.6 M (upstream 93.3 M and 36.6 M);
+  - the sumcheck and `y_dot` save 31 M, less than estimated: one product less per pair saves 6.9 M in the round evaluations;
+  - the verifier core, which the prover recomputes, saves 22 M more through `Eval_Bound_Quad_T`;
+  - time: hash prove from 11.38 s to 9.80 s, hash verify from 5.77 s to 5.19 s, signature prove from 1.22 s to 1.03 s;
+  - the proofs are identical byte for byte.
 - The proofs of the CLI stay identical byte for byte. The bodies compute the same field elements.
 - ADR 0066 and ADR 0069 are amended: the P-256 element has scalar limbs, and `Norm` leaves the code.
 - `Field_GF2_128` and `Field_P256` pass the new lemmas. Each field package proves them next to `Lemma_Mul_Assoc`.
