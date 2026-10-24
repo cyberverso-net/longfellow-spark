@@ -542,6 +542,10 @@ package body Sumcheck_Prover is
          end if;
          Lemma_QW_Step (T, Other, NO, H, I - T'First + 1);
       end loop;
+      pragma Assert
+        (Proof_Only =>
+           (for all X in 0 .. NA - 1 =>
+              Same (QW (X), QW_Ref (T, Other, NO, H, X, T'Length))));
 
       --  The pairs: the three sums, three products per pair, then
       --  p (P2) from them (prover.rs, quad_round_poly; ADR 0070).
