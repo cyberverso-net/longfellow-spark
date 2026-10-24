@@ -48,7 +48,9 @@
 --  Representation (ADR 0069): the element of value x stores the
 --  integer x 2^256 mod p, the Montgomery form, in four 64-bit limbs,
 --  little-endian limb order, always canonical (below p, enforced by
---  the type predicate). Equal elements have equal limbs. Constants and
+--  the type predicate). The limbs are four scalar components, L0 to
+--  L3 (ADR 0070); Limbs gives them as a word array. Equal elements
+--  have equal limbs. Constants and
 --  parsers outside the package go through From_Canonical and
 --  To_Canonical, never through the limbs.
 --  Partial sums are formed in Unsigned_128 so that no step wraps; the
@@ -231,16 +233,45 @@ package P256_Field is
    with Global => null,
         Post => (Proof_Only => Is_Canonical'Result = (To_Int (L) < P));
 
+   --  The canonical test on four scalar limbs, for the type predicate.
+   --  Its body is hidden from the provers outside the subprograms that
+   --  unhide it: elsewhere the predicate stays an opaque fact, carried
+   --  by every element at no cost. The postcondition gives the case of
+   --  a top limb below that of p, enough for Zero and One.
+   function Canonical_Limbs (L0, L1, L2, L3 : Unsigned_64) return Boolean
+   is (Is_Canonical ([L0, L1, L2, L3]))
+   with Global => null,
+        Post => (if L3 < 16#FFFF_FFFF_0000_0001# then Canonical_Limbs'Result),
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
+
+   --  The four limbs of an element, as four scalar components rather
+   --  than an array (ADR 0070): the provers treat a record of scalars
+   --  as a datatype, so that equal limbs give equal elements with no
+   --  further fact, while an array component is a map over Natural.
+   --  The memory layout is the same, four words, least significant
+   --  first, as the limb_ array of upstream's Nat.
    type Element is record
-      Limbs : Limb_Array;
+      L0, L1, L2, L3 : Unsigned_64;
    end record
-   with Dynamic_Predicate => Is_Canonical (Element.Limbs);
+   with Dynamic_Predicate =>
+     Canonical_Limbs (Element.L0, Element.L1, Element.L2, Element.L3);
+
+   --  The limbs as a word array, for the arithmetic. The provers see
+   --  the postcondition, limb by limb, not the aggregate of the body,
+   --  which would weigh on every element in every proof.
+   function Limbs (E : Element) return Limb_Array is
+     ([E.L0, E.L1, E.L2, E.L3])
+   with Global => null,
+        Post => Limbs'Result (0) = E.L0 and then Limbs'Result (1) = E.L1
+                and then Limbs'Result (2) = E.L2
+                and then Limbs'Result (3) = E.L3,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
 
    --  Zero stores 0, One stores 2^256 mod p = 2^256 - p.
-   Zero : constant Element := (Limbs => [others => 0]);
+   Zero : constant Element := (L0 => 0, L1 => 0, L2 => 0, L3 => 0);
    One  : constant Element :=
-     (Limbs => [16#0000_0000_0000_0001#, 16#FFFF_FFFF_0000_0000#,
-                16#FFFF_FFFF_FFFF_FFFF#, 16#0000_0000_FFFF_FFFE#]);
+     (L0 => 16#0000_0000_0000_0001#, L1 => 16#FFFF_FFFF_0000_0000#,
+      L2 => 16#FFFF_FFFF_FFFF_FFFF#, L3 => 16#0000_0000_FFFF_FFFE#);
 
    --  2^-256 mod p, the factor of the Montgomery product, and K with
    --  2^256 R_Inv = 1 + K p.
@@ -260,43 +291,26 @@ package P256_Field is
 
    function Add (A, B : Element) return Element with
      Global => null,
-     Post   => (Proof_Only => To_Int (Add'Result.Limbs)
-               = (To_Int (A.Limbs) + To_Int (B.Limbs)) mod P);
+     Post   => (Proof_Only => To_Int (Limbs (Add'Result))
+               = (To_Int (Limbs (A)) + To_Int (Limbs (B))) mod P);
 
    function Sub (A, B : Element) return Element with
      Global => null,
-     Post   => (Proof_Only => To_Int (Sub'Result.Limbs)
-               = (To_Int (A.Limbs) - To_Int (B.Limbs)) mod P);
+     Post   => (Proof_Only => To_Int (Limbs (Sub'Result))
+               = (To_Int (Limbs (A)) - To_Int (Limbs (B))) mod P);
 
    function Neg (A : Element) return Element is (Sub (Zero, A)) with
      Global => null,
      Post   =>
        (Proof_Only =>
-          To_Int (Neg'Result.Limbs) = (-To_Int (A.Limbs)) mod P);
-
-   --  The logical equality of elements, for contracts (ADR 0066). As
-   --  Field_P256.Same: the body is the predefined "=", outside SPARK,
-   --  and the provers treat Eq as equality of terms (Logical_Equal).
-   function Eq (A, B : Element) return Boolean with
-     Ghost, Global => null, Annotate => (GNATprove, Logical_Equal);
-
-   --  E rebuilt from its four limbs. The limbs of Limb_Array, a subtype
-   --  of Word_Array, are a map over Natural for the provers; an element
-   --  equal to its Norm is determined by the limbs 0 .. 3, so that two
-   --  such elements with equal limbs are Eq. Executable: Mul returns
-   --  through it, since the provers relate an aggregate only to the
-   --  same aggregate.
-   function Norm (E : Element) return Element is
-     ((Limbs => [E.Limbs (0), E.Limbs (1), E.Limbs (2), E.Limbs (3)]))
-   with Global => null;
+          To_Int (Limbs (Neg'Result)) = (-To_Int (Limbs (A))) mod P);
 
    --  The Montgomery product: the stored integers multiply with the
    --  factor 2^-256, so that the elements multiply.
    function Mul (A, B : Element) return Element with
      Global => null,
-     Post   => (Proof_Only => To_Int (Mul'Result.Limbs)
-               = (To_Int (A.Limbs) * To_Int (B.Limbs) * R_Inv) mod P
-               and then Eq (Mul'Result, Norm (Mul'Result)));
+     Post   => (Proof_Only => To_Int (Limbs (Mul'Result))
+               = (To_Int (Limbs (A)) * To_Int (Limbs (B)) * R_Inv) mod P);
 
    --  The product is associative (ADR 0066), the law the Lagrange
    --  tables need; proved from the model.
@@ -305,10 +319,57 @@ package P256_Field is
      Global => null,
      Post   => Mul (Mul (A, B), C) = Mul (A, Mul (B, C));
 
+   --  The other ring laws the sumcheck kernels need (ADR 0070), proved
+   --  from the model like associativity.
+   procedure Lemma_Mul_Comm (A, B : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul (A, B) = Mul (B, A);
+
+   procedure Lemma_Mul_One (A : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul (A, One) = A;
+
+   procedure Lemma_Mul_Distrib (A, B, C : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul (A, Add (B, C)) = Add (Mul (A, B), Mul (A, C));
+
+   procedure Lemma_Mul_Distrib_Sub (A, B, C : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Mul (A, Sub (B, C)) = Sub (Mul (A, B), Mul (A, C));
+
+   procedure Lemma_Add_Assoc (A, B, C : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Add (Add (A, B), C) = Add (A, Add (B, C));
+
+   procedure Lemma_Add_Comm (A, B : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Add (A, B) = Add (B, A);
+
+   procedure Lemma_Add_Zero (A : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Add (A, Zero) = A;
+
+   procedure Lemma_Add_Neg (A : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Add (A, Neg (A)) = Zero;
+
+   procedure Lemma_Sub_Def (A, B : Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Sub (A, B) = Add (A, Neg (B));
+
    function Square (E : Element) return Element is (Mul (E, E)) with
      Global => null,
-     Post   => (Proof_Only => To_Int (Square'Result.Limbs)
-               = (To_Int (E.Limbs) * To_Int (E.Limbs) * R_Inv) mod P);
+     Post   => (Proof_Only => To_Int (Limbs (Square'Result))
+               = (To_Int (Limbs (E)) * To_Int (Limbs (E)) * R_Inv) mod P);
 
    --  Multiplicative inverse by Fermat: E^(p - 2), computed with a
    --  fixed addition chain (255 squarings, 12 multiplications, no
@@ -344,7 +405,7 @@ package P256_Field is
    --  form. For constants and parsers.
    function From_Canonical (L : Limb_Array) return Element with
      Global => null,
-     Post   => (Proof_Only => To_Int (From_Canonical'Result.Limbs)
+     Post   => (Proof_Only => To_Int (Limbs (From_Canonical'Result))
                = (To_Int (L) * Two_256) mod P);
 
    --  The canonical integer of E, below p.
@@ -352,7 +413,7 @@ package P256_Field is
      Global => null,
      Post   => (Proof_Only => To_Int (To_Canonical'Result) < P
                and then To_Int (To_Canonical'Result)
-                        = (To_Int (E.Limbs) * R_Inv) mod P);
+                        = (To_Int (Limbs (E)) * R_Inv) mod P);
 
    --  Ok iff the encoding is canonical (value < p); then E denotes it.
    --  On rejection E is Zero.
@@ -362,7 +423,7 @@ package P256_Field is
      Post   =>
        (Runtime    => Ok = Is_Canonical (Limbs_Of_Bytes (B))
                       and then (if not Ok then E = Zero),
-        Proof_Only => (if Ok then To_Int (E.Limbs)
+        Proof_Only => (if Ok then To_Int (Limbs (E))
                          = (To_Int (Limbs_Of_Bytes (B)) * Two_256) mod P));
 
    function To_Bytes (E : Element) return Bytes_32 is
@@ -374,7 +435,7 @@ package P256_Field is
    --  evaluation point x of the Ligero code, reed_solomon_eval_point).
    function Of_Natural (X : Natural) return Element with
      Global => null,
-     Post   => (Proof_Only => To_Int (Of_Natural'Result.Limbs)
+     Post   => (Proof_Only => To_Int (Limbs (Of_Natural'Result))
                = (To_Big_Integer (X) * Two_256) mod P);
 
 end P256_Field;

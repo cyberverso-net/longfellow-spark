@@ -393,6 +393,117 @@ package body Sumcheck_Prover is
       null;
    end Lemma_D_Step;
 
+   -------------------------------------------------------------------
+   --  The round evaluations from three sums, three products per pair
+   --  (ADR 0070): a0 = sum q0 w0, s1 = sum q1 w1 and a2 = sum dq dw,
+   --  with dq = q1 - q0 and dw = w1 - w0. Each pair contributes
+   --  (q0 + x dq) (w0 + x dw) = a0 + x (s1 - a0 - a2) + x^2 a2 to p (x),
+   --  and the combination is additive, so p (P2) is Comb of the sums.
+   --  These identities are the Lemma_Comb_*_F of Sumcheck_Algebra,
+   --  proved in Ring_Laws on the hidden wrappers.
+   -------------------------------------------------------------------
+
+   function Comb (X, A0, S1, A2 : Element) return Element
+     renames ST.SA.Comb_F;
+
+   --  p (1) over the first M pairs.
+   function D1_Ref
+     (QW : Element_Array; A : Element_Array; NA : Natural; M : Natural)
+      return Element
+   is
+     (if M = 0 then Zero
+      else D1_Ref (QW, A, NA, M - 1)
+           + Ref (QW, NA, 2 * M - 1) * Ref (A, NA, 2 * M - 1))
+   with Ghost => Proof_Only,
+        Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre => QW'First = 0 and then A'First = 0
+               and then NA <= QW'Length and then NA <= A'Length
+               and then M <= Natural'Last / 2,
+        Subprogram_Variant => (Decreases => M);
+
+   --  The leading coefficient over the first M pairs.
+   function Dd_Ref
+     (QW : Element_Array; A : Element_Array; NA : Natural; M : Natural)
+      return Element
+   is
+     (if M = 0 then Zero
+      else Dd_Ref (QW, A, NA, M - 1)
+           + (Ref (QW, NA, 2 * M - 1) - Ref (QW, NA, 2 * (M - 1)))
+             * (Ref (A, NA, 2 * M - 1) - Ref (A, NA, 2 * (M - 1))))
+   with Ghost => Proof_Only,
+        Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre => QW'First = 0 and then A'First = 0
+               and then NA <= QW'Length and then NA <= A'Length
+               and then M <= Natural'Last / 2,
+        Subprogram_Variant => (Decreases => M);
+
+   procedure Lemma_D13_Step
+     (QW : Element_Array; A : Element_Array; NA : Natural; M : Natural)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => QW'First = 0 and then A'First = 0
+               and then NA <= QW'Length and then NA <= A'Length
+               and then M <= Natural'Last / 2,
+     Post   =>
+       (if M = 0 then
+          Same (D1_Ref (QW, A, NA, M), Zero)
+          and then Same (Dd_Ref (QW, A, NA, M), Zero)
+        else
+          Same (D1_Ref (QW, A, NA, M),
+                D1_Ref (QW, A, NA, M - 1)
+                + Ref (QW, NA, 2 * M - 1) * Ref (A, NA, 2 * M - 1))
+          and then
+          Same (Dd_Ref (QW, A, NA, M),
+                Dd_Ref (QW, A, NA, M - 1)
+                + (Ref (QW, NA, 2 * M - 1) - Ref (QW, NA, 2 * (M - 1)))
+                  * (Ref (A, NA, 2 * M - 1) - Ref (A, NA, 2 * (M - 1)))))
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", D1_Ref);
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Dd_Ref);
+   begin
+      null;
+   end Lemma_D13_Step;
+
+   procedure Lemma_D2_Split
+     (QW : Element_Array; A : Element_Array; NA : Natural; X2 : Element;
+      M  : Natural)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => QW'First = 0 and then A'First = 0
+               and then NA <= QW'Length and then NA <= A'Length
+               and then M <= Natural'Last / 2,
+     Post   => Same (D2_Ref (QW, A, NA, X2, M),
+                     Comb (X2, D0_Ref (QW, A, NA, M), D1_Ref (QW, A, NA, M),
+                           Dd_Ref (QW, A, NA, M))),
+     Subprogram_Variant => (Decreases => M)
+   is
+   begin
+      Lemma_D13_Step (QW, A, NA, M);
+      if M = 0 then
+         Lemma_D_Zero (QW, A, NA, X2);
+         ST.SA.Lemma_Comb_Zero_F (X2);
+      else
+         Lemma_D2_Split (QW, A, NA, X2, M - 1);
+         Lemma_D_Step (QW, A, NA, X2, M);
+         ST.SA.Lemma_Comb_Add_F
+           (X2, D0_Ref (QW, A, NA, M - 1), D1_Ref (QW, A, NA, M - 1),
+            Dd_Ref (QW, A, NA, M - 1),
+            Ref (QW, NA, 2 * (M - 1)) * Ref (A, NA, 2 * (M - 1)),
+            Ref (QW, NA, 2 * M - 1) * Ref (A, NA, 2 * M - 1),
+            (Ref (QW, NA, 2 * M - 1) - Ref (QW, NA, 2 * (M - 1)))
+            * (Ref (A, NA, 2 * M - 1) - Ref (A, NA, 2 * (M - 1))));
+         ST.SA.Lemma_Comb_Pair_F
+           (X2, Ref (QW, NA, 2 * (M - 1)), Ref (QW, NA, 2 * M - 1),
+            Ref (A, NA, 2 * (M - 1)), Ref (A, NA, 2 * M - 1));
+      end if;
+   end Lemma_D2_Split;
+
    procedure Round_Evals_Dense
      (T      : Term_Array;
       Active : Element_Array;
@@ -407,6 +518,7 @@ package body Sumcheck_Prover is
    is
       Hb : Natural;
       Q0, Q1, W0, W1 : Element;
+      S1, A2 : Element;
    begin
       for X in 0 .. NA - 1 loop
          QW (X) := Zero;
@@ -430,24 +542,36 @@ package body Sumcheck_Prover is
          end if;
          Lemma_QW_Step (T, Other, NO, H, I - T'First + 1);
       end loop;
+      pragma Assert
+        (Proof_Only =>
+           (for all X in 0 .. NA - 1 =>
+              Same (QW (X), QW_Ref (T, Other, NO, H, X, T'Length))));
 
-      --  The pairs: p (0) and p (P2), three products per pair.
+      --  The pairs: the three sums, three products per pair, then
+      --  p (P2) from them (prover.rs, quad_round_poly; ADR 0070).
       Ev0 := Zero;
-      Ev2 := Zero;
+      S1  := Zero;
+      A2  := Zero;
       Lemma_D_Zero (QW, Active, NA, X2);
+      Lemma_D13_Step (QW, Active, NA, 0);
       for M in 0 .. (NA + 1) / 2 - 1 loop
          pragma Loop_Invariant
            (Proof_Only =>
               Same (Ev0, D0_Ref (QW, Active, NA, M))
-              and then Same (Ev2, D2_Ref (QW, Active, NA, X2, M)));
+              and then Same (S1, D1_Ref (QW, Active, NA, M))
+              and then Same (A2, Dd_Ref (QW, Active, NA, M)));
          Q0 := Ref (QW, NA, 2 * M);
          Q1 := Ref (QW, NA, 2 * M + 1);
          W0 := Ref (Active, NA, 2 * M);
          W1 := Ref (Active, NA, 2 * M + 1);
          Ev0 := Ev0 + Q0 * W0;
-         Ev2 := Ev2 + (Q0 + X2 * (Q1 - Q0)) * (W0 + X2 * (W1 - W0));
+         S1  := S1 + Q1 * W1;
+         A2  := A2 + (Q1 - Q0) * (W1 - W0);
          Lemma_D_Step (QW, Active, NA, X2, M + 1);
+         Lemma_D13_Step (QW, Active, NA, M + 1);
       end loop;
+      Ev2 := Comb (X2, Ev0, S1, A2);
+      Lemma_D2_Split (QW, Active, NA, X2, (NA + 1) / 2);
    end Round_Evals_Dense;
 
    procedure Bind_G_T (T : in out Term_Array; E : Element_Array;

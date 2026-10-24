@@ -12,25 +12,132 @@ package body Sumcheck_Algebra is
    procedure Free_Elems is
      new Ada.Unchecked_Deallocation (Element_Array, Elems_Access);
 
-   function "+" (A, B : Element) return Element is
-   begin
-      return F."+" (A, B);
-   end "+";
+   function "+" (A, B : Element) return Element is (F."+" (A, B));
+   function "-" (A, B : Element) return Element is (F."-" (A, B));
+   function "*" (A, B : Element) return Element is (F."*" (A, B));
+   function Neg (A : Element) return Element is (F.Neg (A));
 
-   function "-" (A, B : Element) return Element is
-   begin
-      return F."-" (A, B);
-   end "-";
+   ----------------------------------------------------------------------
+   --  The ring laws on the wrappers (ADR 0070): each is the law of the
+   --  field with the wrappers unhidden.
+   ----------------------------------------------------------------------
 
-   function "*" (A, B : Element) return Element is
+   procedure Lemma_Mul_Assoc (A, B, C : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
    begin
-      return F."*" (A, B);
-   end "*";
+      F.Lemma_Mul_Assoc (A, B, C);
+   end Lemma_Mul_Assoc;
 
-   function Neg (A : Element) return Element is
+   procedure Lemma_Mul_Comm (A, B : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
    begin
-      return F.Neg (A);
-   end Neg;
+      F.Lemma_Mul_Comm (A, B);
+   end Lemma_Mul_Comm;
+
+   procedure Lemma_Mul_One (A : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      F.Lemma_Mul_One (A);
+   end Lemma_Mul_One;
+
+   procedure Lemma_Mul_Distrib (A, B, C : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+   begin
+      F.Lemma_Mul_Distrib (A, B, C);
+   end Lemma_Mul_Distrib;
+
+   procedure Lemma_Mul_Distrib_Sub (A, B, C : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+   begin
+      F.Lemma_Mul_Distrib_Sub (A, B, C);
+   end Lemma_Mul_Distrib_Sub;
+
+   procedure Lemma_Add_Assoc (A, B, C : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+   begin
+      F.Lemma_Add_Assoc (A, B, C);
+   end Lemma_Add_Assoc;
+
+   procedure Lemma_Add_Comm (A, B : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+   begin
+      F.Lemma_Add_Comm (A, B);
+   end Lemma_Add_Comm;
+
+   procedure Lemma_Add_Zero (A : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+   begin
+      F.Lemma_Add_Zero (A);
+   end Lemma_Add_Zero;
+
+   procedure Lemma_Add_Neg (A : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Neg);
+   begin
+      F.Lemma_Add_Neg (A);
+   end Lemma_Add_Neg;
+
+   procedure Lemma_Sub_Def (A, B : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Neg);
+   begin
+      F.Lemma_Sub_Def (A, B);
+   end Lemma_Sub_Def;
+
+   ----------------------------------------------------------------------
+   --  The round evaluations on the operations of the field (ADR 0070).
+   ----------------------------------------------------------------------
+
+   procedure Lemma_Comb_Zero_F (X : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Comb_Zero (X);
+   end Lemma_Comb_Zero_F;
+
+   procedure Lemma_Comb_Add_F (X, A, S, D, A2, S2, D2 : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Comb_Add (X, A, S, D, A2, S2, D2);
+   end Lemma_Comb_Add_F;
+
+   procedure Lemma_Comb_Pair_F (X, Q0, Q1, W0, W1 : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Comb_Pair (X, Q0, Q1, W0, W1);
+   end Lemma_Comb_Pair_F;
 
    function Bit_Of (X : Natural; B : Natural) return Boolean is
    begin
@@ -58,7 +165,7 @@ package body Sumcheck_Algebra is
    end Eq;
 
    ----------------------------------------------------------------------
-   --  Bindeq: from a_N = [One], expand a_{K+1} (Size elements) into a_K
+   --  Bindeq: from a_N = [W], expand a_{K+1} (Size elements) into a_K
    --  (2 Size elements) in place, highest index first so that no
    --  element is overwritten before it is read.
    ----------------------------------------------------------------------
@@ -77,45 +184,96 @@ package body Sumcheck_Algebra is
       end if;
    end Lemma_Pow2_Mono;
 
-   procedure Bindeq (C : Element_Array; B : out Element_Array) is
+   --  Bindeq scaled by W: the expansion started from [W] instead of
+   --  [One]. One product per pair, as upstream (eq.rs, fill_recursive):
+   --  the high half is c t, the low half t - c t (ADR 0070).
+   procedure Bindeq_From (C : Element_Array; W : Element;
+                          B : out Element_Array)
+   with
+     Global => null,
+     Pre  => C'First = 0 and then C'Length <= Max_Bindeq_Log
+       and then B'First = 0
+       and then To_Big_Integer (B'Length) = Pow2 (C'Length),
+     Post => (for all I in B'Range =>
+                Same (B (I), W * Bindeq_Ref (C, 0, I)));
+
+   procedure Bindeq_From (C : Element_Array; W : Element;
+                          B : out Element_Array)
+   is
       N    : constant Natural := C'Length;
       Size : Positive := 1;
       T    : Element;
    begin
       B := [others => Zero];
-      B (0) := One;
+      B (0) := W;
+      Lemma_Mul_One (W);
       for K in reverse 0 .. N - 1 loop
          pragma Loop_Invariant (To_Big_Integer (Size) = Pow2 (N - 1 - K));
          pragma Loop_Invariant
            (for all I in 0 .. Size - 1 =>
-              Same (B (I), Bindeq_Ref (C, K + 1, I)));
+              Same (B (I), W * Bindeq_Ref (C, K + 1, I)));
          Lemma_Pow2_Mono (N - K, N);
          pragma Assert (2 * Size <= B'Length);
          for I in reverse 0 .. Size - 1 loop
             T := B (I);
             B (2 * I + 1) := C (K) * T;
-            B (2 * I)     := (One - C (K)) * T;
+            B (2 * I)     := T - B (2 * I + 1);
+            RL.Lemma_Scale (W, C (K), Bindeq_Ref (C, K + 1, I));
+            RL.Lemma_One_Minus (C (K), Bindeq_Ref (C, K + 1, I));
+            Lemma_Mul_Distrib_Sub
+              (W, Bindeq_Ref (C, K + 1, I),
+               C (K) * Bindeq_Ref (C, K + 1, I));
             pragma Loop_Invariant
               (for all J in 0 .. I - 1 =>
-                 Same (B (J), Bindeq_Ref (C, K + 1, J)));
+                 Same (B (J), W * Bindeq_Ref (C, K + 1, J)));
             pragma Loop_Invariant
               (for all J in 2 * I .. 2 * Size - 1 =>
-                 Same (B (J), Bindeq_Ref (C, K, J)));
+                 Same (B (J), W * Bindeq_Ref (C, K, J)));
          end loop;
          Size := 2 * Size;
       end loop;
+   end Bindeq_From;
+
+   --  One times each entry is the entry.
+   procedure Lemma_Unscale (C : Element_Array; B : Element_Array) with
+     Ghost => Proof_Only,
+     Global => null,
+     Pre  => C'First = 0 and then C'Length <= Max_Bindeq_Log
+       and then B'First = 0
+       and then (for all I in B'Range =>
+                   Same (B (I), One * Bindeq_Ref (C, 0, I))),
+     Post => (for all I in B'Range => Same (B (I), Bindeq_Ref (C, 0, I)));
+
+   procedure Lemma_Unscale (C : Element_Array; B : Element_Array) is
+   begin
+      for I in B'Range loop
+         Lemma_Mul_Comm (One, Bindeq_Ref (C, 0, I));
+         Lemma_Mul_One (Bindeq_Ref (C, 0, I));
+         pragma Loop_Invariant
+           (for all J in B'First .. I => Same (B (J), Bindeq_Ref (C, 0, J)));
+      end loop;
+   end Lemma_Unscale;
+
+   procedure Bindeq (C : Element_Array; B : out Element_Array) is
+   begin
+      Bindeq_From (C, One, B);
+      Lemma_Unscale (C, B);
    end Bindeq;
 
    ----------------------------------------------------------------------
-   --  Bind
+   --  Bind: a + x (b - a), one product (dense.rs, bind; ADR 0070).
    ----------------------------------------------------------------------
 
    procedure Bind (A : Element_Array; X : Element; B : out Element_Array)
    is
+      A0, A1 : Element;
    begin
       B := [others => Zero];
       for I in B'Range loop
-         B (I) := (One - X) * Pad (A, 2 * I) + X * Pad (A, 2 * I + 1);
+         A0 := Pad (A, 2 * I);
+         A1 := Pad (A, 2 * I + 1);
+         B (I) := A0 + X * (A1 - A0);
+         RL.Lemma_Bind_Pair (X, A0, A1);
          pragma Loop_Invariant
            (for all J in 0 .. I =>
               Same (B (J),
@@ -513,10 +671,12 @@ package body Sumcheck_Algebra is
       N  : constant Positive := Table_Len (L);
       B1 : Elems_Access := new Element_Array'(0 .. N - 1 => Zero);
    begin
+      --  The second table starts from alpha (eq.rs, fill_recursive), so
+      --  no product remains in the sum (ADR 0070).
       Bindeq (G0 (0 .. L - 1), E);
-      Bindeq (G1 (0 .. L - 1), B1.all);
+      Bindeq_From (G1 (0 .. L - 1), Alpha, B1.all);
       for X in 0 .. N - 1 loop
-         E (X) := E (X) + Alpha * B1 (X);
+         E (X) := E (X) + B1 (X);
          pragma Loop_Invariant
            (Proof_Only =>
               (for all X2 in 0 .. X =>

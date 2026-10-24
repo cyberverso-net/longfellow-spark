@@ -284,7 +284,9 @@ package Sumcheck_Verifier is
        and then Pad0 <= Max_Pad_Index
        and then Pad1 = Pad0 + 1
        and then Below (Claim, Pad0),
-     Post => Symbolic_Round (Claim, Pad0, Pad1, HP0, HP2, Chal).Length
+     Post => Symbolic_Round (Claim, Pad0, Pad1, HP0, HP2, Chal).Capacity
+             = Claim.Capacity
+       and then Symbolic_Round (Claim, Pad0, Pad1, HP0, HP2, Chal).Length
              <= Claim.Length + 2
        and then Below (Symbolic_Round (Claim, Pad0, Pad1, HP0, HP2, Chal),
                        Pad1 + 1);

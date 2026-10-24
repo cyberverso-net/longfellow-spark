@@ -72,6 +72,58 @@ package Field_P256 is
      Post   => Same (P256_Field.Mul (P256_Field.Mul (A, B), C),
                      P256_Field.Mul (A, P256_Field.Mul (B, C)));
 
+   --  The other ring laws (ADR 0070), stated with Same.
+   procedure Lemma_Mul_Comm (X, Y : P256_Field.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (P256_Field.Mul (X, Y), P256_Field.Mul (Y, X));
+
+   procedure Lemma_Mul_One (A : P256_Field.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (P256_Field.Mul (A, P256_Field.One), A);
+
+   procedure Lemma_Mul_Distrib (A, B, C : P256_Field.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (P256_Field.Mul (A, P256_Field.Add (B, C)),
+                     P256_Field.Add (P256_Field.Mul (A, B),
+                                     P256_Field.Mul (A, C)));
+
+   procedure Lemma_Mul_Distrib_Sub (A, B, C : P256_Field.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (P256_Field.Mul (A, P256_Field.Sub (B, C)),
+                     P256_Field.Sub (P256_Field.Mul (A, B),
+                                     P256_Field.Mul (A, C)));
+
+   procedure Lemma_Add_Assoc (A, B, C : P256_Field.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (P256_Field.Add (P256_Field.Add (A, B), C),
+                     P256_Field.Add (A, P256_Field.Add (B, C)));
+
+   procedure Lemma_Add_Comm (X, Y : P256_Field.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (P256_Field.Add (X, Y), P256_Field.Add (Y, X));
+
+   procedure Lemma_Add_Zero (A : P256_Field.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (P256_Field.Add (A, P256_Field.Zero), A);
+
+   procedure Lemma_Add_Neg (A : P256_Field.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (P256_Field.Add (A, P256_Field.Neg (A)), P256_Field.Zero);
+
+   procedure Lemma_Sub_Def (A, B : P256_Field.Element) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => Same (P256_Field.Sub (A, B),
+                     P256_Field.Add (A, P256_Field.Neg (B)));
+
    package Sig is new Field_Signature
      (Element    => P256_Field.Element,
       Zero       => P256_Field.Zero,
@@ -86,6 +138,15 @@ package Field_P256 is
       L2_Den_Inv => Half,
       Same       => Same,
       Lemma_Mul_Assoc => Lemma_Mul_Assoc,
+      Lemma_Mul_Comm  => Lemma_Mul_Comm,
+      Lemma_Mul_One   => Lemma_Mul_One,
+      Lemma_Mul_Distrib     => Lemma_Mul_Distrib,
+      Lemma_Mul_Distrib_Sub => Lemma_Mul_Distrib_Sub,
+      Lemma_Add_Assoc => Lemma_Add_Assoc,
+      Lemma_Add_Comm  => Lemma_Add_Comm,
+      Lemma_Add_Zero  => Lemma_Add_Zero,
+      Lemma_Add_Neg   => Lemma_Add_Neg,
+      Lemma_Sub_Def   => Lemma_Sub_Def,
       Serialized_Size  => 32,
       To_Bytes         => P256_Field.To_Bytes,
       From_Bytes       => P256_Field.From_Bytes,

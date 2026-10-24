@@ -13,10 +13,11 @@
 --  Gold here is structural (ADR 0023): the postcondition says that the
 --  executable code equals a ghost reference transcribing the formula
 --  of the draft or of the upstream reference implementation, with the
---  operations in the order the reference applies them. SPARK does not
---  know the field laws of the formal "+", "-", "*": no contract below
---  uses commutativity, associativity or distributivity, and the
---  algebraic facts about these formulas (bindeq agrees with eq, the
+--  operations in the order the reference applies them. No contract
+--  below uses a field law. The bodies of Bind and Bindeq compute in
+--  upstream's form, with fewer products, and reach the reference
+--  through the ring laws of Field_Signature (ADR 0070). The algebraic
+--  facts about the formulas themselves (bindeq agrees with eq, the
 --  Lagrange basis interpolates) are tested, not proved.
 --
 --    Eq               : Gold against Eq_Ref (product over the bits of
@@ -66,6 +67,7 @@ with Proof_Levels;
 with Ada.Numerics.Big_Numbers.Big_Integers;
 use  Ada.Numerics.Big_Numbers.Big_Integers;
 with Field_Signature;
+with Ring_Laws;
 
 generic
    with package F is new Field_Signature (<>);
@@ -87,11 +89,20 @@ package Sumcheck_Algebra is
    --  keeps every proof below a matter of congruence between the code
    --  and its ghost reference (ADR 0023) and makes the verification
    --  conditions the same for every instance. Equality is the
-   --  predefined "=" of the element type.
-   function "+" (A, B : Element) return Element with Global => null, Inline;
-   function "-" (A, B : Element) return Element with Global => null, Inline;
-   function "*" (A, B : Element) return Element with Global => null, Inline;
-   function Neg (A : Element) return Element with Global => null, Inline;
+   --  predefined "=" of the element type. The bodies are expression
+   --  functions, hidden; only the ring laws below unhide them.
+   function "+" (A, B : Element) return Element with
+     Global => null, Inline,
+     Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
+   function "-" (A, B : Element) return Element with
+     Global => null, Inline,
+     Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
+   function "*" (A, B : Element) return Element with
+     Global => null, Inline,
+     Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
+   function Neg (A : Element) return Element with
+     Global => null, Inline,
+     Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
    use type F.Element;
 
    --  Logical equality for the structural contracts (Field_Signature):
@@ -100,6 +111,73 @@ package Sumcheck_Algebra is
    --  stated with Same; the semantic tests of the code (k = Zero, a
    --  product = Zero, an output = Zero) keep the predefined "=".
    function Same (A, B : Element) return Boolean renames F.Same;
+
+   --  The ring laws of the field on the wrappers (ADR 0070), each
+   --  proved from the law of the field with the wrappers unhidden.
+   procedure Lemma_Mul_Assoc (A, B, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same ((A * B) * C, A * (B * C));
+   procedure Lemma_Mul_Comm (A, B : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (A * B, B * A);
+   procedure Lemma_Mul_One (A : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (A * One, A);
+   procedure Lemma_Mul_Distrib (A, B, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (A * (B + C), A * B + A * C);
+   procedure Lemma_Mul_Distrib_Sub (A, B, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (A * (B - C), A * B - A * C);
+   procedure Lemma_Add_Assoc (A, B, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same ((A + B) + C, A + (B + C));
+   procedure Lemma_Add_Comm (A, B : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (A + B, B + A);
+   procedure Lemma_Add_Zero (A : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (A + Zero, A);
+   procedure Lemma_Add_Neg (A : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (A + Neg (A), Zero);
+   procedure Lemma_Sub_Def (A, B : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (A - B, A + Neg (B));
+
+   --  Their consequences, for the bodies here and for the prover. The
+   --  instance sees the wrappers only, so the contracts of the field
+   --  stay out of these proofs.
+   package RL is new Ring_Laws
+     (Element, Zero, One, "+", "-", "*", Neg, Same,
+      Lemma_Mul_Assoc, Lemma_Mul_Comm, Lemma_Mul_One, Lemma_Mul_Distrib,
+      Lemma_Mul_Distrib_Sub, Lemma_Add_Assoc, Lemma_Add_Comm,
+      Lemma_Add_Zero, Lemma_Add_Neg, Lemma_Sub_Def);
+
+   --  The round evaluations of the prover from three sums (ADR 0070),
+   --  on the operations of the field, which the prover computes with:
+   --  Comb_F is RL.Comb, and each lemma below is the lemma of RL with
+   --  the wrappers unhidden.
+   function Comb_F (X, A0, S1, A2 : Element) return Element is
+     (F."+" (F."+" (A0, F."*" (X, F."-" (F."-" (S1, A0), A2))),
+             F."*" (F."*" (X, X), A2)))
+   with Global => null, Inline;
+
+   procedure Lemma_Comb_Zero_F (X : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (Comb_F (X, Zero, Zero, Zero), Zero);
+
+   procedure Lemma_Comb_Add_F (X, A, S, D, A2, S2, D2 : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (Comb_F (X, F."+" (A, A2), F."+" (S, S2), F."+" (D, D2)),
+                    F."+" (Comb_F (X, A, S, D), Comb_F (X, A2, S2, D2)));
+
+   procedure Lemma_Comb_Pair_F (X, Q0, Q1, W0, W1 : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."*" (F."+" (Q0, F."*" (X, F."-" (Q1, Q0))),
+                           F."+" (W0, F."*" (X, F."-" (W1, W0)))),
+                    Comb_F (X, F."*" (Q0, W0), F."*" (Q1, W1),
+                            F."*" (F."-" (Q1, Q0), F."-" (W1, W0))));
 
    --  Arrays of elements are indexed from 0; the index subtype stops
    --  one short of Natural'Last so that 'Length always fits Natural.

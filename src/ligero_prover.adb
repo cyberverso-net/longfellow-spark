@@ -768,7 +768,13 @@ package body Ligero_Prover is
          for J in 0 .. WR - 1 loop
             Wk.A_Ext (NREQ + J) := Wk.A_Full (I * WR + J);
          end loop;
-         Encode_Row (Wk.A_Ext, Com.T_Block, Wk.A_Enc);
+         --  Only the first dblock columns enter y_dot: the FFT extends
+         --  to them alone (prover.rs, dot_proof; ADR 0070).
+         if Use_Fft then
+            Encode_Row (Wk.A_Ext, Com.T_Block, Wk.A_Enc (0 .. K_D - 1));
+         else
+            Encode_Row (Wk.A_Ext, Com.T_Block, Wk.A_Enc);
+         end if;
          for X in 0 .. K_D - 1 loop
             Wk.Row_Buf (X) := Com.Tab (Witness_Row_Start (G) + I, X);
          end loop;

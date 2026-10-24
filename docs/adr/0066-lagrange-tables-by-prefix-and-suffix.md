@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-22, milestone M2 of Phase D). Amends the last item of the decision of [ADR 0063](0063-milestone-m1-algorithmic-parity.md): the verifier's Lagrange tables are built from prefix and suffix products, not with barycentric weights.
+Proposed (2026-10-22, milestone M2 of Phase D). Amends the last item of the decision of [ADR 0063](0063-milestone-m1-algorithmic-parity.md): the verifier's Lagrange tables are built from prefix and suffix products, not with barycentric weights. Amended 2026-10-23 by [ADR 0070](0070-sumcheck-and-ligero-kernels-as-upstream.md): the limbs of a P-256 element are scalar components, so equal limbs give equal elements, and `Norm` leaves the code.
 
 ## Date
 
