@@ -245,6 +245,7 @@ package body Sumcheck_Verifier is
       Proof   : Sumcheck_Proof;
       Ch      : Challenges;
       Base    : Natural;
+      EQQ_In  : Element;
       State   : in out Claims_State;
       A       : in out Ligero_Terms;
       B       : in out Element_Array;
@@ -267,7 +268,6 @@ package body Sumcheck_Verifier is
       Lemma_Pad_Step (C, J, Base);
       declare
          Alpha : constant Element := Ch.Layer (CO);
-         Beta  : constant Element := Ch.Layer (CO + 1);
          SC1   : constant Expression := Scale (State.Claim1, Alpha);
          Claim : Expression (Cap) := Add (State.Claim0, SC1);
       begin
@@ -293,22 +293,11 @@ package body Sumcheck_Verifier is
             end;
          end loop;
 
-         --  The bound quad, by the bindeq tables when they fit (Phase D,
-         --  M1), otherwise term by term as Section 6.7 writes it.
+         --  The bound quad, from Bound_Quads in the verifier and from the
+         --  sumcheck in the prover (ADR 0071).
          declare
-            EQQ_V : Element;
+            EQQ_V : constant Element := EQQ_In;
          begin
-            if State.Logv <= Max_Bindeq_Log
-              and then Logw <= Max_Bindeq_Log
-            then
-               Eval_Bound_Quad_T (Layer_Terms (C, J), State.Logv,
-                                  State.HC0, State.HC1, HC0, HC1, Logw,
-                                  Alpha, Beta, EQQ_V);
-            else
-               EQQ_V := Eval_Bound_Quad (Layer_Terms (C, J), State.Logv,
-                                         State.HC0, State.HC1, HC0, HC1,
-                                         Logw, Alpha, Beta);
-            end if;
             declare
                EQQ  : constant Element := EQQ_V;
                C0   : constant Natural := PB + 4 * Logw;
@@ -561,11 +550,164 @@ package body Sumcheck_Verifier is
    --  Verifier_Core
    ----------------------------------------------------------------------
 
+   procedure Lemma_BQ_Ref_Frame
+     (C        : Circuit;
+      Ch1, Ch2 : Challenges;
+      J        : Natural;
+      Lim      : Natural)
+   is
+      pragma Unreferenced (Lim);
+      Logw : constant Natural := C.Layers (J).Logw;
+      Logv : constant Natural := Layer_Logv (C, J);
+   begin
+      if J > 0 then
+         Lemma_Chal_Step (C, J - 1);
+      end if;
+      if Logv <= Max_Bindeq_Log and then Logw <= Max_Bindeq_Log then
+         Lemma_EBQT_Frame
+           (Layer_Terms (C, J), Layer_Terms (C, J)'Length, Logv,
+            Layer_G (C, Ch1, J, 0), Layer_G (C, Ch1, J, 1),
+            Layer_G (C, Ch2, J, 0), Layer_G (C, Ch2, J, 1),
+            Hand_Chal (C, Ch1, J, 0), Hand_Chal (C, Ch1, J, 1),
+            Hand_Chal (C, Ch2, J, 0), Hand_Chal (C, Ch2, J, 1),
+            Logw, Chv (Ch1, Chal_Off (C, J)), Chv (Ch1, Chal_Off (C, J) + 1));
+      else
+         Lemma_EBQ_Frame
+           (Layer_Terms (C, J), Layer_Terms (C, J)'Length, Logv,
+            Layer_G (C, Ch1, J, 0), Layer_G (C, Ch1, J, 1),
+            Layer_G (C, Ch2, J, 0), Layer_G (C, Ch2, J, 1),
+            Hand_Chal (C, Ch1, J, 0), Hand_Chal (C, Ch1, J, 1),
+            Hand_Chal (C, Ch2, J, 0), Hand_Chal (C, Ch2, J, 1),
+            Logw, Chv (Ch1, Chal_Off (C, J)), Chv (Ch1, Chal_Off (C, J) + 1));
+      end if;
+   end Lemma_BQ_Ref_Frame;
+
+   procedure Lemma_BQ_Ref_Frame_All
+     (C        : Circuit;
+      Ch1, Ch2 : Challenges;
+      J        : Natural)
+   is
+   begin
+      for J2 in 0 .. J - 1 loop
+         Lemma_Chal_Step (C, J2);
+         Lemma_Chal_Mono (C, J2 + 1, J);
+         Lemma_BQ_Ref_Frame (C, Ch1, Ch2, J2, Chal_Off (C, J));
+         pragma Loop_Invariant
+           (for all J3 in 0 .. J2 =>
+              Same (BQ_Ref (C, Ch1, J3), BQ_Ref (C, Ch2, J3)));
+      end loop;
+   end Lemma_BQ_Ref_Frame_All;
+
+   procedure Lemma_Hand_Chal
+     (C  : Circuit;
+      Ch : Challenges;
+      J  : Natural;
+      H  : Natural;
+      V  : Element_Array)
+   is
+   begin
+      null;
+   end Lemma_Hand_Chal;
+
+   procedure Lemma_Layer_G_Frame
+     (C        : Circuit;
+      Ch1, Ch2 : Challenges;
+      J        : Natural)
+   is
+      pragma Unreferenced (Ch1, Ch2);
+   begin
+      if J > 0 then
+         Lemma_Chal_Step (C, J - 1);
+      end if;
+   end Lemma_Layer_G_Frame;
+
+   procedure Lemma_BQ_Ref_From
+     (C        : Circuit;
+      Ch       : Challenges;
+      J        : Natural;
+      Logv     : Natural;
+      G0, G1   : Element_Array;
+      HC0, HC1 : Element_Array;
+      V        : Element)
+   is
+      pragma Unreferenced (V);
+      Logw : constant Natural := C.Layers (J).Logw;
+   begin
+      Lemma_Hand_Chal (C, Ch, J, 0, HC0);
+      Lemma_Hand_Chal (C, Ch, J, 1, HC1);
+      if Logv <= Max_Bindeq_Log and then Logw <= Max_Bindeq_Log then
+         Lemma_EBQT_Frame
+           (Layer_Terms (C, J), Layer_Terms (C, J)'Length, Logv,
+            G0, G1, Layer_G (C, Ch, J, 0), Layer_G (C, Ch, J, 1),
+            HC0, HC1, Hand_Chal (C, Ch, J, 0), Hand_Chal (C, Ch, J, 1),
+            Logw, Ch.Layer (Chal_Off (C, J)), Ch.Layer (Chal_Off (C, J) + 1));
+      else
+         Lemma_EBQ_Frame
+           (Layer_Terms (C, J), Layer_Terms (C, J)'Length, Logv,
+            G0, G1, Layer_G (C, Ch, J, 0), Layer_G (C, Ch, J, 1),
+            HC0, HC1, Hand_Chal (C, Ch, J, 0), Hand_Chal (C, Ch, J, 1),
+            Logw, Ch.Layer (Chal_Off (C, J)), Ch.Layer (Chal_Off (C, J) + 1));
+      end if;
+   end Lemma_BQ_Ref_From;
+
+   procedure Bound_Quads (C : Circuit; Ch : Challenges; BQ : out Element_Array)
+   is
+      Logv   : Natural := Ceil_Lg2 (C.Noutput);
+      G0, G1 : Challenge_Vector := Ch.G;
+   begin
+      BQ := [others => Zero];
+      for J in 0 .. C.Last_Layer loop
+         pragma Loop_Invariant (Logv <= Max_Logw);
+         pragma Loop_Invariant
+           (Proof_Only =>
+              Logv = Layer_Logv (C, J)
+              and then (for all R in 0 .. Logv - 1 =>
+                          Same (G0 (R), Layer_G (C, Ch, J, 0) (R))
+                          and then Same (G1 (R), Layer_G (C, Ch, J, 1) (R)))
+              and then (for all J2 in 0 .. J - 1 =>
+                          Same (BQ (J2), BQ_Ref (C, Ch, J2))));
+         Lemma_Chal_Step (C, J);
+         Lemma_Chal_Mono (C, J + 1, C.Last_Layer + 1);
+         declare
+            Logw : constant Logw_Type := C.Layers (J).Logw;
+            CO   : constant Natural := Chal_Off (C, J);
+            HC0  : Challenge_Vector := [others => Zero];
+            HC1  : Challenge_Vector := [others => Zero];
+            V    : Element;
+         begin
+            for R in 0 .. Logw - 1 loop
+               HC0 (R) := Ch.Layer (CO + 2 + 2 * R);
+               HC1 (R) := Ch.Layer (CO + 2 + 2 * R + 1);
+               pragma Loop_Invariant
+                 (for all R2 in 0 .. R =>
+                    Same (HC0 (R2), Ch.Layer (CO + 2 + 2 * R2))
+                    and then Same (HC1 (R2), Ch.Layer (CO + 2 + 2 * R2 + 1)));
+            end loop;
+            if Logv <= Max_Bindeq_Log and then Logw <= Max_Bindeq_Log then
+               Eval_Bound_Quad_T (Layer_Terms (C, J), Logv, G0, G1, HC0, HC1,
+                                  Logw, Ch.Layer (CO), Ch.Layer (CO + 1), V);
+            else
+               V := Eval_Bound_Quad (Layer_Terms (C, J), Logv, G0, G1,
+                                     HC0, HC1, Logw,
+                                     Ch.Layer (CO), Ch.Layer (CO + 1));
+            end if;
+            Lemma_BQ_Ref_From (C, Ch, J, Logv, G0, G1, HC0, HC1, V);
+            Lemma_Hand_Chal (C, Ch, J, 0, HC0);
+            Lemma_Hand_Chal (C, Ch, J, 1, HC1);
+            BQ (J) := V;
+            Logv := Logw;
+            G0 := HC0;
+            G1 := HC1;
+         end;
+      end loop;
+   end Bound_Quads;
+
    procedure Verifier_Core
      (C       : Circuit;
       Pub     : Element_Array;
       Proof   : Sumcheck_Proof;
       Ch      : Challenges;
+      BQ      : Element_Array;
       A       : out Ligero_Terms;
       B       : out Element_Array;
       Lqc     : out Lqc_Array)
@@ -605,7 +747,8 @@ package body Sumcheck_Verifier is
                           Z => Pad_Off (C, J2, Base) + 4 * C.Layers (J2).Logw
                                  + 2));
          Lemma_Pad_Step (C, J, Base);
-         Verify_Layer (C, J, Proof, Ch, Base, State, A, B, B_Count, Lqc (J));
+         Verify_Layer
+           (C, J, Proof, Ch, Base, BQ (J), State, A, B, B_Count, Lqc (J));
       end loop;
       Input_Constraint (C, Pub, State, Ch.Alpha_Input, A, B, B_Count);
    end Verifier_Core;

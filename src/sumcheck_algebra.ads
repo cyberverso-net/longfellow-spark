@@ -179,6 +179,126 @@ package Sumcheck_Algebra is
                     Comb_F (X, F."*" (Q0, W0), F."*" (Q1, W1),
                             F."*" (F."-" (Q1, Q0), F."-" (W1, W0))));
 
+   --  The identities of the bound quad of the prover (ADR 0071), on
+   --  the operations of the field.
+   procedure Lemma_Split_Zero_F (F0, F1 : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."+" (F."*" (F0, Zero), F."*" (F1, Zero)),
+                    Zero);
+
+   procedure Lemma_Split_L_F (F0, F1, V0, V1, Y : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."+" (F."*" (F0, F."+" (V0, Y)), F."*" (F1, V1)),
+                    F."+" (F."+" (F."*" (F0, V0), F."*" (F1, V1)), F."*" (F0,
+                                                                          Y)));
+
+   procedure Lemma_Split_R_F (F0, F1, V0, V1, Y : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."+" (F."*" (F0, V0), F."*" (F1, F."+" (V1, Y))),
+                    F."+" (F."+" (F."*" (F0, V0), F."*" (F1, V1)), F."*" (F1,
+                                                                          Y)));
+
+   procedure Lemma_Split_LR_F (F0, F1, V0, V1, Y0, Y1 : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."+" (F."*" (F0, F."+" (V0, Y0)), F."*" (F1, F."+" (V1,
+                                                                         Y1))),
+                    F."+" (F."+" (F."*" (F0, V0), F."*" (F1, V1)),
+                           F."+" (F."*" (F0, Y0), F."*" (F1, Y1))));
+
+   procedure Lemma_Corner_Even_F (K, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."-" (K, F."*" (K, C)),
+                    F."*" (F."-" (One, C), K));
+
+   procedure Lemma_Corner_Odd_F (K, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."*" (K, C),
+                    F."*" (C, K));
+
+   procedure Lemma_Corner_Two_F (K0, K1, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."+" (K0, F."*" (F."-" (K1, K0), C)),
+                    F."+" (F."*" (F."-" (One, C), K0), F."*" (C, K1)));
+
+   procedure Lemma_Move_L_F (K, P0, Fc, P1 : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."*" (F."*" (K, F."*" (P0, Fc)), P1),
+                    F."*" (Fc, F."*" (F."*" (K, P0), P1)));
+
+   procedure Lemma_Move_R_F (K, P0, P1, Fc : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."*" (F."*" (K, P0), F."*" (P1, Fc)),
+                    F."*" (Fc, F."*" (F."*" (K, P0), P1)));
+
+   procedure Lemma_One_Mul_F (B : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."*" (One, B),
+                    B);
+
+   procedure Lemma_One_Twice_F (K : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."*" (F."*" (K, One), One),
+                    K);
+
+   procedure Lemma_Zero_Mul_Twice_F (B, X : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."*" (F."*" (B, Zero), X),
+                    Zero);
+
+   procedure Lemma_Assoc_Add_F (S, R, K : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."+" (F."+" (S, R), K),
+                    F."+" (S, F."+" (R, K)));
+
+   procedure Lemma_Zero_Add_Once_F (K : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."+" (Zero, K),
+                    K);
+
+   procedure Lemma_Add_Zero_Once_F (S : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."+" (S, Zero),
+                    S);
+
+   procedure Lemma_Mul_One_Once_F (P : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."*" (P, One),
+                    P);
+
+   procedure Lemma_Assoc_Mul_F (P, Fc, B : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."*" (F."*" (P, Fc), B),
+                    F."*" (P, F."*" (Fc, B)));
+
+   procedure Lemma_Zero_Mul_R_F (X : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."*" (X, Zero),
+                    Zero);
+
+   --  The corners of Bind_H, from the operations of the field to the
+   --  wrappers (ADR 0071).
+
+   procedure Lemma_Corner_Two_W (K0, K1, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."+" (K0, F."*" (F."-" (K1, K0), C)),
+                    (One - C) * K0 + C * K1);
+
+   procedure Lemma_Corner_Even_W (K, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."-" (K, F."*" (K, C)), (One - C) * K);
+
+   procedure Lemma_Corner_Odd_W (K, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."*" (K, C), C * K);
+
+   procedure Lemma_Add_W (A, B : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."+" (A, B), A + B);
+
+   procedure Lemma_Mul_W (A, B : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."*" (A, B), A * B);
+
    --  Arrays of elements are indexed from 0; the index subtype stops
    --  one short of Natural'Last so that 'Length always fits Natural.
    subtype Index is Natural range 0 .. Natural'Last - 1;
@@ -688,5 +808,102 @@ package Sumcheck_Algebra is
      Post => Same (Eval_Bound_Quad'Result,
                    EBQ_Ref (T, T'Length, Logv, G0, G1, HC0, HC1, Logw,
                             Alpha, Beta));
+
+   -------------------------------------------------------------------
+   --  The references of the bound quad read only the challenges they
+   --  bind (ADR 0071): two challenge vectors that agree on their first
+   --  L entries give the same value.
+   -------------------------------------------------------------------
+
+   procedure Lemma_Bindeq_Frame (C1, C2 : Element_Array; K : Natural;
+                                 I : Natural)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => C1'First = 0 and then C2'First = 0
+                and then C1'Length = C2'Length
+                and then C1'Length <= Max_Bindeq_Log
+                and then K <= C1'Length
+                and then (for all J in K .. C1'Length - 1 =>
+                            Same (C1 (J), C2 (J))),
+        Post => Same (Bindeq_Ref (C1, K, I), Bindeq_Ref (C2, K, I)),
+        Subprogram_Variant => (Increases => K);
+
+   procedure Lemma_Beq_Frame (C1, C2 : Element_Array; L : Natural;
+                              X : Natural)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => C1'First = 0 and then C2'First = 0
+                and then L <= C1'Length and then L <= C2'Length
+                and then L <= Max_Bindeq_Log
+                and then (for all J in 0 .. L - 1 => Same (C1 (J), C2 (J))),
+        Post => Same (Beq (C1, L, X), Beq (C2, L, X));
+
+   procedure Lemma_Eq_Frame (R1, R2 : Element_Array; X : Natural;
+                             N : Natural)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => R1'First = 0 and then R2'First = 0
+                and then N <= R1'Length and then N <= R2'Length
+                and then N <= Max_Logw
+                and then (for all J in 0 .. N - 1 => Same (R1 (J), R2 (J))),
+        Post => Same (Eq_Ref (R1, X, N), Eq_Ref (R2, X, N)),
+        Subprogram_Variant => (Decreases => N);
+
+   procedure Lemma_EBQT_Frame
+     (T                  : Term_Array;
+      N                  : Natural;
+      Logv               : Natural;
+      G0, G1, D0, D1     : Element_Array;
+      HC0, HC1, E0, E1   : Element_Array;
+      Logw               : Natural;
+      Alpha, Beta        : Element)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => N <= T'Length
+          and then G0'First = 0 and then G1'First = 0
+          and then D0'First = 0 and then D1'First = 0
+          and then Logv <= G0'Length and then Logv <= G1'Length
+          and then Logv <= D0'Length and then Logv <= D1'Length
+          and then Logv <= Max_Bindeq_Log
+          and then HC0'First = 0 and then HC1'First = 0
+          and then E0'First = 0 and then E1'First = 0
+          and then Logw <= HC0'Length and then Logw <= HC1'Length
+          and then Logw <= E0'Length and then Logw <= E1'Length
+          and then Logw <= Max_Bindeq_Log
+          and then (for all J in 0 .. Logv - 1 =>
+                      Same (G0 (J), D0 (J)) and then Same (G1 (J), D1 (J)))
+          and then (for all J in 0 .. Logw - 1 =>
+                      Same (HC0 (J), E0 (J)) and then Same (HC1 (J), E1 (J))),
+        Post => Same (EBQT_Ref (T, N, Logv, G0, G1, HC0, HC1, Logw,
+                                Alpha, Beta),
+                      EBQT_Ref (T, N, Logv, D0, D1, E0, E1, Logw,
+                                Alpha, Beta)),
+        Subprogram_Variant => (Decreases => N);
+
+   procedure Lemma_EBQ_Frame
+     (T                  : Term_Array;
+      N                  : Natural;
+      Logv               : Natural;
+      G0, G1, D0, D1     : Element_Array;
+      HC0, HC1, E0, E1   : Element_Array;
+      Logw               : Natural;
+      Alpha, Beta        : Element)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => N <= T'Length
+          and then G0'First = 0 and then G1'First = 0
+          and then D0'First = 0 and then D1'First = 0
+          and then Logv <= G0'Length and then Logv <= G1'Length
+          and then Logv <= D0'Length and then Logv <= D1'Length
+          and then Logv <= Max_Logw
+          and then HC0'First = 0 and then HC1'First = 0
+          and then E0'First = 0 and then E1'First = 0
+          and then Logw <= HC0'Length and then Logw <= HC1'Length
+          and then Logw <= E0'Length and then Logw <= E1'Length
+          and then Logw <= Max_Logw
+          and then (for all J in 0 .. Logv - 1 =>
+                      Same (G0 (J), D0 (J)) and then Same (G1 (J), D1 (J)))
+          and then (for all J in 0 .. Logw - 1 =>
+                      Same (HC0 (J), E0 (J)) and then Same (HC1 (J), E1 (J))),
+        Post => Same (EBQ_Ref (T, N, Logv, G0, G1, HC0, HC1, Logw,
+                               Alpha, Beta),
+                      EBQ_Ref (T, N, Logv, D0, D1, E0, E1, Logw,
+                               Alpha, Beta)),
+        Subprogram_Variant => (Decreases => N);
 
 end Sumcheck_Algebra;

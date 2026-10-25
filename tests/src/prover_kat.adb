@@ -648,6 +648,7 @@ procedure Prover_KAT is
             Pads  : SA.Element_Array (0 .. SPR.Pad_Total (C.all) - 1);
             Proof : SV.Sumcheck_Proof (Last => SV.Proof_Total (C.all) - 1);
             Ch    : SV.Challenges (Last => SV.Chal_Total (C.all) - 1);
+            BQ    : SA.Element_Array (0 .. C.Last_Layer);
             Out_B : Byte_Array (0 .. PW.Sumcheck_Len (C.all) - 1);
             Ok    : Boolean;
          begin
@@ -677,7 +678,24 @@ procedure Prover_KAT is
                   return;
                end if;
             end loop;
-            SPR.Prove (C.all, Wires, Pads, Proof, Ch);
+            SPR.Prove (C.all, Wires, Pads, Proof, Ch, BQ);
+            --  ADR 0071: the bound quad of every layer, from the sumcheck
+            --  of the prover, against the verifier's Eval_Bound_Quad_T
+            --  (term by term beyond the tables).
+            declare
+               BQV : SA.Element_Array (0 .. C.Last_Layer);
+            begin
+               SV.Bound_Quads (C.all, Ch, BQV);
+               for J in BQ'Range loop
+                  if BQ (J) /= BQV (J) then
+                     Report_Failure (Name & ": the bound quad of layer"
+                                     & J'Image & " differs from the "
+                                     & "verifier's");
+                     CR.Free (C);
+                     return;
+                  end if;
+               end loop;
+            end;
             PW.Write_Sumcheck_Proof (C.all, Proof, Out_B);
             if Out_B'Length /= Want'Length then
                Report_Failure (Name & ": proof length" & Out_B'Length'Image
@@ -836,7 +854,7 @@ procedure Prover_KAT is
                   return;
                end if;
                SV.Verifier_Core (C.all, W (0 .. C.Npublic - 1), Proof, Ch,
-                                 A, Bv, Lqc);
+                                 BQ, A, Bv, Lqc);
                if Wv'Length /= Npriv + Npads then
                   Report_Failure (Name & ": witness vector length");
                   CR.Free (C);

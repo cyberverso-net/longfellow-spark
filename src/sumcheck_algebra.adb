@@ -139,6 +139,255 @@ package body Sumcheck_Algebra is
       RL.Lemma_Comb_Pair (X, Q0, Q1, W0, W1);
    end Lemma_Comb_Pair_F;
 
+   procedure Lemma_Split_Zero_F (F0, F1 : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Split_Zero (F0, F1);
+   end Lemma_Split_Zero_F;
+
+   procedure Lemma_Split_L_F (F0, F1, V0, V1, Y : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Split_L (F0, F1, V0, V1, Y);
+   end Lemma_Split_L_F;
+
+   procedure Lemma_Split_R_F (F0, F1, V0, V1, Y : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Split_R (F0, F1, V0, V1, Y);
+   end Lemma_Split_R_F;
+
+   procedure Lemma_Split_LR_F (F0, F1, V0, V1, Y0, Y1 : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Split_LR (F0, F1, V0, V1, Y0, Y1);
+   end Lemma_Split_LR_F;
+
+   procedure Lemma_Corner_Even_F (K, C : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Corner_Even (K, C);
+   end Lemma_Corner_Even_F;
+
+   procedure Lemma_Corner_Odd_F (K, C : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Corner_Odd (K, C);
+   end Lemma_Corner_Odd_F;
+
+   procedure Lemma_Corner_Two_F (K0, K1, C : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Corner_Two (K0, K1, C);
+   end Lemma_Corner_Two_F;
+
+   procedure Lemma_Move_L_F (K, P0, Fc, P1 : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Move_L (K, P0, Fc, P1);
+   end Lemma_Move_L_F;
+
+   procedure Lemma_Move_R_F (K, P0, P1, Fc : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Move_R (K, P0, P1, Fc);
+   end Lemma_Move_R_F;
+
+   procedure Lemma_One_Mul_F (B : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_One_Mul (B);
+   end Lemma_One_Mul_F;
+
+   procedure Lemma_One_Twice_F (K : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_One_Twice (K);
+   end Lemma_One_Twice_F;
+
+   procedure Lemma_Zero_Mul_Twice_F (B, X : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Zero_Mul_Twice (B, X);
+   end Lemma_Zero_Mul_Twice_F;
+
+   procedure Lemma_Assoc_Add_F (S, R, K : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Assoc_Add (S, R, K);
+   end Lemma_Assoc_Add_F;
+
+   procedure Lemma_Zero_Add_Once_F (K : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Zero_Add_Once (K);
+   end Lemma_Zero_Add_Once_F;
+
+   procedure Lemma_Add_Zero_Once_F (S : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Add_Zero_Once (S);
+   end Lemma_Add_Zero_Once_F;
+
+   procedure Lemma_Mul_One_Once_F (P : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Mul_One_Once (P);
+   end Lemma_Mul_One_Once_F;
+
+   procedure Lemma_Assoc_Mul_F (P, Fc, B : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Assoc_Mul (P, Fc, B);
+   end Lemma_Assoc_Mul_F;
+
+   procedure Lemma_Zero_Mul_R_F (X : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Zero_Mul_R (X);
+   end Lemma_Zero_Mul_R_F;
+
+   procedure Lemma_Corner_Two_W (K0, K1, C : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Corner_Two (K0, K1, C);
+   end Lemma_Corner_Two_W;
+
+   procedure Lemma_Corner_Even_W (K, C : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Corner_Even (K, C);
+   end Lemma_Corner_Even_W;
+
+   procedure Lemma_Corner_Odd_W (K, C : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Corner_Odd (K, C);
+   end Lemma_Corner_Odd_W;
+
+   procedure Lemma_Add_W (A, B : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+   begin
+      null;
+   end Lemma_Add_W;
+
+   procedure Lemma_Mul_W (A, B : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      null;
+   end Lemma_Mul_W;
+
    function Bit_Of (X : Natural; B : Natural) return Boolean is
    begin
       return (Shift_Right (Unsigned_64 (X), B) and 1) = 1;
@@ -741,5 +990,84 @@ package body Sumcheck_Algebra is
       Free_Elems (H0t);
       Free_Elems (H1t);
    end Eval_Bound_Quad_T;
+
+   procedure Lemma_Bindeq_Frame (C1, C2 : Element_Array; K : Natural;
+                                 I : Natural)
+   is
+   begin
+      if K < C1'Length then
+         Lemma_Bindeq_Frame (C1, C2, K + 1, I / 2);
+      end if;
+   end Lemma_Bindeq_Frame;
+
+   procedure Lemma_Beq_Frame (C1, C2 : Element_Array; L : Natural;
+                              X : Natural)
+   is
+   begin
+      Lemma_Bindeq_Frame (C1 (0 .. L - 1), C2 (0 .. L - 1), 0, X);
+   end Lemma_Beq_Frame;
+
+   procedure Lemma_Eq_Frame (R1, R2 : Element_Array; X : Natural;
+                             N : Natural)
+   is
+   begin
+      if N > 0 then
+         Lemma_Eq_Frame (R1, R2, X, N - 1);
+      end if;
+   end Lemma_Eq_Frame;
+
+   procedure Lemma_EBQT_Frame
+     (T                  : Term_Array;
+      N                  : Natural;
+      Logv               : Natural;
+      G0, G1, D0, D1     : Element_Array;
+      HC0, HC1, E0, E1   : Element_Array;
+      Logw               : Natural;
+      Alpha, Beta        : Element)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", EBQT_Ref);
+   begin
+      if N > 0 then
+         Lemma_EBQT_Frame (T, N - 1, Logv, G0, G1, D0, D1, HC0, HC1, E0, E1,
+                           Logw, Alpha, Beta);
+         declare
+            Tm : constant Term := T (T'First + N - 1);
+         begin
+            Lemma_Beq_Frame (G0, D0, Logv, Tm.G);
+            Lemma_Beq_Frame (G1, D1, Logv, Tm.G);
+            Lemma_Bindeq_Frame (G0 (0 .. Logv - 1), D0 (0 .. Logv - 1), 0,
+                                Tm.G);
+            Lemma_Bindeq_Frame (G1 (0 .. Logv - 1), D1 (0 .. Logv - 1), 0,
+                                Tm.G);
+            Lemma_Beq_Frame (HC0, E0, Logw, Tm.H0);
+            Lemma_Beq_Frame (HC1, E1, Logw, Tm.H1);
+         end;
+      end if;
+   end Lemma_EBQT_Frame;
+
+   procedure Lemma_EBQ_Frame
+     (T                  : Term_Array;
+      N                  : Natural;
+      Logv               : Natural;
+      G0, G1, D0, D1     : Element_Array;
+      HC0, HC1, E0, E1   : Element_Array;
+      Logw               : Natural;
+      Alpha, Beta        : Element)
+   is
+   begin
+      if N > 0 then
+         Lemma_EBQ_Frame (T, N - 1, Logv, G0, G1, D0, D1, HC0, HC1, E0, E1,
+                          Logw, Alpha, Beta);
+         declare
+            Tm : constant Term := T (T'First + N - 1);
+         begin
+            Lemma_Eq_Frame (G0, D0, Tm.G, Logv);
+            Lemma_Eq_Frame (G1, D1, Tm.G, Logv);
+            Lemma_Eq_Frame (HC0, E0, Tm.H0, Logw);
+            Lemma_Eq_Frame (HC1, E1, Tm.H1, Logw);
+         end;
+      end if;
+   end Lemma_EBQ_Frame;
 
 end Sumcheck_Algebra;

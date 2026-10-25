@@ -60,6 +60,7 @@ package body Zk_Prover is
       Wv     : Element_Array (0 .. Wv_Last);
       Lqc    : SV.Lqc_Array (0 .. Lqc_Last);
       Lqc2   : SV.Lqc_Array (0 .. Lqc_Last);
+      BQ     : Element_Array (0 .. Lqc_Last);
       SProof : SV.Sumcheck_Proof (Last => Proof_Last);
       Ch     : SV.Challenges (Last => Chal_Last);
       A      : SV.Ligero_Terms (Max => Terms_Max);
@@ -125,6 +126,7 @@ package body Zk_Prover is
          Wv          => [others => Zero],
          Lqc         => [others => (X => 0, Y => 0, Z => 0)],
          Lqc2        => [others => (X => 0, Y => 0, Z => 0)],
+         BQ          => [others => Zero],
          SProof      => (Last => SV.Proof_Total (C) - 1,
                          Evals => [others => Zero]),
          Ch          => (Last        => SV.Chal_Total (C) - 1,
@@ -282,9 +284,9 @@ package body Zk_Prover is
       Transcript.Reset (Label);
       Transcript.Write_Bytes (Com.Root);
       LPR.LV.ST.Write_Sumcheck_Statement (Id, C, Inputs (0 .. C.Npublic - 1));
-      SPR.Prove (C, Wk.Wires, Wk.Pads, Wk.SProof, Wk.Ch);
+      SPR.Prove (C, Wk.Wires, Wk.Pads, Wk.SProof, Wk.Ch, Wk.BQ);
       SV.Verifier_Core (C, Inputs (0 .. C.Npublic - 1), Wk.SProof, Wk.Ch,
-                        Wk.A, Wk.Bv, Wk.Lqc2);
+                        Wk.BQ, Wk.A, Wk.Bv, Wk.Lqc2);
       LPR.LV.Lemma_Vector_Len_Covers (G);
       pragma Assert (Wk.Lqc'Length = C.Last_Layer + 1);
       pragma Assert

@@ -894,7 +894,12 @@ package body Sumcheck_KAT_Generic is
          Check (Same, "tier 3 " & Name & ": replayed challenges");
          --  Both ways: the core on the replayed record emits what it
          --  emitted on the recorded one.
-         SV.Verifier_Core (C, Pub, Prf, Ch2, A2, B2, Lqc2);
+         declare
+            BQ2 : Element_Array (0 .. C.Last_Layer);
+         begin
+            SV.Bound_Quads (C, Ch2, BQ2);
+            SV.Verifier_Core (C, Pub, Prf, Ch2, BQ2, A2, B2, Lqc2);
+         end;
          Same := A2.Count = A.Count and then B2 = B and then Lqc2 = Lqc;
          if Same then
             for K in 0 .. A.Count - 1 loop
@@ -1009,7 +1014,12 @@ package body Sumcheck_KAT_Generic is
             Check (Chal_Count = SV.Chal_Total (C)
                    and then Proof_Count = SV.Proof_Total (C),
                    "tier 3 " & Name & ": challenge or proof count");
-            SV.Verifier_Core (C, Pub, Prf, Ch, A, B, Lqc);
+            declare
+               BQ : Element_Array (0 .. C.Last_Layer);
+            begin
+               SV.Bound_Quads (C, Ch, BQ);
+               SV.Verifier_Core (C, Pub, Prf, Ch, BQ, A, B, Lqc);
+            end;
             Check_Replay (Name, C, Pub, Prf, Ch, A, B, Lqc);
             --  b, per constraint.
             for Cidx in 0 .. C_NL loop

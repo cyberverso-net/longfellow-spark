@@ -114,6 +114,13 @@ The Ligero output is `Ligero_Terms (Max)`, the sparse matrix A in coordinate for
 
 Update (Phase D, [ADR 0056](../adr/0056-linear-input-constraint.md)). The input constraint is no longer an `Expression`. `Input_Constraint` writes one term per private input straight into the Ligero terms, in input order, with its coefficient `Eq2 (npublic + W)` computed on the spot. Then it appends the few terms of the claims, built as before with the operations of `Expression` (`Input_Tail`). The terms, their order and their values are those of the old sorted expression, so the proofs of Phase C are unchanged byte for byte. The cost is linear in the inputs, and the stack no longer grows with them. `Input_Constraint` became Gold against the formula of Section 6.7: input term W, the public binding `Pub_Binding_Ref`, then the tail. `Input_Capacity_Of` is gone. The per-layer values of `Eval_Circuit` moved to the heap as well. The mDoc hash circuit, with 84 166 private inputs, overflowed the default stack in both places before.
 
+Update (milestone M2, [ADR 0071](../adr/0071-prover-reuses-the-bound-quad.md)). The bound quad of each layer is computed before the core, not inside it.
+
+- `Bound_Quads` computes the bound quad of every layer, with `Eval_Bound_Quad_T`, or with `Eval_Bound_Quad` when the layer does not fit the eq tables. It is Gold against the ghost `BQ_Ref`.
+- `BQ_Ref (C, Ch, J)` reads the terms of layer J and its challenges from `Ch`, as `Verify_Layer` builds them: the hand challenges of the previous layer, or `G` for layer 0, and the round challenges of this layer.
+- `Verifier_Core` takes the bound quads as an input, as upstream's `aux`. Its precondition, at the level `Proof_Only`, is that each one equals `BQ_Ref`. `Verify_Layer` reads its value from there.
+- The verifier passes the values of `Bound_Quads`. The prover passes its own, from the sumcheck (chapter 7), and saves the products of the recomputation.
+
 ### 3.6 Errors as status
 
 No subprogram of stage 3 raises. `Eval_Quad` and `Eval_Circuit` return a Boolean; the core's inputs are checked by preconditions on the sizes of the records (`Chal_Total`, `Proof_Total`, `A_Bound`), which the caller of phase B establishes from the circuit before building them.
@@ -152,7 +159,7 @@ Lessons from closing these proofs, reusable in the next stages:
 - A contract that quantifies over an unbounded type (`for all W in Natural`) is fine for the provers and fatal for the assertion-enabled test build, which executes it as a loop; quantify over positions.
 - The Why3 session returns stale "unproved" results for unchanged checks without re-running them; after a change, `gnatprove --clean` before trusting a list of unproved checks.
 
-In plain terms, for every input, not on samples: no run-time error occurs in any stage 3 package; `Eq`, `Bindeq`, `Bind`, `Lagrange_Basis`, `Eval_Quad`, `Eval_Circuit`, `Bind_G` and `Eval_Bound_Quad` compute their references; every `Expression` operation produces exactly the presence and coefficients its postcondition states; `Symbolic_Round` is the formula of Section 6.7; the core emits NL + 1 linear constraints and NL quadratic triples at the pad indices of Section 6.5, within the stated bounds; every subprogram terminates.
+In plain terms, for every input, not on samples: no run-time error occurs in any stage 3 package; `Eq`, `Bindeq`, `Bind`, `Lagrange_Basis`, `Eval_Quad`, `Eval_Circuit`, `Bind_G`, `Eval_Bound_Quad` and `Bound_Quads` compute their references; every `Expression` operation produces exactly the presence and coefficients its postcondition states; `Symbolic_Round` is the formula of Section 6.7; the core emits NL + 1 linear constraints and NL quadratic triples at the pad indices of Section 6.5, within the stated bounds; every subprogram terminates.
 
 Reproduce with `make prove`.
 

@@ -94,6 +94,7 @@ package body Zk_Verifier is
       A        : LV.ST.SV.Ligero_Terms (A_Max);
       B_Vec    : Element_Array (0 .. B_Last);
       Lqc      : LV.ST.SV.Lqc_Array (0 .. Lqc_Last);
+      BQ       : Element_Array (0 .. Lqc_Last);
    end record;
 
    type Work_Access is access Work;
@@ -172,7 +173,8 @@ package body Zk_Verifier is
                             Constraint => [others => 0],
                             Witness    => [others => 0]),
             B_Vec       => [others => Zero],
-            Lqc         => [others => (X => 0, Y => 0, Z => 0)]);
+            Lqc         => [others => (X => 0, Y => 0, Z => 0)],
+            BQ          => [others => Zero]);
       begin
          Read_Proof (B, C, G, Root, W.Sumcheck, W.Lig, St);
          if St /= Ok then
@@ -186,8 +188,9 @@ package body Zk_Verifier is
             Free_Work (W);
             return;
          end if;
+         LV.ST.SV.Bound_Quads (C, W.Ch, W.BQ);
          LV.ST.SV.Verifier_Core
-           (C, Pub, W.Sumcheck, W.Ch, W.A, W.B_Vec, W.Lqc);
+           (C, Pub, W.Sumcheck, W.Ch, W.BQ, W.A, W.B_Vec, W.Lqc);
          --  The terms and triples of the core lie below the slots of
          --  the constraint vector: Witness_Count <= NWROW * WR <= the
          --  vector's length, and every pad of layer J ends below
