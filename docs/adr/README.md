@@ -49,7 +49,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0043](0043-exhausted-status-and-streaming-slice.md) | Exhausted status and streaming slice | Accepted | 2026-10-16 |
 | [0044](0044-field-contracts-at-proof-only-level.md) | Field contracts at proof-only level | Accepted | 2026-10-16 |
 | [0045](0045-proof-gate-restored-through-partitions.md) | Proof gate restored through partitions | Accepted, amended by 0054 | 2026-10-16 |
-| [0046](0046-phase-b-scope-lfc2-loader-and-interop.md) | Phase B scope: the LFC2 circuit loader and the interop exit criterion | Accepted | 2026-10-16 |
+| [0046](0046-phase-b-scope-lfc2-loader-and-interop.md) | Phase B scope: the LFC2 circuit loader and the interop exit criterion | Accepted, amended by 0074 | 2026-10-16 |
 | [0047](0047-heap-allocation-by-ownership.md) | Heap allocation by ownership for the circuit and the working set | Accepted | 2026-10-16 |
 | [0048](0048-circuit-vectors-and-interop-proofs.md) | Circuit vectors and the upstream interop proofs | Accepted | 2026-10-16 |
 | [0049](0049-phase-c-scope-the-prover.md) | Phase C scope: the prover and its exit criterion | Accepted | 2026-10-17 |
@@ -77,3 +77,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0071](0071-prover-reuses-the-bound-quad.md) | The prover reuses the bound quad of its own sumcheck, proved | Proposed | 2026-10-24 |
 | [0072](0072-predicate-checks-in-the-prover-instances.md) | The prover instances of the command line do not check the circuit predicate again | Proposed | 2026-10-26 |
 | [0073](0073-verifier-binds-the-quad-as-upstream.md) | The verifier binds the quad of each layer as upstream does | Proposed | 2026-10-26 |
+| [0074](0074-circuit-identifier-checked-once.md) | The command line checks the identifier of a known circuit once, not on every load | Proposed | 2026-10-27 |

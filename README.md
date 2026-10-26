@@ -108,7 +108,9 @@ cli/bin/longfellow_verify --field p256 \
    --label ecdsa2_spec_test --rate-inv 4 --nreq 16 --ncol 256
 ```
 
-Both print `ok` in about a second. The verifier proves the shape of a circuit file when it loads it and checks its identifier. It still trusts the file as to what the circuit computes (ADR 0011). Circuits that are malformed, or larger than this project's bounds, are refused with `not_well_formed` or `bound_exceeded`.
+Both print `ok` in about a second. The verifier proves the shape of a circuit file when it loads it and checks its identifier. It still trusts the file as to what the circuit computes (ADR 0011).
+
+The mDoc circuits under `tests/vectors/upstream/mdoc/` are in a fixed list, `cli/src/pinned_circuits.adb`, with the digest of each file and its identifier, checked once. The verifier and the prover load a listed file without recomputing the identifier, which takes seconds on these circuits. `--check-circuit-id` recomputes it all the same (ADR 0074). Circuits that are malformed, or larger than this project's bounds, are refused with `not_well_formed` or `bound_exceeded`.
 
 ## Proving
 

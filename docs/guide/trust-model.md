@@ -59,7 +59,8 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 **The circuit loader** (chapter 6).
 
 - `Uleb128.Read` returns the value of the one to four bytes it consumed.
-- `Circuit_Reader.Read` returns, on `Ok`, a circuit that satisfies `Well_Formed` and whose identifier is the stored one. Otherwise it returns null.
+- `Circuit_Reader.Read` returns, on `Ok`, a circuit that satisfies `Well_Formed` and whose identifier is the stored one, recomputed. Otherwise it returns null.
+- `Circuit_Reader.Read_Pinned` proves the same, except that the identifier is the one the caller gives, not recomputed (ADR 0074).
 
 **The prover** (chapter 7).
 
@@ -162,6 +163,7 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 
 - The pinned specification itself.
 - The upstream circuit files, as to what they compute, until this project compiles its own. Their shape is proved `Well_Formed` on load and their identifier is recomputed (ADR 0046).
+- The list of `Pinned_Circuits` in the command line: the digest of each circuit file and its identifier, checked once by a full `Read` in `interop_kat`. A file in the list is loaded without recomputing its identifier (ADR 0074).
 - The upstream production reader at d5e6be7, as the definition of the LFC2 format.
 - That the recordings of the upstream Ligero verifier are faithful to d5e6be7 (ADR 0040).
 
