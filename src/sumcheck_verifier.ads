@@ -62,11 +62,19 @@ pragma SPARK_Mode (On);
 with Proof_Levels;
 with Sumcheck_Algebra;
 with Sumcheck_Expression;
+with Sumcheck_HQuad;
 
 generic
    with package SA is new Sumcheck_Algebra (<>);
    with package SE is new Sumcheck_Expression (SA => SA);
 package Sumcheck_Verifier is
+
+   --  The kernels of the bound quad (ADR 0073), shared with the prover.
+   --  Instantiated before the use clauses below: with the operators of
+   --  SA directly visible, the instance resolves one field operation
+   --  of Corner_K to the opaque wrapper of SA instead of the operation
+   --  of the field, and the lemmas of the corners no longer apply.
+   package HQ is new Sumcheck_HQuad (SA);
 
    use SA;
    use SE;

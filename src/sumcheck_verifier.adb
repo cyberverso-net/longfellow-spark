@@ -684,8 +684,8 @@ package body Sumcheck_Verifier is
                     and then Same (HC1 (R2), Ch.Layer (CO + 2 + 2 * R2 + 1)));
             end loop;
             if Logv <= Max_Bindeq_Log and then Logw <= Max_Bindeq_Log then
-               Eval_Bound_Quad_T (Layer_Terms (C, J), Logv, G0, G1, HC0, HC1,
-                                  Logw, Ch.Layer (CO), Ch.Layer (CO + 1), V);
+               HQ.Bind_Quad (Layer_Terms (C, J), Logv, G0, G1, HC0, HC1,
+                             Logw, Ch.Layer (CO), Ch.Layer (CO + 1), V);
             else
                V := Eval_Bound_Quad (Layer_Terms (C, J), Logv, G0, G1,
                                      HC0, HC1, Logw,
