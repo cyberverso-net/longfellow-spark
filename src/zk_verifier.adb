@@ -85,7 +85,7 @@ package body Zk_Verifier is
       Ch_Last     : Index;
       A_Max       : Index;
       B_Last      : Index;
-      Lqc_Last    : Natural)
+      Lqc_Last    : Index)
    is record
       Sumcheck : Sumcheck_Proof (Sum_Last);
       Lig      : Ligero_Part (Ldt_Last, Linear_Last, Low_Last, High_Last,
