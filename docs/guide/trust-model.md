@@ -156,7 +156,7 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 - The SMT solvers: CVC5, Z3 and Alt-Ergo.
 - SPARKlib's functional sequences, used as a ghost model (ADR 0031).
 - That `Same`, the logical equality of each field wrapper, is the equality of its element type. Its body is the predefined `=`, outside SPARK (ADR 0023).
-- The release build relies on the proof instead of checking at run time. The units of `src/` are compiled without run-time checks, because GNATprove proves that none can fail; the units of `cli/src/` keep theirs (ADR 0068). This holds only under the preconditions of the units. The command-line programs establish the preconditions of `Circuit_Reader.Read`, `Zk_Verifier.Verify` and `Zk_Prover.Prove` in code before each call, and `Cli_Random.Fill` changes no state the prover reads.
+- The release build relies on the proof instead of checking at run time. The units of `src/` are compiled without run-time checks, because GNATprove proves that none can fail; the units of `cli/src/` keep theirs (ADR 0068). This holds only under the preconditions of the units. The command-line programs establish the preconditions of `Circuit_Reader.Read`, `Zk_Verifier.Verify` and `Zk_Prover.Prove` in code before each call, and `Cli_Random.Fill` changes no state the prover reads. The prover instances of the command line keep their checks, except the predicate checks of the circuit inside the bodies of `Sumcheck_Prover` and `Zk_Prover`, which GNATprove proves; the circuit is checked where it enters the program (ADR 0072).
 
 **Inputs and references.**
 

@@ -71,7 +71,8 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0065](0065-carry-less-multiplication-in-gf2-128.md) | The carry-less multiplication of upstream in GF(2^128), proved Gold | Proposed | 2026-10-21 |
 | [0066](0066-lagrange-tables-by-prefix-and-suffix.md) | The verifier's Lagrange tables by prefix and suffix products, proved | Proposed, amended by 0070 | 2026-10-22 |
 | [0067](0067-performance-milestones-by-trust.md) | Performance milestones by trust: the Gold limit, then a tested variant | Proposed | 2026-10-22 |
-| [0068](0068-release-build-without-run-time-checks.md) | The release build without run-time checks in the proved units | Proposed | 2026-10-22 |
+| [0068](0068-release-build-without-run-time-checks.md) | The release build without run-time checks in the proved units | Proposed, amended by 0072 | 2026-10-22 |
 | [0069](0069-p256-montgomery-multiplication.md) | P-256 in Montgomery form, with the multiplication of upstream | Proposed, amended by 0070 | 2026-10-22 |
 | [0070](0070-sumcheck-and-ligero-kernels-as-upstream.md) | The sumcheck and Ligero kernels in upstream's form | Proposed | 2026-10-23 |
 | [0071](0071-prover-reuses-the-bound-quad.md) | The prover reuses the bound quad of its own sumcheck, proved | Proposed | 2026-10-24 |
+| [0072](0072-predicate-checks-in-the-prover-instances.md) | The prover instances of the command line do not check the circuit predicate again | Proposed | 2026-10-26 |
