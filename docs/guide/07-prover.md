@@ -82,6 +82,22 @@ Since milestone M1 ([ADR 0063](../adr/0063-milestone-m1-algorithmic-parity.md)),
 
 On the mDoc hash circuit the merging cuts the terms visited by the rounds fifteen times. The reference forms stay: `Round_Evals`, `Bind_G` and `Update_Terms`. The harness runs both on every layer, every round and both hands, and checks that the round polynomials agree; the proofs stay the upstream ones byte for byte.
 
+Since milestone M2 ([ADR 0071](../adr/0071-prover-reuses-the-bound-quad.md)), `Prove` also returns the bound quad of each layer, as upstream's `SumcheckProofAux`. `Zk_Prover` passes it to `Verifier_Core`, which no longer recomputes it for the prover: 41.1 M field products on the mDoc hash circuit become 0.3 M.
+
+- After the last round of a layer, the terms left all have both hands at 0. The sum of their coefficients is the bound quad.
+- The postcondition of `Prove`, at the level `Proof_Only`, is that this value equals `BQ_Ref` of chapter 3 for every layer. It is the precondition of `Verifier_Core`.
+- The proof is an invariant on coefficients, kept round by round. For each pair of residual hands, the coefficients of the terms left equal the bound terms of the layer times the factors of the challenges drawn so far.
+- `Bind_G_T`, `Merge_Runs` and `Bind_H` keep their contracts. Lemmas in a ghost package of `Sumcheck_Prover` carry the invariant across each of them.
+- The work of a layer is split so that each proof has a small context. `Merge_Terms` establishes the invariant, `Bind_Round` keeps it across one hand of one round, `Prove_Layer` runs a layer and returns its bound quad.
+- Beyond the size of the eq tables, the prover computes the bound quad with `Eval_Bound_Quad`, as the verifier does.
+- `prover_kat` checks, on every layer of every test circuit, that the prover's bound quad equals that of `Bound_Quads`.
+
+The first proof closed on GF(2^128) and not on P-256, where every product brings the field's contract into the context. Three rules made it close:
+
+- The ghost sums use the hidden wrappers of `Sumcheck_Algebra`, never the field operations.
+- The invariant is a hidden function, read through a lemma.
+- The invariant names only the circuit and the challenges, never a ghost copy of the terms, so it can sit in the contract of an ordinary procedure. SPARK refuses a ghost formal on a non-ghost procedure.
+
 The lesson of `Same` came back a third time with the merged terms: the predefined `=` on a `Term` compares the coefficients with the field's `=`, which is not the logical equality. The frame invariants ("the terms not read yet are untouched") are stated with a ghost `Same_Term`.
 
 ### 3.4 Ligero_Prover: the tableau on the heap, the encoder, the opening
@@ -116,6 +132,7 @@ Section 7.4 writes a subfield element as two bytes: the coordinates of the eleme
 
 - No run-time error in any prover unit, for any circuit, inputs, configuration and byte stream, including the ownership checks on every heap object: no null or dangling dereference, every allocation freed on every path that does not return it, no aliasing.
 - The lengths and offsets of the proof string: the writers write exactly `Proof_Len` bytes, the Ligero part satisfies `Well_Coded` at the reader's offset, the first 32 bytes are the root.
+- The bound quad that `Prove` returns for each layer equals the verifier's reference `BQ_Ref` (ADR 0071).
 - The round evaluations equal the ghost transcription of `eval_round_poly`; the systematic part of every encoded row is the row and the parity part is `Lagrange.Evaluate`; each row of the tableau receives its encoding and the other rows are untouched; the witness slots of each unencoded row hold the witnesses, the triples' values or zeros, as Section 1.4 says; the witness slots of row 2 are zero; the opening is the one `Merkle.Verify` consumes, in its model; the triples are the core's.
 - The pad layout: `Witness_Count (C)` is the private inputs plus `Pad_Total (C)` (`Lemma_Pad_Shift`), and every triple lies below it.
 

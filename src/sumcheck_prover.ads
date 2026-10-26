@@ -481,13 +481,21 @@ package Sumcheck_Prover is
       Wires : Element_Array;
       Pads  : Element_Array;
       Proof : out Sumcheck_Proof;
-      Ch    : out Challenges)
+      Ch    : out Challenges;
+      BQ    : out Element_Array)
    with
      Always_Terminates => not ST.SA.F.Sampling_Rejects,
      Pre =>
        Wires'First = 0 and then Wires'Length = ST.SA.Total_Wires (C)
        and then Pads'First = 0 and then Pads'Length = Pad_Total (C)
        and then Proof.Last + 1 = ST.SV.Proof_Total (C)
-       and then Ch.Last + 1 = ST.SV.Chal_Total (C);
+       and then Ch.Last + 1 = ST.SV.Chal_Total (C)
+       and then BQ'First = 0 and then BQ'Length = C.Last_Layer + 1,
+     --  The bound quad of every layer, as the verifier computes it from
+     --  the challenges (ADR 0071): Verifier_Core takes it from here.
+     Post =>
+       (Proof_Only =>
+          (for all J in 0 .. C.Last_Layer =>
+             Same (BQ (J), ST.SV.BQ_Ref (C, Ch, J))));
 
 end Sumcheck_Prover;

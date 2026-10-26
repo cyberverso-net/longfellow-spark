@@ -123,4 +123,80 @@ package Ring_Laws is
      Post  => Same ((Q0 + X * (Q1 - Q0)) * (W0 + X * (W1 - W0)),
                     Comb (X, Q0 * W0, Q1 * W1, (Q1 - Q0) * (W1 - W0)));
 
+   --  The bound quad of the prover (ADR 0071): the split of a filtered
+   --  sum by the parity of a hand, and the factors of the challenges.
+
+   procedure Lemma_Split_Zero (F0, F1 : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F0 * Zero + F1 * Zero, Zero);
+
+   procedure Lemma_Split_L (F0, F1, V0, V1, Y : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F0 * (V0 + Y) + F1 * V1, (F0 * V0 + F1 * V1) + F0 * Y);
+
+   procedure Lemma_Split_R (F0, F1, V0, V1, Y : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F0 * V0 + F1 * (V1 + Y), (F0 * V0 + F1 * V1) + F1 * Y);
+
+   procedure Lemma_Split_LR (F0, F1, V0, V1, Y0, Y1 : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F0 * (V0 + Y0) + F1 * (V1 + Y1),
+                    (F0 * V0 + F1 * V1) + (F0 * Y0 + F1 * Y1));
+
+   procedure Lemma_Corner_Even (K, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (K - K * C, (One - C) * K);
+
+   procedure Lemma_Corner_Odd (K, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (K * C, C * K);
+
+   procedure Lemma_Corner_Two (K0, K1, C : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (K0 + (K1 - K0) * C, (One - C) * K0 + C * K1);
+
+   procedure Lemma_Move_L (K, P0, Fc, P1 : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same ((K * (P0 * Fc)) * P1, Fc * ((K * P0) * P1));
+
+   procedure Lemma_Move_R (K, P0, P1, Fc : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same ((K * P0) * (P1 * Fc), Fc * ((K * P0) * P1));
+
+   procedure Lemma_One_Mul (B : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (One * B, B);
+
+   procedure Lemma_One_Twice (K : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same ((K * One) * One, K);
+
+   procedure Lemma_Zero_Mul_Twice (B, X : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same ((B * Zero) * X, Zero);
+
+   procedure Lemma_Assoc_Add (S, R, K : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same ((S + R) + K, S + (R + K));
+
+   procedure Lemma_Zero_Add_Once (K : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (Zero + K, K);
+
+   procedure Lemma_Add_Zero_Once (S : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (S + Zero, S);
+
+   procedure Lemma_Mul_One_Once (P : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (P * One, P);
+
+   procedure Lemma_Assoc_Mul (P, Fc, B : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same ((P * Fc) * B, P * (Fc * B));
+
+   procedure Lemma_Zero_Mul_R (X : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (X * Zero, Zero);
+
 end Ring_Laws;

@@ -307,6 +307,190 @@ package Sumcheck_Verifier is
      Global => null,
      Post => Ceil_Lg2'Result <= 24;
 
+   -------------------------------------------------------------------
+   --  The bound quad of each layer, read from the challenges (ADR 0071).
+   --  The verifier computes it with Bound_Quads and the prover takes it
+   --  from its own sumcheck; Verifier_Core receives it, as the aux of
+   --  the reference.
+   -------------------------------------------------------------------
+
+   --  Element I of the challenges of the layers, Zero beyond them.
+   function Chv (Ch : Challenges; I : Natural) return Element is
+     (if I <= Ch.Last then Ch.Layer (I) else Zero)
+   with Ghost => Proof_Only, Global => null;
+
+   --  The challenges of hand H in the rounds of layer J, as Verify_Layer
+   --  gathers them: Zero beyond logw.
+   function Hand_Chal (C : Circuit; Ch : Challenges; J : Natural; H : Natural)
+      return Challenge_Vector
+   is
+     ([for R in 0 .. Max_Logw - 1 =>
+         (if R < C.Layers (J).Logw
+          then Chv (Ch, Chal_Off (C, J) + 2 + 2 * R + H)
+          else Zero)])
+   with Ghost => Proof_Only, Global => null,
+        Pre => J <= C.Last_Layer and then H <= 1;
+
+   --  The number of output variables of layer J, and the challenges
+   --  that bind them: those of the circuit for layer 0, those of the
+   --  rounds of the layer above otherwise.
+   function Layer_Logv (C : Circuit; J : Natural) return Natural is
+     (if J = 0 then Ceil_Lg2 (C.Noutput) else C.Layers (J - 1).Logw)
+   with Ghost => Proof_Only, Global => null, Pre => J <= C.Last_Layer;
+
+   function Layer_G (C : Circuit; Ch : Challenges; J : Natural; H : Natural)
+      return Challenge_Vector
+   is
+     (if J = 0 then Ch.G else Hand_Chal (C, Ch, J - 1, H))
+   with Ghost => Proof_Only, Global => null,
+        Pre => J <= C.Last_Layer and then H <= 1;
+
+   --  The bound quad of layer J: by the tables when they fit, term by
+   --  term otherwise, as Verify_Layer chose before ADR 0071.
+   function BQ_Ref (C : Circuit; Ch : Challenges; J : Natural) return Element
+   is
+     (if Layer_Logv (C, J) <= Max_Bindeq_Log
+        and then C.Layers (J).Logw <= Max_Bindeq_Log
+      then EBQT_Ref (Layer_Terms (C, J), Layer_Terms (C, J)'Length,
+                     Layer_Logv (C, J),
+                     Layer_G (C, Ch, J, 0), Layer_G (C, Ch, J, 1),
+                     Hand_Chal (C, Ch, J, 0), Hand_Chal (C, Ch, J, 1),
+                     C.Layers (J).Logw,
+                     Chv (Ch, Chal_Off (C, J)), Chv (Ch, Chal_Off (C, J) + 1))
+      else EBQ_Ref (Layer_Terms (C, J), Layer_Terms (C, J)'Length,
+                    Layer_Logv (C, J),
+                    Layer_G (C, Ch, J, 0), Layer_G (C, Ch, J, 1),
+                    Hand_Chal (C, Ch, J, 0), Hand_Chal (C, Ch, J, 1),
+                    C.Layers (J).Logw,
+                    Chv (Ch, Chal_Off (C, J)), Chv (Ch, Chal_Off (C, J) + 1)))
+   with Ghost => Proof_Only, Global => null, Pre => J <= C.Last_Layer;
+
+   --  BQ_Ref of layer J reads the challenges of the circuit and those
+   --  of the layers up to J only.
+   procedure Lemma_BQ_Ref_Frame
+     (C        : Circuit;
+      Ch1, Ch2 : Challenges;
+      J        : Natural;
+      Lim      : Natural)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => J <= C.Last_Layer
+                and then Ch1.Last = Ch2.Last
+                and then Chal_Off (C, J) + Chal_Size (C, J) <= Lim
+                and then (for all R in 0 .. Max_Logw - 1 =>
+                            Same (Ch1.G (R), Ch2.G (R)))
+                and then (for all K in 0 .. Ch1.Last =>
+                            (if K < Lim
+                             then Same (Ch1.Layer (K), Ch2.Layer (K)))),
+        Post => Same (BQ_Ref (C, Ch1, J), BQ_Ref (C, Ch2, J));
+
+   procedure Lemma_BQ_Ref_Frame_All
+     (C        : Circuit;
+      Ch1, Ch2 : Challenges;
+      J        : Natural)
+   with Ghost => Proof_Only, Always_Terminates, Global => null,
+        Pre  => J <= C.Last_Layer + 1
+                and then Ch1.Last = Ch2.Last
+                and then (for all R in 0 .. Max_Logw - 1 =>
+                            Same (Ch1.G (R), Ch2.G (R)))
+                and then (for all K in 0 .. Ch1.Last =>
+                            (if K < Chal_Off (C, J)
+                             then Same (Ch1.Layer (K), Ch2.Layer (K)))),
+        Post => (for all J2 in 0 .. J - 1 =>
+                   Same (BQ_Ref (C, Ch1, J2), BQ_Ref (C, Ch2, J2)));
+
+   --  A vector that holds the challenges of hand H of layer J in its
+   --  first logw entries agrees there with Hand_Chal.
+   procedure Lemma_Hand_Chal
+     (C  : Circuit;
+      Ch : Challenges;
+      J  : Natural;
+      H  : Natural;
+      V  : Element_Array)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => J <= C.Last_Layer and then H <= 1
+                and then V'First = 0 and then C.Layers (J).Logw <= V'Length
+                and then Chal_Off (C, J) + Chal_Size (C, J) <= Ch.Last + 1
+                and then (for all R in 0 .. C.Layers (J).Logw - 1 =>
+                            Same (V (R),
+                                  Ch.Layer (Chal_Off (C, J) + 2 + 2 * R + H))),
+        Post => (for all R in 0 .. C.Layers (J).Logw - 1 =>
+                   Same (V (R), Hand_Chal (C, Ch, J, H) (R)));
+
+   --  Layer_G of layer J reads the challenges of the circuit and those
+   --  of the layers above J only.
+   procedure Lemma_Layer_G_Frame
+     (C        : Circuit;
+      Ch1, Ch2 : Challenges;
+      J        : Natural)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => J <= C.Last_Layer
+                and then Ch1.Last = Ch2.Last
+                and then (for all R in 0 .. Max_Logw - 1 =>
+                            Same (Ch1.G (R), Ch2.G (R)))
+                and then (for all K in 0 .. Ch1.Last =>
+                            (if K < Chal_Off (C, J)
+                             then Same (Ch1.Layer (K), Ch2.Layer (K)))),
+        Post => (for all R in 0 .. Max_Logw - 1 =>
+                   Same (Layer_G (C, Ch1, J, 0) (R), Layer_G (C, Ch2, J,
+                                                              0) (R))
+                   and then
+                   Same (Layer_G (C, Ch1, J, 1) (R), Layer_G (C, Ch2, J,
+                                                              1) (R)));
+
+   --  A bound quad computed with vectors that agree with Layer_G on the
+   --  first Logv entries and hold the challenges of the rounds in the
+   --  first logw ones is BQ_Ref.
+   procedure Lemma_BQ_Ref_From
+     (C        : Circuit;
+      Ch       : Challenges;
+      J        : Natural;
+      Logv     : Natural;
+      G0, G1   : Element_Array;
+      HC0, HC1 : Element_Array;
+      V        : Element)
+   with Ghost => Proof_Only, Global => null,
+        Pre  =>
+          J <= C.Last_Layer
+          and then Chal_Off (C, J) + Chal_Size (C, J) <= Ch.Last + 1
+          and then Logv = Layer_Logv (C, J)
+          and then G0'First = 0 and then G1'First = 0
+          and then G0'Length = Max_Logw and then G1'Length = Max_Logw
+          and then HC0'First = 0 and then HC1'First = 0
+          and then HC0'Length = Max_Logw and then HC1'Length = Max_Logw
+          and then (for all R in 0 .. Logv - 1 =>
+                      Same (G0 (R), Layer_G (C, Ch, J, 0) (R))
+                      and then Same (G1 (R), Layer_G (C, Ch, J, 1) (R)))
+          and then (for all R in 0 .. C.Layers (J).Logw - 1 =>
+                      Same (HC0 (R), Ch.Layer (Chal_Off (C, J) + 2 + 2 * R))
+                      and then
+                      Same (HC1 (R),
+                            Ch.Layer (Chal_Off (C, J) + 2 + 2 * R + 1)))
+          and then
+          (if Logv <= Max_Bindeq_Log
+             and then C.Layers (J).Logw <= Max_Bindeq_Log
+           then Same (V, EBQT_Ref (Layer_Terms (C, J),
+                                   Layer_Terms (C, J)'Length, Logv,
+                                   G0, G1, HC0, HC1, C.Layers (J).Logw,
+                                   Ch.Layer (Chal_Off (C, J)),
+                                   Ch.Layer (Chal_Off (C, J) + 1)))
+           else Same (V, EBQ_Ref (Layer_Terms (C, J),
+                                  Layer_Terms (C, J)'Length, Logv,
+                                  G0, G1, HC0, HC1, C.Layers (J).Logw,
+                                  Ch.Layer (Chal_Off (C, J)),
+                                  Ch.Layer (Chal_Off (C, J) + 1)))),
+        Post => Same (V, BQ_Ref (C, Ch, J));
+
+   --  The bound quads of the verifier, layer by layer as Verify_Layer
+   --  computed them before ADR 0071.
+   procedure Bound_Quads (C : Circuit; Ch : Challenges; BQ : out Element_Array)
+   with
+     Global => null,
+     Pre    => Ch.Last + 1 = Chal_Total (C)
+               and then BQ'First = 0 and then BQ'Length = C.Last_Layer + 1,
+     Post   => (Proof_Only =>
+                  (for all J in 0 .. C.Last_Layer =>
+                     Same (BQ (J), BQ_Ref (C, Ch, J))));
+
    --  One layer (Section 6.7, verify_layer): combines the two claims
    --  with alpha, runs the 2 logw symbolic rounds, subtracts the product
    --  expression of the padded claims times the bound quad, emits the
@@ -318,6 +502,7 @@ package Sumcheck_Verifier is
       Proof   : Sumcheck_Proof;
       Ch      : Challenges;
       Base    : Natural;
+      EQQ_In  : Element;
       State   : in out Claims_State;
       A       : in out Ligero_Terms;
       B       : in out Element_Array;
@@ -451,17 +636,26 @@ package Sumcheck_Verifier is
       Pub     : Element_Array;
       Proof   : Sumcheck_Proof;
       Ch      : Challenges;
+      BQ      : Element_Array;
       A       : out Ligero_Terms;
       B       : out Element_Array;
       Lqc     : out Lqc_Array)
    with
      Global => null,
-     Pre  => Pub'First = 0 and then Pub'Length = C.Npublic
-       and then Ch.Last + 1 = Chal_Total (C)
-       and then Proof.Last + 1 = Proof_Total (C)
-       and then A.Max + 1 >= A_Bound (C)
-       and then B'First = 0 and then B'Length = C.Last_Layer + 2
-       and then Lqc'First = 0 and then Lqc'Last = C.Last_Layer,
+     Pre  =>
+       (Runtime    =>
+          Pub'First = 0 and then Pub'Length = C.Npublic
+          and then Ch.Last + 1 = Chal_Total (C)
+          and then Proof.Last + 1 = Proof_Total (C)
+          and then A.Max + 1 >= A_Bound (C)
+          and then B'First = 0 and then B'Length = C.Last_Layer + 2
+          and then Lqc'First = 0 and then Lqc'Last = C.Last_Layer
+          and then BQ'First = 0 and then BQ'Length = C.Last_Layer + 1,
+        --  The bound quads are those of the challenges (ADR 0071): the
+        --  verifier's from Bound_Quads, the prover's from its sumcheck.
+        Proof_Only =>
+          (for all J in 0 .. C.Last_Layer =>
+             Same (BQ (J), BQ_Ref (C, Ch, J)))),
      Post => A.Count <= A_Bound (C)
        and then (for all K in 0 .. A.Count - 1 =>
                    A.Witness (K) < Witness_Count (C)

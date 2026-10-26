@@ -198,4 +198,112 @@ package body Ring_Laws is
       Lemma_Add_Assoc (P + X * Ae, X * Be, (X * X) * Dd);
    end Lemma_Comb_Pair;
 
+   procedure Lemma_Split_Zero (F0, F1 : Element) is
+   begin
+      Lemma_Mul_Zero (F0);
+      Lemma_Mul_Zero (F1);
+      Lemma_Add_Zero (Zero);
+   end Lemma_Split_Zero;
+
+   procedure Lemma_Split_L (F0, F1, V0, V1, Y : Element) is
+   begin
+      Lemma_Mul_Distrib (F0, V0, Y);
+      Lemma_Add_Assoc (F0 * V0, F0 * Y, F1 * V1);
+      Lemma_Add_Comm (F0 * Y, F1 * V1);
+      Lemma_Add_Assoc (F0 * V0, F1 * V1, F0 * Y);
+   end Lemma_Split_L;
+
+   procedure Lemma_Split_R (F0, F1, V0, V1, Y : Element) is
+   begin
+      Lemma_Mul_Distrib (F1, V1, Y);
+      Lemma_Add_Assoc (F0 * V0, F1 * V1, F1 * Y);
+   end Lemma_Split_R;
+
+   procedure Lemma_Split_LR (F0, F1, V0, V1, Y0, Y1 : Element) is
+   begin
+      Lemma_Mul_Distrib (F0, V0, Y0);
+      Lemma_Mul_Distrib (F1, V1, Y1);
+      Lemma_Swap4 (F0 * V0, F0 * Y0, F1 * V1, F1 * Y1);
+   end Lemma_Split_LR;
+
+   procedure Lemma_Corner_Even (K, C : Element) is
+   begin
+      Lemma_One_Minus (C, K);
+      Lemma_Mul_Comm (K, C);
+   end Lemma_Corner_Even;
+
+   procedure Lemma_Corner_Odd (K, C : Element) is
+   begin
+      Lemma_Mul_Comm (K, C);
+   end Lemma_Corner_Odd;
+
+   procedure Lemma_Corner_Two (K0, K1, C : Element) is
+   begin
+      Lemma_Mul_Comm (K1 - K0, C);
+      Lemma_Bind_Pair (C, K0, K1);
+   end Lemma_Corner_Two;
+
+   procedure Lemma_Move_L (K, P0, Fc, P1 : Element) is
+   begin
+      Lemma_Mul_Assoc (K, P0, Fc);
+      Lemma_Mul_Assoc (K * P0, Fc, P1);
+      Lemma_Mul_Comm (Fc, P1);
+      Lemma_Mul_Assoc (K * P0, P1, Fc);
+      Lemma_Mul_Comm ((K * P0) * P1, Fc);
+   end Lemma_Move_L;
+
+   procedure Lemma_Move_R (K, P0, P1, Fc : Element) is
+   begin
+      Lemma_Mul_Assoc (K * P0, P1, Fc);
+      Lemma_Mul_Comm ((K * P0) * P1, Fc);
+   end Lemma_Move_R;
+
+   procedure Lemma_One_Mul (B : Element) is
+   begin
+      Lemma_Mul_Comm (One, B);
+      Lemma_Mul_One (B);
+   end Lemma_One_Mul;
+
+   procedure Lemma_One_Twice (K : Element) is
+   begin
+      Lemma_Mul_One (K);
+   end Lemma_One_Twice;
+
+   procedure Lemma_Zero_Mul_Twice (B, X : Element) is
+   begin
+      Lemma_Mul_Zero (B);
+      Lemma_Mul_Comm (Zero, X);
+      Lemma_Mul_Zero (X);
+   end Lemma_Zero_Mul_Twice;
+
+   procedure Lemma_Assoc_Add (S, R, K : Element) is
+   begin
+      Lemma_Add_Assoc (S, R, K);
+   end Lemma_Assoc_Add;
+
+   procedure Lemma_Zero_Add_Once (K : Element) is
+   begin
+      Lemma_Zero_Add (K);
+   end Lemma_Zero_Add_Once;
+
+   procedure Lemma_Add_Zero_Once (S : Element) is
+   begin
+      Lemma_Add_Zero (S);
+   end Lemma_Add_Zero_Once;
+
+   procedure Lemma_Mul_One_Once (P : Element) is
+   begin
+      Lemma_Mul_One (P);
+   end Lemma_Mul_One_Once;
+
+   procedure Lemma_Assoc_Mul (P, Fc, B : Element) is
+   begin
+      Lemma_Mul_Assoc (P, Fc, B);
+   end Lemma_Assoc_Mul;
+
+   procedure Lemma_Zero_Mul_R (X : Element) is
+   begin
+      Lemma_Mul_Zero (X);
+   end Lemma_Zero_Mul_R;
+
 end Ring_Laws;
