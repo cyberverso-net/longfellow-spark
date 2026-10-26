@@ -30,7 +30,8 @@
 --  path that does not return it). Gold on the shape of the result: on
 --  Ok the circuit is well formed, satisfies the premises Isolated and
 --  Dead_End of upstream's Lean proofs (ADR 0064) and its identifier is
---  the stored one; on any other status no circuit is returned. The
+--  the stored one, recomputed by Read and equal to the caller's by
+--  Read_Pinned (ADR 0074); on any other status no circuit is returned. The
 --  expansion of deltas, segments and tokens agrees with upstream by the
 --  vectors (ADR 0048), not by proof.
 --
@@ -156,6 +157,32 @@ package Circuit_Reader is
                       SA.Well_Formed (C.all)
                       and then H.Field_Id = Field_Id
                       and then H.Id = Compute_Id (C.all, H.Subfield_Boundary)
+                    else H = Null_Header),
+        Proof_Only =>
+          (if St = Ok then Isolated (C.all) and then Dead_End (C.all)));
+
+   --  The loader for a circuit whose identifier was checked once
+   --  before (ADR 0074): as Read, except that the identifier is not
+   --  recomputed. On Ok the stored identifier is Id, which the caller
+   --  takes from its list of checked circuits; a file storing another
+   --  is refused with Id_Mismatch. Nothing here relates Id to the
+   --  circuit: that is the caller's check, made once by Read.
+   procedure Read_Pinned
+     (B  : Byte_Array;
+      Id : Bytes_32;
+      C  : out Circuit_Access;
+      H  : out Header;
+      St : out Status)
+   with
+     Global => null,
+     Pre    => B'First = 0,
+     Post   =>
+       (Runtime =>
+          (St = Ok) = (C /= null)
+          and then (if St = Ok then
+                      SA.Well_Formed (C.all)
+                      and then H.Field_Id = Field_Id
+                      and then H.Id = Id
                     else H = Null_Header),
         Proof_Only =>
           (if St = Ok then Isolated (C.all) and then Dead_End (C.all)));

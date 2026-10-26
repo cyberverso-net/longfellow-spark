@@ -846,11 +846,38 @@ package body Circuit_Reader is
    --  Read
    -------------------------------------------------------------------
 
-   procedure Read
-     (B  : Byte_Array;
-      C  : out Circuit_Access;
-      H  : out Header;
-      St : out Status)
+   --  The body of Read and Read_Pinned: Pinned selects the check of
+   --  the identifier, recomputed or compared with Pin.
+   procedure Load
+     (B      : Byte_Array;
+      Pinned : Boolean;
+      Pin    : Bytes_32;
+      C      : out Circuit_Access;
+      H      : out Header;
+      St     : out Status)
+   with
+     Global => null,
+     Pre    => B'First = 0,
+     Post   =>
+       (Runtime =>
+          (St = Ok) = (C /= null)
+          and then (if St = Ok then
+                      SA.Well_Formed (C.all)
+                      and then H.Field_Id = Field_Id
+                      and then (if Pinned then H.Id = Pin
+                                else H.Id = Compute_Id
+                                       (C.all, H.Subfield_Boundary))
+                    else H = Null_Header),
+        Proof_Only =>
+          (if St = Ok then Isolated (C.all) and then Dead_End (C.all)));
+
+   procedure Load
+     (B      : Byte_Array;
+      Pinned : Boolean;
+      Pin    : Bytes_32;
+      C      : out Circuit_Access;
+      H      : out Header;
+      St     : out Status)
    is
       Cnt, Again : Counts;
       Id : Bytes_32;
@@ -893,12 +920,34 @@ package body Circuit_Reader is
          return;
       end if;
       Id := B (Cnt.Id_Pos .. Cnt.Id_Pos + 31);
-      if Compute_Id (C.all, Cnt.Sfb) /= Id then
+      if (if Pinned then Id /= Pin else Compute_Id (C.all, Cnt.Sfb) /= Id)
+      then
          Free (C);
          St := Id_Mismatch;
          return;
       end if;
       H := (Field_Id => Field_Id, Subfield_Boundary => Cnt.Sfb, Id => Id);
+   end Load;
+
+   procedure Read
+     (B  : Byte_Array;
+      C  : out Circuit_Access;
+      H  : out Header;
+      St : out Status)
+   is
+   begin
+      Load (B, False, [others => 0], C, H, St);
    end Read;
+
+   procedure Read_Pinned
+     (B  : Byte_Array;
+      Id : Bytes_32;
+      C  : out Circuit_Access;
+      H  : out Header;
+      St : out Status)
+   is
+   begin
+      Load (B, True, Id, C, H, St);
+   end Read_Pinned;
 
 end Circuit_Reader;

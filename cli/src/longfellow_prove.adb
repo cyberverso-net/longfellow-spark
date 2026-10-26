@@ -6,6 +6,10 @@
 --  P-256 the integer is reduced modulo p), chooses the randomness
 --  source and writes the proof file; the proving is the SPARK library.
 --
+--  A circuit file in Pinned_Circuits is loaded without recomputing its
+--  identifier, checked once already (ADR 0074); --check-circuit-id
+--  recomputes it all the same.
+--
 --  Randomness: the operating system's generator (Os_Random) unless
 --  --seed N is given, which selects Simple_Rng of the upstream
 --  reference test and makes the proof reproducible, and predictable:
@@ -36,6 +40,7 @@ with Zk_Prover;
 with Cli_Random;
 with Circuit_Reader_GF2_128;
 with Circuit_Reader_P256;
+with Pinned_Circuits;
 with Zk_Prover_Cli_GF2_128;
 with Zk_Prover_Cli_P256;
 
@@ -51,13 +56,14 @@ procedure Longfellow_Prove is
    Usage : constant String :=
      "usage: longfellow_prove --field gf2_128|p256 --circuit FILE"
      & " --inputs FILE.json --label STRING --rate-inv N --nreq N --ncol N"
-     & " --out FILE [--seed N]";
+     & " --out FILE [--seed N] [--check-circuit-id]";
 
    type String_Access is access String;
 
    Field_Arg, Circuit_Arg, Inputs_Arg, Label_Arg, Out_Arg : String_Access;
    Rate_Inv, Nreq, Ncol : Natural := 0;
    Seeded : Boolean := False;
+   Full_Id : Boolean := False;
    Seed   : Unsigned_64 := 0;
 
    type Byte_Array_Access is access Byte_Array;
@@ -229,6 +235,7 @@ procedure Longfellow_Prove is
       use type Circuit_Status.Status;
       use type Prover_Status.Status;
       package F renames ZKP.LPR.LV.ST.SA.F;
+      procedure Read_Circuit is new Pinned_Circuits.Read (CR);
 
       Cfg : constant Ligero_Geometry.Config :=
         (Rate_Inv => Rate_Inv, Num_Queries => Nreq, Encoded_Len => Ncol);
@@ -245,7 +252,7 @@ procedure Longfellow_Prove is
       declare
          B : constant Byte_Array_Access := Read_File (Circuit_Arg.all);
       begin
-         CR.Read (B.all, C, H, CSt);
+         Read_Circuit (B.all, Full_Id, C, H, CSt);
       end;
       if CSt /= Circuit_Status.Ok then
          TIO.Put_Line ("circuit " & Lower (CSt'Image));
@@ -365,6 +372,9 @@ procedure Longfellow_Prove is
                   when others =>
                      raise Usage_Error with "not a seed: " & S;
                end;
+            elsif Opt = "--check-circuit-id" then
+               Full_Id := True;
+               I := I + 1;
             elsif Opt = "--help" or else Opt = "-h" then
                TIO.Put_Line (Usage);
                CL.Set_Exit_Status (0);
