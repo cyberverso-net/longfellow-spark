@@ -121,6 +121,14 @@ Update (milestone M2, [ADR 0071](../adr/0071-prover-reuses-the-bound-quad.md)). 
 - `Verifier_Core` takes the bound quads as an input, as upstream's `aux`. Its precondition, at the level `Proof_Only`, is that each one equals `BQ_Ref`. `Verify_Layer` reads its value from there.
 - The verifier passes the values of `Bound_Quads`. The prover passes its own, from the sumcheck (chapter 7), and saves the products of the recomputation.
 
+Update (milestone M2, [ADR 0073](../adr/0073-verifier-binds-the-quad-as-upstream.md)). `Bound_Quads` binds the quad as upstream's `bind_quad` does, with the kernels of the prover.
+
+- The kernels `Bind_G_T`, `Merge_Runs` and `Bind_H`, and the ghost package that proves their result equal to the reference, moved from `Sumcheck_Prover` to a new generic, `Sumcheck_HQuad`. `Sumcheck_Verifier` instantiates it as `HQ`, and the prover uses that instance.
+- `HQ.Bind_Quad` binds g, merges the terms, then binds one hand at a time for every round, and sums the coefficients left. It is Gold against `EBQT_Ref`, the reference of `Eval_Bound_Quad_T`.
+- `Bound_Quads` calls it when the layer fits the eq tables, and `Eval_Bound_Quad` beyond them. Its contract is unchanged.
+- `Eval_Bound_Quad_T` stays as a Gold kernel, with no caller in the program. `sumcheck_kat` compares the three forms on every layer.
+- On the mDoc hash circuit the verifier goes from 59.6 M to 51.3 M field products. The bound quads take 32.6 M, upstream 30.9 M with its core.
+
 ### 3.6 Errors as status
 
 No subprogram of stage 3 raises. `Eval_Quad` and `Eval_Circuit` return a Boolean; the core's inputs are checked by preconditions on the sizes of the records (`Chal_Total`, `Proof_Total`, `A_Bound`), which the caller of phase B establishes from the circuit before building them.
