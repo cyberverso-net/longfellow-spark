@@ -6,6 +6,14 @@ with Merkle;
 
 package body Zk_Prover is
 
+   --  The predicate of Circuit is checked where a circuit enters the
+   --  program. Inside this body every predicate check is proved by
+   --  GNATprove, and the property does not depend on the formal Fill.
+   --  The instances for the command line, compiled with checks (ADR
+   --  0068), would otherwise scan the whole circuit at every call that
+   --  passes it, once per layer.
+   pragma Suppress (Predicate_Check);
+
    use LPR.LV.ST.SA.F;
    package SV renames LPR.LV.ST.SV;
    package LP renames LPR.LV.LP;

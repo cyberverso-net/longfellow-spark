@@ -6,6 +6,14 @@ with Ada.Unchecked_Deallocation;
 
 package body Sumcheck_Prover is
 
+   --  The predicate of Circuit is checked where a circuit enters the
+   --  program. Inside this body every predicate check is proved by
+   --  GNATprove, and the property does not depend on the formal Fill.
+   --  The instances for the command line, compiled with checks (ADR
+   --  0068), would otherwise scan the whole circuit at every call that
+   --  passes it, once per layer.
+   pragma Suppress (Predicate_Check);
+
    subtype Logw_Type is ST.SA.Logw_Type;
    Max_Logw : constant := ST.SA.Max_Logw;
 
