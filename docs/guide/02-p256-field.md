@@ -269,7 +269,7 @@ A ghost variable (`Q : Big_Integer with Ghost`) exists only for proof and is rem
 GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-prover-configuration-step-budget.md): CVC5, Z3 and Alt-Ergo, `--steps=600000`, `--timeout=120`).
 
 - `P256_Field` alone, proved from an empty object directory: 2897 checks, all proved.
-- The whole project with the scalar limbs of ADR 0070: 21332 checks, all proved.
+- The whole project with the scalar limbs of ADR 0070: 21332 checks, all proved. With the bound-quad reuse of ADR 0071: 25331 checks, all proved.
 - No justification, no `pragma Assume`.
 - Maximum steps for a single successful proof in `P256_Field`: 204295, within the budget of 600000.
 

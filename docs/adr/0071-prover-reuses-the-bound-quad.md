@@ -79,6 +79,15 @@ ADR 0067 makes M2 the Gold limit: nothing new moves from proved to tested. Today
 | prove, total | 143.1 M | 102.3 M | 93.3 M |
 | verify, total | 59.6 M | 59.6 M | 36.6 M |
 
+- Measured on the proving machine (c4-standard-24), proved build, mdoc v7, median of three runs in one session, 10c6bf3 against e504b58:
+
+| | before | after | change |
+|---|---|---|---|
+| hash prove | 9.77 s | 8.44 s | -1.33 s (-14 %) |
+| hash verify | 5.18 s | 5.18 s | 0 |
+| sig prove | 1.02 s | 0.93 s | -0.09 s |
+| sig verify | 0.63 s | 0.63 s | 0 |
+
 - The proofs of the CLI stay identical byte for byte. The value is the same field element.
 - `prover_kat` compares, on every layer of every test circuit, the bound quad of `Prove` with that of `Bound_Quads`.
 - Guide chapters 3 and 7, the trust model and the CHANGELOG are updated.
