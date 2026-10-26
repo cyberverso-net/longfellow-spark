@@ -51,7 +51,17 @@ Our prover takes upstream's path since M1: `Bind_G_T`, `Merge_Runs`, `Bind_H`. A
   | total | 59.6 M | 51.3 M | 36.6 M |
 
   The bound quads are now within 6 % of upstream. What remains of the gap is the encoding of the Ligero verifier, which upstream does by FFT: a candidate for M3. The prover is unchanged at 102.3 M.
-- The first estimate, about 37 M products, assumed that the merged terms would remove most of the work. They remove a fifth: the work of `bind_h` over the rounds stays. Times on the proving machine to be recorded here.
+- The first estimate, about 37 M products, assumed that the merged terms would remove most of the work. They remove a fifth: the work of `bind_h` over the rounds stays.
+- Measured on the proving machine (c4-standard-24), proved build, mdoc v7, median of three runs in one session, 555baa0 against 947d48a:
+
+  | | before | after | change |
+  |---|---|---|---|
+  | hash prove | 7.71 s | 7.69 s | 0 |
+  | hash verify | 5.17 s | 4.90 s | -0.27 s (-5 %) |
+  | sig prove | 0.88 s | 0.88 s | 0 |
+  | sig verify | 0.63 s | 0.62 s | 0 |
+
+  The gain in time is smaller than the gain in products. Reading the circuit now takes about half of the hash verification, most of it in the hash of the circuit id. Upstream verifies the same proof in 1.17 s with its generic field code.
 - The proofs of the CLI stay identical byte for byte. The value is the same field element.
 - The verifier allocates on the heap one copy of the terms of the largest layer, as upstream does.
 - `prover_kat` compares the bound quads of the prover and the verifier, which now share their kernels. `sumcheck_kat` compares them with `Eval_Bound_Quad_T` and `Eval_Bound_Quad`, which do not share any.
