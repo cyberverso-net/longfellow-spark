@@ -87,7 +87,7 @@ Since milestone M2 ([ADR 0071](../adr/0071-prover-reuses-the-bound-quad.md)), `P
 - After the last round of a layer, the terms left all have both hands at 0. The sum of their coefficients is the bound quad.
 - The postcondition of `Prove`, at the level `Proof_Only`, is that this value equals `BQ_Ref` of chapter 3 for every layer. It is the precondition of `Verifier_Core`.
 - The proof is an invariant on coefficients, kept round by round. For each pair of residual hands, the coefficients of the terms left equal the bound terms of the layer times the factors of the challenges drawn so far.
-- `Bind_G_T`, `Merge_Runs` and `Bind_H` keep their contracts. Lemmas in a ghost package of `Sumcheck_Prover` carry the invariant across each of them.
+- `Bind_G_T`, `Merge_Runs` and `Bind_H` keep their contracts. Lemmas in a ghost package carry the invariant across each of them. Since ADR 0073 the kernels and the ghost package live in `Sumcheck_HQuad`, shared with the verifier (chapter 3); `Bind_Round` and `Prove_Layer` stay in `Sumcheck_Prover`.
 - The work of a layer is split so that each proof has a small context. `Merge_Terms` establishes the invariant, `Bind_Round` keeps it across one hand of one round, `Prove_Layer` runs a layer and returns its bound quad.
 - Beyond the size of the eq tables, the prover computes the bound quad with `Eval_Bound_Quad`, as the verifier does.
 - `prover_kat` checks, on every layer of every test circuit, that the prover's bound quad equals that of `Bound_Quads`.

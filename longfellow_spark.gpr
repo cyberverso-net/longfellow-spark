@@ -28,12 +28,14 @@ project Longfellow_Spark is
    --  a step budget as the bound, so that a proof that fits the budget
    --  on one machine fits it on every machine with the same toolchain,
    --  and a wall-clock timeout as a guard against prover runs that do
-   --  not terminate. The budget sits above the 429702 steps of the
-   --  hardest proof observed. The timeout is twelve to thirty times the
-   --  longest successful attempt observed (4 to 10 s) and never binds;
-   --  it is necessary because none of the provers stops in useful time
-   --  on a goal it cannot close (Z3 and CVC5 ran for over twenty minutes
-   --  on three lemmas with --timeout=0, Alt-Ergo for seven hours).
+   --  not terminate. The budget sits above the 499341 steps of the
+   --  hardest proof observed (the postcondition of Lemma_Bind_H_Step,
+   --  P-256 instance). The timeout is three times the longest
+   --  successful attempt observed (40 s, the same proof, on the
+   --  development machine) and has not bound; it is necessary because
+   --  none of the provers stops in useful time on a goal it cannot
+   --  close (Z3 and CVC5 ran for over twenty minutes on three lemmas
+   --  with --timeout=0, Alt-Ergo for seven hours).
    package Prove is
       for Proof_Switches ("Ada") use
         ("--prover=cvc5,z3,altergo", "--steps=600000", "--timeout=120",

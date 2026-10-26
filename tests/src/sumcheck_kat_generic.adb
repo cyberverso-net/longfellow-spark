@@ -280,7 +280,7 @@ package body Sumcheck_KAT_Generic is
                   Logv : Natural := 0;
                   G0, G1, H0, H1 : Element_Array (0 .. Max_Logw - 1);
                   V : Element := P2;
-                  Slow, Fast : Element;
+                  Slow, Fast, Bound : Element;
                begin
                   while 2 ** Logv < Size loop
                      Logv := Logv + 1;
@@ -300,6 +300,14 @@ package body Sumcheck_KAT_Generic is
                      C.Layers (J).Logw, G0 (J), H1 (J), Fast);
                   Check (Fast = Slow, "circuit " & Name & ": layer" & J'Image
                          & ", the bound quad by tables differs");
+                  --  ADR 0073: the bound quad of the verifier, by the
+                  --  merged terms, against both.
+                  SV.HQ.Bind_Quad
+                    (Layer_Terms (C, J), Logv, G0, G1, H0, H1,
+                     C.Layers (J).Logw, G0 (J), H1 (J), Bound);
+                  Check (Bound = Fast and then Bound = Slow,
+                         "circuit " & Name & ": layer" & J'Image
+                         & ", the bound quad by the merged terms differs");
                end;
             end loop;
          end;
@@ -941,6 +949,51 @@ package body Sumcheck_KAT_Generic is
       Zk_Nonce_Given := [others => False];
    end Check_Replay;
 
+   --  ADR 0073: the bound quads of Bound_Quads, by the merged terms of
+   --  Sumcheck_HQuad, against the evaluation by tables and the one term
+   --  by term, on every layer, under the recorded challenges.
+   procedure Check_Bound_Quads
+     (Name : String;
+      C    : Circuit;
+      Ch   : SV.Challenges;
+      BQ   : Element_Array)
+   is
+      Logv   : Natural := SV.Ceil_Lg2 (C.Noutput);
+      G0, G1 : Element_Array (0 .. Max_Logw - 1) := Ch.G;
+   begin
+      for J in 0 .. C.Last_Layer loop
+         declare
+            Logw     : constant Natural := C.Layers (J).Logw;
+            CO       : constant Natural := SV.Chal_Off (C, J);
+            HC0, HC1 : Element_Array (0 .. Max_Logw - 1) :=
+              [others => Zero];
+            Fast, Slow : Element;
+         begin
+            for R in 0 .. Logw - 1 loop
+               HC0 (R) := Ch.Layer (CO + 2 + 2 * R);
+               HC1 (R) := Ch.Layer (CO + 2 + 2 * R + 1);
+            end loop;
+            Slow := Eval_Bound_Quad
+              (Layer_Terms (C, J), Logv, G0, G1, HC0, HC1, Logw,
+               Ch.Layer (CO), Ch.Layer (CO + 1));
+            Check (BQ (J) = Slow,
+                   "tier 3 " & Name & ": layer" & J'Image
+                   & ", Bound_Quads differs from Eval_Bound_Quad");
+            if Logv <= Max_Bindeq_Log and then Logw <= Max_Bindeq_Log then
+               Eval_Bound_Quad_T
+                 (Layer_Terms (C, J), Logv, G0, G1, HC0, HC1, Logw,
+                  Ch.Layer (CO), Ch.Layer (CO + 1), Fast);
+               Check (BQ (J) = Fast,
+                      "tier 3 " & Name & ": layer" & J'Image
+                      & ", Bound_Quads differs from Eval_Bound_Quad_T");
+            end if;
+            Logv := Logw;
+            G0 := HC0;
+            G1 := HC1;
+         end;
+      end loop;
+   end Check_Bound_Quads;
+
    procedure Finish_Tier3 is
       Name : constant String := C_Name (1 .. C_Name_Len);
    begin
@@ -1018,6 +1071,7 @@ package body Sumcheck_KAT_Generic is
                BQ : Element_Array (0 .. C.Last_Layer);
             begin
                SV.Bound_Quads (C, Ch, BQ);
+               Check_Bound_Quads (Name, C, Ch, BQ);
                SV.Verifier_Core (C, Pub, Prf, Ch, BQ, A, B, Lqc);
             end;
             Check_Replay (Name, C, Pub, Prf, Ch, A, B, Lqc);

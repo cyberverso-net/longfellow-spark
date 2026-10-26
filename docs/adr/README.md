@@ -76,3 +76,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0070](0070-sumcheck-and-ligero-kernels-as-upstream.md) | The sumcheck and Ligero kernels in upstream's form | Proposed | 2026-10-23 |
 | [0071](0071-prover-reuses-the-bound-quad.md) | The prover reuses the bound quad of its own sumcheck, proved | Proposed | 2026-10-24 |
 | [0072](0072-predicate-checks-in-the-prover-instances.md) | The prover instances of the command line do not check the circuit predicate again | Proposed | 2026-10-26 |
+| [0073](0073-verifier-binds-the-quad-as-upstream.md) | The verifier binds the quad of each layer as upstream does | Proposed | 2026-10-26 |

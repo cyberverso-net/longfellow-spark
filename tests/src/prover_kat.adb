@@ -792,13 +792,13 @@ procedure Prover_KAT is
                              (0 .. SA.Table_Len (Lv) - 1 => SA.Zero);
                         begin
                            SA.Eq2_Table (Lv, G0, G1, Al, E.all);
-                           SPR.Bind_G_T (TF, E.all, Be);
+                           SV.HQ.Bind_G_T (TF, E.all, Be);
                            Free (E);
                         end;
                      else
                         SA.Bind_G (TF, Lv, G0, G1, Al, Be);
                      end if;
-                     SPR.Merge_Runs (TF, NT);
+                     SV.HQ.Merge_Runs (TF, NT);
                      for R in 0 .. Lw - 1 loop
                         for H in SPR.Hand loop
                            SPR.Round_Evals_Dense
@@ -815,7 +815,7 @@ procedure Prover_KAT is
                               return;
                            end if;
                            SPR.Update_Terms (TR, H, X);
-                           SPR.Bind_H
+                           SV.HQ.Bind_H
                              (TF (TF'First .. TF'First + NT - 1), H, X, NB);
                            NT := NB;
                            X := X * X + Al;

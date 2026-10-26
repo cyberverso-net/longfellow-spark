@@ -75,7 +75,6 @@ package Sumcheck_Prover is
 
    use ST.SA.F;
    use type ST.SV.Lqc_Triple;
-   use type ST.SA.Term;
 
    -------------------------------------------------------------------
    --  The pads (Section 6.5)
@@ -114,16 +113,14 @@ package Sumcheck_Prover is
    --  eval_round_poly (Section 6.6)
    -------------------------------------------------------------------
 
-   subtype Hand is Natural range 0 .. 1;
+   subtype Hand is ST.SV.HQ.Hand;
 
    --  vector_ref: entry I of the first N, zero beyond.
-   function Ref (A : Element_Array; N, I : Natural) return Element is
-     (if I < N then A (I) else Zero)
-   with Global => null, Pre => A'First = 0 and then N <= A'Length;
+   function Ref (A : Element_Array; N, I : Natural) return Element
+     renames ST.SV.HQ.Ref;
 
-   function Hand_Index (T : Term; H : Hand) return Natural is
-     (if H = 0 then T.H0 else T.H1)
-   with Global => null;
+   function Hand_Index (T : Term; H : Hand) return Natural
+     renames ST.SV.HQ.Hand_Index;
 
    --  The two sums over the first K terms, in the order of operations
    --  of eval_round_poly: coef = k * other, wx2 = w0 + x2 * (w1 - w0);
@@ -318,149 +315,10 @@ package Sumcheck_Prover is
           Same (Ev2, D2_Ref (QW, Active, NA, X2, (NA + 1) / 2)));
 
    -------------------------------------------------------------------
-   --  The merged terms (Phase D, M1; ADR 0063), as the production
-   --  prover keeps them (rust/runtime/sumcheck/src/hquad.rs, bind_g and
-   --  bind_h): g bound with the eq2 table, the consecutive terms with
-   --  the same hands merged into one, then at each round the two
-   --  corners (2 i, 2 i + 1) of the bound hand merged by affine
-   --  interpolation, so that the terms shrink with the rounds. The
-   --  coefficient of every corner is linear in the terms, so the round
-   --  polynomial is the one of the reference terms, which Update_Terms
-   --  keeps one by one: tested.
+   --  The merged terms of Sumcheck_HQuad (ADR 0063, 0073), through the
+   --  instance of the verifier, ST.SV.HQ; Update_Terms is the binding of
+   --  the reference, term by term, that they are tested against.
    -------------------------------------------------------------------
-
-   --  The coefficients bound with the eq2 table E (Eq2_Table): beta
-   --  times E (g) for a Z term, k times E (g) otherwise, zero beyond
-   --  the table, as Bound_KT reads it; g set to 0.
-   procedure Bind_G_T (T : in out Term_Array; E : Element_Array;
-                       Beta : Element)
-   with
-     Global => null,
-     Pre    => E'First = 0,
-     Post   =>
-       (for all I in T'Range =>
-          Same (T (I).K,
-                (if T'Old (I).K = Zero
-                 then Beta * Ref (E, E'Length, T'Old (I).G)
-                 else T'Old (I).K * Ref (E, E'Length, T'Old (I).G)))
-          and then T (I).G = 0
-          and then T (I).H0 = T'Old (I).H0
-          and then T (I).H1 = T'Old (I).H1);
-
-   function Same_Hands (A, B : Term) return Boolean is
-     (A.H0 = B.H0 and then A.H1 = B.H1)
-   with Global => null;
-
-   --  The run of the term at offset I: 0 for the first, one more at
-   --  each change of hands.
-   function Run_Id (T : Term_Array; I : Natural) return Natural is
-     (if I = 0 then 0
-      elsif Same_Hands (T (T'First + I - 1), T (T'First + I))
-      then Run_Id (T, I - 1)
-      else Run_Id (T, I - 1) + 1)
-   with Ghost => Proof_Only,
-        Global => null,
-        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre  => I < T'Length,
-        Post => Run_Id'Result <= I,
-        Subprogram_Variant => (Decreases => I);
-
-   --  The coefficient of run X after the first N terms: the sum of
-   --  their coefficients, from zero, in their order.
-   function Run_Sum (T : Term_Array; X : Natural; N : Natural)
-      return Element
-   is
-     (if N = 0 then Zero
-      elsif Run_Id (T, N - 1) = X
-      then Run_Sum (T, X, N - 1) + T (T'First + N - 1).K
-      else Run_Sum (T, X, N - 1))
-   with Ghost => Proof_Only,
-        Global => null,
-        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre => N <= T'Length,
-        Subprogram_Variant => (Decreases => N);
-
-   --  The runs of T merged in place: the first N terms are the runs,
-   --  each with the hands of its terms and the sum of their
-   --  coefficients.
-   procedure Merge_Runs (T : in out Term_Array; N : out Natural)
-   with
-     Global => null,
-     Post   =>
-       (Runtime    => N <= T'Length,
-        Proof_Only =>
-          N = (if T'Length = 0 then 0
-               else Run_Id (T'Old, T'Length - 1) + 1)
-          and then
-          (for all X in 0 .. N - 1 =>
-             Same (T (T'First + X).K, Run_Sum (T'Old, X, T'Length)))
-          and then
-          (for all I in 0 .. T'Length - 1 =>
-             Same_Hands (T (T'First + Run_Id (T'Old, I)),
-                         T'Old (T'First + I))));
-
-   --  Two corners at offset P for hand H: the next term has the same
-   --  other hand and the next index of the same pair.
-   function Two (T : Term_Array; P : Natural; H : Hand) return Boolean is
-     (P + 1 < T'Length
-      and then Hand_Index (T (T'First + P), 1 - H)
-               = Hand_Index (T (T'First + P + 1), 1 - H)
-      and then Hand_Index (T (T'First + P), H) / 2
-               = Hand_Index (T (T'First + P + 1), H) / 2
-      and then Hand_Index (T (T'First + P + 1), H)
-               = Hand_Index (T (T'First + P), H) + 1)
-   with Global => null,
-        Pre => P < T'Length;
-
-   --  The offset of the input read for output K: one corner or two.
-   function Rd (T : Term_Array; H : Hand; K : Natural) return Natural is
-     (if K = 0 then 0
-      elsif Rd (T, H, K - 1) >= T'Length then Rd (T, H, K - 1)
-      elsif Two (T, Rd (T, H, K - 1), H) then Rd (T, H, K - 1) + 2
-      else Rd (T, H, K - 1) + 1)
-   with Ghost => Proof_Only,
-        Global => null,
-        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Post => Rd'Result <= T'Length,
-        Subprogram_Variant => (Decreases => K);
-
-   --  The coefficient of the corner read at P, bound at R:
-   --  affine_interpolation for two corners, nz_z for an even one
-   --  alone, z_nz for an odd one alone.
-   function Corner_K (T : Term_Array; P : Natural; H : Hand; R : Element)
-      return Element
-   is
-     (if Two (T, P, H)
-      then T (T'First + P).K
-           + (T (T'First + P + 1).K - T (T'First + P).K) * R
-      elsif Hand_Index (T (T'First + P), H) mod 2 = 0
-      then T (T'First + P).K - T (T'First + P).K * R
-      else T (T'First + P).K * R)
-   with Global => null,
-        Pre => P < T'Length;
-
-   --  bind_h: the corners of hand H merged in place at R; the first N
-   --  terms are the merged ones, the bound hand halved.
-   procedure Bind_H (T : in out Term_Array; H : Hand; R : Element;
-                     N : out Natural)
-   with
-     Global => null,
-     Post   =>
-       (Runtime    => N <= T'Length,
-        Proof_Only =>
-          Rd (T'Old, H, N) = T'Length
-          and then
-          (for all K in 0 .. N - 1 =>
-             Rd (T'Old, H, K) < T'Length
-             and then
-             Same (T (T'First + K).K,
-                   Corner_K (T'Old, Rd (T'Old, H, K), H, R))
-             and then
-             Hand_Index (T (T'First + K), H)
-             = Hand_Index (T'Old (T'First + Rd (T'Old, H, K)), H) / 2
-             and then
-             Hand_Index (T (T'First + K), 1 - H)
-             = Hand_Index (T'Old (T'First + Rd (T'Old, H, K)), 1 - H)));
 
    --  The reference binding of hand H at X, term by term: an even
    --  index scales k by 1 - X, an odd one by X, the index halved.
