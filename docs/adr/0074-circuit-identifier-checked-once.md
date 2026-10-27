@@ -37,7 +37,17 @@ The key of the list is the digest of the whole file, not the identifier the file
 
 ## Consequences
 
-- Measured on the development machine, the hash verification: 2.21 s with the pinned circuit, 6.24 s with `--check-circuit-id`. Times on the proving machine to be recorded here.
+- Measured on the proving machine (c4-standard-24), proved build, mdoc v7, median of three runs in one session, 5625cce against 9dca001:
+
+  | | before | after | change |
+  |---|---|---|---|
+  | hash prove | 7.52 s | 5.37 s | -2.15 s (-29 %) |
+  | hash verify | 4.82 s | 2.61 s | -2.21 s (-46 %) |
+  | sig prove | 0.87 s | 0.65 s | -0.22 s (-25 %) |
+  | sig verify | 0.62 s | 0.40 s | -0.22 s (-35 %) |
+
+  The signature circuit gains too: its identifier cost about 0.22 s. Upstream, on the same session with its generic field code, proves in 2.77 s and verifies in 1.15 s. SHA-256 has left the top of the profile: the hash verification now spends 62 % of its time in the carry-less multiplication.
+- On the development machine the hash verification takes 2.21 s with the pinned circuit and 6.24 s with `--check-circuit-id`.
 - The proofs of the CLI stay identical byte for byte.
 - A file in the list that has been altered goes through `Read`. Altering its stored identifier gives `id_mismatch`, as before.
 - A new circuit gets the fast path only when it is added to the list, with its digest and its identifier, and `interop_kat` checks the new entry against its file.
