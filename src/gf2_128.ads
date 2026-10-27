@@ -129,6 +129,7 @@ package GF2_128 is
    --  own inverse; no reduction is involved, so it is polynomial-agnostic.
    function Add (A, B : Element) return Element with
      Global => null,
+     Inline,
      Post   =>
        (for all I in Limb_Index =>
           Add'Result.Limbs (I) = (A.Limbs (I) xor B.Limbs (I)));
@@ -138,11 +139,13 @@ package GF2_128 is
    --  protocol code relies on through Field_Signature (ADR 0024).
    function Sub (A, B : Element) return Element with
      Global => null,
+     Inline,
      Post   => Sub'Result = Add (A, B);
 
    --  Negation is the identity in characteristic 2.
    function Neg (A : Element) return Element with
      Global => null,
+     Inline,
      Post   => Neg'Result = A;
 
    --  Multiplication by x with reduction mod Q(x): shift left by one,
@@ -176,6 +179,7 @@ package GF2_128 is
    --  Field multiplication, A * B mod Q(x).
    function Mul (A, B : Element) return Element with
      Global => null,
+     Inline,
      Post   => (Proof_Only => Mul'Result = Mul_Ref (A, B, 128));
 
    --  The same product bit by bit: 128 steps of Xtime and a masked xor,
