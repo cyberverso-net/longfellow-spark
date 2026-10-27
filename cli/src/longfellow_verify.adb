@@ -5,16 +5,19 @@
 --
 --    longfellow_verify --field gf2_128|p256 --circuit FILE --proof FILE
 --                      --label STRING --rate-inv N --nreq N --ncol N
---                      [--public HEX]...
+--                      [--public HEX]... [--check-circuit-id]
 --
 --  Loads the LFC2 circuit (Circuit_Reader), runs Zk_Verifier.Verify on
 --  the proof bytes under the circuit's identifier, the label and the
 --  Ligero configuration, with the public inputs given as big-endian
 --  hex integers (32 digits on GF(2^128), 64 on P-256), and prints the
---  status. Exit status: 0 when the proof is accepted, 1 when it is
---  refused or the circuit is not accepted (the status is printed), 2
---  on a usage or file error. Documentation: docs/guide/06-circuits.md,
---  README "Verifying a proof".
+--  status. A circuit file in Pinned_Circuits is loaded without
+--  recomputing its identifier, checked once already (ADR 0074);
+--  --check-circuit-id recomputes it all the same. Exit status: 0 when
+--  the proof is accepted, 1 when it is refused or the circuit is not
+--  accepted (the status is printed), 2 on a usage or file error.
+--  Documentation: docs/guide/06-circuits.md, README "Verifying a
+--  proof".
 
 pragma SPARK_Mode (Off);
 
@@ -62,6 +65,7 @@ with Zk_Verifier_GF2_128;
 with Zk_Verifier_P256;
 with Circuit_Reader_GF2_128;
 with Circuit_Reader_P256;
+with Pinned_Circuits;
 
 procedure Longfellow_Verify is
 
@@ -73,13 +77,14 @@ procedure Longfellow_Verify is
    Usage : constant String :=
      "usage: longfellow_verify --field gf2_128|p256 --circuit FILE"
      & " --proof FILE --label STRING --rate-inv N --nreq N --ncol N"
-     & " [--public HEX]...";
+     & " [--public HEX]... [--check-circuit-id]";
 
    --  The arguments.
    Max_Public : constant := 4096;
    type String_Access is access String;
    Field_Arg, Circuit_Arg, Proof_Arg, Label_Arg : String_Access;
    Rate_Inv, Nreq, Ncol : Natural := 0;
+   Full_Id : Boolean := False;
    Public : array (1 .. Max_Public) of String_Access;
    Npublic : Natural := 0;
 
@@ -190,6 +195,7 @@ procedure Longfellow_Verify is
    function Run return CL.Exit_Status;
 
    function Run return CL.Exit_Status is
+      procedure Read_Circuit is new Pinned_Circuits.Read (CR);
       use type Circuit_Status.Status;
       use type Verifier_Status.Status;
       Cfg : constant Ligero_Geometry.Config :=
@@ -209,7 +215,7 @@ procedure Longfellow_Verify is
       declare
          B : constant Byte_Array_Access := Read_File (Circuit_Arg.all);
       begin
-         CR.Read (B.all, C, H, CSt);
+         Read_Circuit (B.all, Full_Id, C, H, CSt);
       end;
       if CSt /= Circuit_Status.Ok then
          TIO.Put_Line ("circuit " & Lower (CSt'Image));
@@ -286,6 +292,9 @@ procedure Longfellow_Verify is
                end if;
                Npublic := Npublic + 1;
                Public (Npublic) := new String'(Value);
+            elsif Opt = "--check-circuit-id" then
+               Full_Id := True;
+               I := I + 1;
             elsif Opt = "--help" or else Opt = "-h" then
                TIO.Put_Line (Usage);
                CL.Set_Exit_Status (0);

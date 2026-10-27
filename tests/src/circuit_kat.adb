@@ -243,6 +243,66 @@ procedure Circuit_KAT is
          Name_Len := 0;
       end Release;
 
+      --  Read_Pinned on the same bytes (ADR 0074), against the result
+      --  of Read (S1, C1, H1): under the stored identifier it differs
+      --  from Read only in not recomputing it, so a file Read refuses
+      --  with Id_Mismatch loads and every other status is Read's; under
+      --  another identifier a good file is refused. The second load is
+      --  skipped above a megabyte, where it would double the time of
+      --  the mDoc circuits.
+      procedure Check_Pinned
+        (Name : String;
+         Want : String;
+         B    : Byte_Array;
+         S1   : Circuit_Status.Status;
+         C1   : CR.Circuit_Access;
+         H1   : CR.Header)
+      is
+         use type CR.Header;
+         use type CR.Raw_Circuit;
+         Stored : Bytes_32 := [others => 0];
+         C2 : CR.Circuit_Access;
+         H2 : CR.Header;
+         S2 : Circuit_Status.Status;
+      begin
+         if B'Length >= 32 then
+            Stored := B (B'Last - 31 .. B'Last);
+         end if;
+         CR.Read_Pinned (B, Stored, C2, H2, S2);
+         if Want = "id_mismatch" then
+            if S2 /= Circuit_Status.Ok or else H2.Id /= Stored then
+               Report_Failure ("pinned " & Name & ": got "
+                               & Status_Name (S2) & ", expected ok");
+            else
+               Passed := Passed + 1;
+            end if;
+         elsif S2 /= S1 or else H2 /= H1
+           or else (C1 /= null and then C2 /= null
+                    and then C1.all /= C2.all)
+         then
+            Report_Failure ("pinned " & Name & ": got " & Status_Name (S2)
+                            & ", Read gives " & Status_Name (S1));
+         else
+            Passed := Passed + 1;
+         end if;
+         if C2 /= null then
+            CR.Free (C2);
+         end if;
+         if Want = "ok" and then B'Length <= 2**20 then
+            Stored (0) := Stored (0) xor 1;
+            CR.Read_Pinned (B, Stored, C2, H2, S2);
+            if S2 /= Circuit_Status.Id_Mismatch then
+               Report_Failure ("pinned " & Name & ": another identifier"
+                               & " gives " & Status_Name (S2));
+            else
+               Passed := Passed + 1;
+            end if;
+            if C2 /= null then
+               CR.Free (C2);
+            end if;
+         end if;
+      end Check_Pinned;
+
       procedure Load (Name : String; Want : String; B : Byte_Array) is
          C  : CR.Circuit_Access;
          H  : CR.Header;
@@ -250,6 +310,7 @@ procedure Circuit_KAT is
       begin
          Release;
          CR.Read (B, C, H, St);
+         Check_Pinned (Name, Want, B, St, C, H);
          if Status_Name (St) /= Want then
             Report_Failure ("load " & Name & ": got " & Status_Name (St)
                             & ", expected " & Want);

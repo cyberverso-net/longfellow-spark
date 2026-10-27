@@ -25,6 +25,11 @@
 --  three altered copies, recorded when first observed so that a change
 --  of status shows even where the proof is still refused.
 --
+--  Then the list of Pinned_Circuits (ADR 0074): for each entry, the
+--  file has the recorded digest, a full Read recomputes the recorded
+--  identifier, Read_Pinned gives the same circuit and header, and
+--  Read_Pinned under another identifier refuses the file.
+--
 --  Exit status: success only if at least one case ran and none failed.
 
 pragma SPARK_Mode (Off);
@@ -74,6 +79,8 @@ with Zk_Verifier_GF2_128;
 with Zk_Verifier_P256;
 with Circuit_Reader_GF2_128;
 with Circuit_Reader_P256;
+with Pinned_Circuits;
+with Sha256;
 
 procedure Interop_KAT is
 
@@ -339,6 +346,57 @@ procedure Interop_KAT is
       LV => Ligero_Verifier_P256, ZK => Zk_Verifier_P256,
       CR => Circuit_Reader_P256, To_Element => P_To_Element);
 
+   --  One entry of Pinned_Circuits against its file.
+   generic
+      with package CR is new Circuit_Reader (<>);
+   procedure Check_Pin (E : Pinned_Circuits.Entry_Index);
+
+   procedure Check_Pin (E : Pinned_Circuits.Entry_Index) is
+      use type Circuit_Status.Status;
+      use type CR.Header;
+      use type CR.Raw_Circuit;
+      Name : constant String := "pin" & E'Image;
+      B    : Byte_Array_Access := Read_File (Pinned_Circuits.Path (E));
+      Ctx  : Sha256.Context := Sha256.Initial;
+      C1, C2 : CR.Circuit_Access;
+      H1, H2 : CR.Header;
+      S1, S2 : Circuit_Status.Status;
+      Other  : Bytes_32 := Pinned_Circuits.Id (E);
+   begin
+      Sha256.Update (Ctx, B.all);
+      if Sha256.Digest (Ctx) /= Pinned_Circuits.File_Digest (E) then
+         Report_Failure (Name & ": the file digest differs");
+      end if;
+      CR.Read (B.all, C1, H1, S1);
+      CR.Read_Pinned (B.all, Pinned_Circuits.Id (E), C2, H2, S2);
+      if S1 /= Circuit_Status.Ok or else S2 /= Circuit_Status.Ok then
+         Report_Failure (Name & ": read " & S1'Image & ", pinned "
+                         & S2'Image);
+      elsif H1.Id /= Pinned_Circuits.Id (E) then
+         Report_Failure (Name & ": the recomputed identifier differs");
+      elsif H1 /= H2 or else C1.all /= C2.all then
+         Report_Failure (Name & ": Read_Pinned gives another circuit");
+      else
+         Passed := Passed + 1;
+         TIO.Put_Line ("  " & Name & ": " & Pinned_Circuits.Path (E)
+                       & "," & C1.NT'Image & " terms, identifier checked");
+      end if;
+      CR.Free (C1);
+      CR.Free (C2);
+      Other (0) := Other (0) xor 1;
+      CR.Read_Pinned (B.all, Other, C2, H2, S2);
+      if S2 /= Circuit_Status.Id_Mismatch then
+         Report_Failure (Name & ": another identifier gives " & S2'Image);
+         CR.Free (C2);
+      else
+         Passed := Passed + 1;
+      end if;
+      Free (B);
+   end Check_Pin;
+
+   procedure Check_Pin_GF is new Check_Pin (Circuit_Reader_GF2_128);
+   procedure Check_Pin_P is new Check_Pin (Circuit_Reader_P256);
+
    procedure Check_Line (Line : String) is
       Fields : Field_Array;
       Count  : Natural;
@@ -400,6 +458,15 @@ begin
          Run_File (Ada.Command_Line.Argument (I));
       end loop;
    end if;
+   TIO.Put_Line ("Pinned circuits");
+   Line_No := 0;
+   for E in Pinned_Circuits.Entry_Index loop
+      if Pinned_Circuits.Binary (E) then
+         Check_Pin_GF (E);
+      else
+         Check_Pin_P (E);
+      end if;
+   end loop;
    TIO.Put_Line ("passed" & Passed'Image & ", failed" & Failed'Image);
    if Failed > 0 or else Passed = 0 then
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);

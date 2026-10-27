@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-17, at the close of block 3 of Phase B; proposed 2026-10-16 and edited until then)
+Accepted (2026-10-17, at the close of block 3 of Phase B; proposed 2026-10-16 and edited until then). Amended 2026-10-27 by [ADR 0074](0074-circuit-identifier-checked-once.md): the command line loads the circuits of a fixed list, checked once, without recomputing their identifier; `Read` still recomputes it.
 
 ## Date
 
