@@ -30,9 +30,11 @@
 --  order of operations, through the logical equality Same (p (1) is
 --  not emitted, so its sum is not transcribed). Since M1 (ADR 0063)
 --  Prove computes the round polynomial in the dense form of the
---  production prover, Round_Evals_Dense, Gold against QW_Ref, D0_Ref
---  and D2_Ref; Round_Evals stays as the reference, and the harness
---  checks that the two agree. Prove keeps the terms merged as the
+--  production prover, Round_Evals_Dense, Gold against QW_Ref and
+--  D0_Ref, and against D2_Ref when the claim of the round it is given
+--  is the true sum (ADR 0075: two products per pair, p (1) from the
+--  claim, as upstream); Round_Evals stays as the reference, and the
+--  harness checks that the two agree. Prove keeps the terms merged as the
 --  production prover does: Bind_G_T (Gold against the eq2 table),
 --  Merge_Runs (Gold, structural, against Run_Id and Run_Sum) and Bind_H
 --  (Gold, structural, against Rd and Corner_K); Bind_G and Update_Terms
@@ -40,7 +42,8 @@
 --  polynomials agree on every round.
 --  The padded values are the evaluations minus the pads by the two
 --  statements that compute them. Completeness (the verifier accepts the
---  honest proof) is tested, not proved.
+--  honest proof) is tested, not proved; so is the claim of each round
+--  that Prove tracks (ADR 0075).
 --
 --  Constant-time discipline (ADR 0051): constant time by construction.
 --  Round_Evals loops over the terms of the layer, a public structure,
@@ -224,8 +227,9 @@ package Sumcheck_Prover is
    --  prover.rs, layer and quad_round_poly): each term adds k times its
    --  other-hand wire to qw at its active-hand index, then p (0) and
    --  p (P2) are sums over the pairs (2 i, 2 i + 1) of qw and of the
-   --  active wires. The same values as Round_Evals, which stays as the
-   --  reference: their agreement is distributivity, tested.
+   --  active wires. The same values as Round_Evals at the true claim,
+   --  which stays as the reference: their agreement is distributivity,
+   --  tested.
    -------------------------------------------------------------------
 
    --  qw at X after the first N terms, in their order.
@@ -285,9 +289,47 @@ package Sumcheck_Prover is
                and then M <= Natural'Last / 2,
         Subprogram_Variant => (Decreases => M);
 
-   --  The evaluations of hand H in 0 and in X2 by the dense form. QW is
-   --  a work array of at least NA entries; on return its first NA hold
-   --  qw.
+   --  p (1) over the first M pairs.
+   function D1_Ref
+     (QW : Element_Array; A : Element_Array; NA : Natural; M : Natural)
+      return Element
+   is
+     (if M = 0 then Zero
+      else D1_Ref (QW, A, NA, M - 1)
+           + Ref (QW, NA, 2 * M - 1) * Ref (A, NA, 2 * M - 1))
+   with Ghost => Proof_Only,
+        Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre => QW'First = 0 and then A'First = 0
+               and then NA <= QW'Length and then NA <= A'Length
+               and then M <= Natural'Last / 2,
+        Subprogram_Variant => (Decreases => M);
+
+   --  The leading coefficient over the first M pairs.
+   function Dd_Ref
+     (QW : Element_Array; A : Element_Array; NA : Natural; M : Natural)
+      return Element
+   is
+     (if M = 0 then Zero
+      else Dd_Ref (QW, A, NA, M - 1)
+           + (Ref (QW, NA, 2 * M - 1) - Ref (QW, NA, 2 * (M - 1)))
+             * (Ref (A, NA, 2 * M - 1) - Ref (A, NA, 2 * (M - 1))))
+   with Ghost => Proof_Only,
+        Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre => QW'First = 0 and then A'First = 0
+               and then NA <= QW'Length and then NA <= A'Length
+               and then M <= Natural'Last / 2,
+        Subprogram_Variant => (Decreases => M);
+
+   --  The evaluations of hand H in 0 and in X2 by the dense form, as
+   --  the production prover computes them (quad_round_poly, ADR 0075):
+   --  two products per pair, p (0) and the leading coefficient Lead,
+   --  and p (1) taken as Sum - p (0), where Sum is the claim of the
+   --  round. p (X2) is then upstream's formula for any Sum, and the
+   --  reference whenever Sum is the true sum p (0) + p (1), as for an
+   --  honest prover on a satisfied circuit. QW is a work array of at
+   --  least NA entries; on return its first NA hold qw.
    procedure Round_Evals_Dense
      (T      : Term_Array;
       Active : Element_Array;
@@ -296,9 +338,11 @@ package Sumcheck_Prover is
       NO     : Natural;
       H      : Hand;
       X2     : Element;
+      Sum    : Element;
       QW     : in out Element_Array;
       Ev0    : out Element;
-      Ev2    : out Element)
+      Ev2    : out Element;
+      Lead   : out Element)
    with
      Global => null,
      Pre    => Active'First = 0 and then NA <= Active'Length
@@ -312,7 +356,13 @@ package Sumcheck_Prover is
           and then
           Same (Ev0, D0_Ref (QW, Active, NA, (NA + 1) / 2))
           and then
-          Same (Ev2, D2_Ref (QW, Active, NA, X2, (NA + 1) / 2)));
+          Same (Lead, Dd_Ref (QW, Active, NA, (NA + 1) / 2))
+          and then
+          Same (Ev2, ST.SA.Comb_F (X2, Ev0, Sum - Ev0, Lead))
+          and then
+          (if Same (Sum, D0_Ref (QW, Active, NA, (NA + 1) / 2)
+                         + D1_Ref (QW, Active, NA, (NA + 1) / 2))
+           then Same (Ev2, D2_Ref (QW, Active, NA, X2, (NA + 1) / 2))));
 
    -------------------------------------------------------------------
    --  The merged terms of Sumcheck_HQuad (ADR 0063, 0073), through the

@@ -72,10 +72,13 @@ The proof of `Round_Evals` taught the lesson of [ADR 0023](../adr/0023-gold-peri
 
 Since milestone M1 ([ADR 0063](../adr/0063-milestone-m1-algorithmic-parity.md)), `Prove` runs the sumcheck the way the production prover does (`prover.rs` and `hquad.rs` of upstream):
 
-- `Round_Evals_Dense` computes the round polynomial in the dense form: each term adds k times its other-hand wire to one vector, then sums over the pairs. It is Gold against `QW_Ref`, `D0_Ref` and `D2_Ref`.
-  - Since milestone M2 ([ADR 0070](../adr/0070-sumcheck-and-ligero-kernels-as-upstream.md)) it takes three products per pair, as `quad_round_poly` does: a0 = sum q0 w0, s1 = sum q1 w1 and a2 = sum dq dw. Then p (P2) = a0 + P2 (s1 - a0 - a2) + P2^2 a2.
+- `Round_Evals_Dense` computes the round polynomial in the dense form: each term adds k times its other-hand wire to one vector, then sums over the pairs. It is Gold against `QW_Ref` and `D0_Ref`.
+  - Milestone M2 ([ADR 0070](../adr/0070-sumcheck-and-ligero-kernels-as-upstream.md)) brought it to three products per pair: a0 = sum q0 w0, s1 = sum q1 w1 and a2 = sum dq dw. Then p (P2) = a0 + P2 (s1 - a0 - a2) + P2^2 a2.
   - `Lemma_D2_Split` proves that this equals `D2_Ref`, by induction over the pairs. The identity for one pair and the additivity come from `Ring_Laws`, restated by `Sumcheck_Algebra` on the operations of the field that the prover uses.
-  - Upstream takes two products per pair: it reads s1 off the claimed sum. That rests on a protocol invariant, not on a local identity, and is left for later.
+  - Since [ADR 0075](../adr/0075-round-evaluations-from-the-claim.md) it takes two products per pair, as `quad_round_poly` does. It computes a0 and a2, and takes s1 = p (1) as the claim of the round minus a0, as the verifier does.
+  - So p (P2) equals `D2_Ref` only when the claim it is given is the true sum. The postcondition states upstream's formula for any claim, and `D2_Ref` under that condition (`Lemma_Cancel_L_F`).
+  - `Prove_Layer` tracks the claim as upstream does: claim0 + alpha claim1 at the start of a layer, then p at the challenge after each round. That the tracked claim is the true sum is the completeness of the sumcheck: tested, not proved.
+  - `prover_kat` makes upstream's check at the end of each layer: it tracks the claim from the unpadded proof, by Lagrange, and compares it with the two claims times the bound quad.
 - `Bind_G_T` binds g with the eq2 table of chapter 3, one product per term instead of an eq per term.
 - `Merge_Runs` merges the consecutive terms with the same hands into one. It is Gold, structurally, against `Run_Id` (the run of each term) and `Run_Sum` (the sum of a run, in order).
 - `Bind_H` merges, at every round, the two corners 2i and 2i + 1 of the bound hand by affine interpolation, in place, so the terms shrink with the rounds. It is Gold, structurally, against `Rd` (where output k reads) and `Corner_K` (the interpolation).
