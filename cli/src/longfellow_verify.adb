@@ -195,6 +195,7 @@ procedure Longfellow_Verify is
    function Run return CL.Exit_Status;
 
    function Run return CL.Exit_Status is
+      pragma Suppress (Predicate_Check);
       procedure Read_Circuit is new Pinned_Circuits.Read (CR);
       use type Circuit_Status.Status;
       use type Verifier_Status.Status;
@@ -219,6 +220,16 @@ procedure Longfellow_Verify is
       end;
       if CSt /= Circuit_Status.Ok then
          TIO.Put_Line ("circuit " & Lower (CSt'Image));
+         return 1;
+      end if;
+      --  The predicate of the circuit, checked once here, where the
+      --  circuit enters the program; the calls below do not check it
+      --  again (ADR 0072). The loader proves it, so this test is the
+      --  run-time guard of the boundary, not a new property.
+      if not SA.Well_Formed (C.all) then
+         TIO.Put_Line
+           ("circuit " & Lower (Circuit_Status.Not_Well_Formed'Image));
+         CR.Free (C);
          return 1;
       end if;
       declare

@@ -232,6 +232,7 @@ procedure Longfellow_Prove is
    function Run return CL.Exit_Status;
 
    function Run return CL.Exit_Status is
+      pragma Suppress (Predicate_Check);
       use type Circuit_Status.Status;
       use type Prover_Status.Status;
       package F renames ZKP.LPR.LV.ST.SA.F;
@@ -256,6 +257,16 @@ procedure Longfellow_Prove is
       end;
       if CSt /= Circuit_Status.Ok then
          TIO.Put_Line ("circuit " & Lower (CSt'Image));
+         return 1;
+      end if;
+      --  The predicate of the circuit, checked once here, where the
+      --  circuit enters the program; the calls below do not check it
+      --  again (ADR 0072). The loader proves it, so this test is the
+      --  run-time guard of the boundary, not a new property.
+      if not ZKP.LPR.LV.ST.SA.Well_Formed (C.all) then
+         TIO.Put_Line
+           ("circuit " & Lower (Circuit_Status.Not_Well_Formed'Image));
+         CR.Free (C);
          return 1;
       end if;
       if not ZKP.Config_Fits (Cfg, C.all) then
