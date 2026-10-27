@@ -179,6 +179,11 @@ package Sumcheck_Algebra is
                     Comb_F (X, F."*" (Q0, W0), F."*" (Q1, W1),
                             F."*" (F."-" (Q1, Q0), F."-" (W1, W0))));
 
+   --  p (1) from the claim of the round (ADR 0075): (p0 + y) - p0 = y.
+   procedure Lemma_Cancel_L_F (P, Y : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same (F."-" (F."+" (P, Y), P), Y);
+
    --  The identities of the bound quad of the prover (ADR 0071), on
    --  the operations of the field.
    procedure Lemma_Split_Zero_F (F0, F1 : Element) with

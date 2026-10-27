@@ -696,6 +696,49 @@ procedure Prover_KAT is
                   end if;
                end loop;
             end;
+            --  ADR 0075: the claim of every round, tracked from the
+            --  unpadded proof as upstream's layer does (Lagrange at the
+            --  challenge, p (1) = claim - p (0)), meets at the end of each
+            --  layer the claims times the bound quad, upstream's assert.
+            declare
+               Cl0, Cl1, Sum, P0, P1, P2v : SA.Element := SA.Zero;
+               L : SA.Basis;
+            begin
+               for J in 0 .. C.Last_Layer loop
+                  declare
+                     Lw    : constant Natural := C.Layers (J).Logw;
+                     Off_P : constant Natural := SV.Proof_Off (C.all, J);
+                     Off_C : constant Natural := SV.Chal_Off (C.all, J);
+                     Off_D : constant Natural := SV.Pad_Off (C.all, J, 0);
+                  begin
+                     Sum := Cl0 + Ch.Layer (Off_C) * Cl1;
+                     for R in 0 .. Lw - 1 loop
+                        for H in 0 .. 1 loop
+                           P0  := Proof.Evals (Off_P + 4 * R + 2 * H)
+                             + Pads (Off_D + 4 * R + 2 * H);
+                           P2v := Proof.Evals (Off_P + 4 * R + 2 * H + 1)
+                             + Pads (Off_D + 4 * R + 2 * H + 1);
+                           P1  := Sum - P0;
+                           L   := SA.Lagrange_Basis
+                             (Ch.Layer (Off_C + 2 + 2 * R + H));
+                           Sum := L (0) * P0 + L (1) * P1 + L (2) * P2v;
+                        end loop;
+                     end loop;
+                     Cl0 := Proof.Evals (Off_P + 4 * Lw)
+                       + Pads (Off_D + 4 * Lw);
+                     Cl1 := Proof.Evals (Off_P + 4 * Lw + 1)
+                       + Pads (Off_D + 4 * Lw + 1);
+                     if Sum /= Cl0 * Cl1 * BQ (J) then
+                        Report_Failure (Name & ": the claim tracked over "
+                                        & "layer" & J'Image & " differs "
+                                        & "from the claims times the "
+                                        & "bound quad");
+                        CR.Free (C);
+                        return;
+                     end if;
+                  end;
+               end loop;
+            end;
             PW.Write_Sumcheck_Proof (C.all, Proof, Out_B);
             if Out_B'Length /= Want'Length then
                Report_Failure (Name & ": proof length" & Out_B'Length'Image
@@ -728,15 +771,23 @@ procedure Prover_KAT is
                   QW  : SA.Element_Array (0 .. NW - 1);
                   X2  : constant SA.Element :=
                     Pads (Pads'First) * Pads (Pads'Last) + SA.One;
-                  E0, E2, D0, D2 : SA.Element;
+                  E0, E2, D0, D2, Ld, Sum : SA.Element;
                begin
                   for I in B'Range loop
                      B (I) := A (NW - 1 - I) * X2 + SA.One;
                   end loop;
                   for H in SPR.Hand loop
                      SPR.Round_Evals (T, A, NW, B, NW, H, X2, E0, E2);
+                     --  ADR 0075: the dense form at the true claim, the
+                     --  sum of qw times the active wires.
                      SPR.Round_Evals_Dense
-                       (T, A, NW, B, NW, H, X2, QW, D0, D2);
+                       (T, A, NW, B, NW, H, X2, SA.Zero, QW, D0, D2, Ld);
+                     Sum := SA.Zero;
+                     for X in 0 .. NW - 1 loop
+                        Sum := Sum + QW (X) * A (X);
+                     end loop;
+                     SPR.Round_Evals_Dense
+                       (T, A, NW, B, NW, H, X2, Sum, QW, D0, D2, Ld);
                      if E0 /= D0 or else E2 /= D2 then
                         Report_Failure (Name & ": layer" & J'Image
                                         & " hand" & H'Image
@@ -775,7 +826,7 @@ procedure Prover_KAT is
                      Be  : constant SA.Element := Pads (Pads'Last) + Al;
                      X   : SA.Element := Al * Be + SA.One;
                      NT, NB : Natural;
-                     E0, E2, D0, D2 : SA.Element;
+                     E0, E2, D0, D2, L0, L2, Sum : SA.Element;
                   begin
                      for I in B'Range loop
                         B (I) := A (NW - 1 - I) * X + SA.One;
@@ -801,12 +852,16 @@ procedure Prover_KAT is
                      SV.HQ.Merge_Runs (TF, NT);
                      for R in 0 .. Lw - 1 loop
                         for H in SPR.Hand loop
+                           --  The same claim for both, any claim: the
+                           --  identity is linear in the terms.
+                           Sum := X * Al;
                            SPR.Round_Evals_Dense
-                             (TR, A, NW, B, NW, H, X, QW, E0, E2);
+                             (TR, A, NW, B, NW, H, X, Sum, QW, E0, E2, L0);
                            SPR.Round_Evals_Dense
                              (TF (TF'First .. TF'First + NT - 1), A, NW, B,
-                              NW, H, X, QW, D0, D2);
-                           if E0 /= D0 or else E2 /= D2 then
+                              NW, H, X, Sum, QW, D0, D2, L2);
+                           if E0 /= D0 or else E2 /= D2 or else L0 /= L2
+                           then
                               Report_Failure
                                 (Name & ": layer" & J'Image & " round"
                                  & R'Image & " hand" & H'Image

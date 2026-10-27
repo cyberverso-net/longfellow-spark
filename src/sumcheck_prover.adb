@@ -407,50 +407,19 @@ package body Sumcheck_Prover is
    end Lemma_D_Step;
 
    -------------------------------------------------------------------
-   --  The round evaluations from three sums, three products per pair
-   --  (ADR 0070): a0 = sum q0 w0, s1 = sum q1 w1 and a2 = sum dq dw,
-   --  with dq = q1 - q0 and dw = w1 - w0. Each pair contributes
+   --  The round evaluations from three sums (ADR 0070): a0 = sum q0 w0,
+   --  s1 = sum q1 w1 and a2 = sum dq dw, with dq = q1 - q0 and
+   --  dw = w1 - w0. Each pair contributes
    --  (q0 + x dq) (w0 + x dw) = a0 + x (s1 - a0 - a2) + x^2 a2 to p (x),
    --  and the combination is additive, so p (P2) is Comb of the sums.
    --  These identities are the Lemma_Comb_*_F of Sumcheck_Algebra,
-   --  proved in Ring_Laws on the hidden wrappers.
+   --  proved in Ring_Laws on the hidden wrappers. The prover computes
+   --  only a0 and a2, two products per pair, and takes s1 from the
+   --  claim of the round (ADR 0075); D1_Ref is the s1 of the proof.
    -------------------------------------------------------------------
 
    function Comb (X, A0, S1, A2 : Element) return Element
      renames ST.SA.Comb_F;
-
-   --  p (1) over the first M pairs.
-   function D1_Ref
-     (QW : Element_Array; A : Element_Array; NA : Natural; M : Natural)
-      return Element
-   is
-     (if M = 0 then Zero
-      else D1_Ref (QW, A, NA, M - 1)
-           + Ref (QW, NA, 2 * M - 1) * Ref (A, NA, 2 * M - 1))
-   with Ghost => Proof_Only,
-        Global => null,
-        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre => QW'First = 0 and then A'First = 0
-               and then NA <= QW'Length and then NA <= A'Length
-               and then M <= Natural'Last / 2,
-        Subprogram_Variant => (Decreases => M);
-
-   --  The leading coefficient over the first M pairs.
-   function Dd_Ref
-     (QW : Element_Array; A : Element_Array; NA : Natural; M : Natural)
-      return Element
-   is
-     (if M = 0 then Zero
-      else Dd_Ref (QW, A, NA, M - 1)
-           + (Ref (QW, NA, 2 * M - 1) - Ref (QW, NA, 2 * (M - 1)))
-             * (Ref (A, NA, 2 * M - 1) - Ref (A, NA, 2 * (M - 1))))
-   with Ghost => Proof_Only,
-        Global => null,
-        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre => QW'First = 0 and then A'First = 0
-               and then NA <= QW'Length and then NA <= A'Length
-               and then M <= Natural'Last / 2,
-        Subprogram_Variant => (Decreases => M);
 
    procedure Lemma_D13_Step
      (QW : Element_Array; A : Element_Array; NA : Natural; M : Natural)
@@ -525,13 +494,14 @@ package body Sumcheck_Prover is
       NO     : Natural;
       H      : Hand;
       X2     : Element;
+      Sum    : Element;
       QW     : in out Element_Array;
       Ev0    : out Element;
-      Ev2    : out Element)
+      Ev2    : out Element;
+      Lead   : out Element)
    is
       Hb : Natural;
       Q0, Q1, W0, W1 : Element;
-      S1, A2 : Element;
    begin
       for X in 0 .. NA - 1 loop
          QW (X) := Zero;
@@ -560,31 +530,31 @@ package body Sumcheck_Prover is
            (for all X in 0 .. NA - 1 =>
               Same (QW (X), QW_Ref (T, Other, NO, H, X, T'Length))));
 
-      --  The pairs: the three sums, three products per pair, then
-      --  p (P2) from them (prover.rs, quad_round_poly; ADR 0070).
-      Ev0 := Zero;
-      S1  := Zero;
-      A2  := Zero;
+      --  The pairs: the two sums, two products per pair, then p (P2)
+      --  with p (1) = Sum - p (0) (prover.rs, quad_round_poly; ADR 0070,
+      --  0075).
+      Ev0  := Zero;
+      Lead := Zero;
       Lemma_D_Zero (QW, Active, NA, X2);
       Lemma_D13_Step (QW, Active, NA, 0);
       for M in 0 .. (NA + 1) / 2 - 1 loop
          pragma Loop_Invariant
            (Proof_Only =>
               Same (Ev0, D0_Ref (QW, Active, NA, M))
-              and then Same (S1, D1_Ref (QW, Active, NA, M))
-              and then Same (A2, Dd_Ref (QW, Active, NA, M)));
+              and then Same (Lead, Dd_Ref (QW, Active, NA, M)));
          Q0 := Ref (QW, NA, 2 * M);
          Q1 := Ref (QW, NA, 2 * M + 1);
          W0 := Ref (Active, NA, 2 * M);
          W1 := Ref (Active, NA, 2 * M + 1);
-         Ev0 := Ev0 + Q0 * W0;
-         S1  := S1 + Q1 * W1;
-         A2  := A2 + (Q1 - Q0) * (W1 - W0);
+         Ev0  := Ev0 + Q0 * W0;
+         Lead := Lead + (Q1 - Q0) * (W1 - W0);
          Lemma_D_Step (QW, Active, NA, X2, M + 1);
          Lemma_D13_Step (QW, Active, NA, M + 1);
       end loop;
-      Ev2 := Comb (X2, Ev0, S1, A2);
+      Ev2 := Comb (X2, Ev0, Sum - Ev0, Lead);
       Lemma_D2_Split (QW, Active, NA, X2, (NA + 1) / 2);
+      ST.SA.Lemma_Cancel_L_F
+        (Ev0, D1_Ref (QW, Active, NA, (NA + 1) / 2));
    end Round_Evals_Dense;
 
    procedure Update_Terms (T : in out Term_Array; H : Hand; X : Element) is
@@ -750,9 +720,31 @@ package body Sumcheck_Prover is
       NT := NB;
    end Bind_Round;
 
+   --  The claim of the rounds (ADR 0075), tracked as upstream's layer
+   --  does: claim0 + alpha claim1 at the start of a layer, then p at the
+   --  challenge after each round. Procedures of their own with no
+   --  postcondition, so that the contracts of their products stay out of
+   --  the proof of Prove_Layer; nothing about the claim is proved.
+   procedure First_Claim (Cl0, Cl1, Alpha : Element; Sum : out Element)
+   with Global => null;
+
+   procedure First_Claim (Cl0, Cl1, Alpha : Element; Sum : out Element) is
+   begin
+      Sum := Cl0 + Alpha * Cl1;
+   end First_Claim;
+
+   procedure Next_Claim (Chal, Ev0, Lead : Element; Sum : in out Element)
+   with Global => null;
+
+   procedure Next_Claim (Chal, Ev0, Lead : Element; Sum : in out Element) is
+   begin
+      Sum := Comb (Chal, Ev0, Sum - Ev0, Lead);
+   end Next_Claim;
+
    --  One layer of sumcheck_prove: the binding of g, the 2 logw rounds
    --  of the two hands, the claims; Logv, Cur0 and Cur1 move on to the
-   --  next layer. A subprogram of its own, so that the proof of a layer
+   --  next layer, and so do the unpadded claims Cl0 and Cl1, from which
+   --  the claim of each round is tracked as upstream does (ADR 0075). A subprogram of its own, so that the proof of a layer
    --  sees only this context (ADR 0071).
    procedure Prove_Layer
      (C          : Circuit;
@@ -762,6 +754,7 @@ package body Sumcheck_Prover is
       Logv       : in out Natural;
       Cur0, Cur1 : in out Element_Array;
       Nxt0, Nxt1 : in out Element_Array;
+      Cl0, Cl1   : in out Element;
       Proof      : in out Sumcheck_Proof;
       Ch         : in out Challenges;
       BQJ        : out Element)
@@ -802,7 +795,7 @@ package body Sumcheck_Prover is
                        then Same (Ch.Layer (K), Ch'Old.Layer (K)))))
    is
       Ch_In : constant Challenges := Ch with Ghost => Proof_Only;
-      Alpha, Beta, Chal, Ev0, Ev2, P0, P2V : Element;
+      Alpha, Beta, Chal, Ev0, Ev2, Lead, P0, P2V, Sum : Element;
       N0, N1, NT : Natural;
    begin
       Lemma_Layer_Fits (C, J);
@@ -841,6 +834,8 @@ package body Sumcheck_Prover is
          ST.Begin_Layer (Alpha, Beta);
          Ch.Layer (Off_C)     := Alpha;
          Ch.Layer (Off_C + 1) := Beta;
+         --  The claim of the first round (prover.rs, layer).
+         First_Claim (Cl0, Cl1, Alpha, Sum);
          --  bind_g with the eq2 table when it fits, then the runs of
          --  equal hands merged: NT terms from here on.
          if Logv <= ST.SA.Max_Bindeq_Log then
@@ -912,10 +907,12 @@ package body Sumcheck_Prover is
             --  bound A0, as the reference does.
             Round_Evals_Dense
               (T (T'First .. T'First + NT - 1), A0.all, N0, A1.all, N1, 0,
-               P2, Q.all, Ev0, Ev2);
+               P2, Sum, Q.all, Ev0, Ev2, Lead);
             P0  := Ev0 - Pads (Off_D + 4 * R);
             P2V := Ev2 - Pads (Off_D + 4 * R + 1);
             ST.Round_Poly (P0, P2V, Chal);
+            --  The claim of the next round: p at the challenge.
+            Next_Claim (Chal, Ev0, Lead, Sum);
             Proof.Evals (Off_P + 4 * R)     := P0;
             Proof.Evals (Off_P + 4 * R + 1) := P2V;
             Bind_Hand (A0.all, B0, N0, Chal);
@@ -930,10 +927,11 @@ package body Sumcheck_Prover is
                Tab, C.Terms (First .. Last), Logv, Cur0, Cur1, Alpha, Beta);
             Round_Evals_Dense
               (T (T'First .. T'First + NT - 1), A1.all, N1, A0.all, N0, 1,
-               P2, Q.all, Ev0, Ev2);
+               P2, Sum, Q.all, Ev0, Ev2, Lead);
             P0  := Ev0 - Pads (Off_D + 4 * R + 2);
             P2V := Ev2 - Pads (Off_D + 4 * R + 3);
             ST.Round_Poly (P0, P2V, Chal);
+            Next_Claim (Chal, Ev0, Lead, Sum);
             Proof.Evals (Off_P + 4 * R + 2) := P0;
             Proof.Evals (Off_P + 4 * R + 3) := P2V;
             Bind_Hand (A1.all, B1, N1, Chal);
@@ -1009,8 +1007,10 @@ package body Sumcheck_Prover is
          end if;
          ST.SV.Lemma_BQ_Ref_From
            (C, Ch, J, Logv, Cur0, Cur1, Nxt0, Nxt1, BQJ);
-         P0  := Ref (A0.all, N0, 0) - Pads (Off_D + 4 * Logw);
-         P2V := Ref (A1.all, N1, 0) - Pads (Off_D + 4 * Logw + 1);
+         Cl0 := Ref (A0.all, N0, 0);
+         Cl1 := Ref (A1.all, N1, 0);
+         P0  := Cl0 - Pads (Off_D + 4 * Logw);
+         P2V := Cl1 - Pads (Off_D + 4 * Logw + 1);
          Proof.Evals (Off_P + 4 * Logw)     := P0;
          Proof.Evals (Off_P + 4 * Logw + 1) := P2V;
          ST.End_Layer (P0, P2V);
@@ -1039,6 +1039,9 @@ package body Sumcheck_Prover is
       Logv : Natural := ST.SV.Ceil_Lg2 (C.Noutput);
       Cur0, Cur1 : Element_Array (0 .. Max_Logw - 1);
       Nxt0, Nxt1 : Element_Array (0 .. Max_Logw - 1) := [others => Zero];
+      --  The unpadded claims of the previous layer, zero before the
+      --  first (prover.rs, prove_core).
+      Cl0, Cl1 : Element := Zero;
    begin
       Proof := (Last => Proof.Last, Evals => [others => Zero]);
       Ch := (Last        => Ch.Last,
@@ -1066,7 +1069,7 @@ package body Sumcheck_Prover is
             Ch_Before : constant Challenges := Ch with Ghost => Proof_Only;
          begin
             Prove_Layer (C, J, Wires, Pads, Logv, Cur0, Cur1, Nxt0, Nxt1,
-                         Proof, Ch, BQ (J));
+                         Cl0, Cl1, Proof, Ch, BQ (J));
             ST.SV.Lemma_BQ_Ref_Frame_All (C, Ch, Ch_Before, J);
          end;
       end loop;

@@ -139,6 +139,17 @@ package body Sumcheck_Algebra is
       RL.Lemma_Comb_Pair (X, Q0, Q1, W0, W1);
    end Lemma_Comb_Pair_F;
 
+   procedure Lemma_Cancel_L_F (P, Y : Element) is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "-");
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", "*");
+   begin
+      RL.Lemma_Cancel_L (P, Y);
+   end Lemma_Cancel_L_F;
+
    procedure Lemma_Split_Zero_F (F0, F1 : Element) is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", "+");
