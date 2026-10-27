@@ -120,6 +120,7 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 - Piece by piece, the prover matches an independent Python transcription of the reference prover: the pads and padded sumcheck proofs, the Merkle roots, the unencoded rows and the openings of the commitment.
 - The writers rewrite every proof in the repository identically.
 - The complete proofs of the small circuits are accepted by `Zk_Verifier`. The statuses `input_length`, `not_satisfied`, `not_in_subfield` and `config_invalid` are each triggered. A prover with input checks turned off makes proofs of false statements, and the verifier refuses them.
+- The claim of each round, which the prover tracks to take p (1) from it as upstream does, is checked at the end of every layer of every test circuit against the two claims times the bound quad (ADR 0075). The round evaluations equal the reference ones only when that claim is the true sum.
 - The sixteen masks of the subfield projection are checked on all 65536 subfield elements.
 - The shape of the whole tableau is checked slot by slot (ADR 0052).
 - Both FFTs give the Lagrange codeword. Python transcriptions of the upstream transforms are checked against Lagrange interpolation (`gen_fft_vectors.py` for GF(2^128), `gen_rs_p256_vectors.py` for the real FFT over F_p^2), `fft_kat` checks the Ada units on those vectors and against `Lagrange.Evaluate` on random rows, and the prover's commitments and the two upstream proofs stay those of the Lagrange encoder (Phase D).

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-23, milestone M2 of Phase D).
+Proposed (2026-10-23, milestone M2 of Phase D). Amended 2026-10-27 by [ADR 0075](0075-round-evaluations-from-the-claim.md): the round evaluations take two products per pair, p (1) from the claim of the round.
 
 ## Date
 
@@ -81,7 +81,7 @@ Each is a ghost lemma, `Proof_Only`. A new generic, `Ring_Laws`, derives from th
 
 ## Alternatives considered
 
-- **Round evaluations with two products per pair, as upstream.** `a1` then comes from the claimed sum of the round: `p (1) = claim - p (0)`. The identity holds only under the protocol invariant that the claim is the true sum. Proving that means a new contract for `Round_Evals_Dense` and an invariant across the prover's rounds. That would save about 12 M more products. It is left for a later step, once the three-product form is in.
+- **Round evaluations with two products per pair, as upstream.** `a1` then comes from the claimed sum of the round: `p (1) = claim - p (0)`. The identity holds only under the protocol invariant that the claim is the true sum. Proving that means a new contract for `Round_Evals_Dense` and an invariant across the prover's rounds. That would save about 12 M more products. It is left for a later step, once the three-product form is in. Taken up by ADR 0075.
 - **Delayed reduction.** Upstream accumulates unreduced products (`mac`, `accum_reduce`) and reduces once per sum. That is a change to the field interface, not to the kernels. Out of scope here.
 - **Keep the bodies and accept the gap.** Rejected. The proof cost is a few ring laws per field, and the kernels then match upstream line by line.
 
