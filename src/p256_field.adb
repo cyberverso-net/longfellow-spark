@@ -361,6 +361,43 @@ package body P256_Field is
                               = (To_Int (X) + To_Int (Y)) mod P
                               and then To_Int (Add_Mod'Result) < P);
 
+   --  The proof of Add_Mod, in a lemma on its limbs. Written in the body,
+   --  its Big_Integer assertions left finalisation code in the compiled
+   --  function, though the assertions themselves are not compiled.
+   procedure Lemma_Add_Mod
+     (X, Y : Limb_Array; S, D : Limbs_With_Carry; Ge : Unsigned_64;
+      R : Limb_Array)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => To_Int (X) < P and then To_Int (Y) < P
+       and then S = Add_Limbs (X, Y)
+       and then D = Sub_Limbs (S.Limbs, P_Limbs)
+       and then Ge = (S.Carry or (1 - D.Carry))
+       and then R = (if Ge = 0 then S.Limbs else D.Limbs),
+     Post   => To_Int (R) = (To_Int (X) + To_Int (Y)) mod P
+       and then To_Int (R) < P;
+
+   procedure Lemma_Add_Mod
+     (X, Y : Limb_Array; S, D : Limbs_With_Carry; Ge : Unsigned_64;
+      R : Limb_Array)
+   is
+   begin
+      Lemma_To_Int_Bounds (S.Limbs);
+      Lemma_To_Int_Bounds (D.Limbs);
+      Lemma_To_Int_Bounds (X);
+      Lemma_To_Int_Bounds (Y);
+      pragma Assert (Ge <= 1);
+      --  Sum below 2 p: if it overflowed, the low part is below p.
+      pragma Assert (if S.Carry = 1 then D.Carry = 1);
+      pragma Assert
+        (if Ge = 1 then
+           To_Int (R) = To_Int (X) + To_Int (Y) - P
+         else
+           To_Int (R) = To_Int (X) + To_Int (Y));
+      pragma Assert (To_Int (R) >= 0 and then To_Int (R) < P);
+   end Lemma_Add_Mod;
+
    function Add_Mod (X, Y : Limb_Array) return Limb_Array is
       S  : constant Limbs_With_Carry := Add_Limbs (X, Y);
       D  : constant Limbs_With_Carry := Sub_Limbs (S.Limbs, P_Limbs);
@@ -370,19 +407,7 @@ package body P256_Field is
       Mask : constant Unsigned_64 := 0 - Ge;
       R    : constant Limb_Array := Select_Limbs (S.Limbs, D.Limbs, Mask);
    begin
-      Lemma_To_Int_Bounds (S.Limbs);
-      Lemma_To_Int_Bounds (D.Limbs);
-      Lemma_To_Int_Bounds (X);
-      Lemma_To_Int_Bounds (Y);
-      pragma Assert (Proof_Only => Ge <= 1);
-      --  Sum below 2 p: if it overflowed, the low part is below p.
-      pragma Assert (Proof_Only => (if S.Carry = 1 then D.Carry = 1));
-      pragma Assert
-        (Proof_Only => (if Ge = 1 then
-           To_Int (R) = To_Int (X) + To_Int (Y) - P
-         else
-           To_Int (R) = To_Int (X) + To_Int (Y)));
-      pragma Assert (Proof_Only => To_Int (R) >= 0 and then To_Int (R) < P);
+      Lemma_Add_Mod (X, Y, S, D, Ge, R);
       return R;
    end Add_Mod;
 
@@ -393,11 +418,22 @@ package body P256_Field is
                               = (To_Int (X) - To_Int (Y)) mod P
                               and then To_Int (Sub_Mod'Result) < P);
 
-   function Sub_Mod (X, Y : Limb_Array) return Limb_Array is
-      D    : constant Limbs_With_Carry := Sub_Limbs (X, Y);
-      F    : constant Limbs_With_Carry := Add_Limbs (D.Limbs, P_Limbs);
-      Mask : constant Unsigned_64 := 0 - D.Carry;
-      R    : constant Limb_Array := Select_Limbs (D.Limbs, F.Limbs, Mask);
+   --  The proof of Sub_Mod, in a lemma on its limbs, as for Add_Mod.
+   procedure Lemma_Sub_Mod
+     (X, Y : Limb_Array; D, F : Limbs_With_Carry; R : Limb_Array)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => To_Int (X) < P and then To_Int (Y) < P
+       and then D = Sub_Limbs (X, Y)
+       and then F = Add_Limbs (D.Limbs, P_Limbs)
+       and then R = (if D.Carry = 0 then D.Limbs else F.Limbs),
+     Post   => To_Int (R) = (To_Int (X) - To_Int (Y)) mod P
+       and then To_Int (R) < P;
+
+   procedure Lemma_Sub_Mod
+     (X, Y : Limb_Array; D, F : Limbs_With_Carry; R : Limb_Array)
+   is
    begin
       Lemma_To_Int_Bounds (D.Limbs);
       Lemma_To_Int_Bounds (F.Limbs);
@@ -405,13 +441,22 @@ package body P256_Field is
       Lemma_To_Int_Bounds (Y);
       --  If the difference borrowed, adding p back overflows 2^256
       --  exactly once and yields X - Y + p.
-      pragma Assert (Proof_Only => (if D.Carry = 1 then F.Carry = 1));
+      pragma Assert (if D.Carry = 1 then F.Carry = 1);
       pragma Assert
-        (Proof_Only => (if D.Carry = 1 then
+        (if D.Carry = 1 then
            To_Int (R) = To_Int (X) - To_Int (Y) + P
          else
-           To_Int (R) = To_Int (X) - To_Int (Y)));
-      pragma Assert (Proof_Only => To_Int (R) >= 0 and then To_Int (R) < P);
+           To_Int (R) = To_Int (X) - To_Int (Y));
+      pragma Assert (To_Int (R) >= 0 and then To_Int (R) < P);
+   end Lemma_Sub_Mod;
+
+   function Sub_Mod (X, Y : Limb_Array) return Limb_Array is
+      D    : constant Limbs_With_Carry := Sub_Limbs (X, Y);
+      F    : constant Limbs_With_Carry := Add_Limbs (D.Limbs, P_Limbs);
+      Mask : constant Unsigned_64 := 0 - D.Carry;
+      R    : constant Limb_Array := Select_Limbs (D.Limbs, F.Limbs, Mask);
+   begin
+      Lemma_Sub_Mod (X, Y, D, F, R);
       return R;
    end Sub_Mod;
 
@@ -546,9 +591,8 @@ package body P256_Field is
         [Lo (W0), Lo (W1), Lo (W2), Lo (W3), Hi (W3)];
    begin
       pragma Assert (Proof_Only => Conv (0) = 0);
-      pragma Assert
-        (Proof_Only =>
-           Partial (R, 0) = 0 and then Partial (B, 0) = 0);
+      pragma Assert (Proof_Only => Partial (R, 0) = 0);
+      pragma Assert (Proof_Only => Partial (B, 0) = 0);
       pragma Assert
         (Proof_Only =>
            Conv128 (W0) = Conv (X) * Conv (B (0)) + Conv (0));
@@ -1050,6 +1094,32 @@ package body P256_Field is
                 and then To_Int (Mont_Mul'Result)
                          = (To_Int (A) * To_Int (B) * R_Inv) mod P);
 
+   --  The last step of Mont_Mul, on its words: the Big_Integer terms
+   --  that Lemma_Mont_Final takes are formed here, not in Mont_Mul,
+   --  whose compiled code would keep their finalisation.
+   procedure Lemma_Mont_Close
+     (A, B : Limb_Array; T : Six_Array; Q : Big_Integer; Ge : Unsigned_64;
+      Res : Limb_Array)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => To_Int (T) * Two_256 = To_Int (A) * To_Int (B) + Q * P
+       and then (if Ge = 1 then To_Int (Res) = To_Int (T) - P
+                 else To_Int (Res) = To_Int (T))
+       and then To_Int (Res) >= 0 and then To_Int (Res) < P,
+     Post   => To_Int (Res) = (To_Int (A) * To_Int (B) * R_Inv) mod P
+       and then To_Int (Res) < P;
+
+   procedure Lemma_Mont_Close
+     (A, B : Limb_Array; T : Six_Array; Q : Big_Integer; Ge : Unsigned_64;
+      Res : Limb_Array)
+   is
+   begin
+      Lemma_Mont_Final
+        (A, B, To_Int (T), Q,
+         (if Ge = 1 then To_Big_Integer (1) else To_Big_Integer (0)), Res);
+   end Lemma_Mont_Close;
+
    function Mont_Mul (A, B : Limb_Array) return Limb_Array is
       T    : Six_Array := [others => 0];
       R    : Unsigned_64;
@@ -1064,10 +1134,13 @@ package body P256_Field is
       Lemma_P1;
       pragma Assert (Proof_Only => To_Int (T) = 0);
       for I in Limb_Index loop
+         --  Three invariants, not one conjunction: a conjunction of
+         --  Big_Integer terms leaves finalisation code in the loop.
+         pragma Loop_Invariant (Proof_Only => To_Int (T) < 2 * P);
+         pragma Loop_Invariant (Proof_Only => Q >= 0);
          pragma Loop_Invariant
-           (Proof_Only => To_Int (T) < 2 * P and then Q >= 0
-            and then To_Int (T) * Weight (I)
-                     = Partial (A, I) * To_Int (B) + Q * P);
+           (Proof_Only => To_Int (T) * Weight (I)
+                          = Partial (A, I) * To_Int (B) + Q * P);
          Round (T, A (I), B, R);
          pragma Assert (Proof_Only =>
            Partial (A, I + 1) = Partial (A, I) + Conv (A (I)) * Weight (I));
@@ -1121,14 +1194,7 @@ package body P256_Field is
          pragma Assert (Proof_Only => T (4) = 0);
          pragma Assert (Proof_Only => To_Int (Res) = To_Int (T));
       end if;
-      pragma Assert
-        (Proof_Only => (if Ge = 1 then To_Int (Res) = To_Int (T) - P
-                        else To_Int (Res) = To_Int (T)));
-      pragma Assert
-        (Proof_Only => To_Int (Res) >= 0 and then To_Int (Res) < P);
-      Lemma_Mont_Final
-        (A, B, To_Int (T), Q,
-         (if Ge = 1 then To_Big_Integer (1) else To_Big_Integer (0)), Res);
+      Lemma_Mont_Close (A, B, T, Q, Ge, Res);
       return Res;
    end Mont_Mul;
 
