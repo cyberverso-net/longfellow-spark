@@ -302,6 +302,10 @@ Two more came with the Montgomery form ([ADR 0069](../adr/0069-p256-montgomery-m
 - A shift of a word reaches the integer model most easily through a 128-bit product: r 2^32 as `Unsigned_128`, whose halves are the two shifted words, by `Lemma_Mul_Split` and `Lemma_Split`. Reasoning on `Conv` of `Shift_Left` or `mod 2 ** 32` directly did not close.
 - GNAT 16 stops with an internal error on ghost constants declared in a `declare` block of executable code. The final argument of `Mont_Mul` is therefore a ghost procedure, `Lemma_Mont_Final`, which is also the clearer form.
 
+One came with the profiles of the close of M2 ([ADR 0076](../adr/0076-field-operations-without-call-and-finalisation-overhead.md)):
+
+- An assertion at the level `Proof_Only` is not compiled, but its `Big_Integer` temporaries can be. GNAT keeps their finalisation nodes, and a finaliser that runs at every call, when the assertion is an `if`, `and then` or `or else` form or a loop invariant, and when a ghost call takes a `Big_Integer` term as an actual. In a compiled body, a `Big_Integer` term therefore appears only in a simple assertion; the rest goes into a ghost lemma on the limbs (`Lemma_Add_Mod`, `Lemma_Sub_Mod`, `Lemma_Mont_Close`). The expanded code (`-gnatG`) shows whether a body still holds `master_node` objects.
+
 In plain terms, for every input, not on samples:
 
 - no run-time error occurs anywhere in the package;

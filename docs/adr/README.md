@@ -79,3 +79,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0073](0073-verifier-binds-the-quad-as-upstream.md) | The verifier binds the quad of each layer as upstream does | Proposed | 2026-10-26 |
 | [0074](0074-circuit-identifier-checked-once.md) | The command line checks the identifier of a known circuit once, not on every load | Proposed | 2026-10-27 |
 | [0075](0075-round-evaluations-from-the-claim.md) | The prover's round evaluations take p (1) from the claim of the round, as upstream | Proposed | 2026-10-27 |
+| [0076](0076-field-operations-without-call-and-finalisation-overhead.md) | The field operations without call and finalisation overhead | Proposed | 2026-10-27 |
