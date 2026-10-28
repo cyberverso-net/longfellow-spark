@@ -45,7 +45,16 @@ In each round the prover sends p (0) and p (P2) of a quadratic p. The verifier t
 
 ## Consequences
 
-- Expected saving on the hash circuit: about 6.9 M products in the prover, about 0.2 s on the proving machine. To be measured there.
+- Measured on the proving machine (c4-standard-24), proved build, mdoc v7, median of three runs in one session, 6b2ccc1 against 78f5173:
+
+  | | before | after | change |
+  |---|---|---|---|
+  | hash prove | 5.32 s | 5.09 s | -0.23 s (-4 %) |
+  | hash verify | 2.60 s | 2.59 s | unchanged |
+  | sig prove | 0.64 s | 0.62 s | -0.02 s (-3 %) |
+  | sig verify | 0.39 s | 0.39 s | unchanged |
+
+  About 6.9 M products less in the prover, as expected. The verifier does not change. Upstream, on the same session with its generic field code, proves in 2.75 s and verifies in 1.14 s. The hash proof spends 58 % of its time in the carry-less multiplication.
 - The proofs of the CLI stay identical byte for byte: at the true claim the two forms give the same field element.
 - A wrong claim would give wrong round polynomials. The verifier would refuse the proof, as for any other error of the prover. The verifier does not change.
 - The harness compares the dense form with the term-by-term reference at the true claim, the sum of qw times the active wires, and the merged terms with the reference terms at the same claim.
