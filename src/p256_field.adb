@@ -250,45 +250,11 @@ package body P256_Field is
    --  the control flow depends on the data.
    -------------------------------------------------------------------
 
-   --  The carry and borrow of one word in the form GCC compiles to an
-   --  add or subtract with carry (ADR 0077): the carry of A + B + C is
-   --  set when either addition wraps, the borrow of A - B - Bw when
-   --  either subtraction does. The same words as the 128-bit forms.
-   function B2U (B : Boolean) return Unsigned_64 is
-     (Unsigned_64 (Boolean'Pos (B)))
-   with Global => null, Inline;
-
-   procedure Lemma_Addc (A, B, C : Unsigned_64) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => C <= 1,
-     Post =>
-       Lo (Unsigned_128 (A) + Unsigned_128 (B) + Unsigned_128 (C))
-       = A + B + C
-       and then
-       Hi (Unsigned_128 (A) + Unsigned_128 (B) + Unsigned_128 (C))
-       = (B2U (A + B < A) or B2U (A + B + C < A + B));
-
-   procedure Lemma_Addc (A, B, C : Unsigned_64) is null;
-
-   procedure Lemma_Subb (A, B, Bw : Unsigned_64) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => Bw <= 1,
-     Post =>
-       Lo (Unsigned_128 (A) + 2 ** 64 - (Unsigned_128 (B) + Unsigned_128 (Bw)))
-       = A - B - Bw
-       and then
-       1 - Hi (Unsigned_128 (A) + 2 ** 64
-               - (Unsigned_128 (B) + Unsigned_128 (Bw)))
-       = (B2U (A < B) or B2U (A - B < Bw));
-
-   procedure Lemma_Subb (A, B, Bw : Unsigned_64) is null;
-
    procedure Add_Words
      (A, B : Word_Array; R : out Word_Array; Carry : out Unsigned_64)
    is
       C : Unsigned_64 := 0;
-      --  The sum of the step as one 128-bit value, for the proof only.
-      W : Unsigned_128 with Ghost => Proof_Only;
+      W : Unsigned_128;
    begin
       R := [others => 0];
       for I in 0 .. A'Length - 1 loop
@@ -296,15 +262,9 @@ package body P256_Field is
          pragma Assert
            (Proof_Only =>
               Conv128 (W) = Conv (A (I)) + Conv (B (I)) + Conv (C));
-         Lemma_Addc (A (I), B (I), C);
-         declare
-            S1 : constant Unsigned_64 := A (I) + B (I);
-            S2 : constant Unsigned_64 := S1 + C;
-         begin
-            R (I) := S2;
-            Lemma_Add_Step (A, B, R, I, C, W);
-            C := B2U (S1 < A (I)) or B2U (S2 < S1);
-         end;
+         R (I) := Lo (W);
+         Lemma_Add_Step (A, B, R, I, C, W);
+         C := Hi (W);
          pragma Loop_Invariant (Proof_Only => C <= 1);
          pragma Loop_Invariant
            (Proof_Only => Partial (R, I + 1) + Conv (C) * Weight (I + 1)
@@ -316,12 +276,11 @@ package body P256_Field is
    procedure Sub_Words
      (A, B : Word_Array; R : out Word_Array; Borrow : out Unsigned_64)
    is
-      --  For the proof, each step as A_i + 2^64 - B_i - Borrow_in, which
-      --  lies in 0 .. 2^65 - 1 and never wraps; its high half is 1
-      --  exactly when no borrow is produced. The code computes the
-      --  borrow by the idiom of Lemma_Subb.
+      --  Each step computes A_i + 2^64 - B_i - Borrow_in, which lies in
+      --  0 .. 2^65 - 1 and never wraps; its high half is 1 exactly when
+      --  no borrow is produced.
       Bw : Unsigned_64 := 0;
-      W  : Unsigned_128 with Ghost => Proof_Only;
+      W  : Unsigned_128;
       Nb : Unsigned_64;
    begin
       R := [others => 0];
@@ -329,11 +288,9 @@ package body P256_Field is
       for I in 0 .. A'Length - 1 loop
          pragma Assert (Proof_Only => Bw <= 1);
          declare
-            U : constant Unsigned_128 := Unsigned_128 (A (I)) + 2 ** 64
-            with Ghost => Proof_Only;
+            U : constant Unsigned_128 := Unsigned_128 (A (I)) + 2 ** 64;
             V : constant Unsigned_128 :=
-              Unsigned_128 (B (I)) + Unsigned_128 (Bw)
-            with Ghost => Proof_Only;
+              Unsigned_128 (B (I)) + Unsigned_128 (Bw);
          begin
             pragma Assert (Proof_Only => Conv128 (U) = Conv (A (I)) + Two_64);
             pragma Assert
@@ -347,13 +304,8 @@ package body P256_Field is
            (Proof_Only =>
               Conv128 (W) = Conv (A (I)) + Two_64 - Conv (B (I)) - Conv (Bw));
          pragma Assert (Proof_Only => Hi (W) <= 1);
-         Lemma_Subb (A (I), B (I), Bw);
-         declare
-            D1 : constant Unsigned_64 := A (I) - B (I);
-         begin
-            R (I) := D1 - Bw;
-            Nb := B2U (A (I) < B (I)) or B2U (D1 < Bw);
-         end;
+         R (I) := Lo (W);
+         Nb := 1 - Hi (W);
          Lemma_Sub_Step (A, B, R, I, Bw, Nb, W);
          Bw := Nb;
          pragma Loop_Invariant (Proof_Only => Bw <= 1);
