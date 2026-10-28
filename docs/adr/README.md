@@ -75,7 +75,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0069](0069-p256-montgomery-multiplication.md) | P-256 in Montgomery form, with the multiplication of upstream | Proposed, amended by 0070 | 2026-10-22 |
 | [0070](0070-sumcheck-and-ligero-kernels-as-upstream.md) | The sumcheck and Ligero kernels in upstream's form | Proposed, amended by 0075 | 2026-10-23 |
 | [0071](0071-prover-reuses-the-bound-quad.md) | The prover reuses the bound quad of its own sumcheck, proved | Proposed | 2026-10-24 |
-| [0072](0072-predicate-checks-in-the-prover-instances.md) | The prover instances of the command line do not check the circuit predicate again | Proposed | 2026-10-26 |
+| [0072](0072-predicate-checks-in-the-prover-instances.md) | The prover instances of the command line do not check the circuit predicate again | Proposed, amended 2026-10-28 | 2026-10-26 |
 | [0073](0073-verifier-binds-the-quad-as-upstream.md) | The verifier binds the quad of each layer as upstream does | Proposed | 2026-10-26 |
 | [0074](0074-circuit-identifier-checked-once.md) | The command line checks the identifier of a known circuit once, not on every load | Proposed | 2026-10-27 |
 | [0075](0075-round-evaluations-from-the-claim.md) | The prover's round evaluations take p (1) from the claim of the round, as upstream | Proposed | 2026-10-27 |

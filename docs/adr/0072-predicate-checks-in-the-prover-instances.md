@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-26, milestone M2 of Phase D).
+Proposed (2026-10-26, milestone M2 of Phase D). Amended 2026-10-28: the command-line programs check the predicate of the circuit once, explicitly, after the load, and suppress the predicate checks of their own calls and of the expression functions of `Zk_Prover`'s specification, which walked the circuit again about four times (0.18 s of the hash proof); the contracts and the proofs do not change.
 
 ## Date
 
@@ -47,6 +47,8 @@ ADR 0071 moved the work of a layer into `Prove_Layer`, which takes the circuit. 
 | sig verify | 0.62 s | 0.62 s | 0 |
 
 - `Well_Formed` leaves the profile of the hash proof. The check on entry stays, at about 2 %.
+- The amendment of 2026-10-28, measured the same way, 9ef47a3 against ce0f755: hash prove 4.86 s to 4.70 s, the rest unchanged, round trip 8.16 s to 7.99 s. The proofs stay identical byte for byte.
+- In `Run`, the suppression covers every predicate check of the function, not only the circuit's. The others were already established elsewhere: the public inputs are checked when `To_Element` returns them, and the private inputs come from `From_Bytes`, whose postcondition is proved.
 - The proofs of the CLI stay identical byte for byte.
 - ADR 0068 is amended. The trust model and the CHANGELOG are updated.
 

@@ -68,6 +68,12 @@ generic
    Validate : Boolean := True;
 package Zk_Prover is
 
+   --  As in the body (ADR 0072): the predicate of Circuit is checked
+   --  once where a circuit enters the program, and the expression
+   --  functions below, which the command line calls with the circuit,
+   --  do not walk it again. GNATprove proves these checks as before.
+   pragma Suppress (Predicate_Check);
+
    subtype Element is LPR.LV.ST.SA.Element;
    subtype Element_Array is LPR.LV.ST.SA.Element_Array;
    subtype Circuit is LPR.LV.ST.SA.Circuit;
