@@ -515,115 +515,6 @@ package body P256_Field is
    --  Multiplication, stage 1: the 512-bit product (ADR 0013).
    -------------------------------------------------------------------
 
-   --  64 x 64 -> 128 bit product, exact. The call site only sees the
-   --  postcondition, which keeps 128-bit multiplication out of the
-   --  callers' proofs.
-   function Wide_Mul (X, Y : Unsigned_64) return Unsigned_128 with
-     Global => null,
-     Post   =>
-       (Proof_Only =>
-          Wide_Mul'Result <= 16#FFFF_FFFF_FFFF_FFFE_0000_0000_0000_0001#
-  and then Conv128 (Wide_Mul'Result) = Conv (X) * Conv (Y)
-  and then Conv128 (Wide_Mul'Result) <= (Two_64 - 1) * (Two_64 - 1));
-
-   function Wide_Mul (X, Y : Unsigned_64) return Unsigned_128 is
-      R : constant Unsigned_128 := Unsigned_128 (X) * Unsigned_128 (Y);
-   begin
-      Lemma_Mul_Split (X, Y);
-      return R;
-   end Wide_Mul;
-
-   --  One word of a row product: the prefix identity extends from K to
-   --  K + 1 words.
-   procedure Lemma_Row_Step
-     (X : Unsigned_64; B : Limb_Array; R : Five_Array; K : Natural;
-      C_In : Unsigned_64; W : Unsigned_128)
-   with
-     Ghost => Proof_Only, Global => null,
-     Pre  => K <= 3
-       and then Partial (R, K) + Conv (C_In) * Weight (K)
-                = Conv (X) * Partial (B, K)
-       and then Conv128 (W) = Conv (X) * Conv (B (K)) + Conv (C_In)
-       and then R (K) = Lo (W),
-     Post => Partial (R, K + 1) + Conv (Hi (W)) * Weight (K + 1)
-             = Conv (X) * Partial (B, K + 1);
-
-   procedure Lemma_Row_Step
-     (X : Unsigned_64; B : Limb_Array; R : Five_Array; K : Natural;
-      C_In : Unsigned_64; W : Unsigned_128)
-   is
-   begin
-      pragma Unreferenced (C_In);
-      pragma Assert (Proof_Only => Conv (X) >= 0);
-      Lemma_Split (W);
-      pragma Assert
-        (Proof_Only =>
-           Conv (R (K)) = Conv128 (W) - Conv (Hi (W)) * Two_64);
-      pragma Assert (Proof_Only => Weight (K + 1) = Two_64 * Weight (K));
-      pragma Assert
-        (Proof_Only =>
-           Partial (R, K + 1) = Partial (R, K) + Conv (R (K)) * Weight (K));
-      pragma Assert
-        (Proof_Only =>
-           Partial (B, K + 1) = Partial (B, K) + Conv (B (K)) * Weight (K));
-   end Lemma_Row_Step;
-
-   --  One row of the schoolbook product: X times the four limbs of B,
-   --  as five words.
-   function Mul_Row (X : Unsigned_64; B : Limb_Array) return Five_Array
-   with
-     Global => null,
-     Inline,
-     Post   => (Proof_Only => To_Int (Mul_Row'Result) = Conv (X) * To_Int (B));
-
-   function Mul_Row (X : Unsigned_64; B : Limb_Array) return Five_Array is
-      P0 : constant Unsigned_128 := Wide_Mul (X, B (0));
-      P1 : constant Unsigned_128 := Wide_Mul (X, B (1));
-      P2 : constant Unsigned_128 := Wide_Mul (X, B (2));
-      P3 : constant Unsigned_128 := Wide_Mul (X, B (3));
-      --  Each product is at most (2^64 - 1)^2, so adding a carry below
-      --  2^64 never wraps.
-      W0 : constant Unsigned_128 := P0;
-      W1 : constant Unsigned_128 := P1 + Unsigned_128 (Hi (W0));
-      W2 : constant Unsigned_128 := P2 + Unsigned_128 (Hi (W1));
-      W3 : constant Unsigned_128 := P3 + Unsigned_128 (Hi (W2));
-      R  : constant Five_Array :=
-        [Lo (W0), Lo (W1), Lo (W2), Lo (W3), Hi (W3)];
-   begin
-      pragma Assert (Proof_Only => Conv (0) = 0);
-      pragma Assert (Proof_Only => Partial (R, 0) = 0);
-      pragma Assert (Proof_Only => Partial (B, 0) = 0);
-      pragma Assert
-        (Proof_Only =>
-           Conv128 (W0) = Conv (X) * Conv (B (0)) + Conv (0));
-      Lemma_Row_Step (X, B, R, 0, 0, W0);
-      pragma Assert (Proof_Only => P1 + Unsigned_128 (Hi (W0)) >= P1);
-      Lemma_Add128 (P1, Unsigned_128 (Hi (W0)));
-      Lemma_Ext64 (Hi (W0));
-      pragma Assert
-        (Proof_Only =>
-           Conv128 (W1) = Conv (X) * Conv (B (1)) + Conv (Hi (W0)));
-      Lemma_Row_Step (X, B, R, 1, Hi (W0), W1);
-      pragma Assert (Proof_Only => P2 + Unsigned_128 (Hi (W1)) >= P2);
-      Lemma_Add128 (P2, Unsigned_128 (Hi (W1)));
-      Lemma_Ext64 (Hi (W1));
-      pragma Assert
-        (Proof_Only =>
-           Conv128 (W2) = Conv (X) * Conv (B (2)) + Conv (Hi (W1)));
-      Lemma_Row_Step (X, B, R, 2, Hi (W1), W2);
-      pragma Assert (Proof_Only => P3 + Unsigned_128 (Hi (W2)) >= P3);
-      Lemma_Add128 (P3, Unsigned_128 (Hi (W2)));
-      Lemma_Ext64 (Hi (W2));
-      pragma Assert
-        (Proof_Only =>
-           Conv128 (W3) = Conv (X) * Conv (B (3)) + Conv (Hi (W2)));
-      Lemma_Row_Step (X, B, R, 3, Hi (W2), W3);
-      pragma Assert
-        (Proof_Only =>
-           Partial (R, 5) = Partial (R, 4) + Conv (R (4)) * Weight (4));
-      return R;
-   end Mul_Row;
-
    --  Equal limbs denote equal values (stated element-wise, so that the
    --  proof does not rely on array extensionality).
    procedure Lemma_To_Int_Eq (A, B : Limb_Array) is
@@ -889,79 +780,224 @@ package body P256_Field is
           + Conv (D (5)) * Weight (5));
    end Lemma_Down;
 
-   function Ext6 (V : Five_Array) return Six_Array is
-     [V (0), V (1), V (2), V (3), V (4), 0]
-   with Global => null;
-
-   procedure Lemma_Ext6 (V : Five_Array) with
+   --  Six words as their low four and the two above.
+   procedure Lemma_Six_Split (T : Six_Array; L : Limb_Array) with
      Ghost => Proof_Only, Global => null,
-     Post => To_Int (Ext6 (V)) = To_Int (V);
+     Pre  => (for all I in Limb_Index => L (I) = T (I)),
+     Post => To_Int (T)
+             = To_Int (L) + Conv (T (4)) * Weight (4)
+               + Conv (T (5)) * Weight (5);
 
-   procedure Lemma_Ext6 (V : Five_Array) is
-      X : constant Six_Array := Ext6 (V);
+   procedure Lemma_Six_Split (T : Six_Array; L : Limb_Array) is
    begin
-      Lemma_Unfold;
-      pragma Assert (Proof_Only => To_Int (X)
-        = Conv (X (0)) + Conv (X (1)) * Weight (1) + Conv (X (2)) * Weight (2)
-          + Conv (X (3)) * Weight (3) + Conv (X (4)) * Weight (4)
-          + Conv (X (5)) * Weight (5));
-      pragma Assert (Proof_Only => To_Int (V)
-        = Conv (V (0)) + Conv (V (1)) * Weight (1) + Conv (V (2)) * Weight (2)
-          + Conv (V (3)) * Weight (3) + Conv (V (4)) * Weight (4));
-   end Lemma_Ext6;
+      pragma Assert (Proof_Only => To_Int (T)
+        = Conv (T (0)) * Weight (0) + Conv (T (1)) * Weight (1)
+          + Conv (T (2)) * Weight (2) + Conv (T (3)) * Weight (3)
+          + Conv (T (4)) * Weight (4) + Conv (T (5)) * Weight (5));
+      pragma Assert (Proof_Only => To_Int (L)
+        = Conv (L (0)) * Weight (0) + Conv (L (1)) * Weight (1)
+          + Conv (L (2)) * Weight (2) + Conv (L (3)) * Weight (3));
+   end Lemma_Six_Split;
 
-   --  The shifted copies of R that add up to R p: V carries
-   --  R (2^96 + 2^192 + 2^256), U carries R (1 + 2^224).
-   function V_Of (R : Unsigned_64) return Six_Array is
-     [0, Shift_Left (R, 32), Shift_Right (R, 32), R, R, 0]
-   with Global => null;
-
-   function U_Of (R : Unsigned_64) return Six_Array is
-     [R, 0, 0, Shift_Left (R, 32), Shift_Right (R, 32), 0]
-   with Global => null;
-
-   procedure Lemma_VU (R : Unsigned_64) with
+   --  A + X Y + C as a 128-bit value, which never wraps:
+   --  (2^64 - 1) + (2^64 - 1)^2 + (2^64 - 1) = 2^128 - 1.
+   procedure Lemma_Mac (A, X, Y, C : Unsigned_64) with
      Ghost => Proof_Only, Global => null,
-     Post => To_Int (V_Of (R)) - To_Int (U_Of (R)) = Conv (R) * P
-       and then To_Int (V_Of (R)) <= Conv (R) * (Two_64 * Two_256)
-       and then To_Int (U_Of (R)) >= 0;
+     Post => Conv128 (Unsigned_128 (A) + Unsigned_128 (X) * Unsigned_128 (Y)
+                      + Unsigned_128 (C))
+             = Conv (A) + Conv (X) * Conv (Y) + Conv (C);
 
-   procedure Lemma_VU (R : Unsigned_64) is
-      V  : constant Six_Array := V_Of (R);
-      U  : constant Six_Array := U_Of (R);
-      Lo_R : constant Unsigned_64 := Shift_Left (R, 32);
-      Hi_R : constant Unsigned_64 := Shift_Right (R, 32);
-      X    : constant Unsigned_128 :=
-        Unsigned_128 (R) * Unsigned_128 (Unsigned_64'(2 ** 32));
-      W  : constant Big_Integer := Two_64;
-      T  : constant Big_Integer := Two_32;
+   procedure Lemma_Mac (A, X, Y, C : Unsigned_64) is
+      P  : constant Unsigned_128 := Unsigned_128 (X) * Unsigned_128 (Y);
+      S1 : constant Unsigned_128 := Unsigned_128 (A) + P;
    begin
-      Lemma_Unfold;
-      --  R 2^32 as a 128-bit value: its halves are Lo and Hi.
-      Lemma_Mul_Split (R, 2 ** 32);
-      Lemma_Split (X);
-      pragma Assert (Proof_Only => Lo (X) = Lo_R and then Hi (X) = Hi_R);
-      pragma Assert (Proof_Only => Conv (2 ** 32) = T);
+      Lemma_Mul_Split (X, Y);
+      pragma Assert (S1 >= Unsigned_128 (A));
+      Lemma_Add128 (Unsigned_128 (A), P);
+      Lemma_Ext64 (A);
+      pragma Assert (S1 + Unsigned_128 (C) >= S1);
+      Lemma_Add128 (S1, Unsigned_128 (C));
+      Lemma_Ext64 (C);
+   end Lemma_Mac;
+
+   --  One word of T + X B: the prefix identity extends from K to K + 1.
+   procedure Lemma_Mac_Step
+     (T : Limb_Array; X : Unsigned_64; B : Limb_Array; S : Limb_Array;
+      K : Natural; C_In : Unsigned_64; W : Unsigned_128)
+   with
+     Ghost => Proof_Only, Global => null,
+     Pre  => K <= 3
+       and then Partial (S, K) + Conv (C_In) * Weight (K)
+                = Partial (T, K) + Conv (X) * Partial (B, K)
+       and then Conv128 (W) = Conv (T (K)) + Conv (X) * Conv (B (K))
+                              + Conv (C_In)
+       and then S (K) = Lo (W),
+     Post => Partial (S, K + 1) + Conv (Hi (W)) * Weight (K + 1)
+             = Partial (T, K + 1) + Conv (X) * Partial (B, K + 1);
+
+   procedure Lemma_Mac_Step
+     (T : Limb_Array; X : Unsigned_64; B : Limb_Array; S : Limb_Array;
+      K : Natural; C_In : Unsigned_64; W : Unsigned_128)
+   is
+   begin
+      pragma Unreferenced (C_In);
+      pragma Assert (Conv (X) >= 0);
+      Lemma_Split (W);
+      pragma Assert (Conv (S (K)) = Conv128 (W) - Conv (Hi (W)) * Two_64);
+      pragma Assert (Weight (K + 1) = Two_64 * Weight (K));
       pragma Assert
-        (Proof_Only => Conv (Lo_R) + Conv (Hi_R) * W = Conv (R) * T);
-      pragma Assert (Proof_Only => To_Int (V)
-        = Conv (Lo_R) * W + Conv (Hi_R) * W * W + Conv (R) * W * W * W
-          + Conv (R) * W * W * W * W);
-      pragma Assert (Proof_Only => To_Int (U)
-        = Conv (R) + Conv (Lo_R) * W * W * W + Conv (Hi_R) * W * W * W * W);
-      pragma Assert (Proof_Only => W = 18446744073709551616);
-      pragma Assert (Proof_Only => T = 4294967296);
-      pragma Assert (Proof_Only => P
-        = Conv (P_Limbs (0)) + Conv (P_Limbs (1)) * W
-          + Conv (P_Limbs (2)) * W * W + Conv (P_Limbs (3)) * W * W * W);
-      pragma Assert (Proof_Only => P
-        = W * W * W * W - T * W * W * W + W * W * W + T * W - 1);
-      pragma Assert (Proof_Only =>
-        To_Int (V) = Conv (R) * (T * W + W * W * W + W * W * W * W));
-      pragma Assert (Proof_Only =>
-        To_Int (U) = Conv (R) * (1 + T * W * W * W));
-      pragma Assert (Proof_Only => Conv (R) >= 0);
-   end Lemma_VU;
+        (Partial (S, K + 1) = Partial (S, K) + Conv (S (K)) * Weight (K));
+      pragma Assert
+        (Partial (T, K + 1) = Partial (T, K) + Conv (T (K)) * Weight (K));
+      pragma Assert
+        (Partial (B, K + 1) = Partial (B, K) + Conv (B (K)) * Weight (K));
+   end Lemma_Mac_Step;
+
+   --  The value of two words.
+   procedure Lemma_Two (L : Word_Array) with
+     Ghost => Proof_Only, Global => null,
+     Pre  => L'First = 0 and then L'Length = 2,
+     Post => To_Int (L) = Conv (L (0)) + Conv (L (1)) * Two_64;
+
+   procedure Lemma_Two (L : Word_Array) is
+   begin
+      Lemma_Unfold;
+      pragma Assert (Partial (L, 0) = 0);
+      pragma Assert (Partial (L, 1) = Conv (L (0)));
+      pragma Assert (Partial (L, 2) = Conv (L (0)) + Conv (L (1)) * Two_64);
+   end Lemma_Two;
+
+   --  The last step of Mac_Row: the four low words, the carry added to
+   --  the two words above, and the carry out of those, which the bound
+   --  makes zero.
+   procedure Lemma_Mac_Close
+     (T : Six_Array; Tl : Limb_Array; X : Unsigned_64; B : Limb_Array;
+      Lw : Limb_Array; C : Unsigned_64; Hi_In, Cw, Hi_Out : Word_Array;
+      Cy : Unsigned_64; S : Six_Array)
+   with
+     Ghost => Proof_Only, Global => null,
+     Pre  => Hi_In'First = 0 and then Hi_In'Length = 2
+       and then Cw'First = 0 and then Cw'Length = 2
+       and then Hi_Out'First = 0 and then Hi_Out'Length = 2
+       and then (for all I in Limb_Index => Tl (I) = T (I))
+       and then Hi_In (0) = T (4) and then Hi_In (1) = T (5)
+       and then Cw (0) = C and then Cw (1) = 0
+       and then (for all I in Limb_Index => S (I) = Lw (I))
+       and then S (4) = Hi_Out (0) and then S (5) = Hi_Out (1)
+       and then Partial (Lw, 4) + Conv (C) * Weight (4)
+                = Partial (Tl, 4) + Conv (X) * Partial (B, 4)
+       and then Cy <= 1
+       and then To_Int (Hi_Out) + Conv (Cy) * Weight (2)
+                = To_Int (Hi_In) + To_Int (Cw)
+       and then To_Int (T) + Conv (X) * To_Int (B) < Weight (6),
+     Post => To_Int (S) = To_Int (T) + Conv (X) * To_Int (B);
+
+   procedure Lemma_Mac_Close
+     (T : Six_Array; Tl : Limb_Array; X : Unsigned_64; B : Limb_Array;
+      Lw : Limb_Array; C : Unsigned_64; Hi_In, Cw, Hi_Out : Word_Array;
+      Cy : Unsigned_64; S : Six_Array)
+   is
+      W : constant Big_Integer := Two_64;
+   begin
+      Lemma_Unfold;
+      Lemma_Six_Split (T, Tl);
+      Lemma_Six_Split (S, Lw);
+      Lemma_Two (Hi_In);
+      Lemma_Two (Cw);
+      Lemma_Two (Hi_Out);
+      Lemma_To_Int_Bounds (S);
+      Lemma_Conv_Bounds (Cy);
+      pragma Assert (Conv (0) = 0);
+      pragma Assert (To_Int (Cw) = Conv (C));
+      pragma Assert (To_Int (B) = Partial (B, 4));
+      pragma Assert (To_Int (Tl) = Partial (Tl, 4));
+      pragma Assert (To_Int (Lw) = Partial (Lw, 4));
+      pragma Assert
+        (Conv (S (4)) + Conv (S (5)) * W
+         = Conv (T (4)) + Conv (T (5)) * W + Conv (C) - Conv (Cy) * (W * W));
+      pragma Assert
+        (To_Int (S) = To_Int (Lw) + (Conv (S (4)) + Conv (S (5)) * W) * Weight (4));
+      pragma Assert
+        (To_Int (T) = To_Int (Tl) + (Conv (T (4)) + Conv (T (5)) * W) * Weight (4));
+      --  In three steps: the weights, the two words above, the sum.
+      pragma Assert ((W * W) * Weight (4) = Weight (6));
+      declare
+         Hs : constant Big_Integer := Conv (S (4)) + Conv (S (5)) * W;
+         Ht : constant Big_Integer := Conv (T (4)) + Conv (T (5)) * W;
+         Hr : constant Big_Integer := Ht + Conv (C) - Conv (Cy) * (W * W);
+      begin
+         pragma Assert (Hs = Hr);
+         pragma Assert (Hs * Weight (4) = Hr * Weight (4));
+         pragma Assert
+           (Hr * Weight (4)
+            = Ht * Weight (4) + Conv (C) * Weight (4)
+              - Conv (Cy) * ((W * W) * Weight (4)));
+         pragma Assert
+           (Hs * Weight (4)
+            = Ht * Weight (4) + Conv (C) * Weight (4)
+              - Conv (Cy) * Weight (6));
+      end;
+      pragma Assert
+        ((Conv (S (4)) + Conv (S (5)) * W) * Weight (4)
+         = (Conv (T (4)) + Conv (T (5)) * W) * Weight (4)
+           + Conv (C) * Weight (4) - Conv (Cy) * Weight (6));
+      pragma Assert
+        (To_Int (S)
+         = (To_Int (Lw) + Conv (C) * Weight (4))
+           + (Conv (T (4)) + Conv (T (5)) * W) * Weight (4)
+           - Conv (Cy) * Weight (6));
+      pragma Assert
+        (To_Int (Lw) + Conv (C) * Weight (4)
+         = To_Int (Tl) + Conv (X) * To_Int (B));
+      pragma Assert
+        (To_Int (S) = To_Int (T) + Conv (X) * To_Int (B)
+                      - Conv (Cy) * Weight (6));
+      pragma Assert (Conv (Cy) * Weight (6) < Weight (6));
+      pragma Assert (Cy = 0);
+   end Lemma_Mac_Close;
+
+   --  S = T + X B on six words, as upstream's CIOS step (ADR 0077): four
+   --  128-bit multiply-accumulates on the low words, in place, then the
+   --  carry added to the two words above. The sum stays below 2^384.
+   procedure Mac_Row
+     (T : Six_Array; X : Unsigned_64; B : Limb_Array; S : out Six_Array)
+   with
+     Global => null,
+     Inline,
+     Pre    => (Proof_Only => To_Int (T) + Conv (X) * To_Int (B) < Weight (6)),
+     Post   => (Proof_Only => To_Int (S) = To_Int (T) + Conv (X) * To_Int (B));
+
+   procedure Mac_Row
+     (T : Six_Array; X : Unsigned_64; B : Limb_Array; S : out Six_Array)
+   is
+      Tl : constant Limb_Array := [T (0), T (1), T (2), T (3)]
+      with Ghost => Proof_Only;
+      Lw : Limb_Array := [others => 0];
+      C  : Unsigned_64 := 0;
+      W  : Unsigned_128;
+      Cy : Unsigned_64;
+   begin
+      for J in Limb_Index loop
+         W := Unsigned_128 (T (J)) + Unsigned_128 (X) * Unsigned_128 (B (J))
+              + Unsigned_128 (C);
+         Lemma_Mac (T (J), X, B (J), C);
+         Lw (J) := Lo (W);
+         Lemma_Mac_Step (Tl, X, B, Lw, J, C, W);
+         C := Hi (W);
+         pragma Loop_Invariant
+           (Proof_Only => Partial (Lw, J + 1) + Conv (C) * Weight (J + 1)
+                          = Partial (Tl, J + 1) + Conv (X) * Partial (B, J + 1));
+      end loop;
+      declare
+         Hi_In  : constant Word_Array (0 .. 1) := [T (4), T (5)];
+         Cw     : constant Word_Array (0 .. 1) := [C, 0];
+         Hi_Out : Word_Array (0 .. 1);
+      begin
+         Add_Words (Hi_In, Cw, Hi_Out, Cy);
+         S := [Lw (0), Lw (1), Lw (2), Lw (3), Hi_Out (0), Hi_Out (1)];
+         Lemma_Mac_Close (T, Tl, X, B, Lw, C, Hi_In, Cw, Hi_Out, Cy, S);
+      end;
+   end Mac_Row;
 
    --  One round: T + X B, then R p added with R the low word, which
    --  clears it, then one word down. The value divided by 2^64 stays
@@ -982,9 +1018,7 @@ package body P256_Field is
      (T : in out Six_Array; X : Unsigned_64; B : Limb_Array;
       R : out Unsigned_64)
    is
-      Row : constant Five_Array := Mul_Row (X, B);
-      S, S2, S3 : Six_Array;
-      C, C2, Bw : Unsigned_64;
+      S, S3 : Six_Array;
       T0 : constant Six_Array := T with Ghost => Proof_Only;
    begin
       Lemma_Unfold;
@@ -992,27 +1026,20 @@ package body P256_Field is
       Lemma_To_Int_Bounds (T);
       Lemma_To_Int_Bounds (B);
       Lemma_Conv_Bounds (X);
-      Lemma_Ext6 (Row);
-      Add_Words (T, Ext6 (Row), S, C);
       pragma Assert (Proof_Only => Conv (X) * To_Int (B) <= (Two_64 - 1) * P);
       pragma Assert
-        (Proof_Only => To_Int (T) + To_Int (Ext6 (Row)) < Weight (6));
+        (Proof_Only => To_Int (T) + Conv (X) * To_Int (B) < Weight (6));
+      Mac_Row (T, X, B, S);
       Lemma_To_Int_Bounds (S);
-      pragma Assert (Proof_Only => C = 0);
       pragma Assert
         (Proof_Only => To_Int (S) = To_Int (T0) + Conv (X) * To_Int (B));
       R := S (0);
-      Lemma_VU (R);
       Lemma_Conv_Bounds (R);
-      Add_Words (S, V_Of (R), S2, C2);
+      pragma Assert (Proof_Only => To_Int (P_Limbs) = P);
+      pragma Assert (Proof_Only => Conv (R) * P <= (Two_64 - 1) * P);
       pragma Assert
-        (Proof_Only => To_Int (S) + To_Int (V_Of (R)) < Weight (6));
-      Lemma_To_Int_Bounds (S2);
-      pragma Assert (Proof_Only => C2 = 0);
-      Sub_Words (S2, U_Of (R), S3, Bw);
-      pragma Assert (Proof_Only => To_Int (S2) - To_Int (U_Of (R))
-                     = To_Int (S) + Conv (R) * P);
-      pragma Assert (Proof_Only => Bw = 0);
+        (Proof_Only => To_Int (S) + Conv (R) * To_Int (P_Limbs) < Weight (6));
+      Mac_Row (S, R, P_Limbs, S3);
       pragma Assert (Proof_Only => To_Int (S3) = To_Int (S) + Conv (R) * P);
       --  The low word of S3 is zero: S = R + W s', p = W P1 - 1.
       Lemma_Down (S);
@@ -1039,25 +1066,6 @@ package body P256_Field is
       Lemma_To_Int_Bounds (T);
       Lemma_Div_Bound (To_Int (T), Two_64, 2 * P);
    end Round;
-
-   --  Six words as their low four and the two above.
-   procedure Lemma_Six_Split (T : Six_Array; L : Limb_Array) with
-     Ghost => Proof_Only, Global => null,
-     Pre  => (for all I in Limb_Index => L (I) = T (I)),
-     Post => To_Int (T)
-             = To_Int (L) + Conv (T (4)) * Weight (4)
-               + Conv (T (5)) * Weight (5);
-
-   procedure Lemma_Six_Split (T : Six_Array; L : Limb_Array) is
-   begin
-      pragma Assert (Proof_Only => To_Int (T)
-        = Conv (T (0)) * Weight (0) + Conv (T (1)) * Weight (1)
-          + Conv (T (2)) * Weight (2) + Conv (T (3)) * Weight (3)
-          + Conv (T (4)) * Weight (4) + Conv (T (5)) * Weight (5));
-      pragma Assert (Proof_Only => To_Int (L)
-        = Conv (L (0)) * Weight (0) + Conv (L (1)) * Weight (1)
-          + Conv (L (2)) * Weight (2) + Conv (L (3)) * Weight (3));
-   end Lemma_Six_Split;
 
    --  The last step of Mont_Mul: T 2^256 = A B + Q p and Res = T - G p
    --  in 0 .. p - 1 give Res = A B 2^-256 mod p.

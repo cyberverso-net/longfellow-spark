@@ -95,11 +95,12 @@ After an addition the sum is S = s + carry * 2^256 with s the four limbs. Comput
 ### 2.4 The multiplication
 
     for each of the four words a_i of A, in a six-word accumulator T:
-      1. row      : a_i times the four limbs of B, five words (Mul_Row)
-      2. add      : T + row
-      3. reduce   : r the low word; T + V (r), then - U (r)
-      4. down     : drop the low word, now zero
+      1. row      : T + a_i B, four multiply-accumulates in place (Mac_Row)
+      2. reduce   : r the low word; T + r p, the same step with the limbs of p
+      3. down     : drop the low word, now zero
     then          : one conditional subtraction of p from the low five words
+
+This is upstream's CIOS step ([ADR 0077](../adr/0077-p256-montgomery-round-as-cios.md)). Since p = -1 mod 2^64, the multiplier of p is the low word itself.
 
 Each round is one procedure (`Round`) with a postcondition on the integer value, and the loop over the four rounds carries the invariant T W^i = a_0..i-1 b + Q p (Section 3.6).
 
@@ -187,7 +188,7 @@ A *lemma* in SPARK is a ghost procedure whose postcondition states a fact and wh
 - `Lemma_Mul_Split`: the 128-bit product of two words neither wraps nor exceeds (2^64 - 1)^2, and its value is the product of the values. This is the one place where a nonlinear bound is proved; the provers manage it from the bounds of the factors.
 - `Lemma_Add_Step` and `Lemma_Sub_Step`: one word of addition with carry, or subtraction with borrow, extends the prefix identity from K words to K + 1. The addition and subtraction procedures call them once per iteration, so the loop invariant is the lemma's postcondition.
 - `Lemma_To_Int_Eq`: two limb arrays that are equal element by element have the same `To_Int`. Stated with a precondition `for all I => A (I) = B (I)` rather than `A = B`, and proved by writing `Partial (A, 4)` and `Partial (B, 4)` out over the four limbs. The fact looks trivial, and it is, but the provers reach it from an array equality only through array extensionality, which they applied in some cold runs and not in others; the element-wise statement is proved every time. It closes `Mont_Mul` and `Mul` (3.6), and the accepted branch of `From_Bytes` (3.8).
-- `Lemma_R_Inv`, `Lemma_R2`, `Lemma_P1`, `Lemma_VU`, `Lemma_Down`, `Lemma_Ext6`, `Lemma_Six_Split`, `Lemma_Mont_Final`, `Lemma_To_Mont`, `Lemma_Mod_Multiple`: the multiplication lemmas, described in 3.6 and 3.8.
+- `Lemma_R_Inv`, `Lemma_R2`, `Lemma_P1`, `Lemma_Mac`, `Lemma_Mac_Step`, `Lemma_Two`, `Lemma_Mac_Close`, `Lemma_Down`, `Lemma_Six_Split`, `Lemma_Mont_Final`, `Lemma_To_Mont`, `Lemma_Mod_Multiple`: the multiplication lemmas, described in 3.6 and 3.8.
 
 ### 3.4 Add_Words and Sub_Words
 
@@ -229,7 +230,7 @@ The contract of `Mul` speaks of the stored integers:
 
 `R_Inv` is 2^-256 mod p, a ghost constant written as four limbs. `Lemma_R_Inv` proves `Two_256 * R_Inv = 1 + K * P` for a second constant K. The provers check it by evaluating the products of the literal limbs; it is the only place where 256-bit numbers are multiplied as numbers. `Add`, `Sub`, `Mul`, `From_Bytes` and `From_Canonical` compute on the limbs alone (`Add_Mod`, `Sub_Mod`, `Mont_Mul`) and build the element with `Of_Limbs`.
 
-*The row.* `Wide_Mul (X, Y)` is a plain function whose body is the 128-bit multiplication and whose postcondition is the exact value and the bound; callers see only the postcondition, so the provers never reason about a 128-bit multiplication at the call sites. `Mul_Row (X, B)` multiplies one word by the four limbs into five words, with the carry chain of Section 2.1 and four prefix assertions.
+*The row.* `Mac_Row (T, X, B, S)` makes S = T + X B on six words, in place. Each of its four steps is one 128-bit multiply-accumulate, t_j + x b_j + c, which never wraps: (2^64 - 1) + (2^64 - 1)^2 + (2^64 - 1) = 2^128 - 1 (`Lemma_Mac`). `Lemma_Mac_Step` extends the prefix identity by one word, as `Lemma_Add_Step` does for the addition. The carry then goes into the two words above with `Add_Words`, and `Lemma_Mac_Close` puts the six words together; the bound on T + X B makes the last carry zero. The body holds no `Big_Integer` term: the identity is in the lemmas (ADR 0076).
 
 *The round.* `Round (T, X, B, R)` takes a six-word accumulator below 2p, and its postcondition is
 
@@ -239,7 +240,7 @@ The contract of `Mul` speaks of the stored integers:
                        = To_Int (T'Old) + Conv (X) * To_Int (B) + Conv (R) * P);
 ```
 
-The body is four calls: `Add_Words` adds the row, `Add_Words` adds V (r), `Sub_Words` subtracts U (r), and `Down` drops the low word. The proof states, at each call, why no carry leaves the six words and why the subtraction does not borrow. `Lemma_VU` gives V (r) - U (r) = r p. It goes through the 128-bit product r 2^32, whose two halves are the two shifted words; that is how the shifts reach the integer model. The low word is then zero: with p = W P1 - 1 (`Lemma_P1`), the value is W times an integer, and `Lemma_Digit`, the uniqueness of a base-W digit, makes the low word 0. `Lemma_Div_Bound` carries the bound below 2p from T W to T.
+The body is three calls: `Mac_Row` adds X B, `Mac_Row` adds r p with the limbs of p, and `Down` drops the low word. The proof states, at each call, why the value stays below 2^384. Until ADR 0077 the round formed r p from shifted copies of r, V (r) - U (r), with two six-word carry chains; GCC compiled those chains with two carry steps per word. The low word is then zero: with p = W P1 - 1 (`Lemma_P1`), the value is W times an integer, and `Lemma_Digit`, the uniqueness of a base-W digit, makes the low word 0. `Lemma_Div_Bound` carries the bound below 2p from T W to T.
 
 *The rounds.* `Mont_Mul` loops over the four words of A with a ghost `Q : Big_Integer` and the invariant
 
@@ -254,7 +255,7 @@ After the loop, `Lemma_Six_Split` shows that word 5 is zero and word 4 at most o
 
 *The other ring laws* (ADR 0070): commutativity, `One` as unit, distributivity over `Add` and `Sub`, and the laws of `Add`, `Neg` and `Sub` that the sumcheck kernels use. Each is proved the same way: the two sides have the same integer mod p, and `Lemma_Inj` makes them equal elements. `Field_P256` restates them with `Same`, through `Laws.Lemma_Same`, which needs nothing more than `X = Y` since the limbs are scalar components.
 
-A ghost variable (`Q : Big_Integer with Ghost`) exists only for proof and is removed with the other ghost code when assertions are disabled; square-bracket aggregates `[a, b, c]` are the Ada 2022 array notation; `A (0 .. 7)` is a *slice*, a contiguous part of an array. `Add_Words`, `Sub_Words` and `Mul_Row` are `Inline`, so that the compiler sees their lengths and unrolls the loops.
+A ghost variable (`Q : Big_Integer with Ghost`) exists only for proof and is removed with the other ghost code when assertions are disabled; square-bracket aggregates `[a, b, c]` are the Ada 2022 array notation; `A (0 .. 7)` is a *slice*, a contiguous part of an array. `Add_Words`, `Sub_Words`, `Mac_Row` and `Round` are `Inline`, so that the compiler sees their lengths and unrolls the loops.
 
 ### 3.7 Inv
 
@@ -270,6 +271,7 @@ GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-p
 
 - `P256_Field` alone, proved from an empty object directory: 2897 checks, all proved.
 - The whole project with the scalar limbs of ADR 0070: 21332 checks, all proved. With the bound-quad reuse of ADR 0071: 25331 checks, all proved.
+- With the CIOS round of ADR 0077: the P-256 partition (`P256_Field`, `Field_P256` and its laws), 3078 checks, all proved.
 - No justification, no `pragma Assume`.
 - Maximum steps for a single successful proof in `P256_Field`: 204295, within the budget of 600000.
 
@@ -282,7 +284,7 @@ GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-p
 | Functional contracts (postconditions, lemma postconditions, preconditions at calls) | 540 | Z3 and CVC5, Alt-Ergo about 1% |
 | Termination | 38 | 35 flow, 3 Z3 |
 
-Where the proof checks are, by subprogram (excluding flow):
+Where the proof checks were, by subprogram, at ADR 0070 (excluding flow; ADR 0077 replaced `Mul_Row` and `Lemma_VU` by `Mac_Row` and its lemmas):
 
 - The field operations are small: `Add` 45, `Sub` 44, `Neg` 7, `Mul` 13, `Square` 10, `Is_Canonical` 4, `From_Bytes` 54, `From_Canonical` 13, `To_Canonical` 31, `Of_Natural` 23, `To_Bytes` 1, `Inv` and `Square_N` 0.
 - The word primitives and the multiplication carry more: `Add_Words` 41, `Sub_Words` 66, `Mul_Row` 54, `Round` 147, `Mont_Mul` 177.
@@ -295,7 +297,7 @@ Four lessons from closing the proofs, recorded here because they are reusable in
 - The provers evaluate the conversion of a *literal* to `Big_Integer` but treat `**` as opaque, so `Two_64` is `Conv (Unsigned_64'Last) + 1`, not `2 ** 64`.
 - Modular word arithmetic is connected to the integer model only through small lemmas (`Lemma_Split`, `Lemma_Sub128`, `Lemma_Add128`, `Lemma_Ext64`), each proved once from `/`, `mod` and the no-wrap condition.
 - Polynomial identities prove by normalisation when every weight is written out as a monomial in one base (`Lemma_Unfold`); a recursive definition left folded is an atom the normaliser cannot see through.
-- Large contexts time out even when every fact is present. The cure is structural: one subprogram per step with its own postcondition (`Round`, then `Mont_Mul`), and one lemma per identity with exactly the hypotheses it needs (`Lemma_VU`, `Lemma_Mont_Final`).
+- Large contexts time out even when every fact is present. The cure is structural: one subprogram per step with its own postcondition (`Round`, then `Mont_Mul`), and one lemma per identity with exactly the hypotheses it needs (`Lemma_Mac_Close`, `Lemma_Mont_Final`).
 
 Two more came with the Montgomery form ([ADR 0069](../adr/0069-p256-montgomery-multiplication.md)):
 

@@ -80,3 +80,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0074](0074-circuit-identifier-checked-once.md) | The command line checks the identifier of a known circuit once, not on every load | Proposed | 2026-10-27 |
 | [0075](0075-round-evaluations-from-the-claim.md) | The prover's round evaluations take p (1) from the claim of the round, as upstream | Proposed | 2026-10-27 |
 | [0076](0076-field-operations-without-call-and-finalisation-overhead.md) | The field operations without call and finalisation overhead | Proposed | 2026-10-27 |
+| [0077](0077-p256-montgomery-round-as-cios.md) | The Montgomery round of P-256 as upstream's CIOS step | Proposed | 2026-10-28 |
