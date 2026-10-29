@@ -4,7 +4,7 @@
 --  P2 is the third sumcheck evaluation point of draft-03 Section 6.4,
 --  inj (2) of Section 2.2.2: the second element beta_1 of the subfield
 --  basis, the same upstream constant that anchors the stage 1 vectors
---  (google/longfellow-zk d5e6be7, docs/specs/rust/src/algebra/
+--  (longfellow-zk/longfellow-zk d5e6be7, docs/specs/rust/src/algebra/
 --  gf2_128.rs, SUBFIELD_BASIS [1]).
 --
 --  In characteristic 2 subtraction is addition, so the Lagrange

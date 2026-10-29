@@ -1,6 +1,7 @@
 --  Simple_Rng: the seeded generator of the upstream reference test
---  (google/longfellow-zk d5e6be7, docs/specs/rust/tests/test_reference.rs,
---  struct SimpleRng), a linear congruential generator: the state is
+--  (longfellow-zk/longfellow-zk d5e6be7,
+--  docs/specs/rust/tests/test_reference.rs, struct SimpleRng), a
+--  linear congruential generator: the state is
 --  multiplied by 6364136223846793005 and incremented by
 --  1442695040888963407 modulo 2^64 for every byte, and the byte is
 --  bits 32 to 39 of the new state. It is a TEST source (ADR 0050): it

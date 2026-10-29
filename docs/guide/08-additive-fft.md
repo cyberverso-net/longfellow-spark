@@ -1,6 +1,6 @@
 # Chapter 8: the additive FFT
 
-Phase D makes the prover fast enough for the mDoc circuits of production. On the hash circuit, more than half of the prover's time went into building Lagrange tables to encode the rows of the tableau. This chapter replaces that encoder, on GF(2^128), with the additive FFT that the specification names and that the production prover uses. The decision is [ADR 0057](../adr/0057-additive-fft.md). The reference is google/longfellow-zk at d5e6be7, `rust/runtime/algebra/src/lch14.rs` and `lch14_reed_solomon.rs`.
+Phase D makes the prover fast enough for the mDoc circuits of production. On the hash circuit, more than half of the prover's time went into building Lagrange tables to encode the rows of the tableau. This chapter replaces that encoder, on GF(2^128), with the additive FFT that the specification names and that the production prover uses. The decision is [ADR 0057](../adr/0057-additive-fft.md). The reference is longfellow-zk/longfellow-zk at d5e6be7, `rust/runtime/algebra/src/lch14.rs` and `lch14_reed_solomon.rs`.
 
 The verifier does not change. It evaluates a row only at the NREQ opened columns, and the Lagrange tables of chapter 5 stay the right tool for that.
 

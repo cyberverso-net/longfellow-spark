@@ -53,7 +53,7 @@
 --                   bytes from then on and the flag never clears, so a
 --                   replay reports it as a status.
 --
---  Pinned spec: IETF draft-google-cfrg-libzk-03, Sections 3.1, 3.1.1,
+--  Pinned spec: IETF draft-irtf-cfrg-longfellow-00, Sections 3.1, 3.1.1,
 --  3.2, 3.4.1, 3.4.2; test vectors Appendix B.2.
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0029.

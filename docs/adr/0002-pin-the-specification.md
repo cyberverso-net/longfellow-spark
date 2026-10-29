@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Amended 2026-10-29 by [ADR 0079](0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md): the project follows draft-irtf-cfrg-longfellow-00, whose technical text is that of -03.
 
 ## Date
 

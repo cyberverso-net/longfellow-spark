@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-22, milestone M2 of Phase D). Amended 2026-10-23 by [ADR 0070](0070-sumcheck-and-ligero-kernels-as-upstream.md): the four limbs of an element are scalar components, read as an array through `Limbs (E)` where this record writes `E.Limbs`; the value model is unchanged.
+Proposed (2026-10-22, milestone M2 of Phase D). Amended 2026-10-23 by [ADR 0070](0070-sumcheck-and-ligero-kernels-as-upstream.md): the four limbs of an element are scalar components, read as an array through `Limbs (E)` where this record writes `E.Limbs`; the value model is unchanged. Amended 2026-10-28 by [ADR 0077](0077-p256-montgomery-round-as-cios.md): the round is upstream's CIOS step, r p by multiply-accumulates with the limbs of p instead of shifted additions.
 
 ## Date
 

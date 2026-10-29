@@ -1,6 +1,6 @@
 --  Uleb128: the unsigned LEB128 integers of the LFC2 circuit format
 --  (Phase B, ADR 0046), as the upstream production reader defines them
---  (google/longfellow-zk d5e6be7, rust/core/proto/src/uleb.rs,
+--  (longfellow-zk/longfellow-zk d5e6be7, rust/core/proto/src/uleb.rs,
 --  read_uleb128_max4): at most four bytes, each carrying seven bits
 --  least significant group first and a continuation bit; a fourth byte
 --  with the continuation bit set is an error; the value is therefore

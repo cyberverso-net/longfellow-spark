@@ -1,7 +1,7 @@
 --  Additive_Fft: the Reed-Solomon extension of draft-03 Section 2.2.2 on
 --  GF(2^128) by the additive FFT of Lin, Chung and Han (2014) in the
 --  novel polynomial basis (Phase D, block 3, ADR 0057), in the form of
---  the production prover (google/longfellow-zk at d5e6be7,
+--  the production prover (longfellow-zk/longfellow-zk at d5e6be7,
 --  rust/runtime/algebra/src/lch14.rs and lch14_reed_solomon.rs).
 --
 --  Extend takes the values of a polynomial of degree below n at the

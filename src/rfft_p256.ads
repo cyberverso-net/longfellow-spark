@@ -1,6 +1,6 @@
 --  Rfft_P256: the Reed-Solomon extension of draft-03 Section 2.2.1 on the
 --  P-256 base field (Phase D, block 4, ADR 0057), as the production
---  prover computes it (google/longfellow-zk at d5e6be7,
+--  prover computes it (longfellow-zk/longfellow-zk at d5e6be7,
 --  rust/runtime/algebra/src/reed_solomon.rs, middle_product.rs, rfft.rs,
 --  fp2.rs, p256/mod.rs).
 --

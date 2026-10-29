@@ -8,17 +8,18 @@ This guide explains the project to a reader who knows some cryptography and litt
 2. [Trust model](trust-model.md): every claim of the project, proved, tested or trusted, part by part.
 3. [Correspondence with upstream's Lean proofs](lean-correspondence.md): how the protocol theorems upstream proves in Lean relate to the code proved here, row by row.
 4. [Chapter 1, GF(2^128)](01-gf2_128.md): the binary field under the sumcheck and Ligero layers; the first complete stage.
-5. [Chapter 2, the P-256 base field](02-p256-field.md): prime-field arithmetic with carries, a ghost big-integer model, and the Solinas reduction proved as a polynomial identity.
+5. [Chapter 2, the P-256 base field](02-p256-field.md): prime-field arithmetic with carries, a ghost big-integer model, and Montgomery multiplication as upstream's CIOS step, proved against the model.
 6. [Chapter 3, the sumcheck algebra and the symbolic verifier core](03-sumcheck.md): generics over a field, circuits as data, structural Gold through logical equality, sparse expressions and the constraint-emitting verifier core with challenges as input.
 7. [Chapter 4, the Fiat-Shamir transcript and the challenge replay](04-transcript.md): the transcript of draft Section 3 over SHA-256 and AES-256, field serialisation and sampling, and the replay of the challenges of a proof into the record of chapter 3; the fourth complete stage.
 8. [Chapter 5, Ligero and the complete verifier](05-ligero.md): the Merkle commitment, the geometry and the Reed-Solomon code by Lagrange interpolation, the Ligero proof reader and verifier, and the complete verifier from the proof string to a verdict; the fifth and last stage of Phase A.
 9. [Chapter 6, the circuit loader, the heap and the interop proofs](06-circuits.md): the LFC2 format of the upstream compiler as a representation of the quad circuits of Section 6.3, the loader that proves the shape of what it returns, access types under SPARK's ownership rules, the working sets on the heap, the command-line verifier, and the two upstream proofs accepted from their files; Phase B.
 10. [Chapter 7, the prover](07-prover.md): the sumcheck from the prover's side with its one-time pads, the Ligero commitment and proof, randomness as a generic formal so that a program is proved for any source, the writers as inverses of the readers, the subfield projection as a fixed linear map, the command-line prover, and the two upstream proofs reproduced byte for byte from their inputs and seeds; Phase C.
 11. [Chapter 8, the additive FFT](08-additive-fft.md): the Reed-Solomon code on GF(2^128) by the FFT of Lin, Chung and Han, its subspace polynomials and novel basis, a small example by hand, the encoder of the prover switched to it, and what is proved and what is tested; Phase D.
-12. [Performance](performance.md): how fast the mDoc circuits are proved and verified, the milestones, every optimisation step with its measurement, and the comparison with upstream.
-13. The [architecture decision records](../adr/README.md), referenced from the chapters where a choice is explained.
+12. [Chapter 9, the mDoc layer](09-mdoc.md): an outline, written as the mDoc blocks of Phase D land.
+13. [Performance](performance.md): how fast the mDoc circuits are proved and verified, the milestones, every optimisation step with its measurement, and the comparison with upstream.
+14. The [architecture decision records](../adr/README.md), referenced from the chapters where a choice is explained.
 
-Later chapters follow the roadmap: the circuit compiler (Phase D).
+Later chapters follow the roadmap: the circuit compiler is Phase E (ADR 0055).
 
 ## Building, proving and testing
 
@@ -46,6 +47,6 @@ The proof summary is written to `obj/development/gnatprove/gnatprove.out`. The e
 
 ## Conventions used in the guide
 
-- Specification sections are cited by number (draft-google-cfrg-libzk-03, see [ADR 0002](../adr/0002-pin-the-specification.md)); the text is not reproduced.
-- Upstream files are cited as path and commit of google/longfellow-zk.
+- Specification sections are cited by number (draft-irtf-cfrg-longfellow-00, see [ADR 0002](../adr/0002-pin-the-specification.md) and [ADR 0079](../adr/0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md)); the text is not reproduced.
+- Upstream files are cited as path and commit of longfellow-zk/longfellow-zk (formerly google/longfellow-zk).
 - "Proved" means discharged by GNATprove for all inputs; "tested" means checked on the committed vectors; "trusted" means assumed and listed as such in the [trust model](trust-model.md).
