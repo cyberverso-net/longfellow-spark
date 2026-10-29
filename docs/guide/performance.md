@@ -21,6 +21,7 @@ This page records how fast the project proves and verifies the production mDoc c
 |---|---|---|---|
 | M1 | Algorithmic parity: the eq tables, the verifier's Lagrange tables, the sumcheck prover realigned | at most 100 s | closed at about 126 s |
 | M2 | The Gold limit: as fast as the code goes while every contract stays proved | upstream generic | closed at 8.13 s (ADR 0078) |
+| Memory | The peak heap within twice upstream's, by the same measure, in Gold | upstream's peak heap | in progress (ADR 0080) |
 | M3 | A tested variant chosen at build time: hardware carry-less product, the verifier's encoding by FFT | upstream hardware, 0.69 s | next |
 | M4 | Parallelism | to be set | optional |
 
@@ -108,17 +109,16 @@ The product is the same algorithm as upstream's generic code (ADR 0065), proved 
 
 ## Memory
 
-Peak heap at the close of M2, the same measure on both sides: the bytes allocated at the peak of each process (an `LD_PRELOAD` counter on malloc for ours, the tracking allocator of upstream's bench).
+The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. Its criterion: the peak heap within twice upstream's, by the same measure, the bytes allocated at the peak of each process (an `LD_PRELOAD` counter on malloc, on both sides).
 
-| Peak heap | this project | upstream (both circuits, v2 format) |
-|---|---|---|
-| prover | hash 645 MB, signature 78 MB | 104 MB |
-| verifier | hash 515 MB, signature 44 MB | 45 MB |
+| Peak heap | close of M2 (88835f2) | first step (ADR 0080) | upstream (both circuits) |
+|---|---|---|---|
+| prover | hash 645 MB, signature 78 MB | hash 621 MB, signature 60 MB | 107 MB |
+| verifier | hash 515 MB, signature 44 MB | hash 401 MB, signature 36 MB | 48 MB |
 
-- About 7 times upstream's in the prover and 12 times in the verifier. Our resident set is within 2 % of our heap.
-- The hash circuit in memory takes about 248 MB here: 7.76 million terms of 32 bytes, an element and three wire indices. Upstream keeps it in deduplicated tables, under 6 bytes a term.
-- The rest is the working sets: the eq tables, the bound quad and the Ligero tables, about 270 MB in the hash verification.
-- Memory is not part of the stop criterion of M2. ADR 0055 set a ceiling of 1 GB, which every run keeps.
+- The largest item is the hash circuit in memory: 236.7 MB here, 7.76 million terms of 32 bytes; upstream keeps both circuits in about 3 MB, in the compressed form of the file.
+- The first step removed a copy of the largest layer in the verifier (114 MB) and the provisional buffers of the command-line prover.
+- Next: the circuit held compressed with one layer expanded at a time, then the prover's wires.
 
 ## After M2
 
@@ -127,6 +127,6 @@ Recorded here and handled after M2, each with its own record:
 - **A scalar GF(2^128) product with fewer multiplications:** five classes and 128-bit integer products, no bit reversal; about 75 multiplications instead of 96. To be prototyped and measured first.
 - **The P-256 sum and difference:** an unproved prototype without the generic loop of `Add_Words` takes 5.7 ns against 11.3; the product 16 against 20 ns.
 - **The carry idiom** that GCC compiles to add with carry: proved, but slower in the loop form of `Add_Words` (ADR 0077); to be tried again with the prototype's form.
-- **Memory:** the representation of the circuit in memory (32 bytes a term here, deduplicated tables upstream) and the verifier's working sets, each with a profile of where the bytes go first; a change of representation is a question of format, with its own record.
+- **Memory:** now its own milestone (ADR 0080), before the certification block and M3.
 
 M3 then brings the hardware carry-less product, the verifier's encoding by FFT and the SHA instructions, as a tested build chosen at build time, with the Gold build as the default and the reference.

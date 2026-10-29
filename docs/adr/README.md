@@ -83,3 +83,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0077](0077-p256-montgomery-round-as-cios.md) | The Montgomery round of P-256 as upstream's CIOS step | Proposed | 2026-10-28 |
 | [0078](0078-milestone-m2-closed.md) | Milestone M2 closed: the Gold limit at 8.13 seconds | Proposed | 2026-10-29 |
 | [0079](0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md) | The specification migrated to draft-irtf-cfrg-longfellow-00, and upstream's new home | Proposed | 2026-10-29 |
+| [0080](0080-milestone-memory.md) | A memory milestone, before the certification block and M3 | Proposed | 2026-10-29 |
