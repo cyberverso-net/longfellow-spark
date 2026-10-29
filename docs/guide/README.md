@@ -15,7 +15,8 @@ This guide explains the project to a reader who knows some cryptography and litt
 9. [Chapter 6, the circuit loader, the heap and the interop proofs](06-circuits.md): the LFC2 format of the upstream compiler as a representation of the quad circuits of Section 6.3, the loader that proves the shape of what it returns, access types under SPARK's ownership rules, the working sets on the heap, the command-line verifier, and the two upstream proofs accepted from their files; Phase B.
 10. [Chapter 7, the prover](07-prover.md): the sumcheck from the prover's side with its one-time pads, the Ligero commitment and proof, randomness as a generic formal so that a program is proved for any source, the writers as inverses of the readers, the subfield projection as a fixed linear map, the command-line prover, and the two upstream proofs reproduced byte for byte from their inputs and seeds; Phase C.
 11. [Chapter 8, the additive FFT](08-additive-fft.md): the Reed-Solomon code on GF(2^128) by the FFT of Lin, Chung and Han, its subspace polynomials and novel basis, a small example by hand, the encoder of the prover switched to it, and what is proved and what is tested; Phase D.
-12. The [architecture decision records](../adr/README.md), referenced from the chapters where a choice is explained.
+12. [Performance](performance.md): how fast the mDoc circuits are proved and verified, the milestones, every optimisation step with its measurement, and the comparison with upstream.
+13. The [architecture decision records](../adr/README.md), referenced from the chapters where a choice is explained.
 
 Later chapters follow the roadmap: the circuit compiler (Phase D).
 

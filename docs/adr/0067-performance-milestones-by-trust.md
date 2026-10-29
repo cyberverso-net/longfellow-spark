@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-22, milestone M2 of Phase D). Amends the performance target of [ADR 0055](0055-phase-d-scope-mdoc-scale.md): milestones M2 and M3, and the upstream figures it quotes.
+Proposed (2026-10-22, milestone M2 of Phase D). Amends the performance target of [ADR 0055](0055-phase-d-scope-mdoc-scale.md): milestones M2 and M3, and the upstream figures it quotes. M2 closed 2026-10-29 by [ADR 0078](0078-milestone-m2-closed.md), the stop criterion met.
 
 ## Date
 
