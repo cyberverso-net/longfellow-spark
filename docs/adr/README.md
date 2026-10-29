@@ -58,7 +58,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0052](0052-gold-perimeter-for-the-prover.md) | Gold perimeter for the prover | Accepted | 2026-10-17 |
 | [0053](0053-prover-vectors-and-cross-verification.md) | Prover vectors and cross-verification | Accepted | 2026-10-17 |
 | [0054](0054-prove-job-limit-sixty-minutes.md) | Prove job limit raised to sixty minutes and the prover partition split | Accepted, amended by 0060 | 2026-10-19 |
-| [0055](0055-phase-d-scope-mdoc-scale.md) | Phase D scope: the mDoc scale and the proof of age | Proposed, amended by 0067 | 2026-10-19 |
+| [0055](0055-phase-d-scope-mdoc-scale.md) | Phase D scope: the mDoc scale and the proof of age | Proposed, amended by 0067, M2 closed by 0078 | 2026-10-19 |
 | [0056](0056-linear-input-constraint.md) | The input constraint in linear time | Accepted | 2026-10-19 |
 | [0057](0057-additive-fft.md) | The additive FFT for the Reed-Solomon code | Accepted | 2026-10-19 |
 | [0058](0058-mdoc-layer.md) | The mDoc layer: MACs, public inputs, transcript, proof format and witness | Proposed | 2026-10-19 |
@@ -70,7 +70,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0064](0064-lean-circuit-premises.md) | The circuit premises of upstream's Lean proofs, checked and proved | Accepted | 2026-10-21 |
 | [0065](0065-carry-less-multiplication-in-gf2-128.md) | The carry-less multiplication of upstream in GF(2^128), proved Gold | Proposed | 2026-10-21 |
 | [0066](0066-lagrange-tables-by-prefix-and-suffix.md) | The verifier's Lagrange tables by prefix and suffix products, proved | Proposed, amended by 0070 | 2026-10-22 |
-| [0067](0067-performance-milestones-by-trust.md) | Performance milestones by trust: the Gold limit, then a tested variant | Proposed | 2026-10-22 |
+| [0067](0067-performance-milestones-by-trust.md) | Performance milestones by trust: the Gold limit, then a tested variant | Proposed, M2 closed by 0078 | 2026-10-22 |
 | [0068](0068-release-build-without-run-time-checks.md) | The release build without run-time checks in the proved units | Proposed, amended by 0072 | 2026-10-22 |
 | [0069](0069-p256-montgomery-multiplication.md) | P-256 in Montgomery form, with the multiplication of upstream | Proposed, amended by 0070 | 2026-10-22 |
 | [0070](0070-sumcheck-and-ligero-kernels-as-upstream.md) | The sumcheck and Ligero kernels in upstream's form | Proposed, amended by 0075 | 2026-10-23 |
@@ -81,3 +81,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0075](0075-round-evaluations-from-the-claim.md) | The prover's round evaluations take p (1) from the claim of the round, as upstream | Proposed | 2026-10-27 |
 | [0076](0076-field-operations-without-call-and-finalisation-overhead.md) | The field operations without call and finalisation overhead | Proposed | 2026-10-27 |
 | [0077](0077-p256-montgomery-round-as-cios.md) | The Montgomery round of P-256 as upstream's CIOS step | Proposed | 2026-10-28 |
+| [0078](0078-milestone-m2-closed.md) | Milestone M2 closed: the Gold limit at 8.13 seconds | Proposed | 2026-10-29 |

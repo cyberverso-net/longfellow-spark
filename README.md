@@ -13,6 +13,8 @@ The project is built in phases, each released when complete:
 | C | The prover, which reproduces the two upstream example proofs byte for byte | 0.3.0 | 16671 |
 | D | The production mDoc circuits at full scale | in progress | |
 
+In Phase D, milestone M2 closed at a round trip of 8.13 s for the two mDoc proofs and their verifications, with every contract proved; [the performance page](docs/guide/performance.md) gives the steps and the comparison with upstream.
+
 [CHANGELOG.md](CHANGELOG.md) describes each release.
 
 ## What you can rely on
