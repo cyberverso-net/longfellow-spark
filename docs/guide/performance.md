@@ -106,16 +106,17 @@ The product is the same algorithm as upstream's generic code (ADR 0065), proved 
 
 ## Memory
 
-Peak memory at the close of M2, the same session of 29 October:
+Peak heap at the close of M2, the same measure on both sides: the bytes allocated at the peak of each process (an `LD_PRELOAD` counter on malloc for ours, the tracking allocator of upstream's bench).
 
-| Peak | this project (resident set of the process) | upstream (peak heap, v2 format) |
+| Peak heap | this project | upstream (both circuits, v2 format) |
 |---|---|---|
-| prover | hash 637 MB, signature 79 MB | 104 MB for both circuits |
-| verifier | hash 507 MB, signature 46 MB | 45 MB for both circuits |
+| prover | hash 645 MB, signature 78 MB | 104 MB |
+| verifier | hash 515 MB, signature 44 MB | 45 MB |
 
-- The two figures are not the same measure. Ours is the resident set of each process: code, stack and every page touched, freed or not (`/usr/bin/time`). Upstream's is the peak of its heap, counted by the tracking allocator of its bench, with both circuits in memory in the compact LFA2 form.
-- Even so, the gap is about an order of magnitude, most of it in the verifier. The likely cause is the hash circuit in memory: 7.7 million terms as records here, deduplicated tables upstream.
-- Memory is not part of the stop criterion of M2. ADR 0055 set a ceiling of 1 GB, which both runs keep.
+- About 7 times upstream's in the prover and 12 times in the verifier. Our resident set is within 2 % of our heap.
+- The hash circuit in memory takes about 248 MB here: 7.76 million terms of 32 bytes, an element and three wire indices. Upstream keeps it in deduplicated tables, under 6 bytes a term.
+- The rest is the working sets: the eq tables, the bound quad and the Ligero tables, about 270 MB in the hash verification.
+- Memory is not part of the stop criterion of M2. ADR 0055 set a ceiling of 1 GB, which every run keeps.
 
 ## After M2
 
@@ -124,6 +125,6 @@ Recorded here and handled after M2, each with its own record:
 - **A scalar GF(2^128) product with fewer multiplications:** five classes and 128-bit integer products, no bit reversal; about 75 multiplications instead of 96. To be prototyped and measured first.
 - **The P-256 sum and difference:** an unproved prototype without the generic loop of `Add_Words` takes 5.7 ns against 11.3; the product 16 against 20 ns.
 - **The carry idiom** that GCC compiles to add with carry: proved, but slower in the loop form of `Add_Words` (ADR 0077); to be tried again with the prototype's form.
-- **Memory, like for like:** the same measure on both sides (the peak heap of ours against upstream's, or the resident set of one upstream proof and verification run alone), then a profile of where it goes: the circuit, the tables, the working sets. If the circuit's representation is the cause, it is a question of format, with its own record.
+- **Memory:** the representation of the circuit in memory (32 bytes a term here, deduplicated tables upstream) and the verifier's working sets, each with a profile of where the bytes go first; a change of representation is a question of format, with its own record.
 
 M3 then brings the hardware carry-less product, the verifier's encoding by FFT and the SHA instructions, as a tested build chosen at build time, with the Gold build as the default and the reference.

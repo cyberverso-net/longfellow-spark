@@ -51,7 +51,7 @@ These two are recorded as code generation, not as cost of the proof. Their candi
 - a scalar GF(2^128) product with fewer multiplications: five classes, 128-bit integer products, no bit reversal;
 - the P-256 sum and difference in the prototype's form, which takes 5.7 ns against 11.3.
 
-Memory is outside the criterion. The peaks are recorded on the performance page: an order of magnitude above upstream's, by different measures. A like-for-like measurement comes after M2.
+Memory is outside the criterion. The peak heap, the same measure on both sides, is about 7 times upstream's in the prover and 12 times in the verifier, most of it the circuit in memory (32 bytes a term) and the verifier's tables. It is recorded on the performance page and handled after M2.
 
 **The comparison is at the same processor target on both sides.** Upstream's published generic row, 3.74 s (27 October), is built for the native processor. There LLVM vectorises the GF(2^128) product with AVX-512 and uses GFNI. It is given next to ours, with what it is.
 
