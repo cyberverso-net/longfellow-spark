@@ -44,7 +44,7 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 
 - The frames of `Transcript` and the statement of `Sumcheck_Transcript` are proved on a ghost sequence of the absorbed bytes.
 - `Nat` returns a value below n. `Choose` returns distinct values below n.
-- `GF2_128.To_Bytes` and `From_Bytes`, and the layout of `Serialise`, are proved.
+- `GF2_128.To_Bytes` and `From_Bytes` are proved.
 
 **Ligero and the complete verifier** (chapter 5).
 
@@ -80,11 +80,11 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 **The two fields.**
 
 - `GF2_128.Mul_Ref`, and so `Mul`, follows the convention of the pinned specification: bit i is the coefficient of x^i, and reduction is by Q(x). The checks are in `gf2_128_mul.txt` and `gf2_128_square.txt`, run by `gf2_128_kat`.
-- These files have three tiers. The anchors are checked against the subfield basis constants of upstream (google/longfellow-zk at d5e6be7, `gf2_128.rs` and `gf2_128_test.cc`). Structural cases come from the field definition. Random cases come from a Python reference built differently from `Mul_Ref`: a schoolbook product, then long division.
+- These files have three tiers. The anchors are checked against the subfield basis constants of upstream (longfellow-zk/longfellow-zk at d5e6be7, `gf2_128.rs` and `gf2_128_test.cc`). Structural cases come from the field definition. Random cases come from a Python reference built differently from `Mul_Ref`: a schoolbook product, then long division.
 - `GF2_128.Inv` computes the inverse. `gf2_128_inv.txt` checks `Inv (beta_i) = g^(65535 - i)`, `E * Inv (E) = 1` on random elements and `Inv (Zero) = Zero`. Two Python references, Fermat exponentiation and the extended Euclid algorithm, must agree. The harness checks `E * Inv (E) = One` again at run time.
 - The limbs of `P_Limbs` are the prime of Table 1, and the byte encoding is that of Section 7.2.1. The files `p256_add.txt`, `p256_mul.txt` and `p256_bytes.txt` are anchored on b, Gx and Gy of RFC 5903, through the curve equation.
 - `P256_Field.Inv` is the inverse, by `p256_inv.txt`, with the same two references and the same run-time check.
-- The generator `gen_p256_vectors.py` also re-derives the Solinas reduction table and the inversion chain.
+- The generator `gen_p256_vectors.py` also re-derives the inversion chain, and the Solinas reduction table, a cross-check kept from before the Montgomery form of ADR 0069.
 
 **The sumcheck algebra.**
 
@@ -149,7 +149,7 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 
 - The operating system's generator, `/dev/urandom`, read outside SPARK by `Os_Random`. Zero knowledge of the proofs `longfellow_prove` makes without `--seed` depends on it. A proof made with `--seed` is predictable by design.
 - That `Simple_Rng` is the generator of the upstream test. It was transcribed, and the byte identity confirms it.
-- The soundness, completeness and zero-knowledge theorems of the padded sumcheck, of Ligero and of their composition (ADR 0035, 0050, 0052). Upstream now proves soundness and zero knowledge in Lean for a model of the v7 verifier this project implements: 115-bit soundness for the pair of mDoc circuits, and zero knowledge within 2^-127. They stay trusted here, because the link between that model and this code is mostly by reading. [The correspondence page](lean-correspondence.md) lists it row by row.
+- The soundness, completeness and zero-knowledge theorems of the padded sumcheck, of Ligero and of their composition (ADR 0035, 0050, 0052). Upstream now proves soundness and zero knowledge in Lean for a model of the v7 verifier this project implements: 116-bit soundness for the pair of mDoc circuits (at 7bf8a6b), and zero knowledge within 2^-127. They stay trusted here, because the link between that model and this code is mostly by reading. [The correspondence page](lean-correspondence.md) lists it row by row.
 - The fixed statement hash `DEFAULT_STATEMENT_HASH` of the reference (ADR 0035).
 
 **Tools.**
@@ -158,12 +158,12 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 - The SMT solvers: CVC5, Z3 and Alt-Ergo.
 - SPARKlib's functional sequences, used as a ghost model (ADR 0031).
 - That `Same`, the logical equality of each field wrapper, is the equality of its element type. Its body is the predefined `=`, outside SPARK (ADR 0023).
-- The release build relies on the proof instead of checking at run time. The units of `src/` are compiled without run-time checks, because GNATprove proves that none can fail; the units of `cli/src/` keep theirs (ADR 0068). This holds only under the preconditions of the units. The command-line programs establish the preconditions of `Circuit_Reader.Read`, `Zk_Verifier.Verify` and `Zk_Prover.Prove` in code before each call, and `Cli_Random.Fill` changes no state the prover reads. The prover instances of the command line keep their checks, except the predicate checks of the circuit inside `Sumcheck_Prover` and `Zk_Prover`, which GNATprove proves. The circuit is checked once, explicitly, where it enters the program, and the calls of the programs do not check it again (ADR 0072).
+- The release build relies on the proof instead of checking at run time. The units of `src/` are compiled without run-time checks, because GNATprove proves that none can fail; the units of `cli/src/` keep theirs (ADR 0068). This holds only under the preconditions of the units. The command-line programs establish the preconditions of `Circuit_Reader.Read`, `Zk_Verifier.Verify` and `Zk_Prover.Prove` in code before each call, and `Cli_Random.Fill` changes no state the prover reads. The prover instances of the command line keep their checks, except the predicate checks of the circuit inside `Sumcheck_Prover` and `Zk_Prover`, bodies and specification, which GNATprove proves. The circuit is checked once, explicitly, where it enters the program, and the calls of the programs do not check it again (ADR 0072).
 
 **Inputs and references.**
 
 - The pinned specification itself.
-- The upstream circuit files, as to what they compute, until this project compiles its own. Their shape is proved `Well_Formed` on load and their identifier is recomputed (ADR 0046).
+- The upstream circuit files, as to what they compute, until this project compiles its own. Their shape is proved `Well_Formed` on load and their identifier is recomputed (ADR 0046), except for the pinned list below.
 - The list of `Pinned_Circuits` in the command line: the digest of each circuit file and its identifier, checked once by a full `Read` in `interop_kat`. A file in the list is loaded without recomputing its identifier (ADR 0074).
 - The upstream production reader at d5e6be7, as the definition of the LFC2 format.
 - That the recordings of the upstream Ligero verifier are faithful to d5e6be7 (ADR 0040).

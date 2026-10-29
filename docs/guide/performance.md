@@ -19,7 +19,7 @@ This page records how fast the project proves and verifies the production mDoc c
 
 | Milestone | Content | Reference | Status |
 |---|---|---|---|
-| M1 | Algorithmic parity: the eq tables, the verifier's Lagrange weights, the sumcheck prover realigned | at most 100 s | closed at about 126 s |
+| M1 | Algorithmic parity: the eq tables, the verifier's Lagrange tables, the sumcheck prover realigned | at most 100 s | closed at about 126 s |
 | M2 | The Gold limit: as fast as the code goes while every contract stays proved | upstream generic | closed at 8.13 s (ADR 0078) |
 | M3 | A tested variant chosen at build time: hardware carry-less product, the verifier's encoding by FFT | upstream hardware, 0.69 s | next |
 | M4 | Parallelism | to be set | optional |
@@ -46,6 +46,8 @@ Round trip on the proving machine, proved build unless said otherwise. Each step
 | The field operations without call and finalisation overhead | ADR 0076 | 8.15 s |
 | The circuit predicate checked once at the entry | ADR 0072, amended | 7.99 s |
 | The Montgomery round of P-256 as upstream's CIOS step | ADR 0077 | -0.13 s in its session |
+
+Each figure comes from the session of its own record, and sessions differ by up to 8 %. The close of M2 below was measured in a new session: 8.13 s for the same code.
 
 The proofs of the command line have stayed identical byte for byte at every step.
 

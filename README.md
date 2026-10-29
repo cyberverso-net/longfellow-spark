@@ -1,8 +1,8 @@
 # longfellow-spark
 
-A formally verified reimplementation, in Ada/SPARK, of [Longfellow ZK](https://github.com/google/longfellow-zk), Google's zero-knowledge proof system for identity credentials.
+A formally verified reimplementation, in Ada/SPARK, of [Longfellow ZK](https://github.com/longfellow-zk/longfellow-zk), Google's zero-knowledge proof system for identity credentials.
 
-It follows **IETF draft-google-cfrg-libzk-03 (23 September 2026)**. Changes in later drafts are handled as explicit migrations (ADR 0002).
+It follows **IETF draft-irtf-cfrg-longfellow-00 (22 October 2026)**, the CFRG version of draft-google-cfrg-libzk-03, with the same technical text (ADR 0079). Changes in later drafts are handled as explicit migrations (ADR 0002).
 
 The project is built in phases, each released when complete:
 
@@ -61,7 +61,7 @@ The prover settings are in `longfellow_spark.gpr` (ADR 0020): CVC5, Z3 and Alt-E
 
 `scripts/check.sh` defines these steps. `make build`, `make prove`, `make test`, `make cli`, `make vectors` and `make lint` run them one at a time. The full proof takes about an hour on a laptop.
 
-The project's proving machine, a 24-core virtual machine on Google Cloud, runs the same check on demand (ADR 0060, 0062):
+The project's proving machine, a virtual machine on Google Cloud (c4-standard-24, 12 cores, one thread per core), runs the same check on demand (ADR 0060, 0062):
 
 ```bash
 scripts/remote-check.sh               # make check on the pushed commit, posts the status prove
@@ -137,7 +137,7 @@ cli/bin/longfellow_prove --field p256 \
 cmp /tmp/ecdsa2_proof.bin tests/vectors/upstream/circuits/ecdsa2_proof.bin
 ```
 
-Each takes about six seconds. Without `--seed` the proof changes at every run, and `longfellow_verify` accepts it. To check a proof with the upstream verifier, see `tests/vectors/upstream/verify_proof_file.rs`.
+At Phase C each took about six seconds on the author's laptop; Phase D has made the prover much faster since ([the performance page](docs/guide/performance.md)). Without `--seed` the proof changes at every run, and `longfellow_verify` accepts it. To check a proof with the upstream verifier, see `tests/vectors/upstream/verify_proof_file.rs`.
 
 ## Continuous integration
 

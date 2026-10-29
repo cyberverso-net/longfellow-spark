@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-19) Amended 2026-10-19 by [ADR 0062](0062-proof-on-demand.md): the workflow and the self-hosted runner are withdrawn, and the proof runs on demand through `scripts/remote-check.sh`, which posts the status `prove`. Amended 2026-10-22 with the author: the machine runs with one thread per core (`threadsPerCore: 1`), 12 cores, so that each prover has a core of its own as on the laptop; with two threads per core, a proof near its limits on the laptop ran out of time on the machine.
+Accepted (2026-10-19). Amended 2026-10-19 by [ADR 0062](0062-proof-on-demand.md): the workflow and the self-hosted runner are withdrawn, and the proof runs on demand through `scripts/remote-check.sh`, which posts the status `prove`. Amended 2026-10-22 with the author: the machine runs with one thread per core (`threadsPerCore: 1`), 12 cores, so that each prover has a core of its own as on the laptop; with two threads per core, a proof near its limits on the laptop ran out of time on the machine.
 
 ## Date
 

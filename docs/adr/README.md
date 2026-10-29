@@ -5,7 +5,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | Number | Title | Status | Date |
 |--------|-------|--------|------|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted, amended by 0042 | 2026-10-09 |
-| [0002](0002-pin-the-specification.md) | Pin the specification to draft-google-cfrg-libzk-03 | Accepted | 2026-10-06 |
+| [0002](0002-pin-the-specification.md) | Pin the specification to draft-google-cfrg-libzk-03 | Accepted, amended by 0079 | 2026-10-06 |
 | [0003](0003-proof-policy-and-trust-model.md) | Proof policy and trust model | Accepted, amended by 0020, 0061 | 2026-10-06 |
 | [0004](0004-gf2-128-element-representation.md) | GF(2^128) element representation | Accepted | 2026-10-06 |
 | [0005](0005-mul-ref-as-proof-target.md) | Ghost reference Mul_Ref as the proof target of Mul | Accepted | 2026-10-06 |
@@ -18,7 +18,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0012](0012-p256-limb-representation.md) | P-256 base field: limb representation | Accepted | 2026-10-09 |
 | [0013](0013-p256-reduction-strategy.md) | P-256 base field: reduction strategy | Accepted, amended by 0069 | 2026-10-09 |
 | [0014](0014-p256-functional-specification-and-ghost-model.md) | P-256 base field: functional specification and ghost model | Accepted, amended by 0044 | 2026-10-09 |
-| [0015](0015-p256-canonical-form-and-conditional-subtraction.md) | P-256 base field: canonical form and conditional subtraction | Accepted | 2026-10-09 |
+| [0015](0015-p256-canonical-form-and-conditional-subtraction.md) | P-256 base field: canonical form and constant-time conditional subtraction | Accepted | 2026-10-09 |
 | [0016](0016-p256-inversion.md) | P-256 base field: inversion | Accepted | 2026-10-09 |
 | [0017](0017-p256-test-anchors.md) | P-256 base field: test anchors | Accepted | 2026-10-09 |
 | [0018](0018-continuous-verification-gate.md) | Continuous verification gate | Accepted, amended by 0019 and 0020 | 2026-10-09 |
@@ -66,13 +66,13 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0060](0060-proving-machine-on-google-cloud.md) | A proving machine on Google Cloud: prove as one job, make check remote | Accepted, amended by 0062 | 2026-10-19 |
 | [0061](0061-readme-as-front-page.md) | The README as a front page, the trust model in the guide | Accepted | 2026-10-19 |
 | [0062](0062-proof-on-demand.md) | The proof on demand, posted as a commit status | Accepted | 2026-10-19 |
-| [0063](0063-milestone-m1-algorithmic-parity.md) | Milestone M1: algorithmic parity with the production verifier and prover | Proposed | 2026-10-21 |
-| [0064](0064-lean-circuit-premises.md) | The circuit premises of upstream's Lean proofs, checked and proved | Accepted | 2026-10-21 |
+| [0063](0063-milestone-m1-algorithmic-parity.md) | Milestone M1: algorithmic parity with the production verifier and prover | Proposed, amended by 0066, M1 closed | 2026-10-21 |
+| [0064](0064-lean-circuit-premises.md) | The circuit premises of upstream's Lean proofs, checked and proved | Accepted, amended by 0079 | 2026-10-21 |
 | [0065](0065-carry-less-multiplication-in-gf2-128.md) | The carry-less multiplication of upstream in GF(2^128), proved Gold | Proposed | 2026-10-21 |
 | [0066](0066-lagrange-tables-by-prefix-and-suffix.md) | The verifier's Lagrange tables by prefix and suffix products, proved | Proposed, amended by 0070 | 2026-10-22 |
 | [0067](0067-performance-milestones-by-trust.md) | Performance milestones by trust: the Gold limit, then a tested variant | Proposed, M2 closed by 0078 | 2026-10-22 |
 | [0068](0068-release-build-without-run-time-checks.md) | The release build without run-time checks in the proved units | Proposed, amended by 0072 | 2026-10-22 |
-| [0069](0069-p256-montgomery-multiplication.md) | P-256 in Montgomery form, with the multiplication of upstream | Proposed, amended by 0070 | 2026-10-22 |
+| [0069](0069-p256-montgomery-multiplication.md) | P-256 in Montgomery form, with the multiplication of upstream | Proposed, amended by 0070, 0077 | 2026-10-22 |
 | [0070](0070-sumcheck-and-ligero-kernels-as-upstream.md) | The sumcheck and Ligero kernels in upstream's form | Proposed, amended by 0075 | 2026-10-23 |
 | [0071](0071-prover-reuses-the-bound-quad.md) | The prover reuses the bound quad of its own sumcheck, proved | Proposed | 2026-10-24 |
 | [0072](0072-predicate-checks-in-the-prover-instances.md) | The prover instances of the command line do not check the circuit predicate again | Proposed, amended 2026-10-28 | 2026-10-26 |
@@ -82,3 +82,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0076](0076-field-operations-without-call-and-finalisation-overhead.md) | The field operations without call and finalisation overhead | Proposed | 2026-10-27 |
 | [0077](0077-p256-montgomery-round-as-cios.md) | The Montgomery round of P-256 as upstream's CIOS step | Proposed | 2026-10-28 |
 | [0078](0078-milestone-m2-closed.md) | Milestone M2 closed: the Gold limit at 8.13 seconds | Proposed | 2026-10-29 |
+| [0079](0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md) | The specification migrated to draft-irtf-cfrg-longfellow-00, and upstream's new home | Proposed | 2026-10-29 |

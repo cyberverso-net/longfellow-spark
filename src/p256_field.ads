@@ -39,7 +39,7 @@
 --                   GF2_128 (ADR 0008); the upstream Rust reference
 --                   asserts on zero and the upstream C++ returns zero.
 --
---  Pinned spec: IETF draft-google-cfrg-libzk-03 (23 September 2026),
+--  Pinned spec: IETF draft-irtf-cfrg-longfellow-00 (22 October 2026),
 --  Table 1 (p256, FieldID 0x01, the base field of NIST P-256), Section
 --  7.2.1 (32 bytes, little-endian, canonical) and Section 3.4.3
 --  (values >= p rejected). Curve constants for tests: RFC 5903

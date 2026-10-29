@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-21, with the pull request that realises it)
+Accepted (2026-10-21, with the pull request that realises it). Amended 2026-10-29 by [ADR 0079](0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md): the Lean reference is 7bf8a6b, where the circuit premises are in `formal/lfzk-v1/LfzkV1/ConcreteCircuit.lean` (the path below should read `formal/lfzk/Lfzk/` at d9d8d6a).
 
 ## Date
 

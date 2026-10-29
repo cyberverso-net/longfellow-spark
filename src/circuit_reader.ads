@@ -2,7 +2,7 @@
 --  0046), generic over the sumcheck algebra of a field, so that the
 --  loaded circuit is the Raw_Circuit of stage 3 and the constants are
 --  read with the field's From_Bytes. The format is the one the
---  upstream production reader defines (google/longfellow-zk d5e6be7,
+--  upstream production reader defines (longfellow-zk/longfellow-zk d5e6be7,
 --  rust/core/proto/src/reader/lfc2.rs): the magic "LFC2"; the ULEB128
 --  integers field_id, nv, ncopies (1), npublic_input,
 --  subfield_boundary, ninput, nl; nconst constants of Section 7.2.1;

@@ -64,7 +64,7 @@
 --              The byte order is anchored on the draft by
 --              tests/vectors/gf2_128_bytes.txt.
 --
---  Pinned spec: IETF draft-google-cfrg-libzk-03 (23 September 2026),
+--  Pinned spec: IETF draft-irtf-cfrg-longfellow-00 (22 October 2026),
 --  Section 2.2.2: the field is GF(2)[x] / Q(x) with
 --    Q(x) = x^128 + x^7 + x^2 + x + 1
 --  and x is a generator of the multiplicative group. The spec also defines

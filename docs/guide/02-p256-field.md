@@ -1,6 +1,6 @@
 # Chapter 2: the P-256 base field F_p
 
-Package `P256_Field` (`src/p256_field.ads`, `src/p256_field.adb`). Stage 2 of phase A. Decisions: [ADR 0012](../adr/0012-p256-limb-representation.md) to [ADR 0017](../adr/0017-p256-test-anchors.md), and [ADR 0069](../adr/0069-p256-montgomery-multiplication.md), which replaced the direct representation and the Solinas reduction of ADR 0013 by the Montgomery form and the multiplication of upstream. Specification: draft-google-cfrg-libzk-03, Table 1 (p256, FieldID 0x01), Section 7.2.1 (serialisation), Section 3.4.3 (rejection of non-canonical values). Curve constants: RFC 5903 Section 3.1, identical to SEC 2 v2.0 Section 2.4.2.
+Package `P256_Field` (`src/p256_field.ads`, `src/p256_field.adb`). Stage 2 of phase A. Decisions: [ADR 0012](../adr/0012-p256-limb-representation.md) to [ADR 0017](../adr/0017-p256-test-anchors.md), and [ADR 0069](../adr/0069-p256-montgomery-multiplication.md), which replaced the direct representation and the Solinas reduction of ADR 0013 by the Montgomery form and the multiplication of upstream. Specification: draft-irtf-cfrg-longfellow-00, Table 1 (p256, FieldID 0x01), Section 7.2.1 (serialisation), Section 3.4.3 (rejection of non-canonical values). Curve constants: RFC 5903 Section 3.1, identical to SEC 2 v2.0 Section 2.4.2.
 
 ## 1. The mathematics
 
@@ -46,17 +46,13 @@ The division is exact because p = -1 mod W for this prime, so T + r p = r - r = 
 
 ### 1.5 The reduction step for this p
 
-Adding r p needs no multiplication, because
+Since p = -1 mod W, the multiplier of p in each round is the low word r of T itself, and T + r p is computed as T + a_i B is: four 128-bit multiply-accumulates with the limbs of p, t_j + r p_j + c, then the carry into the two words above. This is upstream's generic CIOS step ([ADR 0077](../adr/0077-p256-montgomery-round-as-cios.md)).
 
-    p = 2^256 - 2^224 + 2^192 + 2^96 - 1.
+Until ADR 0077 the round used the special form of the prime,
 
-So r p is r shifted to 2^256, 2^192 and 2^96, minus r shifted to 2^224, minus r. With r split into its halves r_lo = (r mod 2^32) 2^32 and r_hi = r / 2^32, the shifts by 96 and 224 land on word boundaries:
+    p = 2^256 - 2^224 + 2^192 + 2^96 - 1,
 
-    V = [0, r_lo, r_hi, r, r, 0]       = r (2^96 + 2^192 + 2^256)
-    U = [r, 0, 0, r_lo, r_hi, 0]       = r (1 + 2^224)
-    T + r p = (T + V) - U
-
-in six words, least significant first. This is upstream's `p256_reduction_step` (`rust/runtime/algebra/src/p256/p256_64.rs`). Adding V first and subtracting U after keeps every intermediate non-negative.
+to add r p by shifted copies of r, without a multiplication: upstream's `p256_reduction_step`. On the proving machine that form, two six-word carry chains as GCC compiles them, was slower than the four multiply-accumulates.
 
 ### 1.6 Inversion
 
@@ -275,6 +271,8 @@ GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-p
 - No justification, no `pragma Assume`.
 - Maximum steps for a single successful proof in `P256_Field`: 204295, within the budget of 600000.
 
+The checks by category and by subprogram below were taken at ADR 0070 and are kept as the record of that proof; the counts above are current.
+
 | Category | Checks | Discharged by |
 |----------|--------|---------------|
 | Data dependencies (`Global => null`) | 71 | flow analysis |
@@ -348,4 +346,4 @@ Until the consolidation after Phase A the test build was slow (about three minut
 - GNATprove's model of `Ada.Numerics.Big_Numbers.Big_Integers` and of the conversions from modular types; the SMT solvers; the compiler, including its 128-bit arithmetic.
 - The target is 64-bit: `Unsigned_128` is required ([ADR 0012](../adr/0012-p256-limb-representation.md)).
 - Constant time is a discipline, scoped to assertion-free builds ([ADR 0006](../adr/0006-constant-time-discipline-and-scope.md)); loop bounds and table indices are compile-time constants, every selection is masked, `From_Bytes` may branch on its Boolean result because encodings are public data. Nothing measures timing.
-- Performance: since [ADR 0069](../adr/0069-p256-montgomery-multiplication.md) `Mul` is upstream's Montgomery multiplication, sixteen 128-bit products and four reduction steps of shifts and additions: about 50 ns on the author's laptop at `-O3`, against 230 ns for the Solinas form it replaced and 13 ns for upstream's generic code. `Inv` costs 267 multiplications. A specialised squaring remains available behind the same contracts.
+- Performance: since [ADR 0069](../adr/0069-p256-montgomery-multiplication.md) `Mul` is upstream's Montgomery multiplication, and since [ADR 0077](../adr/0077-p256-montgomery-round-as-cios.md) its CIOS step: thirty-two 128-bit multiply-accumulates. On the proving machine it takes 19.9 ns (throughput), against 11.4 ns for upstream's generic code; the Solinas form it replaced took 230 ns on the author's laptop. `Inv` costs 267 multiplications. A specialised squaring remains available behind the same contracts.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-21, at the start of milestone M1 of Phase D)
+Proposed (2026-10-21, at the start of milestone M1 of Phase D). Amended 2026-10-22 by [ADR 0066](0066-lagrange-tables-by-prefix-and-suffix.md): the verifier's Lagrange tables are built by prefix and suffix products instead of barycentric weights. M1 closed at about 126 s ([ADR 0067](0067-performance-milestones-by-trust.md)).
 
 ## Date
 
