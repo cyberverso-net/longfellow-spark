@@ -29,6 +29,7 @@ with Ada.Characters.Handling;
 with Ada.Numerics.Big_Numbers.Big_Integers;
 with Ada.Streams.Stream_IO;
 with Ada.Text_IO;
+with Ada.Unchecked_Deallocation;
 with Interfaces; use Interfaces;
 with Bytes;      use Bytes;
 with Transcript;
@@ -132,6 +133,22 @@ procedure Longfellow_Prove is
    type Decimal_List is array (Positive range <>) of String_Access;
    type Decimal_List_Access is access Decimal_List;
 
+   procedure Free_String is
+     new Ada.Unchecked_Deallocation (String, String_Access);
+   procedure Free_List is
+     new Ada.Unchecked_Deallocation (Decimal_List, Decimal_List_Access);
+   procedure Free_Bytes is
+     new Ada.Unchecked_Deallocation (Byte_Array, Byte_Array_Access);
+
+   --  The strings of a list, then the list.
+   procedure Free_Decimals (D : in out Decimal_List_Access) is
+   begin
+      for S of D.all loop
+         Free_String (S);
+      end loop;
+      Free_List (D);
+   end Free_Decimals;
+
    function Parse_Inputs (Text : Byte_Array) return Decimal_List_Access is
       Max  : constant := 2**20;
       Tmp  : Decimal_List_Access := new Decimal_List (1 .. Max);
@@ -162,7 +179,8 @@ procedure Longfellow_Prove is
       Skip_Blanks;
       if not At_End and then Cur = ']' then
          P := P + 1;
-         return new Decimal_List'(Tmp (1 .. 0));
+         Free_List (Tmp);
+         return new Decimal_List (1 .. 0);
       end if;
       loop
          Expect ('"');
@@ -199,8 +217,24 @@ procedure Longfellow_Prove is
       if not At_End then
          raise Usage_Error with "inputs: trailing characters";
       end if;
-      return new Decimal_List'(Tmp (1 .. N));
+      --  The list at its length; the provisional one of 2^20 entries,
+      --  16 MB, is freed.
+      declare
+         R : constant Decimal_List_Access := new Decimal_List'(Tmp (1 .. N));
+      begin
+         Free_List (Tmp);
+         return R;
+      end;
    end Parse_Inputs;
+
+   --  The decimal strings of the inputs file, its bytes freed once read.
+   function Parse_Inputs_File (Path : String) return Decimal_List_Access is
+      B : Byte_Array_Access := Read_File (Path);
+      D : constant Decimal_List_Access := Parse_Inputs (B.all);
+   begin
+      Free_Bytes (B);
+      return D;
+   end Parse_Inputs_File;
 
    --  The little-endian bytes of a non-negative integer, Size of them;
    --  the integer must fit.
@@ -280,8 +314,7 @@ procedure Longfellow_Prove is
          return 1;
       end if;
       declare
-         Dec    : constant Decimal_List_Access :=
-           Parse_Inputs (Read_File (Inputs_Arg.all).all);
+         Dec    : Decimal_List_Access := Parse_Inputs_File (Inputs_Arg.all);
          Inputs : ZKP.Element_Array (0 .. Dec'Length - 1);
          Ok     : Boolean;
       begin
@@ -299,6 +332,7 @@ procedure Longfellow_Prove is
                end if;
             end;
          end loop;
+         Free_Decimals (Dec);
          declare
             Label : constant Byte_Array := To_Label (Label_Arg.all);
             Max   : constant Natural :=
