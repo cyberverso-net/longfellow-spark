@@ -21,9 +21,9 @@ In Phase D, milestone M2 closed at a round trip of 8.13 s for the two mDoc proof
 
 Every claim is either proved, tested or trusted. The full list is in [the trust model](docs/guide/trust-model.md). In short:
 
-- **No run-time errors.** GNATprove shows that no SPARK code can overflow, index out of range or read uninitialised data, for any input. Proofs and circuits come from untrusted parties, so this matters on its own.
+- **No run-time errors.** GNATprove shows that no SPARK code can overflow, index out of range or read uninitialised data, for any input that meets the preconditions of the units. Proofs and circuits come from untrusted parties, so this matters on its own. A failed allocation, code outside SPARK and the probabilistic termination of the samplers stay outside, as the trust model lists.
 - **Correct arithmetic.** Both fields are proved equal to simple reference implementations. Test vectors from outside the project confirm that the references follow the specification.
-- **Faithful building blocks.** The sumcheck, Merkle and Ligero pieces, the proof reader and writers, and the circuit loader are proved against transcriptions of the specification's formulas.
+- **Faithful building blocks.** The sumcheck, Merkle and Ligero pieces and the proof reader and writers are proved against transcriptions of the specification's formulas. The circuit loader is proved to return only well-formed circuits; that it decodes the terms the file encodes is tested against upstream.
 - **Interoperability.** The verifier accepts the proofs the upstream prover makes. The prover reproduces upstream's proofs byte for byte. Both are tested.
 - **Not proved.** Soundness and zero knowledge are properties of the protocol, not of the code. The implementation follows the specification step by step instead. Constant time is a coding discipline, valid only in builds without assertions.
 - **Trusted.** The compiler, GNATprove and its solvers, the specification itself, the operating system's random generator, and the upstream circuit files as to what they compute.
