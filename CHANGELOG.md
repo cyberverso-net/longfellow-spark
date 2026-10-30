@@ -43,6 +43,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Fixed
 
+- `GF2_128.Inject` branched on each bit of its argument. The prover applies it to the subfield coordinates of private inputs, in the subfield check of `Zk_Prover`, so the branch broke the constant-time discipline of ADR 0051. It now selects each basis element with a mask built from the bit, as `Mul` does, and keeps its contract against `Inject_Ref`. A source-level finding: no timing leak was measured. ADR 0051 amended, guide chapter 7, the trust model.
 - The quadratic row of `Ligero_Prover.Commit` is built in its own procedure, `Quad_Fixed_Row`, so that its witness slots are proved zero in a small context: on the proving machine, whose cores are slower than the laptop's, the stepping assertions after `Commit_Row` in `Fixed_Rows` ran out of the 120-second timeout. No contract changed.
 
 ## [0.3.0] - 2026-10-19

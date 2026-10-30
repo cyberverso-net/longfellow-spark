@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-18, at the close of block 6 of Phase C; proposed 2026-10-17 and edited until then)
+Accepted (2026-10-18, at the close of block 6 of Phase C; proposed 2026-10-17 and edited until then). Amended 2026-10-30: the re-injection of the subfield check, `GF2_128.Inject`, branched on each bit of the private coordinates and now selects the basis elements with masks, as the rule above requires.
 
 ## Date
 
