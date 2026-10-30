@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-19, block 1 of Phase D). The performance target was replaced by milestones on 2026-10-21, at the close of block 4, with the author. Amended 2026-10-22 by [ADR 0067](0067-performance-milestones-by-trust.md): M2 is the Gold limit, compared with upstream's generic code, and M3 a tested variant chosen at build time, compared with upstream's hardware figures; the upstream figures quoted below are the `_v1` (LFC1) rows, and the comparable ones are the `_v2` rows, 0.69 s and 3.84 s. Milestone M2 closed 2026-10-29 by [ADR 0078](0078-milestone-m2-closed.md): the Gold limit at 8.13 s against upstream's generic 5.83 s at the same processor target.
+Proposed (2026-10-19, block 1 of Phase D). The performance target was replaced by milestones on 2026-10-21, at the close of block 4, with the author. Amended 2026-10-22 by [ADR 0067](0067-performance-milestones-by-trust.md): M2 is the Gold limit, compared with upstream's generic code, and M3 a tested variant chosen at build time, compared with upstream's hardware figures; the upstream figures quoted below are the `_v1` (LFC1) rows, and the comparable ones are the `_v2` rows, 0.69 s and 3.84 s. Milestone M2 closed 2026-10-29 by [ADR 0078](0078-milestone-m2-closed.md): the Gold limit at 8.13 s against upstream's generic 5.83 s at the same processor target. Amended 2026-10-30 by [ADR 0082](0082-order-after-the-memory-milestone.md): the mDoc layer follows the memory milestone, and Phase D has two releases, 0.4.0 at the close of the memory milestone and 0.5.0 at its own close.
 
 ## Date
 
