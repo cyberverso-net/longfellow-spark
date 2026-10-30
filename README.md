@@ -36,6 +36,8 @@ The repository is meant to be read. [docs/guide/](docs/guide/README.md) has one 
 
 Every non-trivial decision has a record in [docs/adr/](docs/adr/README.md).
 
+How work is planned, proved and accepted is in [the development process](docs/process.md); how to contribute is in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Building and proving
 
 You need [Alire](https://alire.ada.dev) with a GNAT toolchain selected (`alr toolchain --select`). Python 3 is needed only to regenerate the test vectors.

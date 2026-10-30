@@ -1,0 +1,55 @@
+name: Bug
+description: A defect in merged or released behaviour, or a wrong statement in the documentation. Report security vulnerabilities privately.
+title: "Short description of the defect"
+type: Bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If the defect could make the verifier accept an invalid proof, reject a valid one, or reveal anything about a witness, do not report it here. Use [private vulnerability reporting](https://github.com/cyberverso-net/longfellow-spark/security/advisories/new).
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      placeholder: A unit (circuit_reader.adb), a guide chapter (chapter 6) or a record (ADR 0068)
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happens
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen
+    validations:
+      required: true
+  - type: input
+    id: expected-by
+    attributes:
+      label: Expected by
+      description: The specification section, the upstream file or the record that the behaviour or the statement should follow.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: A command, a test vector or an input file; for a wrong statement, the passage.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: macOS arm64, Linux x86-64
+    validations:
+      required: false
