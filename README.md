@@ -1,6 +1,6 @@
 # longfellow-spark
 
-A formally verified reimplementation, in Ada/SPARK, of [Longfellow ZK](https://github.com/longfellow-zk/longfellow-zk), Google's zero-knowledge proof system for identity credentials.
+A formally verified reimplementation, in Ada/SPARK, of [Longfellow ZK](https://github.com/longfellow-zk/longfellow-zk), a zero-knowledge proof system for identity credentials. Longfellow ZK was created at Google, which donated it in September 2026 to the [Post-Quantum Cryptography Alliance](https://pqca.org/), a foundation under Linux Foundation Europe.
 
 It follows **IETF draft-irtf-cfrg-longfellow-00 (22 October 2026)**, the CFRG version of draft-google-cfrg-libzk-03, with the same technical text (ADR 0079). Changes in later drafts are handled as explicit migrations (ADR 0002).
 
