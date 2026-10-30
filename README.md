@@ -70,9 +70,10 @@ scripts/remote-check.sh               # make check on the pushed commit, posts t
 scripts/remote-check.sh --collect     # picks up that run later, if the terminal was closed
 scripts/remote-check.sh --text-only   # only text since the last proved commit: posts prove without the proof
 scripts/remote-check.sh --tree prove  # the working tree as it is, any target, posts nothing
+scripts/remote-check.sh --tree-collect  # picks up a tree run later, if the terminal was closed
 ```
 
-The run on a pushed commit does not depend on the connection: the laptop may sleep. The machine keeps the result, shuts itself down, and the script posts the status when it next reaches it.
+Neither run depends on the connection: the laptop may sleep. The machine keeps the result and shuts itself down; the script reads the result when it next reaches it, and for a pushed commit posts the status. A tree run started while another run holds the machine is refused. Two runs launched at the same moment are not yet kept apart, so running one job at a time is still a rule to follow.
 
 ## Testing
 
