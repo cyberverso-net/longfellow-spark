@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-22, milestone M2 of Phase D). Amended 2026-10-26 by [ADR 0072](0072-predicate-checks-in-the-prover-instances.md): the prover instances of the command line do not check the circuit predicate inside the proved bodies; the circuit is still checked on entry.
+Proposed (2026-10-22, milestone M2 of Phase D). Amended 2026-10-26 by [ADR 0072](0072-predicate-checks-in-the-prover-instances.md): the prover instances of the command line do not check the circuit predicate inside the proved bodies; the circuit is still checked on entry. Amended 2026-10-30: `Pinned_Circuits` (ADR 0074), added to `cli/src/` later, was missing from the list of units that keep their checks and was compiled without them; it is in the list now, and `scripts/check.sh cli` checks the switches every unit was compiled with.
 
 ## Date
 

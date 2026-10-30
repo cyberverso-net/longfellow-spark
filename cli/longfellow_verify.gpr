@@ -37,7 +37,9 @@ project Longfellow_Verify is
    --  proved the default: as o3, with the run-time checks suppressed
    --         in the library units of src/, whose absence of run-time
    --         errors is proved; the units of cli/src/, outside the
-   --         proof, keep them (ADR 0068).
+   --         proof, keep them (ADR 0068). Every source of cli/src/ has
+   --         its line below; scripts/check.sh cli checks the switches
+   --         each unit was actually compiled with.
    Common := ("-gnat2022", "-gnatwa", "-gnatW8",
               "-gnaty3aAbBcefhiIklmnOprStux");
    Fast := Common & ("-O3", "-gnatn");
@@ -59,6 +61,8 @@ project Longfellow_Verify is
             for Switches ("longfellow_verify.adb") use Fast;
             for Switches ("os_random.adb") use Fast;
             for Switches ("os_random.ads") use Fast;
+            for Switches ("pinned_circuits.adb") use Fast;
+            for Switches ("pinned_circuits.ads") use Fast;
             for Switches ("sampling_cli_gf2_128.ads") use Fast;
             for Switches ("sampling_cli_p256.ads") use Fast;
             for Switches ("sumcheck_prover_cli_gf2_128.ads") use Fast;
