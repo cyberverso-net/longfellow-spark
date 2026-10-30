@@ -58,7 +58,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0052](0052-gold-perimeter-for-the-prover.md) | Gold perimeter for the prover | Accepted | 2026-10-17 |
 | [0053](0053-prover-vectors-and-cross-verification.md) | Prover vectors and cross-verification | Accepted | 2026-10-17 |
 | [0054](0054-prove-job-limit-sixty-minutes.md) | Prove job limit raised to sixty minutes and the prover partition split | Accepted, amended by 0060 | 2026-10-19 |
-| [0055](0055-phase-d-scope-mdoc-scale.md) | Phase D scope: the mDoc scale and the proof of age | Proposed, amended by 0067, M2 closed by 0078 | 2026-10-19 |
+| [0055](0055-phase-d-scope-mdoc-scale.md) | Phase D scope: the mDoc scale and the proof of age | Proposed, amended by 0067 and 0082, M2 closed by 0078 | 2026-10-19 |
 | [0056](0056-linear-input-constraint.md) | The input constraint in linear time | Accepted | 2026-10-19 |
 | [0057](0057-additive-fft.md) | The additive FFT for the Reed-Solomon code | Accepted | 2026-10-19 |
 | [0058](0058-mdoc-layer.md) | The mDoc layer: MACs, public inputs, transcript, proof format and witness | Proposed | 2026-10-19 |
@@ -83,4 +83,6 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0077](0077-p256-montgomery-round-as-cios.md) | The Montgomery round of P-256 as upstream's CIOS step | Proposed | 2026-10-28 |
 | [0078](0078-milestone-m2-closed.md) | Milestone M2 closed: the Gold limit at 8.13 seconds | Proposed | 2026-10-29 |
 | [0079](0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md) | The specification migrated to draft-irtf-cfrg-longfellow-00, and upstream's new home | Proposed | 2026-10-29 |
-| [0080](0080-milestone-memory.md) | A memory milestone, before the certification block and M3 | Proposed | 2026-10-29 |
+| [0080](0080-milestone-memory.md) | A memory milestone, before the certification block and M3 | Proposed, amended by 0082 | 2026-10-29 |
+| [0081](0081-audience-certification-evaluators.md) | The audience: evaluators in a certification laboratory | Proposed | 2026-10-30 |
+| [0082](0082-order-after-the-memory-milestone.md) | The order after the memory milestone | Proposed | 2026-10-30 |
