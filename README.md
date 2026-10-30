@@ -152,6 +152,10 @@ Work happens on a branch per stage or block, and reaches `main` through a pull r
 
 Together the two checks certify what `make check` certifies. Neither says anything about constant time, or about fidelity to the specification beyond the vectors.
 
+## About this project
+
+longfellow-spark is a personal project of its author, Paolo De Rosa. It is not affiliated with the author's employer, nor with Google or the Post-Quantum Cryptography Alliance. The views and opinions expressed in it are the author's own and do not represent those of the author's employer.
+
 ## Licence
 
 Apache-2.0.
