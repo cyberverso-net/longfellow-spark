@@ -12,7 +12,7 @@ The [verification approach](verification-approach.md) explains why the line fall
 
 ## In short
 
-- No run-time error is possible anywhere in the SPARK code, for any input. This is the Silver level, and it holds for the whole project.
+- No run-time error is possible in the SPARK code, for any input that meets the preconditions of the units. This is the Silver level, and it holds for the whole project. A failed allocation, code outside SPARK and the probabilistic termination of the samplers stay outside, as listed below.
 - The arithmetic of both fields is proved equal to a simple reference written for clarity. That the reference is the one the specification means is tested.
 - The building blocks of the verifier and the prover are proved against transcriptions of the specification's formulas. That those formulas fit together into a sound protocol is a theorem of the protocol, not something SPARK can prove.
 - The verifier accepts the proofs the upstream prover makes. The prover reproduces upstream's proofs byte for byte. Both facts are tested.
@@ -21,7 +21,7 @@ The [verification approach](verification-approach.md) explains why the line fall
 
 ## What is proved
 
-**Everywhere.** Every SPARK unit is Silver for all inputs: no overflow, no index out of range, no division by zero, no read of an uninitialised value. Units that use the heap also pass SPARK's ownership checks on every allocation. Gold, a proved functional contract, applies only where a package header declares it.
+**Everywhere.** Every SPARK unit is Silver for every input that meets its preconditions: no overflow, no index out of range, no division by zero, no read of an uninitialised value. This is not a claim of availability: a failed allocation is outside the proofs, and an input within the bounds can still ask for much memory and time. Units that use the heap also pass SPARK's ownership checks on every allocation. Gold, a proved functional contract, applies only where a package header declares it.
 
 Many of these contracts are stated at the assertion level `Proof_Only`. GNATprove proves them, but they are never compiled into an executable, so the test harnesses check those units through their vectors.
 
