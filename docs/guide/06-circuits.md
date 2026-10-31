@@ -36,6 +36,8 @@ Update (milestone M2, ADR 0074): on an mDoc hash circuit the canonical form is 3
 
 The production reader accepts what its allocator can hold: 5 000 000 wires, 20 000 000 terms, 10 000 layers. This project's bounds are those of the stage 3 proofs: `Max_Wires` 2^24, `Max_Terms` 2^28, `Max_Layers` 64, `Max_Logw` 40 (as upstream). And the production reader does not check what `Well_Formed` demands: a term may name a wire beyond its layer's width, a width may exceed 2^logw. A circuit that upstream would load and then misuse is refused here, with `Bound_Exceeded` or `Not_Well_Formed`. "Accepts everything upstream accepts" is therefore not a property of this loader, and chapter 6 says so where ADR 0046 decided it; the two upstream circuits, and every circuit a correct compiler produces, lie inside both sets of rules.
 
+`Read_Packed` (Section 3.7) has bounds of its own, because it keeps what `Read` only passes through. Over the whole circuit, the deltas, the segments, the segment entries and the tokens it keeps (those of non-empty segments) are each at most `Max_Terms`, 2^28; beyond, the status is `Bound_Exceeded`. `Read` bounds the terms only, and upstream's reader bounds each layer: at most 20 000 000 deltas, segments and tokens, and 20 000 000 entries a segment (`reader/mod.rs`). So a file that `Read` accepts can be refused by `Read_Packed`, for instance one whose unused segments hold more than 2^28 entries. Such a file is over 256 MB, since an entry takes at least a byte; the mDoc circuits hold 395 248 entries.
+
 ## 2. The algorithms
 
 ### 2.1 Reading an integer
@@ -106,6 +108,44 @@ For the two upstream circuits (`sha256`: 12 layers, 98 993 terms, 6657 inputs, 7
 
 `cli/longfellow_verify.gpr` compiles the library without assertions and with optimisation: run-time checks stay on (the proofs establish they cannot fail), executable contracts do not run. `longfellow_verify` takes the field, the circuit file, the proof file, the label, the Ligero configuration and the public inputs, loads the circuit, verifies the proof under the circuit's identifier and prints the status; exit status 0 on `Ok`, 1 on any other status, 2 on a usage or file error. It is `SPARK_Mode (Off)`: it reads files and writes to the terminal, and everything it calls is the SPARK library. `interop_kat` lives in the same project for the reason of Section 5.3.
 
+### 3.7 The packed form (the memory milestone)
+
+The expanded circuit keeps every term: 32 bytes on GF(2^128), 48 on P-256, so 236.7 MB for the mDoc hash circuit. The file itself is much smaller, because it stores the terms as Section 1.3 describes:
+
+- a dictionary of deltas per layer;
+- segments, runs of dictionary entries;
+- tokens, a sequence of segments.
+
+The terms are the prefix sums of the deltas, met in token order. The memory milestone (ADR 0080) keeps the circuit in that form. Its first block adds the form and its reader, beside `Read`; the verifier and the prover still take the expanded circuit.
+
+**The units.**
+
+- `Packed_Circuits` holds the form: the constants, the deltas, the segments, the tokens and the layers' term ranges.
+- A *walk* reads one layer, one term at a time, and is executable:
+  - `Start (P, J)` is the cursor at the beginning of layer J;
+  - `Step` moves it by one term, adding the delta it stands on;
+  - `Term_Of` is the term at the cursor.
+- The meaning of the form is ghost, at level `Proof_Only`, and is never executed:
+  - `Cursor_At (P, J, K)` is the cursor of layer J after K terms, defined by recursion from `Start` and `Step`;
+  - `Expand (P)` is the expanded circuit, a `Raw_Circuit`, whose term K of layer J is the term at `Cursor_At (P, J, K - 1)`.
+- `Read_Packed` reads a file into the form. It proves on `Expand (P)` what `Read` proves on the circuit it returns: `Well_Formed`, `Isolated`, `Dead_End`, and the identifier, recomputed (`Compute_Id_P`, from walks) or the caller's when pinned.
+
+Every walk in the reader proves, at each step, that its cursor is `Cursor_At` of its position. So what the walk reads is the layer of the expansion, and the checks it makes are checks on `Expand (P)`.
+
+**Lessons of the proof.** The block's checks first failed on the step limit, not on a missing fact. Each fix kept the contracts and changed what the provers see:
+
+- **Recursive definitions hidden.** `Cursor_At` and the token sums are recursive. Visible, they are unfolded at every mention, and the provers drown in the instances. Their bodies are hidden (`Hide_Info`, as in chapter 3), and two small lemmas give one step of the walk.
+- **The walk's state as one opaque fact.** A walk carries `Walked (P, J, K, C)`, a hidden predicate that says "C is the cursor after K terms", rather than an instance of `Cursor_At`. The two marking walks of `Mark_Layer_P` carry their invariants, `Inv_Mark` and `Inv_Seen`, the same way, with one lemma per step of the proof of `Mark_Layer`.
+- **The invariant is a cut.** For the provers, a loop invariant is the point where the loop is cut. Past it they know the invariants and the variables the loop does not modify, and nothing else. In each walk of `Mark_Layer_P` the term index `I` is assigned at the top of the body, before the invariants (`I := First + K - 1`), and changes at every iteration. So past the cut nothing tied `I` to `K`.
+  - Every fact about term `I` of the expansion was out of reach: its index in `E.Terms`, its place in layer J, and the invariant at `I + 1`. That was 15 checks per field.
+  - The provers searched the whole context for a link that was not there. Every successful proof took under 7,500 steps, and every one of the 15 reached the limit of 600,000.
+  - The fix is one line per walk, `pragma Loop_Invariant (I = First + K - 1);`, which carries the link across the cut. The procedure then proves, 76 checks per field.
+  - The lesson: a variable assigned in the loop and used past the invariant must be stated in the invariant, even when its value is obvious from the line above.
+
+**What is tested.** `circuit_kat` repeats every load with `Read_Packed` (Section 5). It requires `Read`'s status and header and, on `Ok`, `Read`'s circuit term for term, read through the walk. `Expand` itself is ghost and does not run, but the proof shows that the walk produces its terms. In the walk's preconditions, the check that every index of the form is in range (`Indices_Ok`) is at level `Proof_Only`: it reads the whole circuit, and running it at every step would make the test of the hash circuit quadratic. The reader runs it once, before any walk.
+
+**Memory.** On the mDoc hash circuit the packed form takes 4.2 MB (4,366,352 bytes), against 236.7 MB expanded: 57 times less. This is the size of the object, measured by `circuit_kat`. Most of it is the 395,248 segment entries and the 243,451 tokens, 4 bytes each, and the 53,106 deltas, 32 bytes each: a delta keeps its three fields as 64-bit integers, where 32 bits would hold them. The design's estimate, about 3 MB, counted 4 bytes a field. Upstream holds both mDoc circuits in about 3 MB (performance page). The peak heap does not fall yet, since the consumers still expand the circuit; the next blocks of the milestone change them.
+
 ## 4. What the proofs guarantee
 
 ### 4.1 For all inputs
@@ -114,6 +154,7 @@ For the two upstream circuits (`sha256`: 12 layers, 98 993 terms, 6657 inputs, 7
 - On `Ok`, the returned circuit satisfies `Well_Formed`, so the verifier's precondition holds, and its identifier is the one the file stored: recomputed by `Read`, equal to the caller's by `Read_Pinned`.
 - `Uleb128.Read` returns the value of the bytes it consumed, one to four of them, and fails exactly when no terminating byte lies within four bytes; `Zigzag` is its definition.
 - The two verifiers with their working sets on the heap: the same contracts as chapter 5, plus the ownership checks.
+- `Read_Packed`, on any byte string, has no run-time error. On `Ok` the packed form is valid, and its expansion `Expand (P)` satisfies `Well_Formed`, `Isolated` and `Dead_End`, with the identifier recomputed or the caller's (Section 3.7). The walk is proved to produce the terms of `Expand (P)`.
 
 What the proofs do not say: that the expansion of deltas, segments and tokens is upstream's, or that `Compute_Id` is upstream's `compute_id`. Both are tested.
 
@@ -133,6 +174,8 @@ GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-p
 
 The `circuits` partition proves in about seven minutes locally with ten provers; with sixteen open verification conditions, before their fixes, the same run took thirty-five, since an unproved check costs each of the three provers its full timeout. Reproduce with `make prove`; the summary is in `obj/development/gnatprove/gnatprove.out`.
 
+At the close of block 1 of the memory milestone, the `circuits` partition holds 3,374 checks on both fields, all proved, in 8 minutes 26 seconds on the proving machine. The most steps used by a proof is 104,860.
+
 ## 5. What is only tested
 
 ### 5.1 Tier 1: the upstream files
@@ -141,7 +184,7 @@ The `circuits` partition proves in about seven minutes locally with ten provers;
 
 ### 5.2 Tier 2: an independent reader and writer
 
-The same generator writes the Appendix B.3 circuits and the Z-assertion circuit of chapter 3 in LFC2, in the two encodings of Section 1.3, with their identifiers; `circuit_kat` loads them and compares every term with the term lists the stage 3 vectors were generated from. Then 28 malformed files, each built from the B.3.3 circuit with one defect and the status it must give (a wrong magic, a wrong field, `ncopies` 2, each bound exceeded, a five-byte integer, a constant index, a delta index and a token out of range, a non-canonical P-256 constant, truncations at each section, a trailing byte, a wrong identifier, a wire outside its layer, a width above 2^logw, a last layer not reading `ninput`, `npublic` above `ninput`, a negative prefix sum); the Python reader returns the same status enumeration and the generator aborts if it disagrees with the intended status. 121 cases, in the assertion-enabled test build, about a second. Each load is repeated with `Read_Pinned` under the stored identifier (ADR 0074): it gives the status of `Read`, except on the wrong identifier, where it loads; a good file under another identifier is refused.
+The same generator writes the Appendix B.3 circuits and the Z-assertion circuit of chapter 3 in LFC2, in the two encodings of Section 1.3 and a third, `sparse`, with tokens of empty segments at the start, between terms and at the end of each layer, with their identifiers; `circuit_kat` loads them and compares every term with the term lists the stage 3 vectors were generated from. Then 28 malformed files, each built from the B.3.3 circuit with one defect and the status it must give (a wrong magic, a wrong field, `ncopies` 2, each bound exceeded, a five-byte integer, a constant index, a delta index and a token out of range, a non-canonical P-256 constant, truncations at each section, a trailing byte, a wrong identifier, a wire outside its layer, a width above 2^logw, a last layer not reading `ninput`, `npublic` above `ninput`, a negative prefix sum); the Python reader returns the same status enumeration and the generator aborts if it disagrees with the intended status. 121 cases, in the assertion-enabled test build, about a second. Each load is repeated with `Read_Pinned` under the stored identifier (ADR 0074): it gives the status of `Read`, except on the wrong identifier, where it loads; a good file under another identifier is refused. Each load is also repeated with `Read_Packed`, unpinned against `Read` and pinned against `Read_Pinned` (Section 3.7); one more file has a layer whose tokens all name an empty segment, so a layer without terms.
 
 ### 5.3 Tier 3: the two upstream proofs end to end
 

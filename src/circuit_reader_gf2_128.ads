@@ -7,6 +7,10 @@ pragma SPARK_Mode (On);
 
 with Circuit_Reader;
 with Sumcheck_Algebra_GF2_128;
+with Packed_Circuits_GF2_128;
 
 package Circuit_Reader_GF2_128 is new Circuit_Reader
-  (SA => Sumcheck_Algebra_GF2_128, Field_Id => 4, Is_Binary => True);
+  (SA        => Sumcheck_Algebra_GF2_128,
+   PC        => Packed_Circuits_GF2_128,
+   Field_Id  => 4,
+   Is_Binary => True);

@@ -21,6 +21,14 @@
 --  type under SPARK's ownership rules; the caller passes C.all to the
 --  verifier and calls Free when done.
 --
+--  Read_Packed (the memory milestone, ADR 0080) reads the same files
+--  into Packed_Circuits, the form the file keeps, without expanding the
+--  terms. Its walks prove, at each step, that they read the layers of
+--  the ghost expansion Expand, so its checks are checks on Expand (P).
+--  It keeps the dictionaries, so it bounds them over the whole circuit:
+--  deltas, segments, segment entries and kept tokens, each at most
+--  Max_Terms, beyond which Bound_Exceeded (guide chapter 6, 1.5).
+--
 --  Documentation: docs/guide/06-circuits.md. Decisions: ADR 0046
 --  (scope, the format, the status), 0047 (the heap), 0048 (vectors);
 --  frame: ADR 0011, 0022.
@@ -32,8 +40,11 @@
 --  Dead_End of upstream's Lean proofs (ADR 0064) and its identifier is
 --  the stored one, recomputed by Read and equal to the caller's by
 --  Read_Pinned (ADR 0074); on any other status no circuit is returned. The
---  expansion of deltas, segments and tokens agrees with upstream by the
---  vectors (ADR 0048), not by proof.
+--  same for Read_Packed on Expand (P): Silver on arbitrary bytes, Gold on
+--  the shape of the expansion and its identifier. The expansion of
+--  deltas, segments and tokens agrees with upstream by the vectors (ADR
+--  0048), not by proof; circuit_kat checks that Read_Packed gives Read's
+--  status, header and terms on every shipped circuit.
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037.
 
@@ -42,10 +53,13 @@ pragma SPARK_Mode (On);
 with Proof_Levels;
 with Bytes;           use Bytes;
 with Sumcheck_Algebra;
+with Packed_Circuits;
 with Circuit_Status;  use Circuit_Status;
 
 generic
    with package SA is new Sumcheck_Algebra (<>);
+   --  The packed form over the same algebra (ADR 0080).
+   with package PC is new Packed_Circuits (SA => SA);
    --  FieldID of lib/proto/circuit_io.h: P-256 is 1, GF(2^128) is 4.
    Field_Id  : Natural;
    --  Binary fields hash the bit width into the identifier, prime
@@ -190,5 +204,55 @@ package Circuit_Reader is
    procedure Free (C : in out Circuit_Access) with
      Global => null,
      Post   => C = null;
+
+   -------------------------------------------------------------------
+   --  The packed reader (the memory milestone, ADR 0080)
+   -------------------------------------------------------------------
+
+   subtype Packed_Circuit is PC.Packed_Circuit;
+
+   type Packed_Access is access Packed_Circuit;
+
+   --  compute_id of the expansion, from a walk of each layer: the same
+   --  words in the same order as Compute_Id. That it is upstream's
+   --  identifier is tested (circuit_kat, interop_kat), as for Compute_Id.
+   function Compute_Id_P
+     (P : Packed_Circuit; Subfield_Boundary : Natural) return Bytes_32
+   with Global => null,
+        Pre    => (Proof_Only => PC.Valid (P));
+
+   --  The loader of the packed form: as Read (Pinned False) or
+   --  Read_Pinned (Pinned True, the identifier Pin), but the circuit is
+   --  kept as the file keeps it. On Ok the packed form is valid and its
+   --  expansion is well formed and satisfies Isolated and Dead_End.
+   procedure Read_Packed
+     (B      : Byte_Array;
+      Pinned : Boolean;
+      Pin    : Bytes_32;
+      P      : out Packed_Access;
+      H      : out Header;
+      St     : out Status)
+   with
+     Global => null,
+     Pre    => B'First = 0,
+     Post   =>
+       (Runtime =>
+          (St = Ok) = (P /= null)
+          and then (if St = Ok then
+                      H.Field_Id = Field_Id
+                      and then (if Pinned then H.Id = Pin
+                                else H.Id = Compute_Id_P
+                                       (P.all, H.Subfield_Boundary))
+                    else H = Null_Header),
+        Proof_Only =>
+          (if St = Ok then
+             PC.Valid (P.all)
+             and then SA.Well_Formed (PC.Expand (P.all))
+             and then Isolated (PC.Expand (P.all))
+             and then Dead_End (PC.Expand (P.all))));
+
+   procedure Free_Packed (P : in out Packed_Access) with
+     Global => null,
+     Post   => P = null;
 
 end Circuit_Reader;
