@@ -11,7 +11,7 @@
 --  contracts on thousands of inputs and take the better part of an
 --  hour on one circuit.
 --
---  Build:  alr exec -- gprbuild -P cli/longfellow_verify.gpr -p
+--  Build:  alr exec -- gprbuild -P cli/longfellow_verify.gpr -p -s
 --  Run:    cli/bin/longfellow_verify --help
 --          cli/bin/longfellow_prove --help
 --          cli/bin/interop_kat [vector files]

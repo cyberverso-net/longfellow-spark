@@ -207,7 +207,7 @@ check_cli_switches() {
 
 do_cli() {
    header "cli: build cli/longfellow_verify.gpr (assertions off)"
-   alr -n exec -- gprbuild -P cli/longfellow_verify.gpr -p
+   alr -n exec -- gprbuild -P cli/longfellow_verify.gpr -p -s
    if [ "${LONGFELLOW_CLI_BUILD:-proved}" = proved ]; then
       check_cli_switches
    fi
