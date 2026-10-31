@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-29, after milestone M2 of Phase D).
+Proposed (2026-10-29, after milestone M2 of Phase D). Amended 2026-10-30 by [ADR 0082](0082-order-after-the-memory-milestone.md): the order after this milestone is the mDoc layer, the guide, the certification block, then M3.
 
 ## Date
 

@@ -1,6 +1,6 @@
 # longfellow-spark
 
-A formally verified reimplementation, in Ada/SPARK, of [Longfellow ZK](https://github.com/longfellow-zk/longfellow-zk), Google's zero-knowledge proof system for identity credentials.
+A formally verified reimplementation, in Ada/SPARK, of [Longfellow ZK](https://github.com/longfellow-zk/longfellow-zk), a zero-knowledge proof system for identity credentials. Longfellow ZK was created at Google, which donated it in September 2026 to the [Post-Quantum Cryptography Alliance](https://pqca.org/), a foundation under Linux Foundation Europe.
 
 It follows **IETF draft-irtf-cfrg-longfellow-00 (22 October 2026)**, the CFRG version of draft-google-cfrg-libzk-03, with the same technical text (ADR 0079). Changes in later drafts are handled as explicit migrations (ADR 0002).
 
@@ -11,7 +11,7 @@ The project is built in phases, each released when complete:
 | A | A complete verifier, from the proof string to a verdict, in five stages: GF(2^128), the P-256 base field, the sumcheck algebra, the Fiat-Shamir transcript, Ligero | 0.1.0 | 10738 |
 | B | A loader for the circuits the upstream compiler produces, and the upstream proofs accepted from their files | 0.2.0 | 11967 |
 | C | The prover, which reproduces the two upstream example proofs byte for byte | 0.3.0 | 16671 |
-| D | The production mDoc circuits at full scale | in progress | |
+| D | The production mDoc circuits at full scale: performance and memory (0.4.0), then the mDoc layer and the proof of age (0.5.0) | in progress | |
 
 In Phase D, milestone M2 closed at a round trip of 8.13 s for the two mDoc proofs and their verifications, with every contract proved; [the performance page](docs/guide/performance.md) gives the steps and the comparison with upstream.
 
@@ -21,9 +21,9 @@ In Phase D, milestone M2 closed at a round trip of 8.13 s for the two mDoc proof
 
 Every claim is either proved, tested or trusted. The full list is in [the trust model](docs/guide/trust-model.md). In short:
 
-- **No run-time errors.** GNATprove shows that no SPARK code can overflow, index out of range or read uninitialised data, for any input. Proofs and circuits come from untrusted parties, so this matters on its own.
+- **No run-time errors.** GNATprove shows that no SPARK code can overflow, index out of range or read uninitialised data, for any input that meets the preconditions of the units. Proofs and circuits come from untrusted parties, so this matters on its own. A failed allocation, code outside SPARK and the probabilistic termination of the samplers stay outside, as the trust model lists.
 - **Correct arithmetic.** Both fields are proved equal to simple reference implementations. Test vectors from outside the project confirm that the references follow the specification.
-- **Faithful building blocks.** The sumcheck, Merkle and Ligero pieces, the proof reader and writers, and the circuit loader are proved against transcriptions of the specification's formulas.
+- **Faithful building blocks.** The sumcheck, Merkle and Ligero pieces and the proof reader and writers are proved against transcriptions of the specification's formulas. The circuit loader is proved to return only well-formed circuits; that it decodes the terms the file encodes is tested against upstream.
 - **Interoperability.** The verifier accepts the proofs the upstream prover makes. The prover reproduces upstream's proofs byte for byte. Both are tested.
 - **Not proved.** Soundness and zero knowledge are properties of the protocol, not of the code. The implementation follows the specification step by step instead. Constant time is a coding discipline, valid only in builds without assertions.
 - **Trusted.** The compiler, GNATprove and its solvers, the specification itself, the operating system's random generator, and the upstream circuit files as to what they compute.
@@ -35,6 +35,8 @@ No check is justified away and no `pragma Assume` is used.
 The repository is meant to be read. [docs/guide/](docs/guide/README.md) has one chapter per stage. Each chapter covers the mathematics, the algorithm and the SPARK code, explained for a reader new to SPARK, then says what is proved, tested and trusted. Start with [the verification approach](docs/guide/verification-approach.md).
 
 Every non-trivial decision has a record in [docs/adr/](docs/adr/README.md).
+
+How work is planned, proved and accepted is in [the development process](docs/process.md); how to contribute is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Building and proving
 
@@ -68,9 +70,10 @@ scripts/remote-check.sh               # make check on the pushed commit, posts t
 scripts/remote-check.sh --collect     # picks up that run later, if the terminal was closed
 scripts/remote-check.sh --text-only   # only text since the last proved commit: posts prove without the proof
 scripts/remote-check.sh --tree prove  # the working tree as it is, any target, posts nothing
+scripts/remote-check.sh --tree-collect  # picks up a tree run later, if the terminal was closed
 ```
 
-The run on a pushed commit does not depend on the connection: the laptop may sleep. The machine keeps the result, shuts itself down, and the script posts the status when it next reaches it.
+Neither run depends on the connection: the laptop may sleep. The machine keeps the result and shuts itself down; the script reads the result when it next reaches it, and for a pushed commit posts the status. A tree run started while another run holds the machine is refused. Two runs launched at the same moment are not yet kept apart, so running one job at a time is still a rule to follow.
 
 ## Testing
 
@@ -88,7 +91,7 @@ Each harness reads its vector files from `tests/vectors/` by default, prints pas
 The release project in `cli/` builds the library as it is meant to run: no assertions, optimised. It holds the command-line verifier and prover, and the interop harness:
 
 ```bash
-alr exec -- gprbuild -P cli/longfellow_verify.gpr -p
+alr exec -- gprbuild -P cli/longfellow_verify.gpr -p -s
 cli/bin/interop_kat
 ```
 
@@ -99,7 +102,7 @@ cli/bin/interop_kat
 It prints a status and exits with 0 when the proof is accepted, 1 when it is refused or the circuit is rejected, and 2 on a usage or file error. The two upstream examples:
 
 ```bash
-alr exec -- gprbuild -P cli/longfellow_verify.gpr -p
+alr exec -- gprbuild -P cli/longfellow_verify.gpr -p -s
 cli/bin/longfellow_verify --field gf2_128 \
    --circuit tests/vectors/upstream/circuits/sha256_circuit.lfc2 \
    --proof tests/vectors/upstream/circuits/sha256_proof.bin \
@@ -151,6 +154,10 @@ Two checks guard `main`, both with the toolchain pinned in `alire.toml`: `gnat_n
 Work happens on a branch per stage or block, and reaches `main` through a pull request once both checks are green (ADR 0062). A red check is fixed with a new commit on the branch. Before a release, or after a toolchain change, the check is run on `main` as well.
 
 Together the two checks certify what `make check` certifies. Neither says anything about constant time, or about fidelity to the specification beyond the vectors.
+
+## About this project
+
+longfellow-spark is a personal project of its author, Paolo De Rosa. It is not affiliated with the author's employer, nor with Google or the Post-Quantum Cryptography Alliance. The views and opinions expressed in it are the author's own and do not represent those of the author's employer.
 
 ## Licence
 

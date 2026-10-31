@@ -1,6 +1,8 @@
 # Guide
 
-This guide explains the project to a reader who knows some cryptography and little or no SPARK. Each stage of the implementation has a chapter with the same shape: the mathematics, then the algorithm, then the Ada/SPARK implementation (types, contracts, ghost code, loop invariants, explained for a reader new to SPARK), then an honest account of what the proofs guarantee for all inputs, what is only tested, what remains trusted, with the verification condition table and the commands to reproduce it.
+This guide is meant for evaluators in a certification laboratory, and for anyone who wants to understand how the system works, with no expertise in cryptography or SPARK assumed (ADR 0081). The chapters are not there yet: they were written for a reader who knows some cryptography, and a milestone of their own will revise them, with a primer and a glossary.
+
+Each stage of the implementation has a chapter with the same shape: the mathematics, then the algorithm, then the Ada/SPARK implementation (types, contracts, ghost code, loop invariants, explained for a reader new to SPARK), then an honest account of what the proofs guarantee for all inputs, what is only tested, what remains trusted, with the verification condition table and the commands to reproduce it.
 
 ## Reading order
 

@@ -1,0 +1,75 @@
+name: Block
+description: One increment that is designed, proved, measured, documented and reviewed on its own.
+title: "Short imperative title"
+type: Story
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Blocks follow the [development process](https://github.com/cyberverso-net/longfellow-spark/blob/main/docs/process.md). A block is ready when every required field below is complete.
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: One or two sentences. For work that serves a reader, "As an evaluator, I want … so that …".
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: The record that governs the block, the guide chapter, the specification sections and the upstream files it follows.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Numbered, each one checkable.
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: true
+  - type: textarea
+    id: proof
+    attributes:
+      label: Proof obligations
+      description: The units and contracts added or changed, with the assurance level of each (Gold, Silver, tested, trusted).
+    validations:
+      required: true
+  - type: textarea
+    id: measurements
+    attributes:
+      label: Measurements
+      description: What is measured, against which criterion, on the proving machine in one session with upstream's bench. "None" if the block changes no time or memory.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests and vectors
+      description: Harness cases, known-answer vectors, interop checks, negative cases.
+    validations:
+      required: true
+  - type: textarea
+    id: documentation
+    attributes:
+      label: Documentation
+      description: The chapter, the records, the package headers, the trust model, the changelog entry.
+    validations:
+      required: true
+  - type: textarea
+    id: decisions
+    attributes:
+      label: Decisions needed before the work
+      description: A contract to weaken, an assurance level to change, a prover setting to change. "None" otherwise.
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What this block deliberately does not cover.
+    validations:
+      required: false

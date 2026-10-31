@@ -26,8 +26,16 @@
 #
 #  scripts/remote-check.sh --tree [make target...]
 #     Copies the working tree as it is, committed or not, and runs the
-#     make target (default check) there, attached: the laptop must stay
-#     awake. Posts nothing: it is for a result before a push.
+#     make target (default check) there. Posts nothing: it is for a
+#     result before a push. The run is detached on the VM, as in the
+#     commit mode: the laptop may sleep or lose the network, the VM
+#     keeps the log and powers itself off when done, and this script
+#     checks once a minute, fetches the log and stops the VM.
+#
+#  scripts/remote-check.sh --tree-collect [run]
+#     Picks up a tree run whose script did not stay to the end: the
+#     latest, or the one named (tree-<date>-<time>-<pid>, printed at the
+#     start of the run).
 #
 #  One run at a time: a run started while another is in progress on the
 #  VM is refused. The VM is stopped at the end unless REMOTE_CHECK_KEEP
@@ -107,6 +115,16 @@ vm_stop() {
    fi
 }
 
+#  The shell test, run on the VM, that a run of either mode holds it:
+#  a tree run reserved the VM in the last 30 minutes and has not started
+#  yet (~/runs/tree.reserved, made while its tree is copied); or
+#  ~/runs/current is set, by a run that is starting (written in the last
+#  30 minutes) or whose make is alive (make check for a commit, the
+#  process in ~/runs/tree.pid for a tree run, on the same boot). Each
+#  run removes ~/runs/current when it ends; one left by a lost run
+#  expires.
+BUSY='{ [ -n "$(find ~/runs -maxdepth 1 -name tree.reserved -mmin -30 2> /dev/null)" ] || { [ -e ~/runs/current ] && { [ -n "$(find ~/runs -maxdepth 1 -name current -mmin -30 2> /dev/null)" ] || pgrep -f "[m]ake check" > /dev/null || { [ -e ~/runs/tree.pid ] && read -r p b < ~/runs/tree.pid && [ "$b" = "$(cat /proc/sys/kernel/random/boot_id)" ] && kill -0 "$p" 2> /dev/null; }; }; }; }'
+
 USER_NAME=""
 need_user() {
    USER_NAME="$(gcloud compute os-login describe-profile --project "$PROJECT" \
@@ -145,6 +163,7 @@ collect() {
             running|unreachable) ;;
             lost)
                fetch_log
+               remote "if [ \"\$(cat ~/runs/current 2> /dev/null)\" = $SHA ]; then rm -f ~/runs/current; fi" 2> /dev/null || true
                post_status error "make check of this commit was lost on $VM; run remote-check.sh again"
                vm_stop
                exit 1 ;;
@@ -175,8 +194,9 @@ case "${1:-}" in
    --text-only) MODE=text ;;
    --collect)   MODE=collect; shift ;;
    --tree)      MODE=tree; shift ;;
+   --tree-collect) MODE=tree-collect; shift ;;
    "")          ;;
-   *)           echo "usage: scripts/remote-check.sh [--text-only | --collect [commit] | --tree [target...]]" >&2
+   *)           echo "usage: scripts/remote-check.sh [--text-only | --collect [commit] | --tree [target...] | --tree-collect [run]]" >&2
                 exit 2 ;;
 esac
 
@@ -236,11 +256,11 @@ if [ "$MODE" = commit ]; then
    #  but the one of make itself matches the pattern [m]ake check.
    if [ -n "${REMOTE_CHECK_KEEP:-}" ]; then OFF=true; else OFF='echo $$ > ~/runs/off.pid; sleep 300 && sudo poweroff'; fi
    launched="$(remote "mkdir -p ~/runs
-      if [ -e ~/runs/current ] && pgrep -f '[m]ake check' > /dev/null; then echo busy \$(cat ~/runs/current); exit 0; fi
+      if $BUSY; then echo busy \$(cat ~/runs/current); exit 0; fi
       if [ -e ~/runs/off.pid ]; then kill \$(cat ~/runs/off.pid) 2> /dev/null; rm -f ~/runs/off.pid; fi
       echo $SHA > ~/runs/current
       rm -f ~/runs/$SHA.done ~/runs/$SHA.log
-      cd ~/longfellow-spark && git fetch -q origin && git checkout -q --detach $SHA && git clean -q -fd || { echo fetch-failed; exit 0; }
+      cd ~/longfellow-spark && git fetch -q origin && git checkout -q --detach $SHA && git clean -q -fd || { rm -f ~/runs/current; echo fetch-failed; exit 0; }
       nohup setsid bash -c 'start=\$(date +%s); (time make \"chec\"k) > ~/runs/$SHA.log 2>&1; code=\$?; echo \"\$code \$(( (\$(date +%s) - start + 59) / 60 ))\" > ~/runs/$SHA.done; rm -f ~/runs/current; $OFF' > /dev/null 2>&1 < /dev/null &
       echo started" 2> /dev/null || echo unreachable)"
    case "$launched" in
@@ -257,22 +277,157 @@ if [ "$MODE" = commit ]; then
    collect
 fi
 
-#  --tree: attached, posts nothing.
+#  Every tree run has its own identifier, $RUN: its log, result and
+#  targets are ~/runs/$RUN.log, .done and .targets on the VM, so that a
+#  collector reads its own run and no later one. ~/runs/tree.last names
+#  the latest run for --tree-collect.
+
+#  The log of the tree run, with retries; false if it cannot be read.
+fetch_tree_log() {
+   local i
+   for i in 1 2 3 4 5; do
+      remote "cat ~/runs/$RUN.log" > remote-check.log 2> /dev/null && return 0
+      sleep 20
+   done
+   echo "remote-check: could not read the log of $RUN from $VM" >&2
+   return 1
+}
+
+#  Stop the VM unless another run holds it: collecting an old result
+#  must not stop someone else's run.
+stop_if_idle() {
+   local held
+   held="$(remote "if $BUSY; then echo busy; fi" 2> /dev/null || echo unreachable)"
+   if [ -z "$held" ]; then
+      vm_stop
+   else
+      echo "remote-check: $VM is ${held}; not stopped"
+   fi
+}
+
+#  Wait for the detached tree run $RUN, fetch its log and report. Every
+#  failure to reach the VM is retried, as in collect.
+collect_tree() {
+   echo "remote-check: waiting for the tree run $RUN (checked every $POLL s)"
+   local state result logged targets
+   while true; do
+      state="$(vm_status)"
+      if [ "$state" = "TERMINATED" ]; then
+         vm_start
+      fi
+      if [ "$state" = "RUNNING" ] || [ "$state" = "TERMINATED" ]; then
+         result="$(remote "if [ -e ~/runs/$RUN.done ]; then cat ~/runs/$RUN.done;
+                           elif [ \"\$(cat ~/runs/current 2> /dev/null)\" = $RUN ] && read -r p b < ~/runs/tree.pid && [ \"\$b\" = \"\$(cat /proc/sys/kernel/random/boot_id)\" ] && kill -0 \$p 2> /dev/null; then echo running;
+                           elif [ -n \"\$(find ~/runs/tree.reserved -maxdepth 1 -name $RUN -mmin -30 2> /dev/null)\" ]; then echo running;
+                           elif [ -e ~/runs/$RUN.done ]; then cat ~/runs/$RUN.done;
+                           else echo lost; fi" 2> /dev/null || echo unreachable)"
+         case "$result" in
+            running|unreachable) ;;
+            lost)
+               fetch_tree_log || true
+               #  Its own markers only: another run's stay.
+               remote "if [ \"\$(cat ~/runs/current 2> /dev/null)\" = $RUN ]; then rm -f ~/runs/current ~/runs/tree.pid; fi
+                       if [ -e ~/runs/tree.reserved/$RUN ]; then rm -rf ~/runs/tree.reserved; fi" 2> /dev/null || true
+               stop_if_idle
+               echo "remote-check: the tree run $RUN was lost on $VM (remote-check.log)" >&2
+               exit 1 ;;
+            [0-9]*\ [0-9]*)
+               logged=yes
+               fetch_tree_log || logged=no
+               targets="$(remote "cat ~/runs/$RUN.targets 2> /dev/null" || true)"
+               stop_if_idle
+               if [ "$logged" = no ]; then
+                  echo "remote-check: make $targets ended with status ${result%% *}, log not read" >&2
+                  exit 1
+               fi
+               if [ "${result%% *}" = 0 ]; then
+                  echo "remote-check: make $targets passed in ${result##* } min (remote-check.log)"
+                  exit 0
+               fi
+               echo "remote-check: make $targets FAILED after ${result##* } min (remote-check.log)" >&2
+               exit 1 ;;
+            *) ;;
+         esac
+      fi
+      sleep "$POLL"
+   done
+}
+
+if [ "$MODE" = tree-collect ]; then
+   vm_start
+   RUN="${1:-$(remote 'cat ~/runs/tree.last 2> /dev/null' || true)}"
+   if [ -z "$RUN" ]; then
+      echo "remote-check: no tree run to collect on $VM" >&2
+      stop_if_idle
+      exit 1
+   fi
+   collect_tree
+fi
+
+#  --tree: the working tree copied, make detached, posts nothing.
+RUN="tree-$(date +%Y%m%d-%H%M%S)-$$"
 vm_start
-remote "mkdir -p ~/remote-check"
+remote "mkdir -p ~/remote-check ~/runs"
+#  Reserve the VM before the copy: mkdir is atomic, and the reservation
+#  counts as busy for both modes until the run starts. A pending
+#  poweroff of an earlier run is cancelled here, before the copy, and
+#  markers left by a lost run (BUSY is false, so they are stale) go.
+reserved="$(remote "if $BUSY; then echo busy \$(cat ~/runs/current 2> /dev/null); exit 0; fi
+   find ~/runs -maxdepth 1 -name tree.reserved -mmin +30 -exec rm -rf {} +
+   if mkdir ~/runs/tree.reserved 2> /dev/null; then
+      touch ~/runs/tree.reserved/$RUN
+      rm -f ~/runs/current ~/runs/tree.pid
+      if [ -e ~/runs/off.pid ]; then kill \$(cat ~/runs/off.pid) 2> /dev/null; rm -f ~/runs/off.pid; fi
+      echo reserved
+   else echo busy; fi" 2> /dev/null || echo unreachable)"
+case "$reserved" in
+   reserved|busy*) ;;
+   *) reserved=unreachable ;;
+esac
+if [ "$reserved" = unreachable ]; then
+   #  The reservation may have been made: release it if it is this
+   #  run's, and stop the VM if nothing else holds it.
+   remote "if [ -e ~/runs/tree.reserved/$RUN ]; then rm -rf ~/runs/tree.reserved; fi" 2> /dev/null || true
+   stop_if_idle
+   echo "remote-check: no answer from $VM while reserving it; if it is still running, stop it with gcloud compute instances stop $VM" >&2
+   exit 1
+fi
+if [ "$reserved" != reserved ]; then
+   echo "remote-check: $VM is not free (${reserved}); wait for it" >&2
+   exit 2
+fi
+#  Until the run starts, any exit releases the reservation and stops
+#  the VM if nothing else holds it.
+trap 'remote "if [ -e ~/runs/tree.reserved/$RUN ]; then rm -rf ~/runs/tree.reserved; fi" 2> /dev/null || true; stop_if_idle' EXIT
 echo "remote-check: copying the working tree"
 rsync -az --delete --exclude .git --exclude remote-check.log \
    --filter=':- .gitignore' -e "$SSH_STRING" ./ "$USER_NAME@$VM:remote-check/"
 TARGETS="${*:-check}"
-echo "remote-check: make $TARGETS on $VM"
-set +e
-remote "cd ~/remote-check && (time make $TARGETS) > ~/remote-check.log 2>&1; echo \"exit \$?\" >> ~/remote-check.log; tail -3 ~/remote-check.log"
-remote 'cat ~/remote-check.log' > remote-check.log
-set -e
-vm_stop
-if grep -q "^exit 0" remote-check.log; then
-   echo "remote-check: make $TARGETS passed (remote-check.log)"
-else
-   echo "remote-check: make $TARGETS FAILED (remote-check.log)" >&2
-   exit 1
-fi
+echo "remote-check: make $TARGETS on $VM, detached, as $RUN"
+if [ -n "${REMOTE_CHECK_KEEP:-}" ]; then OFF=true; else OFF='echo $$ > ~/runs/off.pid; sleep 300 && sudo poweroff'; fi
+#  The targets travel on stdin, so that their quoting reaches the VM's
+#  shell as typed; the worker evaluates them as the attached mode did.
+printf '%s\n' "$TARGETS" | remote "cat > ~/runs/$RUN.targets"
+#  The reservation must still be this run's and unexpired, and no run of
+#  the other mode may have started meanwhile.
+launched="$(remote "{ [ -n \"\$(find ~/runs/tree.reserved -maxdepth 1 -name $RUN -mmin -30 2> /dev/null)\" ] && [ ! -e ~/runs/current ]; } || { echo reservation-lost; exit 0; }
+   echo $RUN > ~/runs/current
+   echo $RUN > ~/runs/tree.last
+   cd ~/remote-check
+   nohup setsid bash -c 'echo \$\$ \$(cat /proc/sys/kernel/random/boot_id) > ~/runs/tree.pid; rm -rf ~/runs/tree.reserved; start=\$(date +%s); (time eval \"make \$(cat ~/runs/$RUN.targets)\") > ~/runs/$RUN.log 2>&1; code=\$?; echo \"exit \$code\" >> ~/runs/$RUN.log; echo \"\$code \$(( (\$(date +%s) - start + 59) / 60 ))\" > ~/runs/$RUN.done; rm -f ~/runs/current ~/runs/tree.pid; $OFF' > /dev/null 2>&1 < /dev/null &
+   echo started" 2> /dev/null || echo unreachable)"
+case "$launched" in
+   started)
+      trap - EXIT ;;
+   *started*|unreachable)
+      #  The answer was lost, not necessarily the run: read the state.
+      trap - EXIT
+      echo "remote-check: no answer from the launch; reading the state of $VM" >&2 ;;
+   *)
+      echo "remote-check: could not start the tree run on $VM: ${launched:-no answer}" >&2
+      remote "if [ -e ~/runs/tree.reserved/$RUN ]; then rm -rf ~/runs/tree.reserved; fi" 2> /dev/null || true
+      trap - EXIT
+      stop_if_idle
+      exit 1 ;;
+esac
+collect_tree
