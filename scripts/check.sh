@@ -172,9 +172,45 @@ do_test() {
 #  end and refuses the altered copies; the verifier accepts the same
 #  two proofs with exit status 0, refuses with 1 under a wrong label and
 #  reports a usage error with 2.
+#  In the build "proved" the run-time checks are suppressed (-gnatp) in
+#  the library units of src/ only (ADR 0068). The switches each unit was
+#  compiled with are read from its ALI file (lines "A"), so the check
+#  covers what the compiler did, not the list in the project file.
+check_cli_switches() {
+   local obj=cli/obj/proved status=0 f u ali
+   header "cli: run-time checks on in cli/src/, suppressed in src/ only"
+   for f in cli/src/*.ad[sb]; do
+      u=$(basename "${f%.*}")
+      ali=$obj/$u.ali
+      if [ ! -f "$ali" ]; then
+         echo "cli: $f was not compiled ($ali missing)" >&2
+         status=1
+      elif grep -q -x -e 'A -gnatp' "$ali"; then
+         echo "cli: $f compiled with -gnatp" >&2
+         status=1
+      fi
+   done
+   #  Specs and bodies: an instance declared by a spec alone, such as
+   #  zk_verifier_p256.ads, holds executable code too. One ALI per unit.
+   for u in $(for f in src/*.ad[sb]; do basename "${f%.*}"; done | sort -u); do
+      ali=$obj/$u.ali
+      if [ -f "$ali" ] && ! grep -q -x -e 'A -gnatp' "$ali"; then
+         echo "cli: unit $u of src/ compiled with run-time checks" >&2
+         status=1
+      fi
+   done
+   if [ "$status" -ne 0 ]; then
+      exit "$status"
+   fi
+   echo "cli: checks on in every unit of cli/src/, off in the units of src/"
+}
+
 do_cli() {
    header "cli: build cli/longfellow_verify.gpr (assertions off)"
-   alr -n exec -- gprbuild -P cli/longfellow_verify.gpr -p
+   alr -n exec -- gprbuild -P cli/longfellow_verify.gpr -p -s
+   if [ "${LONGFELLOW_CLI_BUILD:-proved}" = proved ]; then
+      check_cli_switches
+   fi
    local c=tests/vectors/upstream/circuits status
    header "cli: interop_kat, the upstream proofs end to end"
    cli/bin/interop_kat
