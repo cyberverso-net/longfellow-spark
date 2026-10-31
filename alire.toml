@@ -8,6 +8,15 @@ licenses = "Apache-2.0"
 website = ""
 tags = []
 
+#  The toolchain, in one place: the compiler and the builder beside the
+#  prover, so that alr selects them on any machine, and the workflow
+#  reads its versions from here.
+[[depends-on]]
+gnat_native = "=16.1.0"
+
+[[depends-on]]
+gprbuild = "=26.0.1"
+
 [[depends-on]]
 gnatprove = "=16.1.0"
 

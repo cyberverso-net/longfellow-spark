@@ -40,7 +40,7 @@ How work is planned, proved and accepted is in [the development process](docs/pr
 
 ## Building and proving
 
-You need [Alire](https://alire.ada.dev) with a GNAT toolchain selected (`alr toolchain --select`). Python 3 is needed only to regenerate the test vectors.
+You need [Alire](https://alire.ada.dev). The compiler, the builder and the prover are dependencies of the crate, at the versions pinned in `alire.toml`, so the first `alr build` fetches them. Python 3 is needed only to regenerate the test vectors.
 
 ```bash
 alr build                                    # the library
@@ -146,7 +146,13 @@ At Phase C each took about six seconds on the author's laptop; Phase D has made 
 
 [![verify](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/verify.yml/badge.svg)](https://github.com/cyberverso-net/longfellow-spark/actions/workflows/verify.yml)
 
-Two checks guard `main`, both with the toolchain pinned in `alire.toml`: `gnat_native 16.1.0`, `gprbuild 26.0.1` and `gnatprove 16.1.0`.
+Two checks guard `main`, both with the toolchain pinned in `alire.toml`: `gnat_native 16.1.0`, `gprbuild 26.0.1` and `gnatprove 16.1.0`. The workflow reads the versions from that file, and its actions are pinned by commit hash (Dependabot proposes the updates).
+
+To reproduce the environment on another machine:
+
+1. Install Alire.
+2. Clone the repository and run `alr build`: Alire fetches the pinned compiler, builder and prover.
+3. Check the versions with `alr exec -- gnat --version` and `alr exec -- gnatprove --version`.
 
 - **`verify`** is a workflow. It runs on every push and pull request, on a hosted Ubuntu runner, and covers everything in `make check` except the proof.
 - **`prove`** is a commit status. `scripts/remote-check.sh` posts it after running `make check` on the proving machine for that exact commit. Branches that change only text get it with `--text-only`, without running the proof.
