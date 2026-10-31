@@ -4,7 +4,7 @@
 --  (runs of dictionary entries) and a sequence of tokens (segments), and
 --  the terms are the prefix sums of the deltas met in token order, from
 --  zero at the start of each layer. On the mDoc hash circuit this form
---  takes about 3 MB where the expanded terms take 237 MB.
+--  takes 4.2 MB where the expanded terms take 236.7 MB (circuit_kat).
 --
 --  The model is the expanded circuit of Sumcheck_Algebra, Raw_Circuit:
 --  Expand gives it, at level Proof_Only, from one recursive ghost
@@ -19,6 +19,12 @@
 --  tokens index the segments), so a token is never skipped. The running sums are 64-bit integers: K steps of deltas below
 --  2^27 stay below 2^56, so they cannot wrap; that every term's wires are
 --  in range is a fact the reader checks and Valid states.
+--
+--  Indices_Ok is executable, and the reader checks it once. In the
+--  preconditions of the walk it is at level Proof_Only: it reads every
+--  delta, entry and token, and an assertion-enabled build that ran it at
+--  every step would take time quadratic in the circuit. The provers still
+--  require it at every call; the rest of each precondition still runs.
 --
 --  Proof status: Gold for the walk against Cursor_At (absence of
 --  run-time errors and the Posts below). Nothing here relates the packed
@@ -181,13 +187,14 @@ package Packed_Circuits is
    function On_Delta (P : Packed_Circuit; C : Cursor) return Boolean is
      (C.Tok <= P.NK and then C.Off < P.Seg_Len (P.Tokens (C.Tok)))
    with Global => null,
-        Pre    => Indices_Ok (P);
+        Pre    => (Proof_Only => Indices_Ok (P));
 
    --  The delta at the cursor.
    function Delta_At (P : Packed_Circuit; C : Cursor) return Packed_Delta is
      (P.Deltas (P.Entries (P.Seg_Start (P.Tokens (C.Tok)) + C.Off)))
    with Global => null,
-        Pre    => Indices_Ok (P) and then On_Delta (P, C);
+        Pre    => (Proof_Only => Indices_Ok (P),
+                   Runtime    => On_Delta (P, C));
 
    --  The cursor after one term.
    function Step (P : Packed_Circuit; C : Cursor) return Cursor is
@@ -199,10 +206,11 @@ package Packed_Circuits is
        H0  => C.H0 + Delta_At (P, C).DH0,
        H1  => C.H1 + Delta_At (P, C).DH1))
    with Global => null,
-        Pre    => Indices_Ok (P) and then On_Delta (P, C)
-                  and then abs C.G <= Max_Run - 2**27
-                  and then abs C.H0 <= Max_Run - 2**27
-                  and then abs C.H1 <= Max_Run - 2**27;
+        Pre    => (Proof_Only => Indices_Ok (P),
+                   Runtime    => On_Delta (P, C)
+                                 and then abs C.G <= Max_Run - 2**27
+                                 and then abs C.H0 <= Max_Run - 2**27
+                                 and then abs C.H1 <= Max_Run - 2**27);
 
    --  The cursor of layer J after K terms. Recursive, hence hidden (see
    --  Bytes.Add_Zeros): its Post is what callers see, and Lemma_Step
@@ -289,12 +297,15 @@ package Packed_Circuits is
        H0 => Natural (C.H0 + Delta_At (P, C).DH0),
        H1 => Natural (C.H1 + Delta_At (P, C).DH1)))
    with Global => null,
-        Pre    => Indices_Ok (P) and then On_Delta (P, C)
-                  and then C.G + Delta_At (P, C).DG in 0 .. SA.Max_Wires - 1
-                  and then C.H0 + Delta_At (P, C).DH0
-                             in 0 .. SA.Max_Wires - 1
-                  and then C.H1 + Delta_At (P, C).DH1
-                             in 0 .. SA.Max_Wires - 1;
+        Pre    => (Proof_Only => Indices_Ok (P),
+                   Runtime    =>
+                     On_Delta (P, C)
+                     and then C.G + Delta_At (P, C).DG
+                                in 0 .. SA.Max_Wires - 1
+                     and then C.H0 + Delta_At (P, C).DH0
+                                in 0 .. SA.Max_Wires - 1
+                     and then C.H1 + Delta_At (P, C).DH1
+                                in 0 .. SA.Max_Wires - 1);
 
    --  Term K of layer J, K from 1: the constant of the delta at the
    --  cursor after K - 1 terms, the wires of the cursor after K. The body

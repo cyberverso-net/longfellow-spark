@@ -61,6 +61,7 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 - `Uleb128.Read` returns the value of the one to four bytes it consumed.
 - `Circuit_Reader.Read` returns, on `Ok`, a circuit that satisfies `Well_Formed` and whose identifier is the stored one, recomputed. Otherwise it returns null.
 - `Circuit_Reader.Read_Pinned` proves the same, except that the identifier is the one the caller gives, not recomputed (ADR 0074).
+- `Circuit_Reader.Read_Packed` keeps the circuit in the form of the file, without expanding the terms (ADR 0080). It proves the same on the ghost expansion `Expand (P)`: `Well_Formed`, `Isolated`, `Dead_End` and the identifier. Its walks are proved to read the layers of `Expand (P)`. The verifier and the prover do not use it yet.
 
 **The prover** (chapter 7).
 
@@ -111,6 +112,7 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 
 - The LFC2 format is checked against an independent Python reader and writer, and against the two upstream circuit files. The identifier the generator computes must equal the one each upstream file stores.
 - The Appendix B.3 circuits, written in LFC2 in two encodings, load term for term. Twenty-eight malformed files are refused with their status.
+- Every circuit load is repeated with `Read_Packed`. It gives `Read`'s status and header, malformed files included, and on `Ok` its walk gives `Read`'s terms, on every shipped circuit, the mDoc circuits included.
 - The two proofs the upstream prover made, for `sha256` on GF(2^128) and `ecdsa2` on P-256, are accepted from their files. Changing one byte of the root, the sumcheck part or the Ligero part makes them fail with `Merkle_Failed`. This runs in the release build (`interop_kat`).
 
 **The prover.**

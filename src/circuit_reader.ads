@@ -21,6 +21,11 @@
 --  type under SPARK's ownership rules; the caller passes C.all to the
 --  verifier and calls Free when done.
 --
+--  Read_Packed (the memory milestone, ADR 0080) reads the same files
+--  into Packed_Circuits, the form the file keeps, without expanding the
+--  terms. Its walks prove, at each step, that they read the layers of
+--  the ghost expansion Expand, so its checks are checks on Expand (P).
+--
 --  Documentation: docs/guide/06-circuits.md. Decisions: ADR 0046
 --  (scope, the format, the status), 0047 (the heap), 0048 (vectors);
 --  frame: ADR 0011, 0022.
@@ -32,8 +37,11 @@
 --  Dead_End of upstream's Lean proofs (ADR 0064) and its identifier is
 --  the stored one, recomputed by Read and equal to the caller's by
 --  Read_Pinned (ADR 0074); on any other status no circuit is returned. The
---  expansion of deltas, segments and tokens agrees with upstream by the
---  vectors (ADR 0048), not by proof.
+--  same for Read_Packed on Expand (P): Silver on arbitrary bytes, Gold on
+--  the shape of the expansion and its identifier. The expansion of
+--  deltas, segments and tokens agrees with upstream by the vectors (ADR
+--  0048), not by proof; circuit_kat checks that Read_Packed gives Read's
+--  status, header and terms on every shipped circuit.
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037.
 
