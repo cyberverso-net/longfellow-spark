@@ -1113,13 +1113,142 @@ package body GF2_128 is
    end From_Bytes;
 
 
+   --  Bit I of X by a shift, as Inject reads it, is bit I by division,
+   --  as Inject_Ref states it. One case per I, each with its constants:
+   --  the provers do not evaluate 2 ** I for a variable I, and from 2 ** 11
+   --  they need the powers one doubling at a time.
+   procedure Lemma_Bit (X : Subfield_Value; I : Basis_Index) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Post   => (Shift_Right (Unsigned_64 (X), I) and 1)
+               = Unsigned_64 ((X / 2 ** I) mod 2)
+   is
+   begin
+      case I is
+         when 0 =>
+            pragma Assert (2 ** I = 1);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 0) and 1)
+               = Unsigned_64 ((X / 1) mod 2));
+         when 1 =>
+            pragma Assert (2 ** I = 2);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 1) and 1)
+               = Unsigned_64 ((X / 2) mod 2));
+         when 2 =>
+            pragma Assert (2 ** I = 4);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 2) and 1)
+               = Unsigned_64 ((X / 4) mod 2));
+         when 3 =>
+            pragma Assert (2 ** I = 8);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 3) and 1)
+               = Unsigned_64 ((X / 8) mod 2));
+         when 4 =>
+            pragma Assert (2 ** I = 16);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 4) and 1)
+               = Unsigned_64 ((X / 16) mod 2));
+         when 5 =>
+            pragma Assert (2 ** I = 32);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 5) and 1)
+               = Unsigned_64 ((X / 32) mod 2));
+         when 6 =>
+            pragma Assert (2 ** I = 64);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 6) and 1)
+               = Unsigned_64 ((X / 64) mod 2));
+         when 7 =>
+            pragma Assert (2 ** I = 128);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 7) and 1)
+               = Unsigned_64 ((X / 128) mod 2));
+         when 8 =>
+            pragma Assert (2 ** I = 256);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 8) and 1)
+               = Unsigned_64 ((X / 256) mod 2));
+         when 9 =>
+            pragma Assert (2 ** I = 512);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 9) and 1)
+               = Unsigned_64 ((X / 512) mod 2));
+         when 10 =>
+            pragma Assert (2 ** I = 1024);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 10) and 1)
+               = Unsigned_64 ((X / 1024) mod 2));
+         when 11 =>
+            pragma Assert (2 ** (I - 1) = 1024);
+            pragma Assert (2 ** I = 2048);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 11) and 1)
+               = Unsigned_64 ((X / 2048) mod 2));
+         when 12 =>
+            pragma Assert (2 ** (I - 2) = 1024);
+            pragma Assert (2 ** (I - 1) = 2048);
+            pragma Assert (2 ** I = 4096);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 12) and 1)
+               = Unsigned_64 ((X / 4096) mod 2));
+         when 13 =>
+            pragma Assert (2 ** (I - 3) = 1024);
+            pragma Assert (2 ** (I - 2) = 2048);
+            pragma Assert (2 ** (I - 1) = 4096);
+            pragma Assert (2 ** I = 8192);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 13) and 1)
+               = Unsigned_64 ((X / 8192) mod 2));
+         when 14 =>
+            pragma Assert (2 ** (I - 4) = 1024);
+            pragma Assert (2 ** (I - 3) = 2048);
+            pragma Assert (2 ** (I - 2) = 4096);
+            pragma Assert (2 ** (I - 1) = 8192);
+            pragma Assert (2 ** I = 16384);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 14) and 1)
+               = Unsigned_64 ((X / 16384) mod 2));
+         when 15 =>
+            pragma Assert (2 ** (I - 15) = 1);
+            pragma Assert (2 ** (I - 14) = 2);
+            pragma Assert (2 ** (I - 13) = 4);
+            pragma Assert (2 ** (I - 12) = 8);
+            pragma Assert (2 ** (I - 11) = 16);
+            pragma Assert (2 ** (I - 10) = 32);
+            pragma Assert (2 ** (I - 9) = 64);
+            pragma Assert (2 ** (I - 8) = 128);
+            pragma Assert (2 ** (I - 7) = 256);
+            pragma Assert (2 ** (I - 6) = 512);
+            pragma Assert (2 ** (I - 5) = 1024);
+            pragma Assert (2 ** (I - 4) = 2048);
+            pragma Assert (2 ** (I - 3) = 4096);
+            pragma Assert (2 ** (I - 2) = 8192);
+            pragma Assert (2 ** (I - 1) = 16384);
+            pragma Assert (2 ** I = 32768);
+            pragma Assert
+              ((Shift_Right (Unsigned_64 (X), 15) and 1)
+               = Unsigned_64 ((X / 32768) mod 2));
+      end case;
+   end Lemma_Bit;
+
    function Inject (X : Subfield_Value) return Element is
       R : Element := Zero;
+      B : Unsigned_64;
+      M : Unsigned_64;
    begin
       for I in Basis_Index loop
-         if (X / 2 ** I) mod 2 = 1 then
-            R := Add (R, Subfield_Basis (I));
-         end if;
+         --  Constant-time conditional xor of Subfield_Basis (I), selected
+         --  by bit I of X: M is all-ones iff that bit is set. X may be a
+         --  private coordinate (ADR 0051), so no branch and no index
+         --  depends on it.
+         B := Shift_Right (Unsigned_64 (X), I) and 1;
+         Lemma_Bit (X, I);
+         pragma Assert (Proof_Only => B = Unsigned_64 ((X / 2 ** I) mod 2));
+         M := 0 - B;
+         R.Limbs (0) := R.Limbs (0) xor (M and Subfield_Basis (I).Limbs (0));
+         R.Limbs (1) := R.Limbs (1) xor (M and Subfield_Basis (I).Limbs (1));
          pragma Loop_Invariant (Proof_Only => R = Inject_Ref (X, I + 1));
       end loop;
       return R;
