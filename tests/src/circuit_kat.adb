@@ -3,6 +3,10 @@
 --  by the independent reference of gen_circuit_vectors.py; tier 2, the
 --  Appendix B.3 circuits written in LFC2 in two encodings, and the
 --  malformed cases with the status each must give.
+--  Every load is repeated with Read_Pinned (ADR 0074) and with
+--  Read_Packed (ADR 0080): the packed reader must give Read's status and
+--  header, and its walk Read's circuit, term for term; above a megabyte
+--  the size of both forms is printed.
 --
 --  Test code, outside the proof perimeter: SPARK_Mode is Off. Reads
 --  the vector files given as arguments (default: circuit_summary.txt,
@@ -249,7 +253,8 @@ procedure Circuit_KAT is
       --  with Id_Mismatch loads and every other status is Read's; under
       --  another identifier a good file is refused. The second load is
       --  skipped above a megabyte, where it would double the time of
-      --  the mDoc circuits.
+      --  the mDoc circuits. Read_Packed with Pinned True is held to the
+      --  same results as Read_Pinned, under both identifiers.
       procedure Check_Pinned
         (Name : String;
          Want : String;
@@ -264,11 +269,32 @@ procedure Circuit_KAT is
          C2 : CR.Circuit_Access;
          H2 : CR.Header;
          S2 : Circuit_Status.Status;
+
+         --  Read_Packed pinned to Stored gives Read_Pinned's S2 and H2.
+         procedure Packed_Pinned is
+            use type CR.Packed_Access;
+            P  : CR.Packed_Access;
+            H3 : CR.Header;
+            S3 : Circuit_Status.Status;
+         begin
+            CR.Read_Packed (B, True, Stored, P, H3, S3);
+            if S3 /= S2 or else H3 /= H2 then
+               Report_Failure ("packed pinned " & Name & ": got "
+                               & Status_Name (S3) & ", Read_Pinned gives "
+                               & Status_Name (S2));
+            else
+               Passed := Passed + 1;
+            end if;
+            if P /= null then
+               CR.Free_Packed (P);
+            end if;
+         end Packed_Pinned;
       begin
          if B'Length >= 32 then
             Stored := B (B'Last - 31 .. B'Last);
          end if;
          CR.Read_Pinned (B, Stored, C2, H2, S2);
+         Packed_Pinned;
          if Want = "id_mismatch" then
             if S2 /= Circuit_Status.Ok or else H2.Id /= Stored then
                Report_Failure ("pinned " & Name & ": got "
@@ -291,6 +317,7 @@ procedure Circuit_KAT is
          if Want = "ok" and then B'Length <= 2**20 then
             Stored (0) := Stored (0) xor 1;
             CR.Read_Pinned (B, Stored, C2, H2, S2);
+            Packed_Pinned;
             if S2 /= Circuit_Status.Id_Mismatch then
                Report_Failure ("pinned " & Name & ": another identifier"
                                & " gives " & Status_Name (S2));
@@ -303,6 +330,76 @@ procedure Circuit_KAT is
          end if;
       end Check_Pinned;
 
+      --  Read_Packed on the same bytes (ADR 0080), against the result of
+      --  Read (S1, C1, H1): the same status and header, and on Ok the
+      --  same circuit. Expand is ghost at level Proof_Only and does not
+      --  run, so the comparison walks each layer with Start, Step and
+      --  Term_Of, the walk the proof shows to produce the layers of
+      --  Expand. Above a megabyte the size of both forms is printed.
+      procedure Check_Packed
+        (Name : String;
+         B    : Byte_Array;
+         S1   : Circuit_Status.Status;
+         C1   : CR.Circuit_Access;
+         H1   : CR.Header)
+      is
+         use type CR.Header;
+         use type CR.Packed_Access;
+         use type CR.SA.Layer_Array;
+         use type CR.SA.Term;
+         P  : CR.Packed_Access;
+         H2 : CR.Header;
+         S2 : Circuit_Status.Status;
+         Same : Boolean;
+         Cur  : CR.PC.Cursor;
+      begin
+         CR.Read_Packed (B, False, [others => 0], P, H2, S2);
+         if S2 /= S1 or else H2 /= H1 then
+            Report_Failure ("packed " & Name & ": got " & Status_Name (S2)
+                            & ", Read gives " & Status_Name (S1));
+         elsif C1 /= null then
+            Same := P.Last_Layer = C1.Last_Layer and then P.NT = C1.NT
+              and then P.Noutput = C1.Noutput and then P.Ninput = C1.Ninput
+              and then P.Npublic = C1.Npublic and then P.Layers = C1.Layers;
+            if Same then
+               for J in 0 .. P.Last_Layer loop
+                  Cur := CR.PC.Start (P.all, J);
+                  for K in 1 .. CR.PC.Layer_Len (P.all, J) loop
+                     if CR.PC.Term_Of (P.all, Cur)
+                       /= C1.Terms (P.Layers (J).First + K - 1)
+                     then
+                        Same := False;
+                        exit;
+                     end if;
+                     Cur := CR.PC.Step (P.all, Cur);
+                  end loop;
+                  exit when not Same;
+               end loop;
+            end if;
+            if Same then
+               Passed := Passed + 1;
+            else
+               Report_Failure ("packed " & Name & ": the walk differs from"
+                               & " Read's circuit");
+            end if;
+            if B'Length > 2**20 then
+               TIO.Put_Line
+                 ("  " & Name & ": packed form"
+                  & Long_Long_Integer'Image (Long_Long_Integer (P.all'Size)
+                                             / 8)
+                  & " bytes, expanded"
+                  & Long_Long_Integer'Image (Long_Long_Integer (C1.all'Size)
+                                             / 8)
+                  & " bytes");
+            end if;
+         else
+            Passed := Passed + 1;
+         end if;
+         if P /= null then
+            CR.Free_Packed (P);
+         end if;
+      end Check_Packed;
+
       procedure Load (Name : String; Want : String; B : Byte_Array) is
          C  : CR.Circuit_Access;
          H  : CR.Header;
@@ -311,6 +408,7 @@ procedure Circuit_KAT is
          Release;
          CR.Read (B, C, H, St);
          Check_Pinned (Name, Want, B, St, C, H);
+         Check_Packed (Name, B, St, C, H);
          if Status_Name (St) /= Want then
             Report_Failure ("load " & Name & ": got " & Status_Name (St)
                             & ", expected " & Want);

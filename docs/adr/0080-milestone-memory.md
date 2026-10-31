@@ -60,6 +60,11 @@ At the close of M2 ([ADR 0078](0078-milestone-m2-closed.md)) the peak heap was f
 
   The proofs of the command line stay identical byte for byte. The memory still allocated at the end of the verifier falls from 116 MB to 1.4 MB: it was the copy of the layer.
 - The performance page records the measure and the peaks. The tools stay with the notes: the interposer, the profiler, and the per-layer statistics of the circuit files.
+- Block 1, the packed form:
+  - `Packed_Circuits` and `Read_Packed` keep a circuit as its file keeps it, proved on the ghost expansion (chapter 6, Section 3.7);
+  - on the mDoc hash circuit the form takes 4.2 MB (4,366,352 bytes), against 236.7 MB expanded. The estimate was about 3 MB: the deltas keep their three fields as 64-bit integers, 32 bytes a delta, where the estimate counted 4 bytes a field;
+  - the peak heap is unchanged, since the consumers still expand the circuit;
+  - `Read_Packed` bounds what it keeps over the whole circuit: deltas, segments, segment entries and kept tokens, each at most `Max_Terms` (2^28), with `Bound_Exceeded` beyond. `Read` bounds only the terms, upstream each layer, so a file of more than 256 MB with large unused segments loads with `Read` and not with `Read_Packed`. Chapter 6, Section 1.5, records it beside the bounds of ADR 0046.
 
 ## Verification impact
 
