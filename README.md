@@ -91,7 +91,7 @@ Each harness reads its vector files from `tests/vectors/` by default, prints pas
 The release project in `cli/` builds the library as it is meant to run: no assertions, optimised. It holds the command-line verifier and prover, and the interop harness:
 
 ```bash
-alr exec -- gprbuild -P cli/longfellow_verify.gpr -p
+alr exec -- gprbuild -P cli/longfellow_verify.gpr -p -s
 cli/bin/interop_kat
 ```
 
@@ -102,7 +102,7 @@ cli/bin/interop_kat
 It prints a status and exits with 0 when the proof is accepted, 1 when it is refused or the circuit is rejected, and 2 on a usage or file error. The two upstream examples:
 
 ```bash
-alr exec -- gprbuild -P cli/longfellow_verify.gpr -p
+alr exec -- gprbuild -P cli/longfellow_verify.gpr -p -s
 cli/bin/longfellow_verify --field gf2_128 \
    --circuit tests/vectors/upstream/circuits/sha256_circuit.lfc2 \
    --proof tests/vectors/upstream/circuits/sha256_proof.bin \

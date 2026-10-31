@@ -52,6 +52,10 @@
 --              loop invariants that state them: proved for all inputs,
 --              never compiled in any build. What the test build checks
 --              of these operations is their result against the vectors.
+--    Inject  : Gold (stage 5): Inject (X) = Inject_Ref (X, 16). Branch
+--              free since 30 October 2026: the bit of X selects each
+--              basis element through a mask, since the prover applies
+--              Inject to the coordinates of private inputs (ADR 0051).
 --    Subfield_Coords, In_Subfield : Silver (Phase C, ADR 0051): the
 --              fixed projection to the subfield coordinates; that it
 --              inverts Inject on the subfield is tested on the masks
