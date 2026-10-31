@@ -15,8 +15,8 @@
 --  layer of Expand.
 --
 --  Two facts make Step a plain expression function. Tokens of an empty
---  segment produce no term and are not kept, so a segment is never
---  skipped. The running sums are 64-bit integers: K steps of deltas below
+--  segment produce no term and are not kept (the segment is, since the
+--  tokens index the segments), so a token is never skipped. The running sums are 64-bit integers: K steps of deltas below
 --  2^27 stay below 2^56, so they cannot wrap; that every term's wires are
 --  in range is a fact the reader checks and Valid states.
 --
@@ -56,7 +56,7 @@ package Packed_Circuits is
 
    type Delta_Array is array (Positive range <>) of Packed_Delta;
    type Index_Array is array (Positive range <>) of Positive;
-   type Length_Array is array (Positive range <>) of Positive;
+   type Length_Array is array (Positive range <>) of Natural;
    type Const_Array is array (Positive range <>) of SA.Element;
 
    --  The tokens of a layer: First .. Last, Last = First - 1 when none.
@@ -100,10 +100,12 @@ package Packed_Circuits is
    function Indices_Ok (P : Packed_Circuit) return Boolean is
      ((for all I in 1 .. P.ND => P.Deltas (I).K <= P.NC)
       and then (for all S in 1 .. P.NS =>
-                  P.Seg_Start (S) <= P.NE
-                  and then P.Seg_Len (S) <= P.NE - P.Seg_Start (S) + 1)
+                  P.Seg_Start (S) <= P.NE + 1
+                  and then P.Seg_Len (S) <= P.NE + 1 - P.Seg_Start (S))
       and then (for all E in 1 .. P.NE => P.Entries (E) <= P.ND)
-      and then (for all T in 1 .. P.NK => P.Tokens (T) <= P.NS)
+      and then (for all T in 1 .. P.NK =>
+                  P.Tokens (T) <= P.NS
+                  and then P.Seg_Len (P.Tokens (T)) >= 1)
       and then P.Spans (0).First = 1
       and then P.Spans (P.Last_Layer).Last = P.NK
       and then (for all J in 0 .. P.Last_Layer =>
@@ -202,13 +204,16 @@ package Packed_Circuits is
                   and then abs C.H0 <= Max_Run - 2**27
                   and then abs C.H1 <= Max_Run - 2**27;
 
-   --  The cursor of layer J after K terms.
+   --  The cursor of layer J after K terms. Recursive, hence hidden (see
+   --  Bytes.Add_Zeros): its Post is what callers see, and Lemma_Step
+   --  gives one step of its body.
    function Cursor_At
      (P : Packed_Circuit; J : Natural; K : Natural) return Cursor
    is
      (if K = 0 then Start (P, J) else Step (P, Cursor_At (P, J, K - 1)))
    with Ghost => Proof_Only,
         Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
         Pre    => Indices_Ok (P) and then Layers_Ok (P)
                   and then Counts_Ok (P) and then J <= P.Last_Layer
                   and then K <= Layer_Len (P, J),
@@ -226,6 +231,20 @@ package Packed_Circuits is
           and then abs Cursor_At'Result.H1 <= Long_Long_Integer (K) * 2**27,
         Subprogram_Variant => (Decreases => K);
 
+   --  One step of the walk: the cursor after K - 1 terms is on a delta,
+   --  and Step takes it to the cursor after K.
+   procedure Lemma_Step (P : Packed_Circuit; J, K : Natural) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => Indices_Ok (P) and then Layers_Ok (P) and then Counts_Ok (P)
+               and then J <= P.Last_Layer
+               and then K in 1 .. Layer_Len (P, J),
+     Post   => On_Delta (P, Cursor_At (P, J, K - 1))
+               and then abs Cursor_At (P, J, K - 1).G <= Max_Run - 2**27
+               and then abs Cursor_At (P, J, K - 1).H0 <= Max_Run - 2**27
+               and then abs Cursor_At (P, J, K - 1).H1 <= Max_Run - 2**27
+               and then Step (P, Cursor_At (P, J, K - 1)) = Cursor_At (P, J, K);
+
    --  Every term of every layer names wires in range: the fact the
    --  reader checks as it walks.
    function Wires_Ok (P : Packed_Circuit) return Boolean is
@@ -239,10 +258,29 @@ package Packed_Circuits is
         Pre    => Indices_Ok (P) and then Layers_Ok (P)
                   and then Counts_Ok (P);
 
+   --  The packed circuit is one the reader accepts. Hidden: behind it
+   --  are Tok_Sum and Cursor_At, both recursive, and a caller that sees
+   --  them unfolds them without bound. Lemma_Valid gives the two parts an
+   --  executable walk needs, Lemma_Valid_Intro builds it.
    function Valid (P : Packed_Circuit) return Boolean is
      (Indices_Ok (P) and then Layers_Ok (P) and then Counts_Ok (P)
       and then Wires_Ok (P))
-   with Ghost => Proof_Only, Global => null;
+   with Ghost => Proof_Only,
+        Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
+
+   procedure Lemma_Valid (P : Packed_Circuit) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => Valid (P),
+     Post   => Indices_Ok (P) and then Layers_Ok (P);
+
+   procedure Lemma_Valid_Intro (P : Packed_Circuit) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => Indices_Ok (P) and then Layers_Ok (P) and then Counts_Ok (P)
+               and then Wires_Ok (P),
+     Post   => Valid (P);
 
    --  The term a cursor on a delta produces, its wires in range.
    function Term_Of (P : Packed_Circuit; C : Cursor) return SA.Term is
@@ -259,16 +297,22 @@ package Packed_Circuits is
                              in 0 .. SA.Max_Wires - 1;
 
    --  Term K of layer J, K from 1: the constant of the delta at the
-   --  cursor after K - 1 terms, the wires of the cursor after K.
+   --  cursor after K - 1 terms, the wires of the cursor after K. The body
+   --  states the parts of Valid it reads, since Valid is hidden; on a
+   --  valid circuit it is the term (Lemma_Term_Of).
    function Term_At (P : Packed_Circuit; J, K : Natural) return SA.Term is
-     ((K  => P.Constants (Delta_At (P, Cursor_At (P, J, K - 1)).K),
-       G  => Natural (Cursor_At (P, J, K).G),
-       H0 => Natural (Cursor_At (P, J, K).H0),
-       H1 => Natural (Cursor_At (P, J, K).H1)))
+     (if Indices_Ok (P) and then Layers_Ok (P) and then Counts_Ok (P)
+        and then Wires_Ok (P) and then K in 1 .. Layer_Len (P, J)
+      then
+        (K  => P.Constants (Delta_At (P, Cursor_At (P, J, K - 1)).K),
+         G  => Natural (Cursor_At (P, J, K).G),
+         H0 => Natural (Cursor_At (P, J, K).H0),
+         H1 => Natural (Cursor_At (P, J, K).H1))
+      else (K => SA.Zero, G => 0, H0 => 0, H1 => 0))
    with Ghost => Proof_Only,
         Global => null,
-        Pre    => Valid (P) and then J <= P.Last_Layer
-                  and then K in 1 .. Layer_Len (P, J);
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre    => J <= P.Last_Layer;
 
    --  The term a walk produces is the layer's: the cursor after K - 1
    --  terms gives Term_At (P, J, K), and one Step gives the cursor after
@@ -276,10 +320,23 @@ package Packed_Circuits is
    procedure Lemma_Term_Of (P : Packed_Circuit; J, K : Natural) with
      Ghost  => Proof_Only,
      Global => null,
-     Pre    => Valid (P) and then J <= P.Last_Layer
+     Pre    => Valid (P) and then Indices_Ok (P) and then Layers_Ok (P)
+               and then J <= P.Last_Layer
                and then K in 1 .. Layer_Len (P, J),
      Post   => On_Delta (P, Cursor_At (P, J, K - 1))
+               and then abs Cursor_At (P, J, K - 1).G <= Max_Run - 2**27
+               and then abs Cursor_At (P, J, K - 1).H0 <= Max_Run - 2**27
+               and then abs Cursor_At (P, J, K - 1).H1 <= Max_Run - 2**27
                and then Step (P, Cursor_At (P, J, K - 1)) = Cursor_At (P, J, K)
+               and then Cursor_At (P, J, K - 1).G
+                          + Delta_At (P, Cursor_At (P, J, K - 1)).DG
+                        in 0 .. SA.Max_Wires - 1
+               and then Cursor_At (P, J, K - 1).H0
+                          + Delta_At (P, Cursor_At (P, J, K - 1)).DH0
+                        in 0 .. SA.Max_Wires - 1
+               and then Cursor_At (P, J, K - 1).H1
+                          + Delta_At (P, Cursor_At (P, J, K - 1)).DH1
+                        in 0 .. SA.Max_Wires - 1
                and then Term_Of (P, Cursor_At (P, J, K - 1))
                         = Term_At (P, J, K);
 
@@ -301,5 +358,49 @@ package Packed_Circuits is
              (for all K in 1 .. Layer_Len (P, J) =>
                 Expand'Result.Terms (P.Layers (J).First + K - 1)
                 = Term_At (P, J, K)));
+
+   --  C is the cursor of layer J after K terms. Hidden, so that a loop
+   --  that walks a layer carries no instance of Cursor_At and of the
+   --  sums behind it; the two lemmas below are all a walk needs. The
+   --  body states the parts of Valid that Cursor_At needs.
+   function Walked
+     (P : Packed_Circuit; J, K : Natural; C : Cursor) return Boolean
+   is
+     (Indices_Ok (P) and then Layers_Ok (P) and then Counts_Ok (P)
+      and then K <= Layer_Len (P, J) and then C = Cursor_At (P, J, K))
+   with Ghost => Proof_Only,
+        Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre    => J <= P.Last_Layer;
+
+   procedure Lemma_Walked_Start (P : Packed_Circuit; J : Natural) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => Valid (P) and then J <= P.Last_Layer,
+     Post   => Walked (P, J, 0, Start (P, J));
+
+   --  One step of a walk on the expansion: the cursor after K - 1 terms
+   --  produces term K of layer J of Expand (P), and steps to the cursor
+   --  after K.
+   procedure Lemma_Walked_Step
+     (P : Packed_Circuit; J, K : Natural; C : Cursor)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => Valid (P) and then Indices_Ok (P) and then Layers_Ok (P)
+               and then J <= P.Last_Layer
+               and then K in 1 .. Layer_Len (P, J)
+               and then Walked (P, J, K - 1, C),
+     Post   => On_Delta (P, C)
+               and then abs C.G <= Max_Run - 2**27
+               and then abs C.H0 <= Max_Run - 2**27
+               and then abs C.H1 <= Max_Run - 2**27
+               and then Walked (P, J, K, Step (P, C))
+               and then C.G + Delta_At (P, C).DG in 0 .. SA.Max_Wires - 1
+               and then C.H0 + Delta_At (P, C).DH0 in 0 .. SA.Max_Wires - 1
+               and then C.H1 + Delta_At (P, C).DH1 in 0 .. SA.Max_Wires - 1
+               and then P.Layers (J).First + K - 1 in 1 .. P.NT
+               and then Term_Of (P, C)
+                        = Expand (P).Terms (P.Layers (J).First + K - 1);
 
 end Packed_Circuits;
