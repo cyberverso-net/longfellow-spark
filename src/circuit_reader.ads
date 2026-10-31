@@ -25,6 +25,9 @@
 --  into Packed_Circuits, the form the file keeps, without expanding the
 --  terms. Its walks prove, at each step, that they read the layers of
 --  the ghost expansion Expand, so its checks are checks on Expand (P).
+--  It keeps the dictionaries, so it bounds them over the whole circuit:
+--  deltas, segments, segment entries and kept tokens, each at most
+--  Max_Terms, beyond which Bound_Exceeded (guide chapter 6, 1.5).
 --
 --  Documentation: docs/guide/06-circuits.md. Decisions: ADR 0046
 --  (scope, the format, the status), 0047 (the heap), 0048 (vectors);

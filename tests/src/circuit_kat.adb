@@ -253,7 +253,8 @@ procedure Circuit_KAT is
       --  with Id_Mismatch loads and every other status is Read's; under
       --  another identifier a good file is refused. The second load is
       --  skipped above a megabyte, where it would double the time of
-      --  the mDoc circuits.
+      --  the mDoc circuits. Read_Packed with Pinned True is held to the
+      --  same results as Read_Pinned, under both identifiers.
       procedure Check_Pinned
         (Name : String;
          Want : String;
@@ -268,11 +269,32 @@ procedure Circuit_KAT is
          C2 : CR.Circuit_Access;
          H2 : CR.Header;
          S2 : Circuit_Status.Status;
+
+         --  Read_Packed pinned to Stored gives Read_Pinned's S2 and H2.
+         procedure Packed_Pinned is
+            use type CR.Packed_Access;
+            P  : CR.Packed_Access;
+            H3 : CR.Header;
+            S3 : Circuit_Status.Status;
+         begin
+            CR.Read_Packed (B, True, Stored, P, H3, S3);
+            if S3 /= S2 or else H3 /= H2 then
+               Report_Failure ("packed pinned " & Name & ": got "
+                               & Status_Name (S3) & ", Read_Pinned gives "
+                               & Status_Name (S2));
+            else
+               Passed := Passed + 1;
+            end if;
+            if P /= null then
+               CR.Free_Packed (P);
+            end if;
+         end Packed_Pinned;
       begin
          if B'Length >= 32 then
             Stored := B (B'Last - 31 .. B'Last);
          end if;
          CR.Read_Pinned (B, Stored, C2, H2, S2);
+         Packed_Pinned;
          if Want = "id_mismatch" then
             if S2 /= Circuit_Status.Ok or else H2.Id /= Stored then
                Report_Failure ("pinned " & Name & ": got "
@@ -295,6 +317,7 @@ procedure Circuit_KAT is
          if Want = "ok" and then B'Length <= 2**20 then
             Stored (0) := Stored (0) xor 1;
             CR.Read_Pinned (B, Stored, C2, H2, S2);
+            Packed_Pinned;
             if S2 /= Circuit_Status.Id_Mismatch then
                Report_Failure ("pinned " & Name & ": another identifier"
                                & " gives " & Status_Name (S2));

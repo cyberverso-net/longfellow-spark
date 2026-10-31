@@ -24,7 +24,8 @@ All notable changes to this project are recorded here. The format follows [Keep 
   - `Packed_Circuits` holds a circuit as its LFC2 file holds it (deltas, segments, tokens), with an executable walk and, at level `Proof_Only`, the cursor after K terms and the expansion `Expand`.
   - `Circuit_Reader.Read_Packed` reads a file into it and proves on `Expand (P)` what `Read` proves on its circuit: `Well_Formed`, `Isolated`, `Dead_End` and the identifier.
   - The `circuits` partition proves, 3,374 checks, under unchanged prover settings and contracts.
-  - `circuit_kat` repeats every load with `Read_Packed`: the same status and header, and the same terms.
+  - `circuit_kat` repeats every load with `Read_Packed`: the same status and header, and the same terms; pinned, the results of `Read_Pinned`. The vectors gain a third encoding with tokens of empty segments, and a layer of empty tokens.
+  - `Read_Packed` bounds what it keeps over the whole circuit (deltas, segments, entries, tokens) at 2^28 each, where `Read` bounds the terms (chapter 6 Section 1.5).
   - On the mDoc hash circuit the packed form takes 4.2 MB (4,366,352 bytes), against 236.7 MB expanded. The estimate was about 3 MB; the difference is the deltas, whose three fields are 64-bit integers. The consumers still expand the circuit, so the peak heap is unchanged.
   - Chapter 6 explains the lesson of its last proof: a loop invariant is a cut, and a variable the loop assigns must have its value stated in it.
 - The memory milestone (ADR 0080, Proposed): the peak heap within twice upstream's, by the same measure, in Gold. First step: the verifier passes a layer's terms to `Bind_Quad` as a slice, by reference, where a function result copied the largest layer, and the command-line prover frees its provisional input buffers. On the proving machine the hash verification peaks at 401 MB instead of 515 MB, the hash proof at 621 MB instead of 645 MB. The contracts and the proofs of the CLI unchanged.
