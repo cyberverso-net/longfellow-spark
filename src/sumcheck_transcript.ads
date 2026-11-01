@@ -147,27 +147,27 @@ package Sumcheck_Transcript is
    --  element frame, the zero element, then write0 of the term count
    --  over all layers (C.NT, since the layers partition the terms).
    function Statement_Frame
-     (S : Byte_Seq; Id : Bytes_32; C : Circuit; Pub : Element_Array)
+     (S : Byte_Seq; Id : Bytes_32; Sh : Shape; Pub : Element_Array)
       return Byte_Seq
    is
      (Transcript.Zero_Frame
         (Transcript.Element_Frame
            (Publics_Frame (Transcript.Bytes_Frame (S, Id), Pub, Pub'Length),
             SA.F.To_Bytes (Zero)),
-         C.NT))
+         Sh.NT))
    with Ghost => SPARKlib_Full;
 
    procedure Write_Sumcheck_Statement
-     (Id : Bytes_32; C : Circuit; Pub : Element_Array)
+     (Id : Bytes_32; S : Shape; Pub : Element_Array)
    with
      Global => (In_Out => (Transcript.State, Transcript.Absorbed)),
-     Pre    => Pub'First = 0 and then Pub'Length = C.Npublic,
+     Pre    => Pub'First = 0 and then Pub'Length = S.Npublic,
      Post   =>
        (SPARKlib_Full =>
           Transcript.Is_Exhausted'Old <= Transcript.Is_Exhausted
           and then Byte_Seqs.Logical_Eq
             (Transcript.Absorbed,
-             Statement_Frame (Transcript.Absorbed'Old, Id, C, Pub)));
+             Statement_Frame (Transcript.Absorbed'Old, Id, S, Pub)));
 
    ----------------------------------------------------------------------
    --  sumcheck/common.rs: the protocol helpers
@@ -234,7 +234,7 @@ package Sumcheck_Transcript is
      (Label : Byte_Array;
       Root  : Bytes_32;
       Id    : Bytes_32;
-      C     : Circuit;
+      S     : Shape;
       Pub   : Element_Array;
       Proof : Sumcheck_Proof;
       Ch    : out Challenges;
@@ -244,9 +244,9 @@ package Sumcheck_Transcript is
      Always_Terminates => not SA.F.Sampling_Rejects,
      Pre               =>
        Label'Length <= Transcript.Max_Payload
-       and then Pub'First = 0 and then Pub'Length = C.Npublic
-       and then Proof.Last + 1 = Proof_Total (C)
-       and then Ch.Last + 1 = Chal_Total (C),
+       and then Pub'First = 0 and then Pub'Length = S.Npublic
+       and then Proof.Last + 1 = Proof_Total (S)
+       and then Ch.Last + 1 = Chal_Total (S),
      Post              => St in Ok | Exhausted
        and then (St = Ok) = not Transcript.Is_Exhausted;
 
@@ -257,14 +257,14 @@ package Sumcheck_Transcript is
    --  canonical; the output is then not to be used.
    procedure Read_Sumcheck_Proof
      (B     : Byte_Array;
-      C     : Circuit;
+      S     : Shape;
       Proof : out Sumcheck_Proof;
       St    : out Status)
    with
      Global => null,
      Pre    =>
-       B'First = 0 and then B'Length = Proof_Total (C) * Size
-       and then Proof.Last + 1 = Proof_Total (C),
+       B'First = 0 and then B'Length = Proof_Total (S) * Size
+       and then Proof.Last + 1 = Proof_Total (S),
      Post   => St in Ok | Bad_Element;
 
 end Sumcheck_Transcript;

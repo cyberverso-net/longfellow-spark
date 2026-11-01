@@ -10,11 +10,11 @@ package body Sumcheck_Transcript is
    --  the hidden recursive definitions (as in sumcheck_verifier.adb).
    ----------------------------------------------------------------------
 
-   procedure Lemma_Chal_Step (C : Circuit; J : Natural) with
+   procedure Lemma_Chal_Step (S : Shape; J : Natural) with
      Ghost,
      Global => null,
-     Pre    => J <= C.Last_Layer,
-     Post   => Chal_Off (C, J + 1) = Chal_Off (C, J) + Chal_Size (C, J)
+     Pre    => J <= S.Last_Layer,
+     Post   => Chal_Off (S, J + 1) = Chal_Off (S, J) + Chal_Size (S, J)
    is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Chal_Off);
@@ -22,26 +22,26 @@ package body Sumcheck_Transcript is
       null;
    end Lemma_Chal_Step;
 
-   procedure Lemma_Chal_Mono (C : Circuit; I, J : Natural) with
+   procedure Lemma_Chal_Mono (S : Shape; I, J : Natural) with
      Ghost,
      Global             => null,
-     Pre                => I <= J and then J <= C.Last_Layer + 1,
-     Post               => Chal_Off (C, I) <= Chal_Off (C, J),
+     Pre                => I <= J and then J <= S.Last_Layer + 1,
+     Post               => Chal_Off (S, I) <= Chal_Off (S, J),
      Subprogram_Variant => (Decreases => J)
    is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Chal_Off);
    begin
       if J > I then
-         Lemma_Chal_Mono (C, I, J - 1);
+         Lemma_Chal_Mono (S, I, J - 1);
       end if;
    end Lemma_Chal_Mono;
 
-   procedure Lemma_Proof_Step (C : Circuit; J : Natural) with
+   procedure Lemma_Proof_Step (S : Shape; J : Natural) with
      Ghost,
      Global => null,
-     Pre    => J <= C.Last_Layer,
-     Post   => Proof_Off (C, J + 1) = Proof_Off (C, J) + Proof_Size (C, J)
+     Pre    => J <= S.Last_Layer,
+     Post   => Proof_Off (S, J + 1) = Proof_Off (S, J) + Proof_Size (S, J)
    is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Proof_Off);
@@ -49,35 +49,35 @@ package body Sumcheck_Transcript is
       null;
    end Lemma_Proof_Step;
 
-   procedure Lemma_Proof_Mono (C : Circuit; I, J : Natural) with
+   procedure Lemma_Proof_Mono (S : Shape; I, J : Natural) with
      Ghost,
      Global             => null,
-     Pre                => I <= J and then J <= C.Last_Layer + 1,
-     Post               => Proof_Off (C, I) <= Proof_Off (C, J),
+     Pre                => I <= J and then J <= S.Last_Layer + 1,
+     Post               => Proof_Off (S, I) <= Proof_Off (S, J),
      Subprogram_Variant => (Decreases => J)
    is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Proof_Off);
    begin
       if J > I then
-         Lemma_Proof_Mono (C, I, J - 1);
+         Lemma_Proof_Mono (S, I, J - 1);
       end if;
    end Lemma_Proof_Mono;
 
    --  The block of layer J fits in the total.
-   procedure Lemma_Layer_Fits (C : Circuit; J : Natural) with
+   procedure Lemma_Layer_Fits (S : Shape; J : Natural) with
      Ghost,
      Global => null,
-     Pre    => J <= C.Last_Layer,
+     Pre    => J <= S.Last_Layer,
      Post   =>
-       Chal_Off (C, J) + Chal_Size (C, J) <= Chal_Total (C)
-       and then Proof_Off (C, J) + Proof_Size (C, J) <= Proof_Total (C)
+       Chal_Off (S, J) + Chal_Size (S, J) <= Chal_Total (S)
+       and then Proof_Off (S, J) + Proof_Size (S, J) <= Proof_Total (S)
    is
    begin
-      Lemma_Chal_Step (C, J);
-      Lemma_Chal_Mono (C, J + 1, C.Last_Layer + 1);
-      Lemma_Proof_Step (C, J);
-      Lemma_Proof_Mono (C, J + 1, C.Last_Layer + 1);
+      Lemma_Chal_Step (S, J);
+      Lemma_Chal_Mono (S, J + 1, S.Last_Layer + 1);
+      Lemma_Proof_Step (S, J);
+      Lemma_Proof_Mono (S, J + 1, S.Last_Layer + 1);
    end Lemma_Layer_Fits;
 
    ----------------------------------------------------------------------
@@ -136,7 +136,7 @@ package body Sumcheck_Transcript is
    end Write_Element_Slice;
 
    procedure Write_Sumcheck_Statement
-     (Id : Bytes_32; C : Circuit; Pub : Element_Array)
+     (Id : Bytes_32; S : Shape; Pub : Element_Array)
    is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Publics_Frame);
@@ -155,7 +155,7 @@ package body Sumcheck_Transcript is
                  Publics_Frame (Base, Pub, I - Pub'First + 1)));
       end loop;
       Write_Element (Zero);
-      Transcript.Write0 (C.NT);
+      Transcript.Write0 (S.NT);
    end Write_Sumcheck_Statement;
 
    ----------------------------------------------------------------------
@@ -231,7 +231,7 @@ package body Sumcheck_Transcript is
      (Label : Byte_Array;
       Root  : Bytes_32;
       Id    : Bytes_32;
-      C     : Circuit;
+      S     : Shape;
       Pub   : Element_Array;
       Proof : Sumcheck_Proof;
       Ch    : out Challenges;
@@ -244,15 +244,15 @@ package body Sumcheck_Transcript is
              Alpha_Input => Zero);
       Transcript.Reset (Label);
       Transcript.Write_Bytes (Root);
-      Write_Sumcheck_Statement (Id, C, Pub);
+      Write_Sumcheck_Statement (Id, S, Pub);
       Begin_Circuit (Ch.G);
-      for J in 0 .. C.Last_Layer loop
-         pragma Loop_Invariant (Ch.Last = Chal_Total (C) - 1);
-         Lemma_Layer_Fits (C, J);
+      for J in 0 .. S.Last_Layer loop
+         pragma Loop_Invariant (Ch.Last = Chal_Total (S) - 1);
+         Lemma_Layer_Fits (S, J);
          declare
-            Off_C : constant Natural   := Chal_Off (C, J);
-            Off_P : constant Natural   := Proof_Off (C, J);
-            Logw  : constant Logw_Type := C.Layers (J).Logw;
+            Off_C : constant Natural   := Chal_Off (S, J);
+            Off_P : constant Natural   := Proof_Off (S, J);
+            Logw  : constant Logw_Type := S.Layers (J).Logw;
             LP    : constant Element_Array (0 .. 4 * Logw + 1) :=
               Proof.Evals (Off_P .. Off_P + 4 * Logw + 1);
             LC    : Element_Array (0 .. 2 * Logw + 1);
@@ -308,11 +308,11 @@ package body Sumcheck_Transcript is
 
    procedure Read_Sumcheck_Proof
      (B     : Byte_Array;
-      C     : Circuit;
+      S     : Shape;
       Proof : out Sumcheck_Proof;
       St    : out Status)
    is
-      Total : constant Natural := Proof_Total (C);
+      Total : constant Natural := Proof_Total (S);
       Off  : Natural;
       Logw : Logw_Type;
       K    : Natural := 0;
@@ -320,16 +320,16 @@ package body Sumcheck_Transcript is
    begin
       Proof := (Last => Proof.Last, Evals => [others => Zero]);
       St    := Ok;
-      for J in 0 .. C.Last_Layer loop
-         pragma Loop_Invariant (K = Proof_Off (C, J));
+      for J in 0 .. S.Last_Layer loop
+         pragma Loop_Invariant (K = Proof_Off (S, J));
          pragma Loop_Invariant (St in Ok | Bad_Element);
-         Lemma_Layer_Fits (C, J);
-         Off  := Proof_Off (C, J);
-         Logw := C.Layers (J).Logw;
+         Lemma_Layer_Fits (S, J);
+         Off  := Proof_Off (S, J);
+         Logw := S.Layers (J).Logw;
          for R in 0 .. Logw - 1 loop
             pragma Loop_Invariant
-              (Off = Proof_Off (C, J) and then Logw = C.Layers (J).Logw
-               and then Off + Proof_Size (C, J) <= Total);
+              (Off = Proof_Off (S, J) and then Logw = S.Layers (J).Logw
+               and then Off + Proof_Size (S, J) <= Total);
             pragma Loop_Invariant (K = Off + 4 * R);
             pragma Loop_Invariant (St in Ok | Bad_Element);
             --  l (P0), r (P0), l (P2), r (P2): slots 0, 2, 1, 3.
@@ -348,7 +348,7 @@ package body Sumcheck_Transcript is
          Take (B, Total, K + 1, Proof.Evals (Off + 4 * Logw + 1), Acc);
          St := (if Acc then St else Bad_Element);
          K := K + 2;
-         Lemma_Proof_Step (C, J);
+         Lemma_Proof_Step (S, J);
       end loop;
    end Read_Sumcheck_Proof;
 

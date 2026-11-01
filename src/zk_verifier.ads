@@ -56,6 +56,11 @@ package Zk_Verifier is
    subtype Element is LV.ST.SA.Element;
    subtype Element_Array is LV.ST.SA.Element_Array;
    subtype Circuit is LV.ST.SA.Circuit;
+   subtype Shape is LV.ST.SA.Shape;
+
+   --  The shape of the circuit, for the sizes (Sumcheck_Algebra).
+   function Shape_Of (C : Circuit) return Shape is (LV.ST.SA.Shape_Of (C))
+   with Global => null;
    subtype Sumcheck_Proof is LV.ST.SV.Sumcheck_Proof;
    subtype Ligero_Part is LV.LP.Proof;
 
@@ -66,18 +71,18 @@ package Zk_Verifier is
      [16#de#, 16#ad#, 16#be#, 16#ef#, others => 0];
 
    --  nw: the private inputs then the pads of every layer.
-   function Witness_Count (C : Circuit) return Natural
+   function Witness_Count (S : Shape) return Natural
      renames LV.ST.SV.Witness_Count;
 
    --  The geometry of a circuit under a configuration (NQ = one
    --  quadratic triple per layer).
-   function Geometry_Of (Cfg : Config; C : Circuit) return Valid_Geometry is
-     (Make (Cfg, Witness_Count (C), C.Last_Layer + 1))
+   function Geometry_Of (Cfg : Config; S : Shape) return Valid_Geometry is
+     (Make (Cfg, Witness_Count (S), S.Last_Layer + 1))
    with Pre => Valid (Cfg);
 
    --  Bytes of the sumcheck part.
-   function Sumcheck_Len (C : Circuit) return Natural is
-     (LV.ST.SV.Proof_Total (C) * LV.LP.Size);
+   function Sumcheck_Len (S : Shape) return Natural is
+     (LV.ST.SV.Proof_Total (S) * LV.LP.Size);
 
    --  Section 7.5 for one proof: the root, the sumcheck part, the
    --  Ligero part, nothing after. Proof_Encoding on bytes missing or
@@ -85,7 +90,7 @@ package Zk_Verifier is
    --  two readers report; the outputs are then not to be used.
    procedure Read_Proof
      (B        : Byte_Array;
-      C        : Circuit;
+      S        : Shape;
       G        : Valid_Geometry;
       Root     : out Bytes_32;
       Sumcheck : out Sumcheck_Proof;
@@ -95,7 +100,7 @@ package Zk_Verifier is
      Global => null,
      Pre    =>
        B'First = 0 and then LV.LP.Fits (G)
-       and then Sumcheck.Last + 1 = LV.ST.SV.Proof_Total (C)
+       and then Sumcheck.Last + 1 = LV.ST.SV.Proof_Total (S)
        and then Lig.Ldt_Last + 1 = G.Block_Len
        and then Lig.Linear_Last + 1 = G.Dblock_Len
        and then Lig.Low_Last + 1 = G.Num_Queries

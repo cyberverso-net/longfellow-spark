@@ -9,14 +9,14 @@ package body Zk_Verifier is
 
    procedure Read_Proof
      (B        : Byte_Array;
-      C        : Circuit;
+      S        : Shape;
       G        : Valid_Geometry;
       Root     : out Bytes_32;
       Sumcheck : out Sumcheck_Proof;
       Lig      : out Ligero_Part;
       St       : out Status)
    is
-      SL   : constant Natural := Sumcheck_Len (C);
+      SL   : constant Natural := Sumcheck_Len (S);
       Next : Natural;
       St2  : LV.ST.Status;
       St3  : Status;
@@ -47,7 +47,7 @@ package body Zk_Verifier is
       declare
          SB : constant Byte_Array (0 .. SL - 1) := B (32 .. 32 + SL - 1);
       begin
-         LV.ST.Read_Sumcheck_Proof (SB, C, Sumcheck, St2);
+         LV.ST.Read_Sumcheck_Proof (SB, S, Sumcheck, St2);
       end;
       if St2 /= LV.ST.Ok then
          return;
@@ -112,8 +112,9 @@ package body Zk_Verifier is
       St    : out Status)
    is
       use type LV.ST.Status;
-      NW : constant Natural := Witness_Count (C);
-      G  : constant Valid_Geometry := Geometry_Of (Cfg, C);
+      S  : constant Shape := Shape_Of (C);
+      NW : constant Natural := Witness_Count (S);
+      G  : constant Valid_Geometry := Geometry_Of (Cfg, S);
    begin
       if Pub'Length /= C.Npublic then
          St := Public_Input_Length;
@@ -134,7 +135,7 @@ package body Zk_Verifier is
          Root : Bytes_32;
          St2  : LV.ST.Status;
          W    : Work_Access := new Work'
-           (Sum_Last    => LV.ST.SV.Proof_Total (C) - 1,
+           (Sum_Last    => LV.ST.SV.Proof_Total (S) - 1,
             Ldt_Last    => G.Block_Len - 1,
             Linear_Last => G.Dblock_Len - 1,
             Low_Last    => G.Num_Queries - 1,
@@ -142,11 +143,11 @@ package body Zk_Verifier is
             Nonce_Last  => G.Num_Queries - 1,
             Col_Last    => LV.LP.Opened (G) - 1,
             Path_Last   => 2 * Num_Leaves (G) - 1,
-            Ch_Last     => LV.ST.SV.Chal_Total (C) - 1,
-            A_Max       => LV.ST.SV.A_Bound (C),
+            Ch_Last     => LV.ST.SV.Chal_Total (S) - 1,
+            A_Max       => LV.ST.SV.A_Bound (S),
             B_Last      => C.Last_Layer + 1,
             Lqc_Last    => C.Last_Layer,
-            Sumcheck    => (Last  => LV.ST.SV.Proof_Total (C) - 1,
+            Sumcheck    => (Last  => LV.ST.SV.Proof_Total (S) - 1,
                             Evals => [others => Zero]),
             Lig         => (Ldt_Last    => G.Block_Len - 1,
                             Linear_Last => G.Dblock_Len - 1,
@@ -163,11 +164,11 @@ package body Zk_Verifier is
                             Columns     => [others => Zero],
                             Path        => [others => [others => 0]],
                             Path_Count  => 0),
-            Ch          => (Last        => LV.ST.SV.Chal_Total (C) - 1,
+            Ch          => (Last        => LV.ST.SV.Chal_Total (S) - 1,
                             G           => [others => Zero],
                             Layer       => [others => Zero],
                             Alpha_Input => Zero),
-            A           => (Max        => LV.ST.SV.A_Bound (C),
+            A           => (Max        => LV.ST.SV.A_Bound (S),
                             Count      => 0,
                             Coeff      => [others => Zero],
                             Constraint => [others => 0],
@@ -176,13 +177,13 @@ package body Zk_Verifier is
             Lqc         => [others => (X => 0, Y => 0, Z => 0)],
             BQ          => [others => Zero]);
       begin
-         Read_Proof (B, C, G, Root, W.Sumcheck, W.Lig, St);
+         Read_Proof (B, S, G, Root, W.Sumcheck, W.Lig, St);
          if St /= Ok then
             Free_Work (W);
             return;
          end if;
          LV.ST.Replay_Challenges
-           (Label, Root, Id, C, Pub, W.Sumcheck, W.Ch, St2);
+           (Label, Root, Id, S, Pub, W.Sumcheck, W.Ch, St2);
          if St2 /= LV.ST.Ok then
             St := Exhausted;
             Free_Work (W);
@@ -196,7 +197,7 @@ package body Zk_Verifier is
          --  vector's length, and every pad of layer J ends below
          --  Witness_Count.
          LV.Lemma_Vector_Len_Covers (G);
-         LV.ST.SV.Lemma_Pads_Below (C);
+         LV.ST.SV.Lemma_Pads_Below (S);
          LV.Verify (Cfg, NW, W.B_Vec, Root, W.Lig, W.A,
                     Default_Statement_Hash, W.Lqc, St);
          pragma Assert

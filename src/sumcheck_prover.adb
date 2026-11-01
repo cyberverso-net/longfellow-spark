@@ -36,12 +36,12 @@ package body Sumcheck_Prover is
    --  The offsets of the core, unfolded one step (as the readers do)
    -------------------------------------------------------------------
 
-   procedure Lemma_Chal_Step (C : Circuit; J : Natural) with
+   procedure Lemma_Chal_Step (S : Shape; J : Natural) with
      Ghost  => Proof_Only,
      Global => null,
-     Pre    => J <= C.Last_Layer,
-     Post   => ST.SV.Chal_Off (C, J + 1)
-               = ST.SV.Chal_Off (C, J) + ST.SV.Chal_Size (C, J)
+     Pre    => J <= S.Last_Layer,
+     Post   => ST.SV.Chal_Off (S, J + 1)
+               = ST.SV.Chal_Off (S, J) + ST.SV.Chal_Size (S, J)
    is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body",
@@ -50,26 +50,26 @@ package body Sumcheck_Prover is
       null;
    end Lemma_Chal_Step;
 
-   procedure Lemma_Chal_Mono (C : Circuit; I, J : Natural) with
+   procedure Lemma_Chal_Mono (S : Shape; I, J : Natural) with
      Ghost  => Proof_Only,
      Global => null,
-     Pre    => I <= J and then J <= C.Last_Layer + 1,
-     Post   => ST.SV.Chal_Off (C, I) <= ST.SV.Chal_Off (C, J),
+     Pre    => I <= J and then J <= S.Last_Layer + 1,
+     Post   => ST.SV.Chal_Off (S, I) <= ST.SV.Chal_Off (S, J),
      Subprogram_Variant => (Decreases => J)
    is
    begin
       if J > I then
-         Lemma_Chal_Step (C, J - 1);
-         Lemma_Chal_Mono (C, I, J - 1);
+         Lemma_Chal_Step (S, J - 1);
+         Lemma_Chal_Mono (S, I, J - 1);
       end if;
    end Lemma_Chal_Mono;
 
-   procedure Lemma_Proof_Step (C : Circuit; J : Natural) with
+   procedure Lemma_Proof_Step (S : Shape; J : Natural) with
      Ghost  => Proof_Only,
      Global => null,
-     Pre    => J <= C.Last_Layer,
-     Post   => ST.SV.Proof_Off (C, J + 1)
-               = ST.SV.Proof_Off (C, J) + ST.SV.Proof_Size (C, J)
+     Pre    => J <= S.Last_Layer,
+     Post   => ST.SV.Proof_Off (S, J + 1)
+               = ST.SV.Proof_Off (S, J) + ST.SV.Proof_Size (S, J)
    is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body",
@@ -78,58 +78,58 @@ package body Sumcheck_Prover is
       null;
    end Lemma_Proof_Step;
 
-   procedure Lemma_Proof_Mono (C : Circuit; I, J : Natural) with
+   procedure Lemma_Proof_Mono (S : Shape; I, J : Natural) with
      Ghost  => Proof_Only,
      Global => null,
-     Pre    => I <= J and then J <= C.Last_Layer + 1,
-     Post   => ST.SV.Proof_Off (C, I) <= ST.SV.Proof_Off (C, J),
+     Pre    => I <= J and then J <= S.Last_Layer + 1,
+     Post   => ST.SV.Proof_Off (S, I) <= ST.SV.Proof_Off (S, J),
      Subprogram_Variant => (Decreases => J)
    is
    begin
       if J > I then
-         Lemma_Proof_Step (C, J - 1);
-         Lemma_Proof_Mono (C, I, J - 1);
+         Lemma_Proof_Step (S, J - 1);
+         Lemma_Proof_Mono (S, I, J - 1);
       end if;
    end Lemma_Proof_Mono;
 
    --  Layer J's blocks lie within the three totals.
-   procedure Lemma_Layer_Fits (C : Circuit; J : Natural) with
+   procedure Lemma_Layer_Fits (S : Shape; J : Natural) with
      Ghost  => Proof_Only,
      Global => null,
-     Pre    => J <= C.Last_Layer,
-     Post   => ST.SV.Chal_Off (C, J) + ST.SV.Chal_Size (C, J)
-               <= ST.SV.Chal_Total (C)
-               and then ST.SV.Proof_Off (C, J) + ST.SV.Proof_Size (C, J)
-                        <= ST.SV.Proof_Total (C)
-               and then ST.SV.Pad_Off (C, J, 0) + ST.SV.Pad_Size (C, J)
-                        <= Pad_Total (C)
+     Pre    => J <= S.Last_Layer,
+     Post   => ST.SV.Chal_Off (S, J) + ST.SV.Chal_Size (S, J)
+               <= ST.SV.Chal_Total (S)
+               and then ST.SV.Proof_Off (S, J) + ST.SV.Proof_Size (S, J)
+                        <= ST.SV.Proof_Total (S)
+               and then ST.SV.Pad_Off (S, J, 0) + ST.SV.Pad_Size (S, J)
+                        <= Pad_Total (S)
    is
    begin
-      Lemma_Chal_Step (C, J);
-      Lemma_Chal_Mono (C, J + 1, C.Last_Layer + 1);
-      Lemma_Proof_Step (C, J);
-      Lemma_Proof_Mono (C, J + 1, C.Last_Layer + 1);
-      ST.SV.Lemma_Pad_Step (C, J, 0);
-      ST.SV.Lemma_Pad_Mono (C, J + 1, C.Last_Layer + 1, 0);
+      Lemma_Chal_Step (S, J);
+      Lemma_Chal_Mono (S, J + 1, S.Last_Layer + 1);
+      Lemma_Proof_Step (S, J);
+      Lemma_Proof_Mono (S, J + 1, S.Last_Layer + 1);
+      ST.SV.Lemma_Pad_Step (S, J, 0);
+      ST.SV.Lemma_Pad_Mono (S, J + 1, S.Last_Layer + 1, 0);
    end Lemma_Layer_Fits;
 
    --  The input wires of layer J are segment J + 1 of the wires buffer.
-   procedure Lemma_Segment (C : Circuit; J : Natural) with
+   procedure Lemma_Segment (S : Shape; J : Natural) with
      Ghost  => Proof_Only,
      Global => null,
-     Pre    => J <= C.Last_Layer,
-     Post   => ST.SA.Off (C, J + 1) + C.Layers (J).NW_In
-               <= ST.SA.Total_Wires (C)
+     Pre    => J <= S.Last_Layer,
+     Post   => ST.SA.Off (S, J + 1) + S.Layers (J).NW_In
+               <= ST.SA.Total_Wires (S)
    is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", ST.SA.Off);
    begin
-      --  Off (C, J + 2) = Off (C, J + 1) + Seg_Size (C, J + 1), with
-      --  Seg_Size (C, J + 1) = NW_In of layer J, and Off is monotonic
-      --  up to Total_Wires = Off (C, Last_Layer + 2).
-      for K in J + 2 .. C.Last_Layer + 2 loop
+      --  Off (S, J + 2) = Off (S, J + 1) + Seg_Size (S, J + 1), with
+      --  Seg_Size (S, J + 1) = NW_In of layer J, and Off is monotonic
+      --  up to Total_Wires = Off (S, Last_Layer + 2).
+      for K in J + 2 .. S.Last_Layer + 2 loop
          pragma Loop_Invariant
-           (ST.SA.Off (C, J + 1) + C.Layers (J).NW_In <= ST.SA.Off (C, K));
+           (ST.SA.Off (S, J + 1) + S.Layers (J).NW_In <= ST.SA.Off (S, K));
       end loop;
    end Lemma_Segment;
 
@@ -137,22 +137,22 @@ package body Sumcheck_Prover is
    --  Sample_Pads
    -------------------------------------------------------------------
 
-   procedure Sample_Pads (C : Circuit; Pads : out Element_Array) is
+   procedure Sample_Pads (S : Shape; Pads : out Element_Array) is
       C0, C1 : Element;
    begin
       Pads := [others => Zero];
-      for J in 0 .. C.Last_Layer loop
-         Lemma_Layer_Fits (C, J);
+      for J in 0 .. S.Last_Layer loop
+         Lemma_Layer_Fits (S, J);
          declare
-            Off  : constant Natural := ST.SV.Pad_Off (C, J, 0);
-            Logw : constant Logw_Type := C.Layers (J).Logw;
+            Off  : constant Natural := ST.SV.Pad_Off (S, J, 0);
+            Logw : constant Logw_Type := S.Layers (J).Logw;
          begin
             for R in 0 .. Logw - 1 loop
                pragma Loop_Invariant
-                 (Off + ST.SV.Pad_Size (C, J) <= Pads'Length);
+                 (Off + ST.SV.Pad_Size (S, J) <= Pads'Length);
                for K in 0 .. 3 loop
                   pragma Loop_Invariant
-                    (Off + ST.SV.Pad_Size (C, J) <= Pads'Length);
+                    (Off + ST.SV.Pad_Size (S, J) <= Pads'Length);
                   SP.Sample_Element (Pads (Off + 4 * R + K));
                end loop;
             end loop;
@@ -169,27 +169,27 @@ package body Sumcheck_Prover is
    --  Lqc_Triples
    -------------------------------------------------------------------
 
-   procedure Lqc_Triples (C : Circuit; Lqc : out ST.SV.Lqc_Array) is
-      Base : constant Natural := C.Ninput - C.Npublic;
+   procedure Lqc_Triples (S : Shape; Lqc : out ST.SV.Lqc_Array) is
+      Base : constant Natural := S.Ninput - S.Npublic;
       Pi   : Natural := Base;
    begin
       Lqc := [others => (X => 0, Y => 0, Z => 0)];
-      ST.SV.Lemma_Pads_Below (C);
-      for J in 0 .. C.Last_Layer loop
-         pragma Loop_Invariant (Pi = ST.SV.Pad_Off (C, J, Base));
+      ST.SV.Lemma_Pads_Below (S);
+      for J in 0 .. S.Last_Layer loop
+         pragma Loop_Invariant (Pi = ST.SV.Pad_Off (S, J, Base));
          pragma Loop_Invariant
            (for all J2 in 0 .. J - 1 =>
-              Lqc (J2) = (X => ST.SV.Pad_Off (C, J2, Base)
-                                 + 4 * C.Layers (J2).Logw,
-                          Y => ST.SV.Pad_Off (C, J2, Base)
-                                 + 4 * C.Layers (J2).Logw + 1,
-                          Z => ST.SV.Pad_Off (C, J2, Base)
-                                 + 4 * C.Layers (J2).Logw + 2));
-         Lqc (J) := (X => Pi + 4 * C.Layers (J).Logw,
-                     Y => Pi + 4 * C.Layers (J).Logw + 1,
-                     Z => Pi + 4 * C.Layers (J).Logw + 2);
-         ST.SV.Lemma_Pad_Step (C, J, Base);
-         Pi := Pi + 4 * C.Layers (J).Logw + 3;
+              Lqc (J2) = (X => ST.SV.Pad_Off (S, J2, Base)
+                                 + 4 * S.Layers (J2).Logw,
+                          Y => ST.SV.Pad_Off (S, J2, Base)
+                                 + 4 * S.Layers (J2).Logw + 1,
+                          Z => ST.SV.Pad_Off (S, J2, Base)
+                                 + 4 * S.Layers (J2).Logw + 2));
+         Lqc (J) := (X => Pi + 4 * S.Layers (J).Logw,
+                     Y => Pi + 4 * S.Layers (J).Logw + 1,
+                     Z => Pi + 4 * S.Layers (J).Logw + 2);
+         ST.SV.Lemma_Pad_Step (S, J, Base);
+         Pi := Pi + 4 * S.Layers (J).Logw + 3;
       end loop;
    end Lqc_Triples;
 
@@ -763,50 +763,56 @@ package body Sumcheck_Prover is
      Pre  =>
        (Runtime =>
        J <= C.Last_Layer
-       and then Wires'First = 0 and then Wires'Length = ST.SA.Total_Wires (C)
-       and then Pads'First = 0 and then Pads'Length = Pad_Total (C)
+       and then Wires'First = 0
+       and then Wires'Length = ST.SA.Total_Wires (Shape_Of (C))
+       and then Pads'First = 0 and then Pads'Length = Pad_Total (Shape_Of (C))
        and then Logv <= Max_Logw
        and then Cur0'First = 0 and then Cur0'Last = Max_Logw - 1
        and then Cur1'First = 0 and then Cur1'Last = Max_Logw - 1
        and then Nxt0'First = 0 and then Nxt0'Last = Max_Logw - 1
        and then Nxt1'First = 0 and then Nxt1'Last = Max_Logw - 1
-       and then Proof.Last + 1 = ST.SV.Proof_Total (C)
-       and then Ch.Last + 1 = ST.SV.Chal_Total (C),
+       and then Proof.Last + 1 = ST.SV.Proof_Total (Shape_Of (C))
+       and then Ch.Last + 1 = ST.SV.Chal_Total (Shape_Of (C)),
         Proof_Only =>
-          Logv = ST.SV.Layer_Logv (C, J)
+          Logv = ST.SV.Layer_Logv (Shape_Of (C), J)
           and then (for all R in 0 .. Logv - 1 =>
-                      Same (Cur0 (R), ST.SV.Layer_G (C, Ch, J, 0) (R))
-                      and then Same (Cur1 (R), ST.SV.Layer_G (C, Ch, J,
-                                                              1) (R)))),
+                      Same (Cur0 (R),
+                            ST.SV.Layer_G (Shape_Of (C), Ch, J, 0) (R))
+                      and then
+                      Same (Cur1 (R),
+                            ST.SV.Layer_G (Shape_Of (C), Ch, J, 1) (R)))),
      Post =>
        (Runtime    => Logv <= Max_Logw,
         Proof_Only =>
           Same (BQJ, ST.SV.BQ_Ref (C, Ch, J))
           and then Logv = C.Layers (J).Logw
           and then (for all R in 0 .. Logv - 1 =>
-                      Same (Cur0 (R), ST.SV.Hand_Chal (C, Ch, J, 0) (R))
-                      and then Same (Cur1 (R), ST.SV.Hand_Chal (C, Ch, J,
-                                                                1) (R)))
+                      Same (Cur0 (R),
+                            ST.SV.Hand_Chal (Shape_Of (C), Ch, J, 0) (R))
+                      and then
+                      Same (Cur1 (R),
+                            ST.SV.Hand_Chal (Shape_Of (C), Ch, J, 1) (R)))
           and then Ch.Last = Ch'Old.Last
           and then (for all R in 0 .. Max_Logw - 1 =>
                       Same (Ch.G (R), Ch'Old.G (R)))
           and then (for all K in 0 .. Ch.Last =>
-                      (if K < ST.SV.Chal_Off (C, J)
+                      (if K < ST.SV.Chal_Off (Shape_Of (C), J)
                        then Same (Ch.Layer (K), Ch'Old.Layer (K)))))
    is
+      S     : constant Shape := Shape_Of (C);
       Ch_In : constant Challenges := Ch with Ghost => Proof_Only;
       Alpha, Beta, Chal, Ev0, Ev2, Lead, P0, P2V, Sum : Element;
       N0, N1, NT : Natural;
    begin
-      Lemma_Layer_Fits (C, J);
-      Lemma_Segment (C, J);
+      Lemma_Layer_Fits (S, J);
+      Lemma_Segment (S, J);
       declare
          Logw  : constant Logw_Type := C.Layers (J).Logw;
          NW    : constant Natural := C.Layers (J).NW_In;
-         Seg   : constant Natural := ST.SA.Off (C, J + 1);
-         Off_P : constant Natural := ST.SV.Proof_Off (C, J);
-         Off_C : constant Natural := ST.SV.Chal_Off (C, J);
-         Off_D : constant Natural := ST.SV.Pad_Off (C, J, 0);
+         Seg   : constant Natural := ST.SA.Off (S, J + 1);
+         Off_P : constant Natural := ST.SV.Proof_Off (S, J);
+         Off_C : constant Natural := ST.SV.Chal_Off (S, J);
+         Off_D : constant Natural := ST.SV.Pad_Off (S, J, 0);
          First : constant Positive := C.Layers (J).First;
          Last  : constant Natural := C.Layers (J).Last;
          T  : Terms_Access := new Term_Array'(C.Terms (First .. Last));
@@ -879,8 +885,8 @@ package body Sumcheck_Prover is
                                BQ.Bound_Array (C.Terms (First .. Last), Logv,
                                                Cur0, Cur1, Alpha, Beta),
                                Nxt0, R, Nxt1, R)));
-            pragma Loop_Invariant (Proof.Last + 1 = ST.SV.Proof_Total (C));
-            pragma Loop_Invariant (Ch.Last + 1 = ST.SV.Chal_Total (C));
+            pragma Loop_Invariant (Proof.Last + 1 = ST.SV.Proof_Total (S));
+            pragma Loop_Invariant (Ch.Last + 1 = ST.SV.Chal_Total (S));
             pragma Loop_Invariant (Proof_Only => Ch.Last = Ch_In.Last);
             pragma Loop_Invariant
               (Proof_Only =>
@@ -992,12 +998,12 @@ package body Sumcheck_Prover is
            (Proof_Only =>
               (for all R in 0 .. Logw - 1 =>
                  Same (Nxt1 (R), Ch.Layer (Off_C + 2 + 2 * R + 1))));
-         ST.SV.Lemma_Layer_G_Frame (C, Ch_In, Ch, J);
+         ST.SV.Lemma_Layer_G_Frame (S, Ch_In, Ch, J);
          pragma Assert
            (Proof_Only =>
               (for all R in 0 .. Logv - 1 =>
-                 Same (Cur0 (R), ST.SV.Layer_G (C, Ch, J, 0) (R))
-                 and then Same (Cur1 (R), ST.SV.Layer_G (C, Ch, J, 1) (R))));
+                 Same (Cur0 (R), ST.SV.Layer_G (S, Ch, J, 0) (R))
+                 and then Same (Cur1 (R), ST.SV.Layer_G (S, Ch, J, 1) (R))));
          if Tab then
             BQJ := BQ_J;
          else
@@ -1017,8 +1023,8 @@ package body Sumcheck_Prover is
          Logv := Logw;
          Cur0 := Nxt0;
          Cur1 := Nxt1;
-         ST.SV.Lemma_Hand_Chal (C, Ch, J, 0, Cur0);
-         ST.SV.Lemma_Hand_Chal (C, Ch, J, 1, Cur1);
+         ST.SV.Lemma_Hand_Chal (S, Ch, J, 0, Cur0);
+         ST.SV.Lemma_Hand_Chal (S, Ch, J, 1, Cur1);
          Free_Terms (T);
          Free_Elems (A0);
          Free_Elems (A1);
@@ -1036,6 +1042,7 @@ package body Sumcheck_Prover is
       Ch    : out Challenges;
       BQ    : out Element_Array)
    is
+      S    : constant Shape := Shape_Of (C);
       Logv : Natural := ST.SV.Ceil_Lg2 (C.Noutput);
       Cur0, Cur1 : Element_Array (0 .. Max_Logw - 1);
       Nxt0, Nxt1 : Element_Array (0 .. Max_Logw - 1) := [others => Zero];
@@ -1054,15 +1061,15 @@ package body Sumcheck_Prover is
       Cur1 := Ch.G;
       for J in 0 .. C.Last_Layer loop
          pragma Loop_Invariant (Logv <= Max_Logw);
-         pragma Loop_Invariant (Proof.Last + 1 = ST.SV.Proof_Total (C));
-         pragma Loop_Invariant (Ch.Last + 1 = ST.SV.Chal_Total (C));
+         pragma Loop_Invariant (Proof.Last + 1 = ST.SV.Proof_Total (S));
+         pragma Loop_Invariant (Ch.Last + 1 = ST.SV.Chal_Total (S));
          pragma Loop_Invariant
            (Proof_Only =>
-              Logv = ST.SV.Layer_Logv (C, J)
+              Logv = ST.SV.Layer_Logv (S, J)
               and then (for all R in 0 .. Logv - 1 =>
-                          Same (Cur0 (R), ST.SV.Layer_G (C, Ch, J, 0) (R))
+                          Same (Cur0 (R), ST.SV.Layer_G (S, Ch, J, 0) (R))
                           and then
-                          Same (Cur1 (R), ST.SV.Layer_G (C, Ch, J, 1) (R)))
+                          Same (Cur1 (R), ST.SV.Layer_G (S, Ch, J, 1) (R)))
               and then (for all J2 in 0 .. J - 1 =>
                           Same (BQ (J2), ST.SV.BQ_Ref (C, Ch, J2))));
          declare

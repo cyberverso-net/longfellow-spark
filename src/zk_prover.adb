@@ -24,27 +24,27 @@ package body Zk_Prover is
    --  Pad_Off with a base is the base plus Pad_Off from zero
    -------------------------------------------------------------------
 
-   procedure Lemma_Pad_Shift (C : Circuit; J : Natural; Base : Natural) with
+   procedure Lemma_Pad_Shift (S : Shape; J : Natural; Base : Natural) with
      Ghost, Global => null,
-     Pre  => J <= C.Last_Layer + 1 and then Base <= LPR.LV.ST.SA.Max_Wires,
-     Post => SV.Pad_Off (C, J, Base) = Base + SV.Pad_Off (C, J, 0),
+     Pre  => J <= S.Last_Layer + 1 and then Base <= LPR.LV.ST.SA.Max_Wires,
+     Post => SV.Pad_Off (S, J, Base) = Base + SV.Pad_Off (S, J, 0),
      Subprogram_Variant => (Decreases => J)
    is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", SV.Pad_Off);
    begin
       if J > 0 then
-         Lemma_Pad_Shift (C, J - 1, Base);
-         SV.Lemma_Pad_Step (C, J - 1, Base);
-         SV.Lemma_Pad_Step (C, J - 1, 0);
+         Lemma_Pad_Shift (S, J - 1, Base);
+         SV.Lemma_Pad_Step (S, J - 1, Base);
+         SV.Lemma_Pad_Step (S, J - 1, 0);
       end if;
    end Lemma_Pad_Shift;
 
-   --  The wires buffer holds at least the inputs: Total_Wires = Off (C,
-   --  Last_Layer + 2) = Off (C, Last_Layer + 1) + Ninput.
-   procedure Lemma_Wires_Cover (C : Circuit) with
+   --  The wires buffer holds at least the inputs: Total_Wires = Off (S,
+   --  Last_Layer + 2) = Off (S, Last_Layer + 1) + Ninput.
+   procedure Lemma_Wires_Cover (S : Shape) with
      Ghost, Global => null,
-     Post => LPR.LV.ST.SA.Total_Wires (C) >= C.Ninput
+     Post => LPR.LV.ST.SA.Total_Wires (S) >= S.Ninput
    is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body",
@@ -85,16 +85,16 @@ package body Zk_Prover is
      new Ada.Unchecked_Deallocation (LPR.Commitment, LPR.Commitment_Access);
 
    function Work_Shape
-     (Wk : Work; C : Circuit; G : Valid_Geometry) return Boolean
+     (Wk : Work; S : Shape; G : Valid_Geometry) return Boolean
    is
-     (Wk.Wires_Last + 1 = LPR.LV.ST.SA.Total_Wires (C)
-      and then Wk.Pads_Last + 1 = SPR.Pad_Total (C)
-      and then Wk.Wv_Last + 1 = Witness_Count (C)
-      and then Wk.Lqc_Last = C.Last_Layer
-      and then Wk.Proof_Last + 1 = SV.Proof_Total (C)
-      and then Wk.Chal_Last + 1 = SV.Chal_Total (C)
-      and then Wk.Terms_Max = SV.A_Bound (C)
-      and then Wk.B_Last = C.Last_Layer + 1
+     (Wk.Wires_Last + 1 = LPR.LV.ST.SA.Total_Wires (S)
+      and then Wk.Pads_Last + 1 = SPR.Pad_Total (S)
+      and then Wk.Wv_Last + 1 = Witness_Count (S)
+      and then Wk.Lqc_Last = S.Last_Layer
+      and then Wk.Proof_Last + 1 = SV.Proof_Total (S)
+      and then Wk.Chal_Last + 1 = SV.Chal_Total (S)
+      and then Wk.Terms_Max = SV.A_Bound (S)
+      and then Wk.B_Last = S.Last_Layer + 1
       and then Wk.Ldt_Last + 1 = G.Block_Len
       and then Wk.Linear_Last + 1 = G.Dblock_Len
       and then Wk.Low_Last + 1 = G.Num_Queries
@@ -106,22 +106,22 @@ package body Zk_Prover is
 
    --  The working set, allocated and zeroed.
    procedure Allocate_Work
-     (C : Circuit; G : Valid_Geometry; Wk : out Work_Access)
+     (S : Shape; G : Valid_Geometry; Wk : out Work_Access)
    with
-     Pre  => LPR.Prover_Fits (G) and then C.Ninput >= 1,
-     Post => Wk /= null and then Work_Shape (Wk.all, C, G)
+     Pre  => LPR.Prover_Fits (G) and then S.Ninput >= 1,
+     Post => Wk /= null and then Work_Shape (Wk.all, S, G)
    is
    begin
-      Lemma_Wires_Cover (C);
+      Lemma_Wires_Cover (S);
       Wk := new Work'
-        (Wires_Last  => LPR.LV.ST.SA.Total_Wires (C) - 1,
-         Pads_Last   => SPR.Pad_Total (C) - 1,
-         Wv_Last     => Witness_Count (C) - 1,
-         Lqc_Last    => C.Last_Layer,
-         Proof_Last  => SV.Proof_Total (C) - 1,
-         Chal_Last   => SV.Chal_Total (C) - 1,
-         Terms_Max   => SV.A_Bound (C),
-         B_Last      => C.Last_Layer + 1,
+        (Wires_Last  => LPR.LV.ST.SA.Total_Wires (S) - 1,
+         Pads_Last   => SPR.Pad_Total (S) - 1,
+         Wv_Last     => Witness_Count (S) - 1,
+         Lqc_Last    => S.Last_Layer,
+         Proof_Last  => SV.Proof_Total (S) - 1,
+         Chal_Last   => SV.Chal_Total (S) - 1,
+         Terms_Max   => SV.A_Bound (S),
+         B_Last      => S.Last_Layer + 1,
          Ldt_Last    => G.Block_Len - 1,
          Linear_Last => G.Dblock_Len - 1,
          Low_Last    => G.Num_Queries - 1,
@@ -135,13 +135,13 @@ package body Zk_Prover is
          Lqc         => [others => (X => 0, Y => 0, Z => 0)],
          Lqc2        => [others => (X => 0, Y => 0, Z => 0)],
          BQ          => [others => Zero],
-         SProof      => (Last => SV.Proof_Total (C) - 1,
+         SProof      => (Last => SV.Proof_Total (S) - 1,
                          Evals => [others => Zero]),
-         Ch          => (Last        => SV.Chal_Total (C) - 1,
+         Ch          => (Last        => SV.Chal_Total (S) - 1,
                          G           => [others => Zero],
                          Layer       => [others => Zero],
                          Alpha_Input => Zero),
-         A           => (Max        => SV.A_Bound (C),
+         A           => (Max        => SV.A_Bound (S),
                          Count      => 0,
                          Coeff      => [others => Zero],
                          Constraint => [others => 0],
@@ -172,17 +172,17 @@ package body Zk_Prover is
    --  re-injected, equal themselves; the differences are accumulated in
    --  one mask over the bytes of the two encodings.
    function Prefix_In_Subfield
-     (C : Circuit; Inputs : Element_Array; Count : Natural) return Boolean
+     (S : Shape; Inputs : Element_Array; Count : Natural) return Boolean
    with
      Global => null,
-     Pre    => Inputs'First = 0 and then Inputs'Length = C.Ninput
-               and then Count <= C.Ninput - C.Npublic
+     Pre    => Inputs'First = 0 and then Inputs'Length = S.Ninput
+               and then Count <= S.Ninput - S.Npublic
    is
       Mask : Unsigned_8 := 0;
       E2   : Element;
       Ok2  : Boolean;
    begin
-      for I in C.Npublic .. C.Npublic + Count - 1 loop
+      for I in S.Npublic .. S.Npublic + Count - 1 loop
          From_Subfield_Bytes (To_Subfield_Bytes (Inputs (I)), E2, Ok2);
          if not Ok2 then
             Mask := Mask or 1;
@@ -228,10 +228,11 @@ package body Zk_Prover is
       Len    : out Natural;
       St     : out Status)
    is
-      G     : constant Valid_Geometry := Geometry_Of (Cfg, C);
+      S     : constant Shape := Shape_Of (C);
+      G     : constant Valid_Geometry := Geometry_Of (Cfg, S);
       Npriv : constant Natural := C.Ninput - C.Npublic;
-      Sfb_W : constant Natural := Boundary_Of (C, Sfb);
-      NP    : constant Natural := SPR.Pad_Total (C);
+      Sfb_W : constant Natural := Boundary_Of (S, Sfb);
+      NP    : constant Natural := SPR.Pad_Total (S);
       Wk    : Work_Access;
       Com   : LPR.Commitment_Access;
       Ok_E, Ok_C, Ok_P : Boolean;
@@ -250,8 +251,8 @@ package body Zk_Prover is
         (G.Num_Quad_Rows
          = (C.Last_Layer + 1 + G.Witnesses_Per_Row - 1)
            / G.Witnesses_Per_Row);
-      Lemma_Pad_Shift (C, C.Last_Layer + 1, Npriv);
-      Allocate_Work (C, G, Wk);
+      Lemma_Pad_Shift (S, C.Last_Layer + 1, Npriv);
+      Allocate_Work (S, G, Wk);
 
       --  Validation: the circuit is satisfied, the inputs below the
       --  boundary lie in the subfield.
@@ -264,7 +265,7 @@ package body Zk_Prover is
       if Validate
         and then (Projected_Count (G, Sfb_W) > Npriv
                   or else not Prefix_In_Subfield
-                               (C, Inputs, Projected_Count (G, Sfb_W)))
+                               (S, Inputs, Projected_Count (G, Sfb_W)))
       then
          Free_Work (Wk);
          St := Not_In_Subfield;
@@ -272,15 +273,15 @@ package body Zk_Prover is
       end if;
 
       --  commit: the pads, the witness vector, the triples, Ligero.
-      SPR.Sample_Pads (C, Wk.Pads);
+      SPR.Sample_Pads (S, Wk.Pads);
       for I in 0 .. Npriv - 1 loop
          Wk.Wv (I) := Inputs (C.Npublic + I);
       end loop;
       for K in 0 .. NP - 1 loop
          Wk.Wv (Npriv + K) := Wk.Pads (K);
       end loop;
-      SPR.Lqc_Triples (C, Wk.Lqc);
-      SV.Lemma_Pads_Below (C);
+      SPR.Lqc_Triples (S, Wk.Lqc);
+      SV.Lemma_Pads_Below (S);
       LPR.Commit (G, Wk.Wv, Wk.Lqc, Sfb_W, Com, Ok_C);
       if not Ok_C then
          Free_Work (Wk);
@@ -291,7 +292,7 @@ package body Zk_Prover is
       --  prove: the transcript, the sumcheck, the core, Ligero.
       Transcript.Reset (Label);
       Transcript.Write_Bytes (Com.Root);
-      LPR.LV.ST.Write_Sumcheck_Statement (Id, C, Inputs (0 .. C.Npublic - 1));
+      LPR.LV.ST.Write_Sumcheck_Statement (Id, S, Inputs (0 .. C.Npublic - 1));
       SPR.Prove (C, Wk.Wires, Wk.Pads, Wk.SProof, Wk.Ch, Wk.BQ);
       SV.Verifier_Core (C, Inputs (0 .. C.Npublic - 1), Wk.SProof, Wk.Ch,
                         Wk.BQ, Wk.A, Wk.Bv, Wk.Lqc2);
@@ -310,8 +311,8 @@ package body Zk_Prover is
       end if;
 
       --  The bytes.
-      Len := PW.Proof_Len (C, G, Sfb_W, Wk.Lig.Path_Count);
-      PW.Write_Proof (C, G, Sfb_W, Com.Root, Wk.SProof, Wk.Lig,
+      Len := PW.Proof_Len (S, G, Sfb_W, Wk.Lig.Path_Count);
+      PW.Write_Proof (S, G, Sfb_W, Com.Root, Wk.SProof, Wk.Lig,
                       B (0 .. Len - 1));
       Free_Com (Com);
       Free_Work (Wk);

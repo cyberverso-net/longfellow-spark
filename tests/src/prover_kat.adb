@@ -344,8 +344,9 @@ procedure Prover_KAT is
             return;
          end if;
          declare
+            Sh    : constant SA.Shape := SA.Shape_Of (C.all);
             W     : SA.Element_Array (0 .. Nin - 1);
-            Pads  : SA.Element_Array (0 .. SPR.Pad_Total (C.all) - 1);
+            Pads  : SA.Element_Array (0 .. SPR.Pad_Total (Sh) - 1);
             Lqc   : SV.Lqc_Array (0 .. C.Last_Layer);
             Sfb   : constant Natural :=
               (if H.Subfield_Boundary > C.Npublic
@@ -355,8 +356,8 @@ procedure Prover_KAT is
                W (I) := To_Element (F (10 + I));
             end loop;
             Simple_Rng.Seed (Seed);
-            SPR.Sample_Pads (C.all, Pads);
-            SPR.Lqc_Triples (C.all, Lqc);
+            SPR.Sample_Pads (Sh, Pads);
+            SPR.Lqc_Triples (Sh, Lqc);
             declare
                Wv : constant SA.Element_Array
                  (0 .. C.Ninput - C.Npublic + Pads'Length - 1) :=
@@ -365,7 +366,7 @@ procedure Prover_KAT is
                  Make (Cfg, Wv'Length, Lqc'Length);
                NL : constant Natural := Num_Leaves (G);
             begin
-               if Wv'Length /= SV.Witness_Count (C.all) then
+               if Wv'Length /= SV.Witness_Count (Sh) then
                   Report_Failure (Name & ": witness vector length");
                   CR.Free (C);
                   return;
@@ -532,7 +533,9 @@ procedure Prover_KAT is
             Report_Failure (Name & ": circuit " & CSt'Image);
             return;
          end if;
-         if not Valid (Cfg) or else not ZKP.Config_Fits (Cfg, C.all) then
+         if not Valid (Cfg)
+           or else not ZKP.Config_Fits (Cfg, SA.Shape_Of (C.all))
+         then
             if Got ("config_invalid") then
                TIO.Put_Line ("  " & Name & ": config_invalid as expected");
                Passed := Passed + 1;
@@ -546,7 +549,8 @@ procedure Prover_KAT is
          declare
             W   : SA.Element_Array (0 .. Nin - 1);
             Max : constant Natural :=
-              ZKP.Max_Proof_Len (Cfg, C.all, H.Subfield_Boundary);
+              ZKP.Max_Proof_Len
+                (Cfg, SA.Shape_Of (C.all), H.Subfield_Boundary);
             B   : Byte_Array_Access := new Byte_Array (0 .. Max - 1);
          begin
             for I in W'Range loop
@@ -642,14 +646,15 @@ procedure Prover_KAT is
             return;
          end if;
          declare
+            Sh    : constant SA.Shape := SA.Shape_Of (C.all);
             W     : SA.Element_Array (0 .. Nwit - 1);
-            Wires : SA.Element_Array (0 .. SA.Total_Wires (C.all) - 1) :=
+            Wires : SA.Element_Array (0 .. SA.Total_Wires (Sh) - 1) :=
               [others => SA.Zero];
-            Pads  : SA.Element_Array (0 .. SPR.Pad_Total (C.all) - 1);
-            Proof : SV.Sumcheck_Proof (Last => SV.Proof_Total (C.all) - 1);
-            Ch    : SV.Challenges (Last => SV.Chal_Total (C.all) - 1);
+            Pads  : SA.Element_Array (0 .. SPR.Pad_Total (Sh) - 1);
+            Proof : SV.Sumcheck_Proof (Last => SV.Proof_Total (Sh) - 1);
+            Ch    : SV.Challenges (Last => SV.Chal_Total (Sh) - 1);
             BQ    : SA.Element_Array (0 .. C.Last_Layer);
-            Out_B : Byte_Array (0 .. PW.Sumcheck_Len (C.all) - 1);
+            Out_B : Byte_Array (0 .. PW.Sumcheck_Len (Sh) - 1);
             Ok    : Boolean;
          begin
             if Nwit /= C.Ninput or else Npads /= Pads'Length then
@@ -668,9 +673,9 @@ procedure Prover_KAT is
             end if;
             Transcript.Reset (Label);
             Transcript.Write_Bytes (Root.all);
-            ST.Write_Sumcheck_Statement (H.Id, C.all, W (0 .. C.Npublic - 1));
+            ST.Write_Sumcheck_Statement (H.Id, Sh, W (0 .. C.Npublic - 1));
             Simple_Rng.Seed (Seed);
-            SPR.Sample_Pads (C.all, Pads);
+            SPR.Sample_Pads (Sh, Pads);
             for I in Pads'Range loop
                if Pads (I) /= To_Element (F (10 + Nwit + I)) then
                   Report_Failure (Name & ": pad" & I'Image & " differs");
@@ -707,9 +712,9 @@ procedure Prover_KAT is
                for J in 0 .. C.Last_Layer loop
                   declare
                      Lw    : constant Natural := C.Layers (J).Logw;
-                     Off_P : constant Natural := SV.Proof_Off (C.all, J);
-                     Off_C : constant Natural := SV.Chal_Off (C.all, J);
-                     Off_D : constant Natural := SV.Pad_Off (C.all, J, 0);
+                     Off_P : constant Natural := SV.Proof_Off (Sh, J);
+                     Off_C : constant Natural := SV.Chal_Off (Sh, J);
+                     Off_D : constant Natural := SV.Pad_Off (Sh, J, 0);
                   begin
                      Sum := Cl0 + Ch.Layer (Off_C) * Cl1;
                      for R in 0 .. Lw - 1 loop
@@ -739,7 +744,7 @@ procedure Prover_KAT is
                   end;
                end loop;
             end;
-            PW.Write_Sumcheck_Proof (C.all, Proof, Out_B);
+            PW.Write_Sumcheck_Proof (Sh, Proof, Out_B);
             if Out_B'Length /= Want'Length then
                Report_Failure (Name & ": proof length" & Out_B'Length'Image
                                & ", expected" & Want'Length'Image);
@@ -762,7 +767,7 @@ procedure Prover_KAT is
             for J in 0 .. C.Last_Layer loop
                declare
                   NW  : constant Natural := C.Layers (J).NW_In;
-                  Seg : constant Natural := SA.Off (C.all, J + 1);
+                  Seg : constant Natural := SA.Off (Sh, J + 1);
                   T   : constant SA.Term_Array :=
                     C.Terms (C.Layers (J).First .. C.Layers (J).Last);
                   A   : constant SA.Element_Array (0 .. NW - 1) :=
@@ -813,7 +818,7 @@ procedure Prover_KAT is
                        (SA.Element_Array, Elems_Access);
                      NW  : constant Natural := C.Layers (J).NW_In;
                      Lw  : constant Natural := C.Layers (J).Logw;
-                     Seg : constant Natural := SA.Off (C.all, J + 1);
+                     Seg : constant Natural := SA.Off (Sh, J + 1);
                      TR  : SA.Term_Array :=
                        C.Terms (C.Layers (J).First .. C.Layers (J).Last);
                      TF  : SA.Term_Array := TR;
@@ -886,17 +891,17 @@ procedure Prover_KAT is
                Npriv : constant Natural := C.Ninput - C.Npublic;
                Ch2   : SV.Challenges (Last => Ch.Last);
                VSt   : ST.Status;
-               A     : SV.Ligero_Terms (Max => SV.A_Bound (C.all) - 1);
+               A     : SV.Ligero_Terms (Max => SV.A_Bound (Sh) - 1);
                Bv    : SA.Element_Array (0 .. C.Last_Layer + 1);
                Lqc   : SV.Lqc_Array (0 .. C.Last_Layer);
                Wv    : constant SA.Element_Array
-                 (0 .. SV.Witness_Count (C.all) - 1) :=
+                 (0 .. SV.Witness_Count (Sh) - 1) :=
                  W (C.Npublic .. C.Ninput - 1) & Pads;
                Acc   : SA.Element_Array (Bv'Range) := [others => SA.Zero];
             begin
                ST.Replay_Challenges
-                 (Label, Root.all, H.Id, C.all, W (0 .. C.Npublic - 1),
-                  Proof, Ch2, VSt);
+                 (Label, Root.all, H.Id, Sh,
+                  W (0 .. C.Npublic - 1), Proof, Ch2, VSt);
                if VSt /= ST.Ok then
                   Report_Failure (Name & ": replay " & VSt'Image);
                   CR.Free (C);

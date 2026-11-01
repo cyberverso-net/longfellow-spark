@@ -214,10 +214,11 @@ procedure Writer_KAT is
          return;
       end if;
       declare
+         Sh   : constant SA.Shape := SA.Shape_Of (C.all);
          G    : constant Ligero_Geometry.Valid_Geometry :=
-           ZK.Geometry_Of (Cfg, C.all);
+           ZK.Geometry_Of (Cfg, Sh);
          Root : Bytes_32;
-         Sum  : SV.Sumcheck_Proof (Last => SV.Proof_Total (C.all) - 1);
+         Sum  : SV.Sumcheck_Proof (Last => SV.Proof_Total (Sh) - 1);
          Lig  : LP.Proof
            (Ldt_Last    => G.Block_Len - 1,
             Linear_Last => G.Dblock_Len - 1,
@@ -227,7 +228,7 @@ procedure Writer_KAT is
             Col_Last    => LP.Opened (G) - 1,
             Path_Last   => 2 * Ligero_Geometry.Num_Leaves (G) - 1);
       begin
-         ZK.Read_Proof (Proof, C.all, G, Root, Sum, Lig, VSt);
+         ZK.Read_Proof (Proof, Sh, G, Root, Sum, Lig, VSt);
          if VSt /= Verifier_Status.Ok then
             Report_Failure (Name & ": read " & VSt'Image);
             CR.Free (C);
@@ -235,8 +236,8 @@ procedure Writer_KAT is
          end if;
          declare
             Len : constant Natural :=
-              PW.Proof_Len (C.all, G, H.Subfield_Boundary, Lig.Path_Count);
-            SL  : constant Natural := 32 + PW.Sumcheck_Len (C.all);
+              PW.Proof_Len (Sh, G, H.Subfield_Boundary, Lig.Path_Count);
+            SL  : constant Natural := 32 + PW.Sumcheck_Len (Sh);
             FL  : constant Natural := SL + LP.Fixed_Len (G);
             Out_B : Byte_Array (0 .. Len - 1);
          begin
@@ -246,8 +247,7 @@ procedure Writer_KAT is
                CR.Free (C);
                return;
             end if;
-            PW.Write_Proof (C.all, G, H.Subfield_Boundary, Root, Sum, Lig,
-                            Out_B);
+            PW.Write_Proof (Sh, G, H.Subfield_Boundary, Root, Sum, Lig, Out_B);
             for I in Out_B'Range loop
                if Out_B (I) /= Proof (I) then
                   Report_Failure

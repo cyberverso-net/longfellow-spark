@@ -304,7 +304,7 @@ procedure Interop_KAT is
          --  part (its last byte, a path digest).
          declare
             Offsets : constant array (1 .. 3) of Natural :=
-              [0, 32 + ZK.Sumcheck_Len (C.all) / 2, Proof'Last];
+              [0, 32 + ZK.Sumcheck_Len (ZK.Shape_Of (C.all)) / 2, Proof'Last];
          begin
             for K in Offsets'Range loop
                declare

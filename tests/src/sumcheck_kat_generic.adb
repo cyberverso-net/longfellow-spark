@@ -234,7 +234,7 @@ package body Sumcheck_KAT_Generic is
          declare
             C     : constant Circuit := Raw;   --  predicate checked here
             W     : Element_Array (0 .. C_Ninput - 1);
-            Wires : Element_Array (0 .. Total_Wires (C) - 1) :=
+            Wires : Element_Array (0 .. Total_Wires (Shape_Of (C)) - 1) :=
               [others => Zero];
             Ok    : Boolean;
          begin
@@ -248,8 +248,8 @@ package body Sumcheck_KAT_Generic is
             for J in 0 .. C_NL loop
                if Segments (J).Given then
                   declare
-                     Size : constant Natural := Seg_Size (C, J);
-                     Base : constant Natural := Off (C, J);
+                     Size : constant Natural := Seg_Size (Shape_Of (C), J);
+                     Base : constant Natural := Off (Shape_Of (C), J);
                      Good : Boolean := Segments (J).Length = Size;
                   begin
                      if Good then
@@ -276,7 +276,7 @@ package body Sumcheck_KAT_Generic is
             --  fast form is tested against the reference form).
             for J in 0 .. C.Last_Layer loop
                declare
-                  Size : constant Natural := Seg_Size (C, J);
+                  Size : constant Natural := Seg_Size (Shape_Of (C), J);
                   Logv : Natural := 0;
                   G0, G1, H0, H1 : Element_Array (0 .. Max_Logw - 1);
                   V : Element := P2;
@@ -717,7 +717,7 @@ package body Sumcheck_KAT_Generic is
       end if;
       declare
          G      : constant Valid_Geometry :=
-           Make (Cfg, ZK.Witness_Count (C), C.Last_Layer + 1);
+           Make (Cfg, ZK.Witness_Count (Shape_Of (C)), C.Last_Layer + 1);
          Size   : constant Natural := LP.Size;
          Sub    : constant Natural := LP.Sub_Size;
          Total  : constant Natural := LP.Opened (G);
@@ -830,15 +830,15 @@ package body Sumcheck_KAT_Generic is
          Stat : ST.Status;
          Same : Boolean := True;
       begin
-         if Zk_Sumcheck_Len /= SV.Proof_Total (C) * ST.Size then
+         if Zk_Sumcheck_Len /= SV.Proof_Total (Shape_Of (C)) * ST.Size then
             Report_Failure
               ("tier 3 " & Name & ": sumcheck part is" & Zk_Sumcheck_Len'Image
                & " bytes, the circuit needs"
-               & Natural'Image (SV.Proof_Total (C) * ST.Size));
+               & Natural'Image (SV.Proof_Total (Shape_Of (C)) * ST.Size));
             return;
          end if;
          ST.Read_Sumcheck_Proof
-           (Zk_Sumcheck (0 .. Zk_Sumcheck_Len - 1), C, Prf2, Stat);
+           (Zk_Sumcheck (0 .. Zk_Sumcheck_Len - 1), Shape_Of (C), Prf2, Stat);
          Check (Stat = ST.Ok,
                 "tier 3 " & Name & ": reader status " & Stat'Image);
          for I in Prf2.Evals'Range loop
@@ -864,8 +864,8 @@ package body Sumcheck_KAT_Generic is
          Lqc2 : SV.Lqc_Array (Lqc'Range);
       begin
          ST.Replay_Challenges
-           (Zk_Label (0 .. Zk_Label_Len - 1), Zk_Root, Zk_Id, C, Pub, Prf,
-            Ch2, Stat);
+           (Zk_Label (0 .. Zk_Label_Len - 1), Zk_Root, Zk_Id, Shape_Of (C),
+            Pub, Prf, Ch2, Stat);
          Check (Stat = ST.Ok,
                 "tier 3 " & Name & ": replay status " & Stat'Image);
          for I in Ch2.G'Range loop
@@ -938,7 +938,7 @@ package body Sumcheck_KAT_Generic is
             Stat : ST.Status;
          begin
             Bad (0 .. ST.Size - 1) := [others => 16#FF#];
-            ST.Read_Sumcheck_Proof (Bad, C, Prf3, Stat);
+            ST.Read_Sumcheck_Proof (Bad, Shape_Of (C), Prf3, Stat);
             Check (Stat = ST.Bad_Element,
                    "tier 3 " & Name & ": non-canonical element not refused");
          end;
@@ -964,7 +964,7 @@ package body Sumcheck_KAT_Generic is
       for J in 0 .. C.Last_Layer loop
          declare
             Logw     : constant Natural := C.Layers (J).Logw;
-            CO       : constant Natural := SV.Chal_Off (C, J);
+            CO       : constant Natural := SV.Chal_Off (Shape_Of (C), J);
             HC0, HC1 : Element_Array (0 .. Max_Logw - 1) :=
               [others => Zero];
             Fast, Slow : Element;
@@ -1045,7 +1045,7 @@ package body Sumcheck_KAT_Generic is
             Pub : Element_Array (0 .. C_Npublic - 1);
             Ch  : SV.Challenges (Last => Chal_Count - 1);
             Prf : SV.Sumcheck_Proof (Last => Proof_Count - 1);
-            A   : SV.Ligero_Terms (Max => SV.A_Bound (C));
+            A   : SV.Ligero_Terms (Max => SV.A_Bound (Shape_Of (C)));
             B   : Element_Array (0 .. C_NL);
             Lqc : SV.Lqc_Array (0 .. C_NL - 1);
          begin
@@ -1064,8 +1064,8 @@ package body Sumcheck_KAT_Generic is
             end loop;
             Check (Pad_Base_Val = C_Ninput - C_Npublic,
                    "tier 3 " & Name & ": pad_base is not ninput - npublic");
-            Check (Chal_Count = SV.Chal_Total (C)
-                   and then Proof_Count = SV.Proof_Total (C),
+            Check (Chal_Count = SV.Chal_Total (Shape_Of (C))
+                   and then Proof_Count = SV.Proof_Total (Shape_Of (C)),
                    "tier 3 " & Name & ": challenge or proof count");
             declare
                BQ : Element_Array (0 .. C.Last_Layer);

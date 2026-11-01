@@ -303,7 +303,7 @@ procedure Longfellow_Prove is
          CR.Free (C);
          return 1;
       end if;
-      if not ZKP.Config_Fits (Cfg, C.all) then
+      if not ZKP.Config_Fits (Cfg, ZKP.Shape_Of (C.all)) then
          TIO.Put_Line ("config_invalid");
          CR.Free (C);
          return 1;
@@ -336,7 +336,8 @@ procedure Longfellow_Prove is
          declare
             Label : constant Byte_Array := To_Label (Label_Arg.all);
             Max   : constant Natural :=
-              ZKP.Max_Proof_Len (Cfg, C.all, H.Subfield_Boundary);
+              ZKP.Max_Proof_Len
+                (Cfg, ZKP.Shape_Of (C.all), H.Subfield_Boundary);
             Out_B : constant Byte_Array_Access :=
               new Byte_Array (0 .. Max - 1);
          begin

@@ -77,6 +77,12 @@ package Zk_Prover is
    subtype Element is LPR.LV.ST.SA.Element;
    subtype Element_Array is LPR.LV.ST.SA.Element_Array;
    subtype Circuit is LPR.LV.ST.SA.Circuit;
+   subtype Shape is LPR.LV.ST.SA.Shape;
+
+   --  The shape of the circuit, for the sizes (Sumcheck_Algebra).
+   function Shape_Of (C : Circuit) return Shape is
+     (LPR.LV.ST.SA.Shape_Of (C))
+   with Global => null;
 
    use type LPR.LV.ST.SA.Element;
 
@@ -86,31 +92,31 @@ package Zk_Prover is
    Default_Statement_Hash : constant Bytes_32 :=
      [16#de#, 16#ad#, 16#be#, 16#ef#, others => 0];
 
-   function Witness_Count (C : Circuit) return Natural
+   function Witness_Count (S : Shape) return Natural
      renames LPR.LV.ST.SV.Witness_Count;
 
    --  The geometry of a proof of C under Cfg (as the verifier's).
-   function Geometry_Of (Cfg : Config; C : Circuit) return Valid_Geometry is
-     (Make (Cfg, Witness_Count (C), C.Last_Layer + 1))
+   function Geometry_Of (Cfg : Config; S : Shape) return Valid_Geometry is
+     (Make (Cfg, Witness_Count (S), S.Last_Layer + 1))
    with Pre => Valid (Cfg);
 
-   --  A configuration the prover handles for C.
-   function Config_Fits (Cfg : Config; C : Circuit) return Boolean is
-     (Valid (Cfg) and then LPR.Prover_Fits (Geometry_Of (Cfg, C)));
+   --  A configuration the prover handles for S.
+   function Config_Fits (Cfg : Config; S : Shape) return Boolean is
+     (Valid (Cfg) and then LPR.Prover_Fits (Geometry_Of (Cfg, S)));
 
    --  The subfield boundary within the witness vector: the circuit's,
    --  less the public inputs (saturating), as ZkProver::commit.
-   function Boundary_Of (C : Circuit; Sfb : Natural) return Natural is
-     (if Sfb > C.Npublic then Sfb - C.Npublic else 0);
+   function Boundary_Of (S : Shape; Sfb : Natural) return Natural is
+     (if Sfb > S.Npublic then Sfb - S.Npublic else 0);
 
    --  The bytes a proof of C may take under Cfg: the writer's length
    --  with the longest opening.
    function Max_Proof_Len
-     (Cfg : Config; C : Circuit; Sfb : Natural) return Natural
+     (Cfg : Config; S : Shape; Sfb : Natural) return Natural
    is
-     (PW.Proof_Len (C, Geometry_Of (Cfg, C), Boundary_Of (C, Sfb),
-                    2 * Num_Leaves (Geometry_Of (Cfg, C))))
-   with Pre => Config_Fits (Cfg, C);
+     (PW.Proof_Len (S, Geometry_Of (Cfg, S), Boundary_Of (S, Sfb),
+                    2 * Num_Leaves (Geometry_Of (Cfg, S))))
+   with Pre => Config_Fits (Cfg, S);
 
    --  The proof of C on Inputs under Label and Cfg, Id the circuit
    --  identifier and Sfb the subfield boundary of the circuit file:
@@ -132,9 +138,10 @@ package Zk_Prover is
      Always_Terminates => False,
      Pre               =>
        Label'Length <= Transcript.Max_Payload
-       and then Config_Fits (Cfg, C) and then C.Ninput >= 1
+       and then Config_Fits (Cfg, Shape_Of (C)) and then C.Ninput >= 1
        and then Inputs'First = 0
-       and then B'First = 0 and then B'Length = Max_Proof_Len (Cfg, C, Sfb),
+       and then B'First = 0
+       and then B'Length = Max_Proof_Len (Cfg, Shape_Of (C), Sfb),
      Post              =>
        (if St = Ok then Len in 1 .. B'Length else Len = 0)
        and then (St = Input_Length) = (Inputs'Length /= C.Ninput)

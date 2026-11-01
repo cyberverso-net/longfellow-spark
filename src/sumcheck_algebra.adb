@@ -575,34 +575,39 @@ package body Sumcheck_Algebra is
       end loop;
    end Eval_Quad;
 
+   procedure Lemma_Shape_Of (C : Raw_Circuit) is
+   begin
+      null;
+   end Lemma_Shape_Of;
+
    ----------------------------------------------------------------------
    --  Lemmas for Eval_Circuit (ghost procedures, bodies proved).
    ----------------------------------------------------------------------
 
    --  Off is non-decreasing in the segment index.
-   procedure Lemma_Off_Mono (C : Circuit; I, J : Natural) with
+   procedure Lemma_Off_Mono (S : Shape; I, J : Natural) with
      Ghost, Global => null,
-     Pre  => I <= J and then J <= C.Last_Layer + 2,
-     Post => Off (C, I) <= Off (C, J),
+     Pre  => I <= J and then J <= S.Last_Layer + 2,
+     Post => Off (S, I) <= Off (S, J),
      Subprogram_Variant => (Decreases => J);
 
-   procedure Lemma_Off_Mono (C : Circuit; I, J : Natural) is
+   procedure Lemma_Off_Mono (S : Shape; I, J : Natural) is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Off);
    begin
       if J > I then
-         Lemma_Off_Mono (C, I, J - 1);
+         Lemma_Off_Mono (S, I, J - 1);
       end if;
    end Lemma_Off_Mono;
 
    --  One step of the definition of Off, for the callers that do not see
    --  its body.
-   procedure Lemma_Off_Step (C : Circuit; J : Natural) with
+   procedure Lemma_Off_Step (S : Shape; J : Natural) with
      Ghost, Global => null,
-     Pre  => J <= C.Last_Layer + 1,
-     Post => Off (C, J + 1) = Off (C, J) + Seg_Size (C, J);
+     Pre  => J <= S.Last_Layer + 1,
+     Post => Off (S, J + 1) = Off (S, J) + Seg_Size (S, J);
 
-   procedure Lemma_Off_Step (C : Circuit; J : Natural) is
+   procedure Lemma_Off_Step (S : Shape; J : Natural) is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Off);
    begin
@@ -644,9 +649,9 @@ package body Sumcheck_Algebra is
       end if;
    end Lemma_Acc_Frame;
 
-   --  Two buffers of the same length that agree from Off (C, From + 1)
-   --  on: a layer J above From that holds in B1 holds in B2, and its Z
-   --  status is the same in both.
+   --  Two buffers of the same length that agree from the offset of
+   --  segment From + 1 on: a layer J above From that holds in B1 holds
+   --  in B2, and its Z status is the same in both.
    procedure Lemma_Layer_Frame (C : Circuit; B1, B2 : Element_Array;
                                 J, From : Natural)
    with
@@ -654,7 +659,7 @@ package body Sumcheck_Algebra is
      Pre  => B1'First = 0 and then B2'First = 0
        and then B1'Length = B2'Length
        and then From < J and then J <= C.Last_Layer
-       and then (for all K in Off (C, From + 1) .. B1'Last =>
+       and then (for all K in Off (Shape_Of (C), From + 1) .. B1'Last =>
                    Same (B1 (K), B2 (K)))
        and then Layer_Holds (C, B1, J),
      Post => Layer_Holds (C, B2, J)
@@ -665,20 +670,21 @@ package body Sumcheck_Algebra is
    is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Layer_Holds);
+      S : constant Shape := Shape_Of (C);
    begin
-      Lemma_Off_Mono (C, From + 1, J);
-      Lemma_Off_Mono (C, From + 1, J + 1);
-      for G in 0 .. Seg_Size (C, J) - 1 loop
-         Lemma_Acc_Frame (B1, B2, Off (C, J + 1), Layer_Terms (C, J),
+      Lemma_Off_Mono (S, From + 1, J);
+      Lemma_Off_Mono (S, From + 1, J + 1);
+      for G in 0 .. Seg_Size (S, J) - 1 loop
+         Lemma_Acc_Frame (B1, B2, Off (S, J + 1), Layer_Terms (C, J),
                           Layer_Terms (C, J)'Length, G);
          pragma Loop_Invariant
            (for all G2 in 0 .. G =>
-              Same (Acc_Ref (B1, Off (C, J + 1), Layer_Terms (C, J),
+              Same (Acc_Ref (B1, Off (S, J + 1), Layer_Terms (C, J),
                              Layer_Terms (C, J)'Length, G2),
-                    Acc_Ref (B2, Off (C, J + 1), Layer_Terms (C, J),
+                    Acc_Ref (B2, Off (S, J + 1), Layer_Terms (C, J),
                              Layer_Terms (C, J)'Length, G2)));
       end loop;
-      Lemma_Acc_Frame (B1, B2, Off (C, J + 1), Layer_Terms (C, J),
+      Lemma_Acc_Frame (B1, B2, Off (S, J + 1), Layer_Terms (C, J),
                        Layer_Terms (C, J)'Length, 0);
    end Lemma_Layer_Frame;
 
@@ -691,13 +697,13 @@ package body Sumcheck_Algebra is
      Pre  => B1'First = 0 and then B2'First = 0
        and then B1'Length = B2'Length
        and then From <= C.Last_Layer
-       and then (for all K in Off (C, From + 1) .. B1'Last =>
+       and then (for all K in Off (Shape_Of (C), From + 1) .. B1'Last =>
                    Same (B1 (K), B2 (K))),
-     Post => (for all G in 0 .. Seg_Size (C, From) - 1 =>
-                Same (Acc_Ref (B1, Off (C, From + 1),
+     Post => (for all G in 0 .. Seg_Size (Shape_Of (C), From) - 1 =>
+                Same (Acc_Ref (B1, Off (Shape_Of (C), From + 1),
                                Layer_Terms (C, From),
                                Layer_Terms (C, From)'Length, G),
-                      Acc_Ref (B2, Off (C, From + 1),
+                      Acc_Ref (B2, Off (Shape_Of (C), From + 1),
                                Layer_Terms (C, From),
                                Layer_Terms (C, From)'Length, G)))
        and then Layer_Z (C, B1, From) = Layer_Z (C, B2, From);
@@ -705,18 +711,19 @@ package body Sumcheck_Algebra is
    procedure Lemma_From_Frame (C : Circuit; B1, B2 : Element_Array;
                                From : Natural)
    is
+      S : constant Shape := Shape_Of (C);
    begin
-      for G in 0 .. Seg_Size (C, From) - 1 loop
-         Lemma_Acc_Frame (B1, B2, Off (C, From + 1), Layer_Terms (C, From),
+      for G in 0 .. Seg_Size (S, From) - 1 loop
+         Lemma_Acc_Frame (B1, B2, Off (S, From + 1), Layer_Terms (C, From),
                           Layer_Terms (C, From)'Length, G);
          pragma Loop_Invariant
            (for all G2 in 0 .. G =>
-              Same (Acc_Ref (B1, Off (C, From + 1), Layer_Terms (C, From),
+              Same (Acc_Ref (B1, Off (S, From + 1), Layer_Terms (C, From),
                              Layer_Terms (C, From)'Length, G2),
-                    Acc_Ref (B2, Off (C, From + 1), Layer_Terms (C, From),
+                    Acc_Ref (B2, Off (S, From + 1), Layer_Terms (C, From),
                              Layer_Terms (C, From)'Length, G2)));
       end loop;
-      Lemma_Acc_Frame (B1, B2, Off (C, From + 1), Layer_Terms (C, From),
+      Lemma_Acc_Frame (B1, B2, Off (S, From + 1), Layer_Terms (C, From),
                        Layer_Terms (C, From)'Length, 0);
    end Lemma_From_Frame;
 
@@ -727,13 +734,15 @@ package body Sumcheck_Algebra is
    with
      Ghost, Global => null,
      Pre  => Wires'First = 0 and then J <= C.Last_Layer
-       and then V'First = 0 and then V'Length = Seg_Size (C, J)
-       and then Off (C, J) + Seg_Size (C, J) <= Wires'Length
+       and then V'First = 0 and then V'Length = Seg_Size (Shape_Of (C), J)
+       and then Off (Shape_Of (C), J) + Seg_Size (Shape_Of (C), J)
+                <= Wires'Length
        and then (for all G in V'Range =>
-                   Same (Wires (Off (C, J) + G), V (G)))
+                   Same (Wires (Off (Shape_Of (C), J) + G), V (G)))
        and then (for all G in V'Range =>
                    Same (V (G),
-                         Acc_Ref (Wires, Off (C, J + 1), Layer_Terms (C, J),
+                         Acc_Ref (Wires, Off (Shape_Of (C), J + 1),
+                                  Layer_Terms (C, J),
                                   Layer_Terms (C, J)'Length, G))),
      Post => Layer_Holds (C, Wires, J);
 
@@ -753,10 +762,11 @@ package body Sumcheck_Algebra is
    procedure Eval_Circuit (C : Circuit; W : Element_Array;
                            Wires : in out Element_Array; OK : out Boolean)
    is
-      In_Base : constant Natural := Off (C, C.Last_Layer + 1);
+      S       : constant Shape := Shape_Of (C);
+      In_Base : constant Natural := Off (S, C.Last_Layer + 1);
    begin
       --  Segment NL is the input.
-      Lemma_Off_Step (C, C.Last_Layer + 1);
+      Lemma_Off_Step (S, C.Last_Layer + 1);
       for I in 0 .. C.Ninput - 1 loop
          Wires (In_Base + I) := W (I);
          pragma Loop_Invariant
@@ -773,14 +783,14 @@ package body Sumcheck_Algebra is
          pragma Loop_Invariant
            (OK = (for all J2 in J + 1 .. C.Last_Layer =>
                     Layer_Z (C, Wires, J2)));
-         Lemma_Off_Step (C, J);
-         Lemma_Off_Step (C, J + 1);
-         Lemma_Off_Mono (C, J + 2, C.Last_Layer + 2);
-         Lemma_Off_Mono (C, J + 1, C.Last_Layer + 1);
+         Lemma_Off_Step (S, J);
+         Lemma_Off_Step (S, J + 1);
+         Lemma_Off_Mono (S, J + 2, C.Last_Layer + 2);
+         Lemma_Off_Mono (S, J + 1, C.Last_Layer + 1);
          declare
-            Size     : constant Wire_Count := Seg_Size (C, J);
-            Base_In  : constant Natural := Off (C, J + 1);
-            Base_Out : constant Natural := Off (C, J);
+            Size     : constant Wire_Count := Seg_Size (S, J);
+            Base_In  : constant Natural := Off (S, J + 1);
+            Base_Out : constant Natural := Off (S, J);
             V        : Elems_Access :=
               new Element_Array'(0 .. Size - 1 => Zero);
             Layer_OK : Boolean;

@@ -15,73 +15,73 @@ package body Sumcheck_Verifier is
    --  Offset lemmas (the bodies of the offset functions are hidden).
    ----------------------------------------------------------------------
 
-   procedure Lemma_Chal_Step (C : Circuit; J : Natural) with
+   procedure Lemma_Chal_Step (S : Shape; J : Natural) with
      Ghost, Global => null,
-     Pre  => J <= C.Last_Layer,
-     Post => Chal_Off (C, J + 1) = Chal_Off (C, J) + Chal_Size (C, J);
+     Pre  => J <= S.Last_Layer,
+     Post => Chal_Off (S, J + 1) = Chal_Off (S, J) + Chal_Size (S, J);
 
-   procedure Lemma_Chal_Step (C : Circuit; J : Natural) is
+   procedure Lemma_Chal_Step (S : Shape; J : Natural) is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Chal_Off);
    begin
       null;
    end Lemma_Chal_Step;
 
-   procedure Lemma_Chal_Mono (C : Circuit; I, J : Natural) with
+   procedure Lemma_Chal_Mono (S : Shape; I, J : Natural) with
      Ghost, Global => null,
-     Pre  => I <= J and then J <= C.Last_Layer + 1,
-     Post => Chal_Off (C, I) <= Chal_Off (C, J),
+     Pre  => I <= J and then J <= S.Last_Layer + 1,
+     Post => Chal_Off (S, I) <= Chal_Off (S, J),
      Subprogram_Variant => (Decreases => J);
 
-   procedure Lemma_Chal_Mono (C : Circuit; I, J : Natural) is
+   procedure Lemma_Chal_Mono (S : Shape; I, J : Natural) is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Chal_Off);
    begin
       if J > I then
-         Lemma_Chal_Mono (C, I, J - 1);
+         Lemma_Chal_Mono (S, I, J - 1);
       end if;
    end Lemma_Chal_Mono;
 
-   procedure Lemma_Proof_Step (C : Circuit; J : Natural) with
+   procedure Lemma_Proof_Step (S : Shape; J : Natural) with
      Ghost, Global => null,
-     Pre  => J <= C.Last_Layer,
-     Post => Proof_Off (C, J + 1) = Proof_Off (C, J) + Proof_Size (C, J);
+     Pre  => J <= S.Last_Layer,
+     Post => Proof_Off (S, J + 1) = Proof_Off (S, J) + Proof_Size (S, J);
 
-   procedure Lemma_Proof_Step (C : Circuit; J : Natural) is
+   procedure Lemma_Proof_Step (S : Shape; J : Natural) is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Proof_Off);
    begin
       null;
    end Lemma_Proof_Step;
 
-   procedure Lemma_Proof_Mono (C : Circuit; I, J : Natural) with
+   procedure Lemma_Proof_Mono (S : Shape; I, J : Natural) with
      Ghost, Global => null,
-     Pre  => I <= J and then J <= C.Last_Layer + 1,
-     Post => Proof_Off (C, I) <= Proof_Off (C, J),
+     Pre  => I <= J and then J <= S.Last_Layer + 1,
+     Post => Proof_Off (S, I) <= Proof_Off (S, J),
      Subprogram_Variant => (Decreases => J);
 
-   procedure Lemma_Proof_Mono (C : Circuit; I, J : Natural) is
+   procedure Lemma_Proof_Mono (S : Shape; I, J : Natural) is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Proof_Off);
    begin
       if J > I then
-         Lemma_Proof_Mono (C, I, J - 1);
+         Lemma_Proof_Mono (S, I, J - 1);
       end if;
    end Lemma_Proof_Mono;
 
-   procedure Lemma_Pad_Step (C : Circuit; J : Natural; Base : Natural) is
+   procedure Lemma_Pad_Step (S : Shape; J : Natural; Base : Natural) is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Pad_Off);
    begin
       null;
    end Lemma_Pad_Step;
 
-   procedure Lemma_Pad_Mono (C : Circuit; I, J : Natural; Base : Natural) is
+   procedure Lemma_Pad_Mono (S : Shape; I, J : Natural; Base : Natural) is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Pad_Off);
    begin
       if J > I then
-         Lemma_Pad_Mono (C, I, J - 1, Base);
+         Lemma_Pad_Mono (S, I, J - 1, Base);
       end if;
    end Lemma_Pad_Mono;
 
@@ -122,16 +122,16 @@ package body Sumcheck_Verifier is
       end loop;
    end Lemma_Terms_Below;
 
-   procedure Lemma_Pads_Below (C : Circuit) is
-      Base : constant Natural := C.Ninput - C.Npublic;
+   procedure Lemma_Pads_Below (S : Shape) is
+      Base : constant Natural := S.Ninput - S.Npublic;
    begin
-      for J in 0 .. C.Last_Layer loop
+      for J in 0 .. S.Last_Layer loop
          pragma Loop_Invariant
            (for all J2 in 0 .. J - 1 =>
-              Pad_Off (C, J2, Base) + 4 * C.Layers (J2).Logw + 3
-              <= Witness_Count (C));
-         Lemma_Pad_Step (C, J, Base);
-         Lemma_Pad_Mono (C, J + 1, C.Last_Layer + 1, Base);
+              Pad_Off (S, J2, Base) + 4 * S.Layers (J2).Logw + 3
+              <= Witness_Count (S));
+         Lemma_Pad_Step (S, J, Base);
+         Lemma_Pad_Mono (S, J + 1, S.Last_Layer + 1, Base);
       end loop;
    end Lemma_Pads_Below;
 
@@ -240,7 +240,7 @@ package body Sumcheck_Verifier is
    ----------------------------------------------------------------------
 
    procedure Verify_Layer
-     (C       : Circuit;
+     (S       : Shape;
       J       : Natural;
       Proof   : Sumcheck_Proof;
       Ch      : Challenges;
@@ -253,19 +253,19 @@ package body Sumcheck_Verifier is
       Lqc     : out Lqc_Triple)
    is
       Cap   : constant Capacity_Type := Layer_Capacity;
-      Logw  : constant Logw_Type := C.Layers (J).Logw;
-      CO    : constant Natural := Chal_Off (C, J);
-      PO    : constant Natural := Proof_Off (C, J);
-      PB    : constant Natural := Pad_Off (C, J, Base);
+      Logw  : constant Logw_Type := S.Layers (J).Logw;
+      CO    : constant Natural := Chal_Off (S, J);
+      PO    : constant Natural := Proof_Off (S, J);
+      PB    : constant Natural := Pad_Off (S, J, Base);
       HC0   : Challenge_Vector := [others => Zero];
       HC1   : Challenge_Vector := [others => Zero];
    begin
       --  The blocks of this layer lie inside the records.
-      Lemma_Chal_Step (C, J);
-      Lemma_Chal_Mono (C, J + 1, C.Last_Layer + 1);
-      Lemma_Proof_Step (C, J);
-      Lemma_Proof_Mono (C, J + 1, C.Last_Layer + 1);
-      Lemma_Pad_Step (C, J, Base);
+      Lemma_Chal_Step (S, J);
+      Lemma_Chal_Mono (S, J + 1, S.Last_Layer + 1);
+      Lemma_Proof_Step (S, J);
+      Lemma_Proof_Mono (S, J + 1, S.Last_Layer + 1);
+      Lemma_Pad_Step (S, J, Base);
       declare
          Alpha : constant Element := Ch.Layer (CO);
          SC1   : constant Expression := Scale (State.Claim1, Alpha);
@@ -326,7 +326,7 @@ package body Sumcheck_Verifier is
                pragma Assert (Below (Before, CR + 1));
                Claim := Sub (Claim, Prod);
                Lemma_Below_Union (Before, Prod, Claim, CR + 1);
-               pragma Assert (CR + 1 = Pad_Off (C, J + 1, Base));
+               pragma Assert (CR + 1 = Pad_Off (S, J + 1, Base));
                declare
                   Start : constant Natural := A.Count with Ghost;
                   Cst   : constant Natural := B_Count with Ghost;
@@ -405,7 +405,7 @@ package body Sumcheck_Verifier is
    --  One term per private input W, in input order: witness W,
    --  coefficient Eq2 (npublic + W), constraint Cst.
    procedure Append_Inputs
-     (C     : Circuit;
+     (S     : Shape;
       State : Claims_State;
       Alpha : Element;
       E     : Element_Array;
@@ -415,7 +415,7 @@ package body Sumcheck_Verifier is
      Global => null,
      Pre  =>
        (Runtime =>
-          A.Max + 1 - A.Count >= C.Ninput - C.Npublic and then E'First = 0
+          A.Max + 1 - A.Count >= S.Ninput - S.Npublic and then E'First = 0
           and then (if State.Logv <= Max_Bindeq_Log
                     then E'Last = Table_Len (State.Logv) - 1),
         Proof_Only =>
@@ -425,8 +425,8 @@ package body Sumcheck_Verifier is
                                    Alpha))))),
      Post =>
        (Runtime =>
-          A.Count = A.Count'Old + (C.Ninput - C.Npublic)
-          and then (for all W in 0 .. C.Ninput - C.Npublic - 1 =>
+          A.Count = A.Count'Old + (S.Ninput - S.Npublic)
+          and then (for all W in 0 .. S.Ninput - S.Npublic - 1 =>
                       A.Witness (A.Count'Old + W) = W
                       and then A.Constraint (A.Count'Old + W) = Cst)
           and then (for all K in A.Count'Old .. A.Count - 1 =>
@@ -436,13 +436,13 @@ package body Sumcheck_Verifier is
                       A.Witness (K) = A.Witness'Old (K)
                       and then A.Constraint (K) = A.Constraint'Old (K)),
         Proof_Only =>
-          (for all W in 0 .. C.Ninput - C.Npublic - 1 =>
+          (for all W in 0 .. S.Ninput - S.Npublic - 1 =>
              Same (A.Coeff (A.Count'Old + W),
-                   In_Coef (C.Npublic + W, State, Alpha))))
+                   In_Coef (S.Npublic + W, State, Alpha))))
    is
       Start : constant Natural := A.Count;
-      NP    : constant Wire_Count := C.Npublic;
-      NW    : constant Natural := C.Ninput - C.Npublic;
+      NP    : constant Wire_Count := S.Npublic;
+      NW    : constant Natural := S.Ninput - S.Npublic;
       Fast  : constant Boolean := State.Logv <= Max_Bindeq_Log;
       Constraint_Before : constant Index_Array := A.Constraint with Ghost;
       Witness_Before    : constant Index_Array := A.Witness with Ghost;
@@ -475,7 +475,7 @@ package body Sumcheck_Verifier is
    end Append_Inputs;
 
    procedure Input_Constraint
-     (C       : Circuit;
+     (S       : Shape;
       Pub     : Element_Array;
       State   : Claims_State;
       Alpha   : Element;
@@ -483,9 +483,9 @@ package body Sumcheck_Verifier is
       B       : in out Element_Array;
       B_Count : in out Natural)
    is
-      NP    : constant Wire_Count := C.Npublic;
-      NW    : constant Natural := C.Ninput - C.Npublic;
-      WC    : constant Natural := Witness_Count (C);
+      NP    : constant Wire_Count := S.Npublic;
+      NW    : constant Natural := S.Ninput - S.Npublic;
+      WC    : constant Natural := Witness_Count (S);
       Start : constant Natural := A.Count;
       Cst   : constant Natural := B_Count;
       Fast  : constant Boolean := State.Logv <= Max_Bindeq_Log;
@@ -513,7 +513,7 @@ package body Sumcheck_Verifier is
         (Proof_Only =>
            Same (Binding, Pub_Binding_Ref (Pub, State, Alpha, NP)));
 
-      Append_Inputs (C, State, Alpha, E.all, A, Cst);
+      Append_Inputs (S, State, Alpha, E.all, A, Cst);
       Free_Elems (E);
       --  The input terms name witnesses below NW, and NW is below the
       --  witness count: the private inputs come before every pad.
@@ -557,28 +557,29 @@ package body Sumcheck_Verifier is
       Lim      : Natural)
    is
       pragma Unreferenced (Lim);
+      S    : constant Shape := Shape_Of (C);
       Logw : constant Natural := C.Layers (J).Logw;
-      Logv : constant Natural := Layer_Logv (C, J);
+      Logv : constant Natural := Layer_Logv (S, J);
    begin
       if J > 0 then
-         Lemma_Chal_Step (C, J - 1);
+         Lemma_Chal_Step (S, J - 1);
       end if;
       if Logv <= Max_Bindeq_Log and then Logw <= Max_Bindeq_Log then
          Lemma_EBQT_Frame
            (Layer_Terms (C, J), Layer_Terms (C, J)'Length, Logv,
-            Layer_G (C, Ch1, J, 0), Layer_G (C, Ch1, J, 1),
-            Layer_G (C, Ch2, J, 0), Layer_G (C, Ch2, J, 1),
-            Hand_Chal (C, Ch1, J, 0), Hand_Chal (C, Ch1, J, 1),
-            Hand_Chal (C, Ch2, J, 0), Hand_Chal (C, Ch2, J, 1),
-            Logw, Chv (Ch1, Chal_Off (C, J)), Chv (Ch1, Chal_Off (C, J) + 1));
+            Layer_G (S, Ch1, J, 0), Layer_G (S, Ch1, J, 1),
+            Layer_G (S, Ch2, J, 0), Layer_G (S, Ch2, J, 1),
+            Hand_Chal (S, Ch1, J, 0), Hand_Chal (S, Ch1, J, 1),
+            Hand_Chal (S, Ch2, J, 0), Hand_Chal (S, Ch2, J, 1),
+            Logw, Chv (Ch1, Chal_Off (S, J)), Chv (Ch1, Chal_Off (S, J) + 1));
       else
          Lemma_EBQ_Frame
            (Layer_Terms (C, J), Layer_Terms (C, J)'Length, Logv,
-            Layer_G (C, Ch1, J, 0), Layer_G (C, Ch1, J, 1),
-            Layer_G (C, Ch2, J, 0), Layer_G (C, Ch2, J, 1),
-            Hand_Chal (C, Ch1, J, 0), Hand_Chal (C, Ch1, J, 1),
-            Hand_Chal (C, Ch2, J, 0), Hand_Chal (C, Ch2, J, 1),
-            Logw, Chv (Ch1, Chal_Off (C, J)), Chv (Ch1, Chal_Off (C, J) + 1));
+            Layer_G (S, Ch1, J, 0), Layer_G (S, Ch1, J, 1),
+            Layer_G (S, Ch2, J, 0), Layer_G (S, Ch2, J, 1),
+            Hand_Chal (S, Ch1, J, 0), Hand_Chal (S, Ch1, J, 1),
+            Hand_Chal (S, Ch2, J, 0), Hand_Chal (S, Ch2, J, 1),
+            Logw, Chv (Ch1, Chal_Off (S, J)), Chv (Ch1, Chal_Off (S, J) + 1));
       end if;
    end Lemma_BQ_Ref_Frame;
 
@@ -589,9 +590,9 @@ package body Sumcheck_Verifier is
    is
    begin
       for J2 in 0 .. J - 1 loop
-         Lemma_Chal_Step (C, J2);
-         Lemma_Chal_Mono (C, J2 + 1, J);
-         Lemma_BQ_Ref_Frame (C, Ch1, Ch2, J2, Chal_Off (C, J));
+         Lemma_Chal_Step (Shape_Of (C), J2);
+         Lemma_Chal_Mono (Shape_Of (C), J2 + 1, J);
+         Lemma_BQ_Ref_Frame (C, Ch1, Ch2, J2, Chal_Off (Shape_Of (C), J));
          pragma Loop_Invariant
            (for all J3 in 0 .. J2 =>
               Same (BQ_Ref (C, Ch1, J3), BQ_Ref (C, Ch2, J3)));
@@ -599,7 +600,7 @@ package body Sumcheck_Verifier is
    end Lemma_BQ_Ref_Frame_All;
 
    procedure Lemma_Hand_Chal
-     (C  : Circuit;
+     (S  : Shape;
       Ch : Challenges;
       J  : Natural;
       H  : Natural;
@@ -610,14 +611,14 @@ package body Sumcheck_Verifier is
    end Lemma_Hand_Chal;
 
    procedure Lemma_Layer_G_Frame
-     (C        : Circuit;
+     (S        : Shape;
       Ch1, Ch2 : Challenges;
       J        : Natural)
    is
       pragma Unreferenced (Ch1, Ch2);
    begin
       if J > 0 then
-         Lemma_Chal_Step (C, J - 1);
+         Lemma_Chal_Step (S, J - 1);
       end if;
    end Lemma_Layer_G_Frame;
 
@@ -631,27 +632,29 @@ package body Sumcheck_Verifier is
       V        : Element)
    is
       pragma Unreferenced (V);
+      S    : constant Shape := Shape_Of (C);
       Logw : constant Natural := C.Layers (J).Logw;
    begin
-      Lemma_Hand_Chal (C, Ch, J, 0, HC0);
-      Lemma_Hand_Chal (C, Ch, J, 1, HC1);
+      Lemma_Hand_Chal (S, Ch, J, 0, HC0);
+      Lemma_Hand_Chal (S, Ch, J, 1, HC1);
       if Logv <= Max_Bindeq_Log and then Logw <= Max_Bindeq_Log then
          Lemma_EBQT_Frame
            (Layer_Terms (C, J), Layer_Terms (C, J)'Length, Logv,
-            G0, G1, Layer_G (C, Ch, J, 0), Layer_G (C, Ch, J, 1),
-            HC0, HC1, Hand_Chal (C, Ch, J, 0), Hand_Chal (C, Ch, J, 1),
-            Logw, Ch.Layer (Chal_Off (C, J)), Ch.Layer (Chal_Off (C, J) + 1));
+            G0, G1, Layer_G (S, Ch, J, 0), Layer_G (S, Ch, J, 1),
+            HC0, HC1, Hand_Chal (S, Ch, J, 0), Hand_Chal (S, Ch, J, 1),
+            Logw, Ch.Layer (Chal_Off (S, J)), Ch.Layer (Chal_Off (S, J) + 1));
       else
          Lemma_EBQ_Frame
            (Layer_Terms (C, J), Layer_Terms (C, J)'Length, Logv,
-            G0, G1, Layer_G (C, Ch, J, 0), Layer_G (C, Ch, J, 1),
-            HC0, HC1, Hand_Chal (C, Ch, J, 0), Hand_Chal (C, Ch, J, 1),
-            Logw, Ch.Layer (Chal_Off (C, J)), Ch.Layer (Chal_Off (C, J) + 1));
+            G0, G1, Layer_G (S, Ch, J, 0), Layer_G (S, Ch, J, 1),
+            HC0, HC1, Hand_Chal (S, Ch, J, 0), Hand_Chal (S, Ch, J, 1),
+            Logw, Ch.Layer (Chal_Off (S, J)), Ch.Layer (Chal_Off (S, J) + 1));
       end if;
    end Lemma_BQ_Ref_From;
 
    procedure Bound_Quads (C : Circuit; Ch : Challenges; BQ : out Element_Array)
    is
+      S      : constant Shape := Shape_Of (C);
       Logv   : Natural := Ceil_Lg2 (C.Noutput);
       G0, G1 : Challenge_Vector := Ch.G;
    begin
@@ -660,17 +663,17 @@ package body Sumcheck_Verifier is
          pragma Loop_Invariant (Logv <= Max_Logw);
          pragma Loop_Invariant
            (Proof_Only =>
-              Logv = Layer_Logv (C, J)
+              Logv = Layer_Logv (S, J)
               and then (for all R in 0 .. Logv - 1 =>
-                          Same (G0 (R), Layer_G (C, Ch, J, 0) (R))
-                          and then Same (G1 (R), Layer_G (C, Ch, J, 1) (R)))
+                          Same (G0 (R), Layer_G (S, Ch, J, 0) (R))
+                          and then Same (G1 (R), Layer_G (S, Ch, J, 1) (R)))
               and then (for all J2 in 0 .. J - 1 =>
                           Same (BQ (J2), BQ_Ref (C, Ch, J2))));
-         Lemma_Chal_Step (C, J);
-         Lemma_Chal_Mono (C, J + 1, C.Last_Layer + 1);
+         Lemma_Chal_Step (S, J);
+         Lemma_Chal_Mono (S, J + 1, C.Last_Layer + 1);
          declare
             Logw : constant Logw_Type := C.Layers (J).Logw;
-            CO   : constant Natural := Chal_Off (C, J);
+            CO   : constant Natural := Chal_Off (S, J);
             HC0  : Challenge_Vector := [others => Zero];
             HC1  : Challenge_Vector := [others => Zero];
             V    : Element;
@@ -698,8 +701,8 @@ package body Sumcheck_Verifier is
                   Ch.Layer (CO), Ch.Layer (CO + 1));
             end if;
             Lemma_BQ_Ref_From (C, Ch, J, Logv, G0, G1, HC0, HC1, V);
-            Lemma_Hand_Chal (C, Ch, J, 0, HC0);
-            Lemma_Hand_Chal (C, Ch, J, 1, HC1);
+            Lemma_Hand_Chal (S, Ch, J, 0, HC0);
+            Lemma_Hand_Chal (S, Ch, J, 1, HC1);
             BQ (J) := V;
             Logv := Logw;
             G0 := HC0;
@@ -718,6 +721,7 @@ package body Sumcheck_Verifier is
       B       : out Element_Array;
       Lqc     : out Lqc_Array)
    is
+      S       : constant Shape := Shape_Of (C);
       Base    : constant Natural := C.Ninput - C.Npublic;
       B_Count : Natural := 0;
       State   : Claims_State :=
@@ -739,24 +743,24 @@ package body Sumcheck_Verifier is
          pragma Loop_Invariant (B_Count = J);
          pragma Loop_Invariant
            (State.Claim0.Length <= 1 and then State.Claim1.Length <= 1);
-         pragma Loop_Invariant (Below (State.Claim0, Pad_Off (C, J, Base)));
-         pragma Loop_Invariant (Below (State.Claim1, Pad_Off (C, J, Base)));
+         pragma Loop_Invariant (Below (State.Claim0, Pad_Off (S, J, Base)));
+         pragma Loop_Invariant (Below (State.Claim1, Pad_Off (S, J, Base)));
          pragma Loop_Invariant
            (for all K in 0 .. A.Count - 1 =>
-              A.Witness (K) < Pad_Off (C, J, Base)
+              A.Witness (K) < Pad_Off (S, J, Base)
               and then A.Constraint (K) < J);
          pragma Loop_Invariant
            (for all J2 in 0 .. J - 1 =>
-              Lqc (J2) = (X => Pad_Off (C, J2, Base) + 4 * C.Layers (J2).Logw,
-                          Y => Pad_Off (C, J2, Base) + 4 * C.Layers (J2).Logw
+              Lqc (J2) = (X => Pad_Off (S, J2, Base) + 4 * C.Layers (J2).Logw,
+                          Y => Pad_Off (S, J2, Base) + 4 * C.Layers (J2).Logw
                                  + 1,
-                          Z => Pad_Off (C, J2, Base) + 4 * C.Layers (J2).Logw
+                          Z => Pad_Off (S, J2, Base) + 4 * C.Layers (J2).Logw
                                  + 2));
-         Lemma_Pad_Step (C, J, Base);
+         Lemma_Pad_Step (S, J, Base);
          Verify_Layer
-           (C, J, Proof, Ch, Base, BQ (J), State, A, B, B_Count, Lqc (J));
+           (S, J, Proof, Ch, Base, BQ (J), State, A, B, B_Count, Lqc (J));
       end loop;
-      Input_Constraint (C, Pub, State, Ch.Alpha_Input, A, B, B_Count);
+      Input_Constraint (S, Pub, State, Ch.Alpha_Input, A, B, B_Count);
    end Verifier_Core;
 
 end Sumcheck_Verifier;
