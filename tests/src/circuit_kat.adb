@@ -6,7 +6,9 @@
 --  Every load is repeated with Read_Pinned (ADR 0074) and with
 --  Read_Packed (ADR 0080): the packed reader must give Read's status and
 --  header, and its walk Read's circuit, term for term; above a megabyte
---  the size of both forms is printed.
+--  the size of both forms is printed. On every layer the run count of
+--  the packed path (Packed_HQuad) is checked, and on the small layers
+--  its first step is compared with the expanded one (Check_Kernels).
 --
 --  Test code, outside the proof perimeter: SPARK_Mode is Off. Reads
 --  the vector files given as arguments (default: circuit_summary.txt,
@@ -48,6 +50,9 @@ with Circuit_Status;
 with Circuit_Reader;
 with Circuit_Reader_GF2_128;
 with Circuit_Reader_P256;
+with Packed_HQuad;
+with Packed_HQuad_GF2_128;
+with Packed_HQuad_P256;
 
 procedure Circuit_KAT is
 
@@ -211,7 +216,11 @@ procedure Circuit_KAT is
    --  The checks of one field: the loader, the current circuit.
    generic
       with package CR is new Circuit_Reader (<>);
+      with package PQ is new Packed_HQuad
+        (SA => CR.SA, PC => CR.PC, others => <>);
       with function To_Element (S : String) return CR.SA.Element;
+      --  A random element: Hex_Digits hex digits, the first one 0.
+      Hex_Digits : Positive;
    package Field_Checks is
       procedure Load (Name : String; Want : String; B : Byte_Array);
       procedure Summary
@@ -330,6 +339,160 @@ procedure Circuit_KAT is
          end if;
       end Check_Pinned;
 
+      --  The first step of each layer from the packed form (ADR 0080,
+      --  block 2), against the expanded path on the same layer, with
+      --  pseudo-random challenges. On every layer, Layer_Runs against
+      --  a count of the runs of equal hands made here on the expanded
+      --  layer. On the layers whose Logv is at most Table_Log, with the
+      --  tables at the layer's own Logv and Logw: Bind_Merge against
+      --  Bind_G_T and Merge_Runs, entry by entry, and Bind_Quad_Packed
+      --  against Bind_Quad. On the layers of at most No_Table_Layer
+      --  terms, without the tables (Logv = Logw = No_Table): Bind_Merge
+      --  against Bind_G and Merge_Runs, and Eval_Bound_Quad_Packed
+      --  against Eval_Bound_Quad. The two limits come from this build:
+      --  the loop invariants of the table builder and of the kernels of
+      --  the expanded path, and the ghost references their contracts
+      --  name, run with the assertions, at a cost quadratic in the
+      --  table (about half a minute a layer at Logv 12, four times
+      --  more at each step) and in the layer (seconds for 128 terms
+      --  without the tables). The larger layers rest on the proof,
+      --  which covers every size; the times of the two paths are
+      --  measured by first_step_bench, in the release build.
+      Table_Log      : constant := 10;
+      No_Table_Layer : constant := 128;
+      No_Table       : constant := 30;
+      Seed           : Unsigned_64 := 16#9E37_79B9_7F4A_7C15#;
+
+      function Random_Element return CR.SA.Element is
+         Hex : constant String := "0123456789abcdef";
+         S   : String (1 .. Hex_Digits) := [others => '0'];
+      begin
+         for I in 2 .. Hex_Digits loop
+            Seed := Seed * 6364136223846793005 + 1442695040888963407;
+            S (I) := Hex (Natural (Shift_Right (Seed, 60)) + 1);
+         end loop;
+         return To_Element (S);
+      end Random_Element;
+
+      procedure Check_Kernels
+        (Name : String;
+         P    : CR.Packed_Access;
+         C1   : CR.Circuit_Access)
+      is
+         package SA renames CR.SA;
+         use type SA.Term;
+         type Terms_Access is access SA.Term_Array;
+         type Elems_Access is access SA.Element_Array;
+         procedure Free_T is
+           new Ada.Unchecked_Deallocation (SA.Term_Array, Terms_Access);
+         procedure Free_E is
+           new Ada.Unchecked_Deallocation (SA.Element_Array, Elems_Access);
+         G0, G1, HC0, HC1 : SA.Element_Array (0 .. SA.Max_Logw - 1);
+         Alpha, Beta, V1, V2 : SA.Element;
+         Logv, Logw, First, Last, NR, N1, N2 : Natural;
+         T, W   : Terms_Access;
+         E      : Elems_Access;
+         Ok     : Boolean;
+         J_Cur  : Natural := 0;
+
+         function Ceil_Log2 (N : Natural) return Natural is
+            L : Natural := 0;
+         begin
+            while 2**L < N loop
+               L := L + 1;
+            end loop;
+            return L;
+         end Ceil_Log2;
+
+         --  The runs of equal hands of the expanded layer, counted here.
+         function Run_Count return Natural is
+            N : Natural := 0;
+         begin
+            for I in First .. Last loop
+               if I = First
+                 or else C1.Terms (I).H0 /= C1.Terms (I - 1).H0
+                 or else C1.Terms (I).H1 /= C1.Terms (I - 1).H1
+               then
+                  N := N + 1;
+               end if;
+            end loop;
+            return N;
+         end Run_Count;
+
+         --  The first N1 entries of T and W agree.
+         function Agree return Boolean is
+           (N1 = N2 and then N1 = NR
+            and then (for all I in 0 .. N1 - 1 =>
+                        T (First + I) = W (First + I)));
+
+         procedure Merge_Both (Lv : Natural) is
+         begin
+            T := new SA.Term_Array'(C1.Terms (First .. Last));
+            if Lv <= SA.Max_Bindeq_Log then
+               E := new SA.Element_Array'
+                 (0 .. SA.Table_Len (Lv) - 1 => SA.Zero);
+               SA.Eq2_Table (Lv, G0, G1, Alpha, E.all);
+               PQ.HQ.Bind_G_T (T.all, E.all, Beta);
+            else
+               E := new SA.Element_Array'(0 .. 0 => SA.Zero);
+               SA.Bind_G (T.all, Lv, G0, G1, Alpha, Beta);
+            end if;
+            PQ.HQ.Merge_Runs (T.all, N1);
+            W := new SA.Term_Array'
+              (First .. First + NR - 1 => (K => SA.Zero, G => 0, H0 => 0,
+                                           H1 => 0));
+            PQ.Bind_Merge (P.all, J_Cur, E.all, Lv, G0, G1, Alpha, Beta,
+                           HC0, HC1, W.all, N2);
+            Ok := Ok and then Agree;
+            Free_E (E);
+            Free_T (T);
+            Free_T (W);
+         end Merge_Both;
+      begin
+         for J in 0 .. P.Last_Layer loop
+            J_Cur := J;
+            First := P.Layers (J).First;
+            Last  := P.Layers (J).Last;
+            Logw  := P.Layers (J).Logw;
+            Logv  := (if J = 0 then Ceil_Log2 (P.Noutput)
+                      else P.Layers (J - 1).Logw);
+            for R in G0'Range loop
+               G0 (R)  := Random_Element;
+               G1 (R)  := Random_Element;
+               HC0 (R) := Random_Element;
+               HC1 (R) := Random_Element;
+            end loop;
+            Alpha := Random_Element;
+            Beta  := Random_Element;
+            PQ.Layer_Runs (P.all, J, NR);
+            Ok := NR = Run_Count;
+            if Logv <= Table_Log and then Logw <= SA.Max_Bindeq_Log then
+               Merge_Both (Logv);
+               PQ.HQ.Bind_Quad (C1.Terms (First .. Last), Logv, G0, G1, HC0,
+                                HC1, Logw, Alpha, Beta, V1);
+               PQ.Bind_Quad_Packed (P.all, J, Logv, G0, G1, HC0, HC1, Logw,
+                                    Alpha, Beta, V2);
+               Ok := Ok and then V1 = V2;
+            end if;
+            if Last + 1 - First <= No_Table_Layer then
+               Merge_Both (No_Table);
+               V1 := SA.Eval_Bound_Quad (C1.Terms (First .. Last), No_Table,
+                                         G0, G1, HC0, HC1, No_Table, Alpha,
+                                         Beta);
+               PQ.Eval_Bound_Quad_Packed (P.all, J, No_Table, G0, G1, HC0,
+                                          HC1, No_Table, Alpha, Beta, V2);
+               Ok := Ok and then V1 = V2;
+            end if;
+            if Ok then
+               Passed := Passed + 1;
+            else
+               Report_Failure ("packed kernels of " & Name & ": layer"
+                               & J'Image
+                               & " differs from the expanded path");
+            end if;
+         end loop;
+      end Check_Kernels;
+
       --  Read_Packed on the same bytes (ADR 0080), against the result of
       --  Read (S1, C1, H1): the same status and header, and on Ok the
       --  same circuit. Expand is ghost at level Proof_Only and does not
@@ -378,6 +541,7 @@ procedure Circuit_KAT is
             end if;
             if Same then
                Passed := Passed + 1;
+               Check_Kernels (Name, P, C1);
             else
                Report_Failure ("packed " & Name & ": the walk differs from"
                                & " Read's circuit");
@@ -551,9 +715,11 @@ procedure Circuit_KAT is
    end Field_Checks;
 
    package GF_Checks is
-     new Field_Checks (Circuit_Reader_GF2_128, GF_To_Element);
+     new Field_Checks
+       (Circuit_Reader_GF2_128, Packed_HQuad_GF2_128, GF_To_Element, 32);
    package P_Checks is
-     new Field_Checks (Circuit_Reader_P256, P_To_Element);
+     new Field_Checks
+       (Circuit_Reader_P256, Packed_HQuad_P256, P_To_Element, 64);
 
    procedure Check_Case (Line : String) is
       Fields : Field_Array;

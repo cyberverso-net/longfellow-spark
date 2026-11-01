@@ -61,7 +61,8 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 - `Uleb128.Read` returns the value of the one to four bytes it consumed.
 - `Circuit_Reader.Read` returns, on `Ok`, a circuit that satisfies `Well_Formed` and whose identifier is the stored one, recomputed. Otherwise it returns null.
 - `Circuit_Reader.Read_Pinned` proves the same, except that the identifier is the one the caller gives, not recomputed (ADR 0074).
-- `Circuit_Reader.Read_Packed` keeps the circuit in the form of the file, without expanding the terms (ADR 0080). It proves the same on the ghost expansion `Expand (P)`: `Well_Formed`, `Isolated`, `Dead_End` and the identifier. Its walks are proved to read the layers of `Expand (P)`. The verifier and the prover do not use it yet.
+- `Circuit_Reader.Read_Packed` keeps the circuit in the form of the file, without expanding the terms (ADR 0080). It proves the same on the ghost expansion `Expand (P)`: `Well_Formed`, `Isolated`, `Dead_End` and the identifier. Its walks are proved to read the layers of `Expand (P)`, each coefficient by `Same`.
+- `Packed_HQuad` does the first step of a layer from the packed form: `Bind_Merge` binds g and merges the runs of equal hands from the walk, `Bind_Quad_Packed` is the verifier's bound quad on it, `Eval_Bound_Quad_Packed` the form without tables. Each is Gold on the layer of `Expand (P)`, with the references of `Sumcheck_HQuad` (ADR 0080, block 2); `Bind_Merge` without the eq2 table (Logv above 24) proves the run count only, as `Merge_Terms` does, and its coefficients are tested (below). The verifier and the prover still take the expanded circuit.
 
 **The prover** (chapter 7).
 
@@ -113,6 +114,7 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 - The LFC2 format is checked against an independent Python reader and writer, and against the two upstream circuit files. The identifier the generator computes must equal the one each upstream file stores.
 - The Appendix B.3 circuits, written in LFC2 in two encodings, load term for term. Twenty-eight malformed files are refused with their status.
 - Every circuit load is repeated with `Read_Packed`. It gives `Read`'s status and header, malformed files included, and on `Ok` its walk gives `Read`'s terms, on every shipped circuit, the mDoc circuits included. Pinned, it gives `Read_Pinned`'s status and header. A third encoding of the Appendix B.3 circuits has tokens of empty segments, which `Read_Packed` does not keep.
+- On every layer of every circuit loaded, the run count of the packed form equals a count made on the expanded layer. On the small layers (Logv at most 10 with the eq tables, at most 128 terms without them) the first step from the packed form gives what the expanded path gives, with pseudo-random challenges: the merged terms of `Merge_Runs`, the bound quad of `Bind_Quad`, the value of `Eval_Bound_Quad`. The larger layers rest on the proof, which covers every size, except the merged coefficients of `Bind_Merge` without the eq2 table, which its contract does not state and no caller of this block uses; `first_step_bench`, in the release build, compares the two bound quads on every layer of the mDoc circuits as well, as a measurement outside `make check`.
 - The two proofs the upstream prover made, for `sha256` on GF(2^128) and `ecdsa2` on P-256, are accepted from their files. Changing one byte of the root, the sumcheck part or the Ligero part makes them fail with `Merkle_Failed`. This runs in the release build (`interop_kat`).
 
 **The prover.**

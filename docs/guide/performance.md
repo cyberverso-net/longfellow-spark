@@ -118,6 +118,17 @@ The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. I
 
 - The largest item is the hash circuit in memory: 236.7 MB here, 7.76 million terms of 32 bytes; upstream keeps both circuits in about 3 MB, in the compressed form of the file.
 - The first step removed a copy of the largest layer in the verifier (114 MB) and the provisional buffers of the command-line prover.
+- Block 2 of the milestone binds and merges the first step of a layer from the packed form (chapter 3, Section 3.5), with a working array of one entry per run of equal hands. On the mDoc hash circuit, measured by `first_step_bench` in the release build on the proving machine:
+
+| Layer of the hash circuit | terms | runs | expanded layer | working array | `Bind_Quad` | `Bind_Quad_Packed` |
+|---|---|---|---|---|---|---|
+| 13 | 1,429,054 | 1,153,333 | 45.7 MB | 36.9 MB | 434 ms | 448 ms |
+| 14, the largest | 3,578,789 | 439,013 | 114.5 MB | 14.0 MB | 341 ms | 359 ms |
+| all 17 layers | 7,757,579 | 3,144,054 | 248.2 MB | 100.6 MB | 1,376 ms | 1,444 ms |
+
+  The time of a layer is the median of three calls; one session, the tree of the pull request of block 2. The packed path costs 5 % more over the circuit: it rebuilds each term from the deltas where the expanded path reads an array already laid out, and the rounds are the same code on the same merged entries. On the signature circuit (P-256, 481,833 terms, 285,426 runs) 84 ms against 90 ms.
+
+  The verifier and the prover still take the expanded circuit in this block; the peak heap moves when they take the packed form, in the next block.
 - Next: the circuit held compressed with one layer expanded at a time, then the prover's wires.
 
 ## After M2
