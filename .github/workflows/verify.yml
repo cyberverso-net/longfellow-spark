@@ -30,12 +30,21 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      #  The toolchain versions, read from alire.toml: one source of truth.
+      - name: Toolchain pinned in alire.toml
+        id: pins
+        run: |
+          gnat=$(sed -n 's/^gnat_native = "=\(.*\)"$/\1/p' alire.toml)
+          gpr=$(sed -n 's/^gprbuild = "=\(.*\)"$/\1/p' alire.toml)
+          test -n "$gnat" && test -n "$gpr"
+          echo "toolchain=gnat_native=$gnat gprbuild=$gpr" >> "$GITHUB_OUTPUT"
 
       - name: Set up Alire and the pinned toolchain
-        uses: alire-project/setup-alire@latest
+        uses: alire-project/setup-alire@fc4c8ce471aa30b3af0d39ce15add1ee9eaf28f2 # v6.0.0
         with:
-          toolchain: "gnat_native=16.1.0 gprbuild=26.0.1"
+          toolchain: ${{ steps.pins.outputs.toolchain }}
 
       - name: Toolchain versions
         run: alr -n toolchain
