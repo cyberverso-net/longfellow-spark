@@ -29,7 +29,8 @@ project Longfellow_Verify is
    for Exec_Dir use "bin";
    for Create_Missing_Dirs use "True";
    for Main use
-     ("longfellow_verify.adb", "interop_kat.adb", "longfellow_prove.adb");
+     ("longfellow_verify.adb", "interop_kat.adb", "longfellow_prove.adb",
+      "first_step_bench.adb");
 
    --  The build, chosen with LONGFELLOW_CLI_BUILD:
    --  o2     -O2, every run-time check on (the build until ADR 0068);
@@ -54,6 +55,7 @@ project Longfellow_Verify is
             for Default_Switches ("Ada") use Fast & ("-gnatp");
             for Switches ("cli_random.adb") use Fast;
             for Switches ("cli_random.ads") use Fast;
+            for Switches ("first_step_bench.adb") use Fast;
             for Switches ("interop_kat.adb") use Fast;
             for Switches ("ligero_prover_cli_gf2_128.ads") use Fast;
             for Switches ("ligero_prover_cli_p256.ads") use Fast;

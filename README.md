@@ -88,11 +88,12 @@ make test        # the nine harnesses, concurrently, in about a minute
 
 Each harness reads its vector files from `tests/vectors/` by default, prints pass and fail counts, and fails if any case fails or none ran. The [trust model](docs/guide/trust-model.md) maps each file to its generator and harness.
 
-The release project in `cli/` builds the library as it is meant to run: no assertions, optimised. It holds the command-line verifier and prover, and the interop harness:
+The release project in `cli/` builds the library as it is meant to run: no assertions, optimised. It holds the command-line verifier and prover, the interop harness, and `first_step_bench`, which measures the first step of a layer from the packed circuit against the expanded path (chapter 3, Section 3.5):
 
 ```bash
 alr exec -- gprbuild -P cli/longfellow_verify.gpr -p -s
 cli/bin/interop_kat
+cli/bin/first_step_bench --field gf2_128 --circuit tests/vectors/upstream/circuits/sha256_circuit.lfc2
 ```
 
 ## Verifying a proof

@@ -94,6 +94,7 @@ Since milestone M2 ([ADR 0071](../adr/0071-prover-reuses-the-bound-quad.md)), `P
 - The work of a layer is split so that each proof has a small context. `Merge_Terms` establishes the invariant, `Bind_Round` keeps it across one hand of one round, `Prove_Layer` runs a layer and returns its bound quad.
 - Beyond the size of the eq tables, the prover computes the bound quad with `Eval_Bound_Quad`, as the verifier does.
 - `prover_kat` checks, on every layer of every test circuit, that the prover's bound quad equals that of `Bound_Quads`.
+- Since block 2 of the memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)), `Packed_HQuad.Bind_Merge` does the first step, bind g and the merge, from the packed circuit, with one entry per run of equal hands and no copy of the layer (chapter 3, Section 3.5). `Prove_Layer` still takes the expanded layer; the next block makes it call `Bind_Merge`.
 
 The first proof closed on GF(2^128) and not on P-256, where every product brings the field's contract into the context. Three rules made it close:
 

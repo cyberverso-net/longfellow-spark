@@ -140,23 +140,27 @@ do_partitions_check() {
 #  printed in a fixed order once all have finished, so that the output
 #  reads as before and a failure is attributed to its harness. Every
 #  case runs, on both fields: since ADR 0044 the field contracts are
-#  proof-only and the whole set takes seconds.
+#  proof-only, and the step lasts as long as circuit_kat on the mDoc
+#  circuits, minutes.
 do_test() {
    header "test: build the harnesses (assertions on)"
    alr -n exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
    local harnesses="gf2_128_kat p256_kat sumcheck_kat transcript_kat ligero_kat circuit_kat writer_kat prover_kat fft_kat"
-   local logs status=0 h
+   local logs status=0 h code
    logs="$(mktemp -d)"
    header "test: $harnesses, concurrently"
    for h in $harnesses; do
       ( tests/bin/"$h" > "$logs/$h.log" 2>&1; echo $? > "$logs/$h.status" ) &
    done
    wait
+   #  A harness whose exit status is anything but 0, or was never
+   #  written (the harness or its subshell killed by a signal), fails.
    for h in $harnesses; do
       header "test: $h"
       cat "$logs/$h.log"
-      if [ "$(cat "$logs/$h.status")" -ne 0 ]; then
-         echo "test: $h failed" >&2
+      code="$(cat "$logs/$h.status" 2> /dev/null)"
+      if [ "${code:-none}" != 0 ]; then
+         echo "test: $h failed (exit status ${code:-unknown})" >&2
          status=1
       fi
    done

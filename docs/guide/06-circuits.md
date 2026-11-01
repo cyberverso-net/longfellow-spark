@@ -146,6 +146,8 @@ Every walk in the reader proves, at each step, that its cursor is `Cursor_At` of
 
 **Memory.** On the mDoc hash circuit the packed form takes 4.2 MB (4,366,352 bytes), against 236.7 MB expanded: 57 times less. This is the size of the object, measured by `circuit_kat`. Most of it is the 395,248 segment entries and the 243,451 tokens, 4 bytes each, and the 53,106 deltas, 32 bytes each: a delta keeps its three fields as 64-bit integers, where 32 bits would hold them. The design's estimate, about 3 MB, counted 4 bytes a field. Upstream holds both mDoc circuits in about 3 MB (performance page). The peak heap does not fall yet, since the consumers still expand the circuit; the next blocks of the milestone change them.
 
+**Block 2.** The first consumer of the form is `Packed_HQuad` (chapter 3, Section 3.5): the first step of a layer, bind g and the merge of the runs, from the walk, with a working array of one entry per run of equal hands. It computes with the coefficient of each term, which block 1 never did, and that showed a limit of the link above. `Lemma_Walked_Step` stated the walk's term equal to the expansion's with the predefined `=` of `Term`: enough for the wires, which are integers, not for a coefficient of GF(2^128), whose `=` is pointwise on the limbs and gives the provers no congruence (chapter 3, Section 4.1). `Lemma_Term_Of`, `Expand` and `Lemma_Walked_Step` now state the coefficient also by `Same`, an addition to their postconditions; the partition proved again (Section 4.2).
+
 ## 4. What the proofs guarantee
 
 ### 4.1 For all inputs
@@ -154,7 +156,7 @@ Every walk in the reader proves, at each step, that its cursor is `Cursor_At` of
 - On `Ok`, the returned circuit satisfies `Well_Formed`, so the verifier's precondition holds, and its identifier is the one the file stored: recomputed by `Read`, equal to the caller's by `Read_Pinned`.
 - `Uleb128.Read` returns the value of the bytes it consumed, one to four of them, and fails exactly when no terminating byte lies within four bytes; `Zigzag` is its definition.
 - The two verifiers with their working sets on the heap: the same contracts as chapter 5, plus the ownership checks.
-- `Read_Packed`, on any byte string, has no run-time error. On `Ok` the packed form is valid, and its expansion `Expand (P)` satisfies `Well_Formed`, `Isolated` and `Dead_End`, with the identifier recomputed or the caller's (Section 3.7). The walk is proved to produce the terms of `Expand (P)`.
+- `Read_Packed`, on any byte string, has no run-time error. On `Ok` the packed form is valid, and its expansion `Expand (P)` satisfies `Well_Formed`, `Isolated` and `Dead_End`, with the identifier recomputed or the caller's (Section 3.7). The walk is proved to produce the terms of `Expand (P)`, each coefficient by the logical equality `Same`.
 
 What the proofs do not say: that the expansion of deltas, segments and tokens is upstream's, or that `Compute_Id` is upstream's `compute_id`. Both are tested.
 
@@ -174,7 +176,7 @@ GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-p
 
 The `circuits` partition proves in about seven minutes locally with ten provers; with sixteen open verification conditions, before their fixes, the same run took thirty-five, since an unproved check costs each of the three provers its full timeout. Reproduce with `make prove`; the summary is in `obj/development/gnatprove/gnatprove.out`.
 
-At the close of block 1 of the memory milestone, the `circuits` partition holds 3,374 checks on both fields, all proved, in 8 minutes 26 seconds on the proving machine. The most steps used by a proof is 104,860.
+At the close of block 1 of the memory milestone, the `circuits` partition holds 3,374 checks on both fields, all proved, in 8 minutes 26 seconds on the proving machine. The most steps used by a proof is 104,860. At the close of block 2, with `Same` on the coefficients in the contracts of the walk (Section 3.7), it holds 3,436 checks, all proved, in 8 minutes 31 seconds; the most steps used by a proof is 104,860, unchanged.
 
 ## 5. What is only tested
 

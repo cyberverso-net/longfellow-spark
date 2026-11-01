@@ -46,7 +46,10 @@ package body Packed_Circuits is
            (for all J2 in 0 .. J - 1 =>
               (for all K2 in 1 .. Layer_Len (P, J2) =>
                  R.Terms (P.Layers (J2).First + K2 - 1)
-                   = Term_At (P, J2, K2)));
+                   = Term_At (P, J2, K2)
+                 and then
+                 SA.Same (R.Terms (P.Layers (J2).First + K2 - 1).K,
+                          Term_At (P, J2, K2).K)));
          for K in 1 .. Layer_Len (P, J) loop
             R.Terms (P.Layers (J).First + K - 1) := Term_At (P, J, K);
             pragma Loop_Invariant (R.Layers = P.Layers);
@@ -54,10 +57,16 @@ package body Packed_Circuits is
               (for all J2 in 0 .. J - 1 =>
                  (for all K2 in 1 .. Layer_Len (P, J2) =>
                     R.Terms (P.Layers (J2).First + K2 - 1)
-                    = Term_At (P, J2, K2)));
+                    = Term_At (P, J2, K2)
+                    and then
+                    SA.Same (R.Terms (P.Layers (J2).First + K2 - 1).K,
+                             Term_At (P, J2, K2).K)));
             pragma Loop_Invariant
               (for all K2 in 1 .. K =>
-                 R.Terms (P.Layers (J).First + K2 - 1) = Term_At (P, J, K2));
+                 R.Terms (P.Layers (J).First + K2 - 1) = Term_At (P, J, K2)
+                 and then
+                 SA.Same (R.Terms (P.Layers (J).First + K2 - 1).K,
+                          Term_At (P, J, K2).K));
          end loop;
       end loop;
       return R;
@@ -101,6 +110,9 @@ package body Packed_Circuits is
       Lemma_Term_Of (P, J, K);
       pragma Assert
         (Expand (P).Terms (P.Layers (J).First + K - 1) = Term_At (P, J, K));
+      pragma Assert
+        (SA.Same (Expand (P).Terms (P.Layers (J).First + K - 1).K,
+                  Term_At (P, J, K).K));
    end Lemma_Walked_Step;
 
 end Packed_Circuits;

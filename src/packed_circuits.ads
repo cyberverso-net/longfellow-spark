@@ -330,7 +330,9 @@ package Packed_Circuits is
 
    --  The term a walk produces is the layer's: the cursor after K - 1
    --  terms gives Term_At (P, J, K), and one Step gives the cursor after
-   --  K.
+   --  K. The coefficient is stated also by Same, the logical equality: the
+   --  equality of a field whose elements hold an array is pointwise and
+   --  carries no result computed from it (header of field_signature.ads).
    procedure Lemma_Term_Of (P : Packed_Circuit; J, K : Natural) with
      Ghost  => Proof_Only,
      Global => null,
@@ -352,10 +354,13 @@ package Packed_Circuits is
                           + Delta_At (P, Cursor_At (P, J, K - 1)).DH1
                         in 0 .. SA.Max_Wires - 1
                and then Term_Of (P, Cursor_At (P, J, K - 1))
-                        = Term_At (P, J, K);
+                        = Term_At (P, J, K)
+               and then SA.Same (Term_Of (P, Cursor_At (P, J, K - 1)).K,
+                                 Term_At (P, J, K).K);
 
    --  The model: the circuit with the layers of P and, at the term
-   --  indices of each layer, the terms of its walk.
+   --  indices of each layer, the terms of its walk, each coefficient
+   --  stated also by Same (see Lemma_Term_Of).
    function Expand (P : Packed_Circuit) return SA.Raw_Circuit
    with Ghost => Proof_Only,
         Global => null,
@@ -371,7 +376,10 @@ package Packed_Circuits is
           (for all J in 0 .. P.Last_Layer =>
              (for all K in 1 .. Layer_Len (P, J) =>
                 Expand'Result.Terms (P.Layers (J).First + K - 1)
-                = Term_At (P, J, K)));
+                = Term_At (P, J, K)
+                and then
+                SA.Same (Expand'Result.Terms (P.Layers (J).First + K - 1).K,
+                         Term_At (P, J, K).K)));
 
    --  C is the cursor of layer J after K terms. Hidden, so that a loop
    --  that walks a layer carries no instance of Cursor_At and of the
@@ -394,8 +402,8 @@ package Packed_Circuits is
      Post   => Walked (P, J, 0, Start (P, J));
 
    --  One step of a walk on the expansion: the cursor after K - 1 terms
-   --  produces term K of layer J of Expand (P), and steps to the cursor
-   --  after K.
+   --  produces term K of layer J of Expand (P), its coefficient stated
+   --  also by Same (see Lemma_Term_Of), and steps to the cursor after K.
    procedure Lemma_Walked_Step
      (P : Packed_Circuit; J, K : Natural; C : Cursor)
    with
@@ -415,6 +423,9 @@ package Packed_Circuits is
                and then C.H1 + Delta_At (P, C).DH1 in 0 .. SA.Max_Wires - 1
                and then P.Layers (J).First + K - 1 in 1 .. P.NT
                and then Term_Of (P, C)
-                        = Expand (P).Terms (P.Layers (J).First + K - 1);
+                        = Expand (P).Terms (P.Layers (J).First + K - 1)
+               and then
+               SA.Same (Term_Of (P, C).K,
+                        Expand (P).Terms (P.Layers (J).First + K - 1).K);
 
 end Packed_Circuits;
