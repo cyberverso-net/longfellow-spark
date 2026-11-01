@@ -15,7 +15,10 @@ and the [records](adr/README.md).
 | Bug | Issue of type *Bug* | A defect in merged or released behaviour, or a wrong statement in the documentation |
 
 The project board, *longfellow-spark roadmap*, shows every open item with its status, milestone
-and labels. A block too large for one pull request is split into sub-issues.
+and labels. A block too large for one pull request is split into sub-issues. Every item has a
+milestone, except the tasks of tooling and surveillance (the scripts of the proving machine, the
+watch on the proof budget), which may have none. A dependency between issues is a GitHub
+blocked-by relation on the issue that waits.
 
 ## Writing a block
 
@@ -42,9 +45,12 @@ A block may move to *Ready* when:
 
 - its acceptance criteria are complete and checkable;
 - the decisions it depends on are recorded, as *Proposed* at least, in a record;
-- the issues it depends on are done;
+- every issue it is blocked by is closed;
 - any decision the maintainer must take before the work has been taken, and is stated in the
   issue.
+
+A task or a bug moves to *Ready* when every issue it is blocked by is closed. An item that
+waits on an open issue stays in *Backlog*, whatever else is ready.
 
 ## Workflow
 
@@ -62,6 +68,20 @@ or `task/58-prover-memory-profile`. Pull requests reference their issue with `Cl
 The gate of a pull request is the check `verify` (GitHub Actions: build, partitions, tests,
 command line, vectors, lint) and the status `prove` (`make check` on the proving machine,
 posted by `scripts/remote-check.sh`), both green. The ruleset on `main` requires both.
+
+Two cases get `prove` without a proof run, because they cannot change what the proof checks:
+
+- A change without code: nothing under `src/`, `tests/` or `scripts/`, and not `alire.toml`.
+  `scripts/remote-check.sh --text-only` checks that only Markdown files, LICENSE and the
+  configuration files under `.github/` (the issue forms, `CODEOWNERS`, `dependabot.yml`, the
+  pull request template; never the workflows) changed since a proved commit, and posts the
+  status naming that commit.
+- A merge of `main` into the branch of an open pull request that brings no such change. The
+  maintainer may post `prove` by hand; the description of the status says so and names the
+  commit that was proved. The review of the pull request checks that `src/`, `tests/`,
+  `scripts/` and `alire.toml` are the same as in that commit.
+
+Every other change runs the proof.
 
 ## Proof rules
 
@@ -156,10 +176,11 @@ A block is done when:
 | `area: fields`, `area: sumcheck`, `area: ligero`, `area: verifier`, `area: prover`, `area: circuits`, `area: mdoc`, `area: docs`, `area: measurements`, `area: ci` | The part of the project concerned |
 | `assurance: gold`, `assurance: silver`, `assurance: tested`, `assurance: trusted` | What the item delivers or changes, read with the trust model |
 | `needs: adr`, `needs: discussion`, `needs: approval` | What must happen before the work can proceed |
-| `blocked` | Waiting on another item, named in the issue |
+| `blocked` | Waiting on something that is not an issue (an upstream change, an external decision), named in the issue; a wait on an issue is a blocked-by relation, not a label |
 | `priority: high`, `priority: low` | Deviation from normal priority |
 
-Issue type, milestone and status are not duplicated as labels.
+Issue type, milestone and status are not duplicated as labels. Dependabot labels its pull
+requests `area: ci` (`.github/dependabot.yml`); they need no issue.
 
 ## Releases
 
