@@ -64,6 +64,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Fixed
 
+- Chapter 8 lacked the verification conditions and the measurements of block 3 of Phase D, and still promised them "when the block closes": the closing text of 20 October never reached `main`. Section 4 now gives the proof of the block (2 547 checks of the partition, 17 269 of the project, the three kinds of check that needed attention) and Section 5 its measurements (the hash proof from 19 min 59 s to 6 min 30 s, identical byte for byte; the profile after the change). ADR 0057 points there in its Status line. No code change.
 - `GF2_128.Inject` branched on each bit of its argument. The prover applies it to the subfield coordinates of private inputs, in the subfield check of `Zk_Prover`, so the branch broke the constant-time discipline of ADR 0051. It now selects each basis element with a mask built from the bit, as `Mul` does, and keeps its contract against `Inject_Ref`. A source-level finding: no timing leak was measured. ADR 0051 amended, guide chapter 7, the trust model.
 - The quadratic row of `Ligero_Prover.Commit` is built in its own procedure, `Quad_Fixed_Row`, so that its witness slots are proved zero in a small context: on the proving machine, whose cores are slower than the laptop's, the stepping assertions after `Commit_Row` in `Fixed_Rows` ran out of the 120-second timeout. No contract changed.
 

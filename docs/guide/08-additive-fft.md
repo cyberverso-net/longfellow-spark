@@ -127,14 +127,34 @@ The tableau is a small part of the peak. The rest is the circuit as loaded, the 
 - Silver on `Rfft_P256` for the same lengths, and its `Extend` also leaves the first n values unchanged.
 - `Encode_Row`, conditional on the encoder ([ADR 0057](../adr/0057-additive-fft.md)). The systematic part is the row, for both fields. With the Lagrange encoder the parity part is the Lagrange evaluation, as in Phase C. With an FFT, which both fields now use, the parity part is not proved equal to anything: that is the test of section 5.
 
-The table of verification conditions is added when the block closes.
+The proof at the close of block 3 (20 October 2026), on the proving machine:
+
+| Scope | Checks | Unproved |
+|-------|--------|----------|
+| partition `ligero-prover` (the prover, the composed prover, `Additive_Fft`, `No_Fft_P256`) | 2 547 | 0 |
+| the whole project (`make check`) | 17 269 | 0 |
+
+Block 4 brought the partition to 3 253 checks, with `Rfft_P256` in place of `No_Fft_P256` ([ADR 0057](../adr/0057-additive-fft.md), block 4 as realised). Three kinds of check needed attention in block 3, and none changed a contract. Termination: `Commit_Row` is called from procedures that declare `Always_Terminates`, so the two `while` loops of `Extend` got loop variants and the transforms an explicit `Always_Terminates`. The bound on L: the provers do not evaluate 2^16 for a variable exponent, so the loop that finds 2^L stops at L = 16 by its own condition, and a branch that is never taken covers the case 2^L < N after it. The formal contract: section 3.3.
 
 ## 5. What is only tested
 
 - **The FFT gives the Lagrange codeword.** `gen_fft_vectors.py` transcribes `lch14.rs` and `lch14_reed_solomon.rs` in Python and checks every extension against barycentric Lagrange interpolation on the points inj(i), with no FFT. It writes the table, sample twiddles and 19 extensions to `fft.txt`. `fft_kat` checks `Additive_Fft` on that file, then against `Lagrange.Evaluate` of chapter 5 on random rows of 16 shapes, among them those of the two Phase C geometries.
 - **The commitments of the prover are unchanged.** `prover_kat` compares the roots and the openings of the commitments of the small circuits with the Python reference of Phase C, which encodes by Lagrange. They still agree.
 - **The two Phase C proofs are still reproduced byte for byte.** The `sha256` proof is now encoded by the FFT.
-- Times before and after on the mDoc hash circuit are measured at the close of the block.
+- **The mDoc proofs are the same bytes.** At the close of block 3 the version 7 hash and signature circuits were proved with seed 1 by `main`, which encoded by Lagrange, and by the block. The two hash proofs were identical, which tests the FFT on every row of the tableau of a production circuit. The signature proofs, still encoded by Lagrange on both sides at the time, were identical too.
+
+Times on the proving machine at the close of block 3 (20 October 2026), version 7 circuits, default 8 MB stack, the Lagrange encoder against the additive FFT on GF(2^128); the signature circuit kept the Lagrange encoder until block 4:
+
+| Run | Lagrange encoder | Additive FFT |
+|-----|------------------|--------------|
+| hash, prove | 19 min 59 s, 672 MB | 6 min 30 s, 599 MB |
+| hash, verify | 2 min 02 s, 371 MB | 2 min 02 s, 371 MB |
+| signature, prove | 18 min 51 s, 216 MB | 18 min 49 s, 216 MB |
+| signature, verify | 53 s, 41 MB | 54 s, 41 MB |
+
+The hash prover was three times faster. The verifier, which keeps Lagrange on the NREQ opened columns, did not change, nor did the signature circuit until block 4 replaced its encoder too (41 s against 1 129 s, ADR 0057).
+
+The profile of the hash prover moved accordingly. The Ligero commitment, FFT included, fell below 0.5 % of the time, from 60 % before. What remained was the sumcheck: the sumcheck prover took 75 % (`Round_Evals` 51 %), and the verifier core the prover runs 24 %, almost all of it `Eval_Bound_Quad`, the cost the milestones M1 and M2 then addressed. The figures of today are on [the performance page](performance.md).
 
 ## 6. What stays trusted, and the limits
 
