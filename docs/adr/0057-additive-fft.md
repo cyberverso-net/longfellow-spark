@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-20, at the close of block 4 of Phase D). Proposed on 2026-10-19 in block 1; block 3 realised it for GF(2^128), block 4 for P-256; corrected while Proposed: F_p has no large roots of unity, the reference's transform on P-256 is a real FFT over F_p^2.
+Accepted (2026-10-20, at the close of block 4 of Phase D). Proposed on 2026-10-19 in block 1; block 3 realised it for GF(2^128), block 4 for P-256; corrected while Proposed: F_p has no large roots of unity, the reference's transform on P-256 is a real FFT over F_p^2. Amended 2026-11-01: the account of block 3 as realised (its proof counts and its measurements, written on 20 October and lost before the record was accepted) is in chapter 8, Sections 4 and 5.
 
 ## Date
 
