@@ -76,10 +76,12 @@ Two cases get `prove` without a proof run, because they cannot change what the p
   configuration files under `.github/` (the issue forms, `CODEOWNERS`, `dependabot.yml`, the
   pull request template; never the workflows) changed since a proved commit, and posts the
   status naming that commit.
-- A merge of `main` into the branch of an open pull request that brings no such change. The
-  maintainer may post `prove` by hand; the description of the status says so and names the
-  commit that was proved. The review of the pull request checks that `src/`, `tests/`,
-  `scripts/` and `alire.toml` are the same as in that commit.
+- A merge of `main` into the branch of an open pull request that brings no such change: the
+  complete diff between the merge commit and the proved commit touches only the files
+  `--text-only` accepts, so the project files, the workflows and every other input of the
+  proof are the same as in that commit. The maintainer may then post `prove` by hand; the
+  description of the status says so and names the commit that was proved; the review of the
+  pull request checks the diff.
 
 Every other change runs the proof.
 
