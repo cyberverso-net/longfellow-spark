@@ -16,9 +16,10 @@
 --
 --  Two facts make Step a plain expression function. Tokens of an empty
 --  segment produce no term and are not kept (the segment is, since the
---  tokens index the segments), so a token is never skipped. The running sums are 64-bit integers: K steps of deltas below
---  2^27 stay below 2^56, so they cannot wrap; that every term's wires are
---  in range is a fact the reader checks and Valid states.
+--  tokens index the segments), so a token is never skipped. The running
+--  sums are 64-bit integers: K steps of deltas below 2^27 stay below
+--  2^56, so they cannot wrap; that every term's wires are in range is a
+--  fact the reader checks and Valid states.
 --
 --  Indices_Ok is executable, and the reader checks it once. In the
 --  preconditions of the walk it is at level Proof_Only: it reads every
@@ -136,7 +137,8 @@ package Packed_Circuits is
    with Global => null;
 
    --  The number of terms tokens F .. L produce.
-   function Tok_Sum (P : Packed_Circuit; F, L : Natural) return Long_Long_Integer
+   function Tok_Sum
+     (P : Packed_Circuit; F, L : Natural) return Long_Long_Integer
    is
      (if L < F then 0
       else Tok_Sum (P, F, L - 1)
@@ -251,7 +253,8 @@ package Packed_Circuits is
                and then abs Cursor_At (P, J, K - 1).G <= Max_Run - 2**27
                and then abs Cursor_At (P, J, K - 1).H0 <= Max_Run - 2**27
                and then abs Cursor_At (P, J, K - 1).H1 <= Max_Run - 2**27
-               and then Step (P, Cursor_At (P, J, K - 1)) = Cursor_At (P, J, K);
+               and then Step (P, Cursor_At (P, J, K - 1))
+                          = Cursor_At (P, J, K);
 
    --  Every term of every layer names wires in range: the fact the
    --  reader checks as it walks.

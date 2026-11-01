@@ -45,7 +45,8 @@ package body Packed_Circuits is
          pragma Loop_Invariant
            (for all J2 in 0 .. J - 1 =>
               (for all K2 in 1 .. Layer_Len (P, J2) =>
-                 R.Terms (P.Layers (J2).First + K2 - 1) = Term_At (P, J2, K2)));
+                 R.Terms (P.Layers (J2).First + K2 - 1)
+                   = Term_At (P, J2, K2)));
          for K in 1 .. Layer_Len (P, J) loop
             R.Terms (P.Layers (J).First + K - 1) := Term_At (P, J, K);
             pragma Loop_Invariant (R.Layers = P.Layers);
@@ -90,6 +91,8 @@ package body Packed_Circuits is
    procedure Lemma_Walked_Step
      (P : Packed_Circuit; J, K : Natural; C : Cursor)
    is
+      --  C is named only by the contract.
+      pragma Unreferenced (C);
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Walked);
       pragma Annotate
