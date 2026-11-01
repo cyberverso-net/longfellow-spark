@@ -72,4 +72,4 @@ body:
       label: Out of scope
       description: What this block deliberately does not cover.
     validations:
-      required: false
+      required: true

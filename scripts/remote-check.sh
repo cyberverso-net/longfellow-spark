@@ -20,9 +20,13 @@
 #
 #  scripts/remote-check.sh --text-only
 #     Checks that the commit changes only text (Markdown files and
-#     LICENSE) since a commit already proved: the nearest ancestor whose
-#     status `prove` is success, or else origin/main. Then posts `prove`
-#     as passed, naming that commit, without starting the VM.
+#     LICENSE) and the configuration files under .github/ (the issue
+#     forms, CODEOWNERS, dependabot.yml, the pull request template; not
+#     the workflows) since a commit already proved: the nearest ancestor
+#     whose status `prove` is success, or else origin/main. Then posts
+#     `prove` as passed, naming that commit, without starting the VM.
+#     Anything under src/, tests/ or scripts/, and alire.toml, is code
+#     for this purpose and needs the proof.
 #
 #  scripts/remote-check.sh --tree [make target...]
 #     Copies the working tree as it is, committed or not, and runs the
@@ -226,13 +230,16 @@ if [ "$MODE" = text ]; then
    else
       RANGE="origin/main...$SHA"; FROM="main"
    fi
-   others="$(git diff --name-only "$RANGE" | grep -v -E '(\.md$|^LICENSE$)' || true)"
+   #  Text and configuration that cannot change the proof. The workflows
+   #  are not in the list: they are code.
+   TEXT_ONLY='(\.md$|^LICENSE$|^\.github/(ISSUE_TEMPLATE/[^/]+|CODEOWNERS|dependabot\.yml|pull_request_template\.md)$)'
+   others="$(git diff --name-only "$RANGE" | grep -v -E "$TEXT_ONLY" || true)"
    if [ -n "$others" ]; then
-      echo "remote-check: files that are not text changed since $FROM:" >&2
+      echo "remote-check: files that are not text or .github configuration changed since $FROM:" >&2
       echo "$others" >&2
       exit 1
    fi
-   post_status success "Text only since $FROM: Markdown files and LICENSE, proof not run"
+   post_status success "Text only since $FROM: Markdown, LICENSE and .github configuration, proof not run"
    exit 0
 fi
 
