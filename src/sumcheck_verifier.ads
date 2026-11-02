@@ -7,8 +7,10 @@
 --  the Challenges record, index names), 0023 (structural Gold), 0026
 --  (expressions); frame: ADR 0011, 0020, 0024, 0025.
 --
---  What it computes. Given a circuit, its public inputs, the padded
---  sumcheck proof and every verifier challenge, the core replays the
+--  What it computes. Given the shape of a circuit (Sumcheck_Algebra, the
+--  memory milestone), its public inputs, the bound quad of each layer,
+--  the padded sumcheck proof and every verifier challenge, the core
+--  replays the
 --  verifier of Section 6.7 on symbolic witnesses and emits the
 --  constraints that the Ligero layer checks: one linear constraint per
 --  layer and one after the input layer (A * W + b = 0, A as sparse
@@ -18,11 +20,11 @@
 --
 --  Layouts (ADR 0022). Challenges.G holds the MAX_LOGW output-binding
 --  challenges; the core reads the first Ceil_Lg2 (noutput). For layer J,
---  Challenges.Layer holds, from Chal_Off (C, J): alpha, beta, then one
+--  Challenges.Layer holds, from Chal_Off (S, J): alpha, beta, then one
 --  challenge per round r and hand h at 2 + 2 r + h. Sumcheck_Proof.Evals
---  holds, from Proof_Off (C, J): the padded p (0) and p (P2) of hand h
+--  holds, from Proof_Off (S, J): the padded p (0) and p (P2) of hand h
 --  in round r at 4 r + 2 h and 4 r + 2 h + 1, then the two padded
---  claims. The pad variables of layer J start at Pad_Off (C, J, Base):
+--  claims. The pad variables of layer J start at Pad_Off (S, J, Base):
 --  the same 4 r + 2 h + k for the round pads, then c0, c1, cr (Section
 --  6.5); Base is ninput - npublic (zk/verifier.rs).
 --
@@ -131,7 +133,20 @@ package Sumcheck_Verifier is
                 and then Pad_Off'Result >= Base + 3 * J,
         Subprogram_Variant => (Decreases => J);
 
-   --  One step and monotonicity of Pad_Off, from the hidden recursion.
+   --  One step and monotonicity of Chal_Off and of Pad_Off, from the
+   --  hidden recursions. The two on Chal_Off serve the bound quads of
+   --  Zk_Verifier as well.
+   procedure Lemma_Chal_Step (S : Shape; J : Natural) with
+     Ghost, Global => null,
+     Pre  => J <= S.Last_Layer,
+     Post => Chal_Off (S, J + 1) = Chal_Off (S, J) + Chal_Size (S, J);
+
+   procedure Lemma_Chal_Mono (S : Shape; I, J : Natural) with
+     Ghost, Global => null,
+     Pre  => I <= J and then J <= S.Last_Layer + 1,
+     Post => Chal_Off (S, I) <= Chal_Off (S, J),
+     Subprogram_Variant => (Decreases => J);
+
    procedure Lemma_Pad_Step (S : Shape; J : Natural; Base : Natural) with
      Ghost, Global => null,
      Pre  => J <= S.Last_Layer and then Base <= Max_Wires,
@@ -499,8 +514,11 @@ package Sumcheck_Verifier is
                                   Ch.Layer (Chal_Off (Shape_Of (C), J) + 1)))),
         Post => Same (V, BQ_Ref (C, Ch, J));
 
-   --  The bound quads of the verifier, layer by layer as Verify_Layer
-   --  computed them before ADR 0071.
+   --  The bound quads of the verifier from an expanded circuit, layer by
+   --  layer as Verify_Layer computed them before ADR 0071. Since the
+   --  memory milestone (ADR 0080) the verifier computes them from the
+   --  packed circuit (Zk_Verifier.Bound_Quads); this form is proved and
+   --  kept as the oracle of sumcheck_kat, and is not on the program path.
    procedure Bound_Quads (C : Circuit; Ch : Challenges; BQ : out Element_Array)
    with
      Global => null,
@@ -651,9 +669,16 @@ package Sumcheck_Verifier is
                                         T.Terms (I).C))
              and then Same (B (B_Count'Old), T.Known)));
 
-   --  The whole core (Section 6.7, symbolic_sumcheck_verifier_core).
+   --  The whole core (Section 6.7, symbolic_sumcheck_verifier_core). It
+   --  reads the shape of the circuit only, never a term: BQ, the bound
+   --  quad of each layer, is an input (ADR 0071). That BQ holds the bound
+   --  quads of the challenges, BQ_Ref on the circuit, is a fact the
+   --  callers establish where the quads are produced and assert at the
+   --  call (Zk_Verifier after its Bound_Quads, Zk_Prover after the
+   --  prover's sumcheck); the core's own postcondition, the sizes
+   --  emitted and the pad indices of the triples, does not depend on it.
    procedure Verifier_Core
-     (C       : Circuit;
+     (S       : Shape;
       Pub     : Element_Array;
       Proof   : Sumcheck_Proof;
       Ch      : Challenges;
@@ -664,32 +689,23 @@ package Sumcheck_Verifier is
    with
      Global => null,
      Pre  =>
-       (Runtime    =>
-          Pub'First = 0 and then Pub'Length = C.Npublic
-          and then Ch.Last + 1 = Chal_Total (Shape_Of (C))
-          and then Proof.Last + 1 = Proof_Total (Shape_Of (C))
-          and then A.Max + 1 >= A_Bound (Shape_Of (C))
-          and then B'First = 0 and then B'Length = C.Last_Layer + 2
-          and then Lqc'First = 0 and then Lqc'Last = C.Last_Layer
-          and then BQ'First = 0 and then BQ'Length = C.Last_Layer + 1,
-        --  The bound quads are those of the challenges (ADR 0071): the
-        --  verifier's from Bound_Quads, the prover's from its sumcheck.
-        Proof_Only =>
-          (for all J in 0 .. C.Last_Layer =>
-             Same (BQ (J), BQ_Ref (C, Ch, J)))),
-     Post => A.Count <= A_Bound (Shape_Of (C))
+       Pub'First = 0 and then Pub'Length = S.Npublic
+       and then Ch.Last + 1 = Chal_Total (S)
+       and then Proof.Last + 1 = Proof_Total (S)
+       and then A.Max + 1 >= A_Bound (S)
+       and then B'First = 0 and then B'Length = S.Last_Layer + 2
+       and then Lqc'First = 0 and then Lqc'Last = S.Last_Layer
+       and then BQ'First = 0 and then BQ'Length = S.Last_Layer + 1,
+     Post => A.Count <= A_Bound (S)
        and then (for all K in 0 .. A.Count - 1 =>
-                   A.Witness (K) < Witness_Count (Shape_Of (C))
-                   and then A.Constraint (K) <= C.Last_Layer + 1)
-       and then (for all J in 0 .. C.Last_Layer =>
-                   Lqc (J) = (X => Pad_Off (Shape_Of (C), J,
-                                            C.Ninput - C.Npublic)
-                                     + 4 * C.Layers (J).Logw,
-                              Y => Pad_Off (Shape_Of (C), J,
-                                            C.Ninput - C.Npublic)
-                                     + 4 * C.Layers (J).Logw + 1,
-                              Z => Pad_Off (Shape_Of (C), J,
-                                            C.Ninput - C.Npublic)
-                                     + 4 * C.Layers (J).Logw + 2));
+                   A.Witness (K) < Witness_Count (S)
+                   and then A.Constraint (K) <= S.Last_Layer + 1)
+       and then (for all J in 0 .. S.Last_Layer =>
+                   Lqc (J) = (X => Pad_Off (S, J, S.Ninput - S.Npublic)
+                                     + 4 * S.Layers (J).Logw,
+                              Y => Pad_Off (S, J, S.Ninput - S.Npublic)
+                                     + 4 * S.Layers (J).Logw + 1,
+                              Z => Pad_Off (S, J, S.Ninput - S.Npublic)
+                                     + 4 * S.Layers (J).Logw + 2));
 
 end Sumcheck_Verifier;

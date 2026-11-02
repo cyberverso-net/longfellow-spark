@@ -35,6 +35,7 @@ with Sumcheck_Transcript;
 with Ligero_Proof;
 with Lagrange;
 with Ligero_Verifier;
+with Packed_HQuad;
 with Zk_Verifier;
 
 generic
@@ -45,7 +46,8 @@ generic
    with package LP is new Ligero_Proof (SA => SA);
    with package L is new Lagrange (F => SA.F);
    with package LV is new Ligero_Verifier (ST => ST, LP => LP, L => L);
-   with package ZK is new Zk_Verifier (LV => LV);
+   with package PH is new Packed_HQuad (SA => SA, HQ => SV.HQ, others => <>);
+   with package ZK is new Zk_Verifier (LV => LV, PH => PH);
    Field_Name : String;
    with function To_Element (S : String) return SA.Element;
    with function Image (E : SA.Element) return String;

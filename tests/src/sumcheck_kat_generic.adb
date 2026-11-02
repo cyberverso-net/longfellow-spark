@@ -664,6 +664,8 @@ package body Sumcheck_KAT_Generic is
       Len   : constant Natural := LO + LL;
       Full  : Bytes.Byte_Array (0 .. Len - 1);
       Label : constant Bytes.Byte_Array := Zk_Label (0 .. Zk_Label_Len - 1);
+      --  The verifier takes the packed form (ADR 0080).
+      Packed : constant PH.PC.Packed_Circuit := PH.PC.Pack (C);
 
       function LE32 (B : Bytes.Byte_Array; Off : Natural) return Natural is
         (Natural (B (Off)) + 256 * Natural (B (Off + 1))
@@ -688,7 +690,7 @@ package body Sumcheck_KAT_Generic is
       is
          St : Status;
       begin
-         ZK.Verify (Label, Zk_Id, Cfg, C, P, B, St);
+         ZK.Verify (Label, Zk_Id, Cfg, Packed, P, B, St);
          Check (St = Want, "tier 3 " & Name & ": end to end, " & What
                 & ": got " & St'Image & ", expected " & Want'Image);
       end Expect;
@@ -906,7 +908,8 @@ package body Sumcheck_KAT_Generic is
             BQ2 : Element_Array (0 .. C.Last_Layer);
          begin
             SV.Bound_Quads (C, Ch2, BQ2);
-            SV.Verifier_Core (C, Pub, Prf, Ch2, BQ2, A2, B2, Lqc2);
+            SV.Verifier_Core
+              (Shape_Of (C), Pub, Prf, Ch2, BQ2, A2, B2, Lqc2);
          end;
          Same := A2.Count = A.Count and then B2 = B and then Lqc2 = Lqc;
          if Same then
@@ -994,6 +997,47 @@ package body Sumcheck_KAT_Generic is
       end loop;
    end Check_Bound_Quads;
 
+   --  The memory milestone (ADR 0080): the circuit packed with Pack, the
+   --  walk of each layer giving its terms back, and the bound quads of
+   --  the verifier from the packed form equal to those from the expanded
+   --  one, under the recorded challenges.
+   procedure Check_Packed
+     (Name : String;
+      C    : Circuit;
+      Ch   : SV.Challenges;
+      BQ   : Element_Array)
+   is
+      use PH.PC;
+      P   : constant Packed_Circuit := Pack (C);
+      BQP : Element_Array (0 .. C.Last_Layer);
+      Ok  : Boolean := P.Layers = C.Layers and then P.NT = C.NT
+        and then P.Noutput = C.Noutput and then P.Ninput = C.Ninput
+        and then P.Npublic = C.Npublic;
+   begin
+      for J in 0 .. C.Last_Layer loop
+         declare
+            Cur : Cursor := Start (P, J);
+         begin
+            for K in 1 .. Layer_Len (P, J) loop
+               if not On_Delta (P, Cur) then
+                  Ok := False;
+                  exit;
+               end if;
+               if Term_Of (P, Cur) /= C.Terms (C.Layers (J).First + K - 1)
+               then
+                  Ok := False;
+               end if;
+               Cur := Step (P, Cur);
+            end loop;
+         end;
+      end loop;
+      Check (Ok, "tier 3 " & Name
+             & ": Pack then the walk does not give the terms back");
+      ZK.Bound_Quads (P, Shape_Of (C), Ch, BQP);
+      Check (BQP = BQ, "tier 3 " & Name
+             & ": Bound_Quads on the packed form differs");
+   end Check_Packed;
+
    procedure Finish_Tier3 is
       Name : constant String := C_Name (1 .. C_Name_Len);
    begin
@@ -1072,7 +1116,9 @@ package body Sumcheck_KAT_Generic is
             begin
                SV.Bound_Quads (C, Ch, BQ);
                Check_Bound_Quads (Name, C, Ch, BQ);
-               SV.Verifier_Core (C, Pub, Prf, Ch, BQ, A, B, Lqc);
+               Check_Packed (Name, C, Ch, BQ);
+               SV.Verifier_Core
+                 (Shape_Of (C), Pub, Prf, Ch, BQ, A, B, Lqc);
             end;
             Check_Replay (Name, C, Pub, Prf, Ch, A, B, Lqc);
             --  b, per constraint.

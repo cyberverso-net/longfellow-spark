@@ -15,23 +15,12 @@ package body Sumcheck_Verifier is
    --  Offset lemmas (the bodies of the offset functions are hidden).
    ----------------------------------------------------------------------
 
-   procedure Lemma_Chal_Step (S : Shape; J : Natural) with
-     Ghost, Global => null,
-     Pre  => J <= S.Last_Layer,
-     Post => Chal_Off (S, J + 1) = Chal_Off (S, J) + Chal_Size (S, J);
-
    procedure Lemma_Chal_Step (S : Shape; J : Natural) is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Chal_Off);
    begin
       null;
    end Lemma_Chal_Step;
-
-   procedure Lemma_Chal_Mono (S : Shape; I, J : Natural) with
-     Ghost, Global => null,
-     Pre  => I <= J and then J <= S.Last_Layer + 1,
-     Post => Chal_Off (S, I) <= Chal_Off (S, J),
-     Subprogram_Variant => (Decreases => J);
 
    procedure Lemma_Chal_Mono (S : Shape; I, J : Natural) is
       pragma Annotate
@@ -712,7 +701,7 @@ package body Sumcheck_Verifier is
    end Bound_Quads;
 
    procedure Verifier_Core
-     (C       : Circuit;
+     (S       : Shape;
       Pub     : Element_Array;
       Proof   : Sumcheck_Proof;
       Ch      : Challenges;
@@ -721,11 +710,10 @@ package body Sumcheck_Verifier is
       B       : out Element_Array;
       Lqc     : out Lqc_Array)
    is
-      S       : constant Shape := Shape_Of (C);
-      Base    : constant Natural := C.Ninput - C.Npublic;
+      Base    : constant Natural := S.Ninput - S.Npublic;
       B_Count : Natural := 0;
       State   : Claims_State :=
-        (Logv     => Ceil_Lg2 (C.Noutput),
+        (Logv     => Ceil_Lg2 (S.Noutput),
          Claim0   => From_Constant (Zero, Layer_Capacity),
          Claim1   => From_Constant (Zero, Layer_Capacity),
          HC0      => Ch.G,
@@ -738,7 +726,7 @@ package body Sumcheck_Verifier is
               Witness    => [others => 0]);
       B   := [others => Zero];
       Lqc := [others => (X => 0, Y => 0, Z => 0)];
-      for J in 0 .. C.Last_Layer loop
+      for J in 0 .. S.Last_Layer loop
          pragma Loop_Invariant (A.Count <= J * (4 * Max_Logw + 5));
          pragma Loop_Invariant (B_Count = J);
          pragma Loop_Invariant
@@ -751,10 +739,10 @@ package body Sumcheck_Verifier is
               and then A.Constraint (K) < J);
          pragma Loop_Invariant
            (for all J2 in 0 .. J - 1 =>
-              Lqc (J2) = (X => Pad_Off (S, J2, Base) + 4 * C.Layers (J2).Logw,
-                          Y => Pad_Off (S, J2, Base) + 4 * C.Layers (J2).Logw
+              Lqc (J2) = (X => Pad_Off (S, J2, Base) + 4 * S.Layers (J2).Logw,
+                          Y => Pad_Off (S, J2, Base) + 4 * S.Layers (J2).Logw
                                  + 1,
-                          Z => Pad_Off (S, J2, Base) + 4 * C.Layers (J2).Logw
+                          Z => Pad_Off (S, J2, Base) + 4 * S.Layers (J2).Logw
                                  + 2));
          Lemma_Pad_Step (S, J, Base);
          Verify_Layer

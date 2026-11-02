@@ -37,6 +37,8 @@ with Lagrange_GF2_128;
 with Lagrange_P256;
 with Ligero_Verifier_GF2_128;
 with Ligero_Verifier_P256;
+with Packed_HQuad_GF2_128;
+with Packed_HQuad_P256;
 with Zk_Verifier_GF2_128;
 with Zk_Verifier_P256;
 with Sumcheck_KAT_Generic;
@@ -126,16 +128,16 @@ procedure Sumcheck_KAT is
      (SA => Sumcheck_Algebra_GF2_128, SE => Sumcheck_Expression_GF2_128,
       SV => Sumcheck_Verifier_GF2_128, ST => Sumcheck_Transcript_GF2_128,
       LP => Ligero_Proof_GF2_128, L => Lagrange_GF2_128,
-      LV => Ligero_Verifier_GF2_128, ZK => Zk_Verifier_GF2_128,
-      Field_Name => "gf2_128",
+      LV => Ligero_Verifier_GF2_128, PH => Packed_HQuad_GF2_128,
+      ZK => Zk_Verifier_GF2_128, Field_Name => "gf2_128",
       To_Element => GF_To_Element, Image => GF_Image);
 
    package P_KAT is new Sumcheck_KAT_Generic
      (SA => Sumcheck_Algebra_P256, SE => Sumcheck_Expression_P256,
       SV => Sumcheck_Verifier_P256, ST => Sumcheck_Transcript_P256,
       LP => Ligero_Proof_P256, L => Lagrange_P256,
-      LV => Ligero_Verifier_P256, ZK => Zk_Verifier_P256,
-      Field_Name => "p256",
+      LV => Ligero_Verifier_P256, PH => Packed_HQuad_P256,
+      ZK => Zk_Verifier_P256, Field_Name => "p256",
       To_Element => P_To_Element, Image => P_Image);
 
    Passed : Natural := 0;

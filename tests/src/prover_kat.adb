@@ -82,6 +82,7 @@ with Sumcheck_Prover;
 with Ligero_Prover;
 with Zk_Prover;
 with Zk_Verifier;
+with Packed_HQuad;
 with Prover_Status;
 with Verifier_Status;
 with Simple_Rng;
@@ -111,6 +112,8 @@ with Zk_Prover_GF2_128;
 with Zk_Prover_P256;
 with Zk_Verifier_GF2_128;
 with Zk_Verifier_P256;
+with Packed_HQuad_GF2_128;
+with Packed_HQuad_P256;
 
 procedure Prover_KAT is
 
@@ -287,7 +290,9 @@ procedure Prover_KAT is
       with package SPR is new Sumcheck_Prover (ST => ST, others => <>);
       with package LPR is new Ligero_Prover (LV => LV, others => <>);
       with package ZKP is new Zk_Prover (LPR => LPR, SPR => SPR, PW => PW);
-      with package ZK is new Zk_Verifier (LV => LV);
+      with package PH is new Packed_HQuad
+        (SA => SA, PC => CR.PC, HQ => SV.HQ);
+      with package ZK is new Zk_Verifier (LV => LV, PH => PH);
       with function To_Element (S : String) return SA.Element;
    procedure Check_Sumcheck
      (Name  : String;
@@ -524,6 +529,30 @@ procedure Prover_KAT is
          --  false inputs must be refused by the verifier.
          package ZKP_U is new Zk_Prover
            (LPR => LPR, SPR => SPR, PW => PW, Validate => False);
+
+         --  The verifier takes the packed form of the circuit (ADR
+         --  0080), loaded from the same bytes with the same header.
+         procedure Verify_Packed
+           (Pub   : SA.Element_Array;
+            Proof : Byte_Array;
+            VSt   : out Verifier_Status.Status)
+         is
+            use type CR.Header;
+            P   : CR.Packed_Access;
+            HP  : CR.Header;
+            PSt : Circuit_Status.Status;
+         begin
+            CR.Read_Packed (Circ.all, False, [others => 0], P, HP, PSt);
+            if PSt /= Circuit_Status.Ok then
+               raise Parse_Error with "packed load " & PSt'Image;
+            end if;
+            if HP /= H then
+               CR.Free_Packed (P);
+               raise Parse_Error with "packed load: another header";
+            end if;
+            ZK.Verify (Label, HP.Id, Cfg, P.all, Pub, Proof, VSt);
+            CR.Free_Packed (P);
+         end Verify_Packed;
       begin
          if Count /= 10 + Nin then
             raise Parse_Error with "prove: field count";
@@ -576,8 +605,7 @@ procedure Prover_KAT is
                   Free (B);
                   return;
                end if;
-               ZK.Verify (Label, H.Id, Cfg, C.all, W (0 .. C.Npublic - 1),
-                          B (0 .. Len - 1), VSt);
+               Verify_Packed (W (0 .. C.Npublic - 1), B (0 .. Len - 1), VSt);
                if VSt /= Verifier_Status.Ok then
                   Report_Failure (Name & ": the verifier reports "
                                   & VSt'Image & " on the proof");
@@ -601,8 +629,7 @@ procedure Prover_KAT is
                   Free (B);
                   return;
                end if;
-               ZK.Verify (Label, H.Id, Cfg, C.all, W (0 .. C.Npublic - 1),
-                          B (0 .. Len - 1), VSt);
+               Verify_Packed (W (0 .. C.Npublic - 1), B (0 .. Len - 1), VSt);
                if VSt = Verifier_Status.Ok then
                   Report_Failure (Name & ": the verifier accepts the proof"
                                   & " of false inputs");
@@ -913,7 +940,7 @@ procedure Prover_KAT is
                   CR.Free (C);
                   return;
                end if;
-               SV.Verifier_Core (C.all, W (0 .. C.Npublic - 1), Proof, Ch,
+               SV.Verifier_Core (Sh, W (0 .. C.Npublic - 1), Proof, Ch,
                                  BQ, A, Bv, Lqc);
                if Wv'Length /= Npriv + Npads then
                   Report_Failure (Name & ": witness vector length");
@@ -975,7 +1002,8 @@ procedure Prover_KAT is
       LV => Ligero_Verifier_GF2_128, CR => Circuit_Reader_GF2_128,
       PW => Proof_Writer_GF2_128, SPR => Sumcheck_Prover_GF2_128,
       LPR => Ligero_Prover_GF2_128, ZKP => Zk_Prover_GF2_128,
-      ZK => Zk_Verifier_GF2_128, To_Element => GF_To_Element);
+      PH => Packed_HQuad_GF2_128, ZK => Zk_Verifier_GF2_128,
+      To_Element => GF_To_Element);
    procedure Check_P is new Check_Sumcheck
      (FS => Field_P256.Sig,
       SA => Sumcheck_Algebra_P256, SE => Sumcheck_Expression_P256,
@@ -984,7 +1012,8 @@ procedure Prover_KAT is
       LV => Ligero_Verifier_P256, CR => Circuit_Reader_P256,
       PW => Proof_Writer_P256, SPR => Sumcheck_Prover_P256,
       LPR => Ligero_Prover_P256, ZKP => Zk_Prover_P256,
-      ZK => Zk_Verifier_P256, To_Element => P_To_Element);
+      PH => Packed_HQuad_P256, ZK => Zk_Verifier_P256,
+      To_Element => P_To_Element);
 
    procedure Check_Line (Line : String) is
       Fields : Field_Array;

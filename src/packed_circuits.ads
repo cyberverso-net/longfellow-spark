@@ -27,10 +27,18 @@
 --  every step would take time quadratic in the circuit. The provers still
 --  require it at every call; the rest of each precondition still runs.
 --
+--  Shape_Of gives the shape of the form, the header and the layer table
+--  (Sumcheck_Algebra.Shape, block 3): the verifier takes every size from
+--  it, and Lemma_Shape_Of proves it a Shape from the loader's
+--  postcondition. Pack is the packed form of an expanded circuit, for
+--  the circuits the tests build by hand, proved by the walk to expand
+--  back to it.
+--
 --  Proof status: Gold for the walk against Cursor_At (absence of
---  run-time errors and the Posts below). Nothing here relates the packed
---  form to the bytes of a file: as before, the expansion agrees with
---  upstream's by the vectors (ADR 0048).
+--  run-time errors and the Posts below), Gold for Pack against Expand.
+--  Nothing here relates the packed form to the bytes of a file: as
+--  before, the expansion agrees with upstream's by the vectors (ADR
+--  0048).
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, circuits are
 --  public data (ADR 0037).
@@ -46,6 +54,7 @@ package Packed_Circuits is
 
    use type SA.Layer_Array;
    use type SA.Term;
+   use type SA.Raw_Circuit;
 
    subtype Count is Natural range 0 .. SA.Max_Terms;
 
@@ -427,5 +436,50 @@ package Packed_Circuits is
                and then
                SA.Same (Term_Of (P, C).K,
                         Expand (P).Terms (P.Layers (J).First + K - 1).K);
+
+   -------------------------------------------------------------------
+   --  The shape, and the packing of an expanded circuit (block 3)
+   -------------------------------------------------------------------
+
+   --  The shape of P: its header and its layer table, which Expand
+   --  copies, so it is the shape of the expansion as well.
+   function Shape_Of (P : Packed_Circuit) return SA.Raw_Shape is
+     ((Last_Layer => P.Last_Layer,
+       NT         => P.NT,
+       Noutput    => P.Noutput,
+       Ninput     => P.Ninput,
+       Npublic    => P.Npublic,
+       Layers     => P.Layers))
+   with Global => null;
+
+   --  The shape of a valid packed circuit whose expansion is well
+   --  formed satisfies Shape_Ok. Valid alone does not give it: Layers_Ok
+   --  says nothing of the wire counts, nor that the last layer ends at
+   --  NT; the reader's postcondition states both facts.
+   procedure Lemma_Shape_Of (P : Packed_Circuit) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => Valid (P) and then SA.Well_Formed (Expand (P)),
+     Post   => SA.Shape_Ok (Shape_Of (P));
+
+   --  The packed form of a well-formed circuit, for the circuits the
+   --  tests build by hand. Per layer one segment, its entries one delta
+   --  per term in order, each delta the difference from the term before
+   --  (from the zero cursor for the first), and one token when the
+   --  layer has a term; the constants are the coefficients of the terms
+   --  in order. Its expansion is the circuit.
+   function Pack (C : SA.Raw_Circuit) return Packed_Circuit with
+     Global => null,
+     Pre    => SA.Well_Formed (C),
+     Post   =>
+       (Runtime    =>
+          Pack'Result.Last_Layer = C.Last_Layer
+          and then Pack'Result.NT = C.NT
+          and then Pack'Result.Noutput = C.Noutput
+          and then Pack'Result.Ninput = C.Ninput
+          and then Pack'Result.Npublic = C.Npublic
+          and then Pack'Result.Layers = C.Layers,
+        Proof_Only =>
+          Valid (Pack'Result) and then Expand (Pack'Result) = C);
 
 end Packed_Circuits;

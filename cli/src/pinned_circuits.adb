@@ -104,4 +104,20 @@ package body Pinned_Circuits is
       end if;
    end Read;
 
+   procedure Read_Packed
+     (B    : Byte_Array;
+      Full : Boolean;
+      P    : out CR.Packed_Access;
+      H    : out CR.Header;
+      St   : out Circuit_Status.Status)
+   is
+      Found : Boolean := False;
+      Pid   : Bytes_32 := [others => 0];
+   begin
+      if not Full then
+         Lookup (B, Found, Pid);
+      end if;
+      CR.Read_Packed (B, Found, Pid, P, H, St);
+   end Read_Packed;
+
 end Pinned_Circuits;

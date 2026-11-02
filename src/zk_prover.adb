@@ -248,6 +248,7 @@ package body Zk_Prover is
          return;
       end if;
       pragma Assert (S.Last_Layer = C.Last_Layer);
+      pragma Assert (S.Ninput = C.Ninput and then S.Npublic = C.Npublic);
       pragma Assert
         (G.Num_Quad_Rows
          = (C.Last_Layer + 1 + G.Witnesses_Per_Row - 1)
@@ -296,7 +297,14 @@ package body Zk_Prover is
       Transcript.Write_Bytes (Com.Root);
       LPR.LV.ST.Write_Sumcheck_Statement (Id, S, Inputs (0 .. C.Npublic - 1));
       SPR.Prove (C, Wk.Wires, Wk.Pads, Wk.SProof, Wk.Ch, Wk.BQ);
-      SV.Verifier_Core (C, Inputs (0 .. C.Npublic - 1), Wk.SProof, Wk.Ch,
+      --  The bound quads the core receives are those of the challenges
+      --  (ADR 0071), from the prover's own sumcheck; the core reads the
+      --  shape only.
+      pragma Assert
+        (Proof_Only =>
+           (for all J in 0 .. C.Last_Layer =>
+              Same (Wk.BQ (J), SV.BQ_Ref (C, Wk.Ch, J))));
+      SV.Verifier_Core (S, Inputs (0 .. C.Npublic - 1), Wk.SProof, Wk.Ch,
                         Wk.BQ, Wk.A, Wk.Bv, Wk.Lqc2);
       LPR.LV.Lemma_Vector_Len_Covers (G);
       pragma Assert (Wk.Lqc'Length = C.Last_Layer + 1);
