@@ -1011,6 +1011,10 @@ package body Sumcheck_Prover is
               (C.Terms (First .. Last), Logv, Cur0, Cur1, Nxt0, Nxt1, Logw,
                Alpha, Beta);
          end if;
+         --  The lemma names the offset through the shape of C; Off_C is
+         --  the same offset through S, the shape of C.
+         pragma Assert
+           (Proof_Only => Off_C = ST.SV.Chal_Off (Shape_Of (C), J));
          ST.SV.Lemma_BQ_Ref_From
            (C, Ch, J, Logv, Cur0, Cur1, Nxt0, Nxt1, BQJ);
          Cl0 := Ref (A0.all, N0, 0);

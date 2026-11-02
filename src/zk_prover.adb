@@ -247,6 +247,7 @@ package body Zk_Prover is
          St := Input_Not_One;
          return;
       end if;
+      pragma Assert (S.Last_Layer = C.Last_Layer);
       pragma Assert
         (G.Num_Quad_Rows
          = (C.Last_Layer + 1 + G.Witnesses_Per_Row - 1)
@@ -282,6 +283,7 @@ package body Zk_Prover is
       end loop;
       SPR.Lqc_Triples (S, Wk.Lqc);
       SV.Lemma_Pads_Below (S);
+      pragma Assert (Wk.Lqc'Length = C.Last_Layer + 1);
       LPR.Commit (G, Wk.Wv, Wk.Lqc, Sfb_W, Com, Ok_C);
       if not Ok_C then
          Free_Work (Wk);
