@@ -1012,9 +1012,27 @@ package body Sumcheck_Prover is
                Alpha, Beta);
          end if;
          --  The lemma names the offset through the shape of C; Off_C is
-         --  the same offset through S, the shape of C.
+         --  the same offset through S, the shape of C. The bound quad
+         --  in the lemma's terms is reached in two steps (the terms of
+         --  the layer and the layer's width, then the challenges in
+         --  Ch), each a small proof: in one step the provers reach
+         --  their step budget on the P-256 instance.
          pragma Assert
            (Proof_Only => Off_C = ST.SV.Chal_Off (Shape_Of (C), J));
+         pragma Assert
+           (Proof_Only =>
+              (if Tab
+               then Same (BQJ,
+                          ST.SA.EBQT_Ref (ST.SA.Layer_Terms (C, J),
+                                          ST.SA.Layer_Terms (C, J)'Length,
+                                          Logv, Cur0, Cur1, Nxt0, Nxt1,
+                                          C.Layers (J).Logw,
+                                          Alpha, Beta))));
+         pragma Assert
+           (Proof_Only =>
+              Same (Alpha, Ch.Layer (ST.SV.Chal_Off (Shape_Of (C), J)))
+              and then
+              Same (Beta, Ch.Layer (ST.SV.Chal_Off (Shape_Of (C), J) + 1)));
          ST.SV.Lemma_BQ_Ref_From
            (C, Ch, J, Logv, Cur0, Cur1, Nxt0, Nxt1, BQJ);
          Cl0 := Ref (A0.all, N0, 0);
