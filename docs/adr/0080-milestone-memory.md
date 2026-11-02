@@ -70,12 +70,24 @@ At the close of M2 ([ADR 0078](0078-milestone-m2-closed.md)) the peak heap was f
   - Every result is stated on the layer of the ghost expansion, as the kernels of `Sumcheck_HQuad` state theirs on an expanded layer, so the invariant of the rounds (with the eq2 table; without it `Bind_Merge`, like `Merge_Terms`, states the run count only) and the references `EBQT_Ref` and `EBQ_Ref` are reached unchanged.
   - The verifier and the prover still take the expanded circuit, so the peak heap is unchanged; block 3 makes them take the packed form and measures it.
   - `Bind_Step_Packed`, the rounds on the packed path, is a copy of `Bind_Step` with the ghost layer in its contract, kept until block 3 removes the expanded path.
+- Block 3, first part (3a), the verifier on the packed form (chapter 3, Section 3.5; chapter 6, Section 3.7).
+  - The sizes come from the shape of the circuit, `Shape` of `Sumcheck_Algebra` (the header and the layer table, with `Shape_Ok` as its predicate); the subprograms that read no term take it in place of the circuit, the ghost references keep the circuit and are stated on the expansion `Expand (P)` on the packed path.
+  - `Zk_Verifier.Verify` takes the packed circuit: the shape once, the bound quads from the walk with the kernels of block 2 (`Bound_Quads`, Gold against `BQ_Ref` on the expansion), the core on the shape. `Verifier_Core` takes the shape; the fact that the bound quads it receives are those of the challenges lives in the postconditions of their producers and in `Proof_Only` assertions at its two calls. The command-line verifier loads with `Read_Packed`; `Read` stays as the prover's loader and the oracle of the tests. `Pack`, Gold, packs the hand-built circuits of the tests.
+  - Peak heap on the proving machine, one session, the counter of the first step on both sides (upstream's `heap_v7` verification of the mDoc v7 flow, generic code, baseline CPU):
+
+    | | before (main 7946d77) | after (3a) | upstream (both circuits) |
+    |---|---|---|---|
+    | hash verify | 401 MB | 79 MB | 48 MB |
+    | signature verify | 36 MB | 11 MB | |
+
+    The verifier is within the criterion of the milestone, 1.6 times upstream's peak for both circuits on the hash circuit alone (from 8.3 times). The proofs of the command line stay identical byte for byte. The prover's peak is unchanged until the second part of the block.
 
 ## Verification impact
 
 - No contract changes. The slice is the value `Layer_Terms` returned; the protocol partition is proved (6238 checks).
 - The command-line prover is outside the proof perimeter (SPARK_Mode Off).
 - Block 2: the ghost postconditions of `Lemma_Term_Of`, `Expand` and `Lemma_Walked_Step` in `Packed_Circuits` gain `Same` on the coefficient of each term, beside the equality they stated. An addition: on GF(2^128) the predefined equality of an element is pointwise and gives no congruence through the field operations, so the coefficient could not be carried from the walk to the model (chapter 3, Section 4.1). The `circuits` partition is proved again (3,436 checks, 3,374 at the close of block 1); the new partition `packed_hquad` holds 1,644 checks. Prover settings unchanged.
+- Block 3, first part: `Verifier_Core` takes the shape of the circuit, and its `Proof_Only` precondition on the bound quads moves to the postconditions of `Zk_Verifier.Bound_Quads` and `Sumcheck_Prover.Prove` and to `Proof_Only` assertions at the two calls; its own postcondition, and those of `Zk_Verifier.Verify` and `Zk_Prover.Prove`, are unchanged. New Gold contracts: `Shape_Of (P)` with `Lemma_Shape_Of`, `Pack`, `Zk_Verifier.Bound_Quads`. `Zk_Verifier.Verify` asks of the circuit, at level `Proof_Only`, the loader's postcondition. No contract weakened, prover settings unchanged. The `circuits` partition holds 4,557 checks (3,436 at the close of block 2: `Pack` and its lemmas), the `verifier` partition 2,542 (1,945 at the close of Phase B), all proved.
 
 ## References
 

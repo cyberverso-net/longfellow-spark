@@ -129,7 +129,15 @@ The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. I
   The time of a layer is the median of three calls; one session, the tree of the pull request of block 2. The packed path costs 5 % more over the circuit: it rebuilds each term from the deltas where the expanded path reads an array already laid out, and the rounds are the same code on the same merged entries. On the signature circuit (P-256, 481,833 terms, 285,426 runs) 84 ms against 90 ms.
 
   The verifier and the prover still take the expanded circuit in this block; the peak heap moves when they take the packed form, in the next block.
-- Next: the circuit held compressed with one layer expanded at a time, then the prover's wires.
+- Block 3, first part: the verifier takes the packed circuit (chapter 6, Section 3.7), and the expanded circuit leaves its path. Peak heap of `longfellow_verify` on the mDoc v7 circuits, one session on the proving machine, three runs each, upstream's `heap_v7` (a small driver on its mDoc runtime that verifies the two v7 proofs in one process, generic code, baseline CPU) under the same counter:
+
+| Peak heap, verifier | before (main 7946d77) | after block 3a | upstream (both circuits) |
+|---|---|---|---|
+| hash | 401 MB | 79 MB | 48 MB |
+| signature | 36 MB | 11 MB | |
+
+  The peaks are identical from run to run. The verifier's peak falls 5.1 times on the hash circuit and 3.3 times on the signature circuit; the hash verification alone takes 1.6 times upstream's peak for both circuits, from 8.3 times, within the criterion of the milestone for the verifier. The maximum resident set agrees (405 MB to 83 MB on the hash circuit). The fall on the hash circuit, 321 MB, is more than the expanded circuit, 7,757,579 terms of 32 bytes, 248 MB: the rest was held beside it on the expanded path and is not attributed here; what remains, 79 MB, is the packed form (4.4 MB), the proof and the working sets of `Verify` (chapter 6, Section 3.4), to be profiled in the second part of the block. The verification time, median of three, goes from 2.54 s to 2.43 s on the hash circuit and from 0.29 s to 0.28 s on the signature circuit. The proofs are identical byte for byte; the prover, which still loads the expanded circuit, keeps its peak (621 MB and 60 MB) and its time until the second part of the block.
+- Next: the prover on the packed form (the second part of block 3), then the prover's wires.
 
 ## After M2
 
