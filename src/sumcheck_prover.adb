@@ -17,6 +17,9 @@ package body Sumcheck_Prover is
    package HQ renames ST.SV.HQ;
    package BQ renames HQ.BQ with Ghost => Proof_Only;
 
+   use type ST.SA.Term_Array;
+   use type ST.SA.Layer;
+
    subtype Logw_Type is ST.SA.Logw_Type;
    Max_Logw : constant := ST.SA.Max_Logw;
 
@@ -132,6 +135,157 @@ package body Sumcheck_Prover is
            (ST.SA.Off (S, J + 1) + S.Layers (J).NW_In <= ST.SA.Off (S, K));
       end loop;
    end Lemma_Segment;
+
+   -------------------------------------------------------------------
+   --  The bound quad of a layer, from the kernels to the reference of
+   --  the verifier (ADR 0071, ADR 0073)
+   -------------------------------------------------------------------
+
+   --  The two lemmas below are the end of Prove_Layer, taken out of its
+   --  body: after the rounds of a layer the provers carry the whole
+   --  layer, and did not reach these steps within their budget on one
+   --  instance. Each lemma is a small proof from the facts it names.
+
+   --  When the eq tables fit: the coefficients left at hands (0, 0)
+   --  after the rounds, which the invariant of the rounds relates to
+   --  the layer bound with g, sum to the bound quad of the layer, the
+   --  table form EBQT_Ref on the layer of the expansion. The proof is
+   --  the one Bind_Quad_Packed of Packed_HQuad makes for the verifier.
+   procedure Lemma_BQ_Table
+     (P        : Packed_Circuit;
+      J        : Natural;
+      T        : Term_Array;
+      NT       : Natural;
+      Logv     : Natural;
+      G0, G1   : Element_Array;
+      HC0, HC1 : Element_Array;
+      Logw     : Natural;
+      Alpha    : Element;
+      Beta     : Element;
+      V        : Element)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    =>
+       PH.PC.Valid (P) and then PH.PC.Layers_Ok (P)
+       and then J <= P.Last_Layer
+       and then NT <= T'Length
+       and then G0'First = 0 and then G1'First = 0
+       and then Logv <= G0'Length and then Logv <= G1'Length
+       and then Logv <= ST.SA.Max_Bindeq_Log
+       and then HC0'First = 0 and then HC1'First = 0
+       and then Logw <= HC0'Length and then Logw <= HC1'Length
+       and then Logw <= ST.SA.Max_Bindeq_Log
+       and then BQ.Inv (T, NT,
+                        PH.Bound_Layer (P, J, Logv, G0, G1, Alpha, Beta),
+                        HC0, Logw, HC1, Logw)
+       and then Same (V, BQ.W_Sum (T, NT, 0, 0, 0)),
+     Post   =>
+       Same (V, ST.SA.EBQT_Ref (PH.Layer_Of (P, J), PH.PC.Layer_Len (P, J),
+                                Logv, G0, G1, HC0, HC1, Logw, Alpha, Beta))
+   is
+      T0 : constant Term_Array := PH.Layer_Of (P, J);
+      T1 : constant Term_Array :=
+        PH.Bound_Layer (P, J, Logv, G0, G1, Alpha, Beta);
+   begin
+      BQ.Lemma_Inv_At (T, NT, T1, HC0, Logw, HC1, Logw, 0, 0);
+      pragma Assert
+        (Same (V, BQ.V_Sum (T1, T1'Length, HC0, Logw, HC1, Logw, 0, 0)));
+      BQ.Lemma_V_End_All
+        (T1, T0, T0'Length, Logv, G0, G1, HC0, HC1, Logw, Alpha, Beta);
+      pragma Assert (T1'Length = T0'Length);
+      pragma Assert (T0'Length = PH.PC.Layer_Len (P, J));
+   end Lemma_BQ_Table;
+
+   --  The bound quad of layer J in the terms of the verifier, BQ_Ref on
+   --  the expansion, from its statement on the layer of P as the kernels
+   --  give it: the bridge from P, its layer table and the offset Off_C
+   --  of its challenges to the expansion and its shape. The challenges
+   --  of the layer are named as the rounds leave them in Ch.
+   procedure Lemma_BQ_Layer
+     (P        : Packed_Circuit;
+      J        : Natural;
+      Ch       : Challenges;
+      Off_C    : Natural;
+      Logv     : Natural;
+      G0, G1   : Element_Array;
+      HC0, HC1 : Element_Array;
+      Logw     : Natural;
+      Alpha    : Element;
+      Beta     : Element;
+      V        : Element)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    =>
+       PH.PC.Valid (P) and then PH.PC.Layers_Ok (P)
+       and then ST.SA.Well_Formed (PH.PC.Expand (P))
+       and then J <= P.Last_Layer
+       and then Logw = P.Layers (J).Logw
+       and then Off_C = ST.SV.Chal_Off (Exp_Shape (P), J)
+       and then Off_C + 2 * Logw + 2 <= Ch.Last + 1
+       and then Logv = ST.SV.Layer_Logv (Exp_Shape (P), J)
+       and then G0'First = 0 and then G1'First = 0
+       and then G0'Length = Max_Logw and then G1'Length = Max_Logw
+       and then HC0'First = 0 and then HC1'First = 0
+       and then HC0'Length = Max_Logw and then HC1'Length = Max_Logw
+       and then (for all R in 0 .. Logv - 1 =>
+                   Same (G0 (R),
+                         ST.SV.Layer_G (Exp_Shape (P), Ch, J, 0) (R))
+                   and then
+                   Same (G1 (R),
+                         ST.SV.Layer_G (Exp_Shape (P), Ch, J, 1) (R)))
+       and then (for all R in 0 .. Logw - 1 =>
+                   Same (HC0 (R), Ch.Layer (Off_C + 2 + 2 * R))
+                   and then
+                   Same (HC1 (R), Ch.Layer (Off_C + 2 + 2 * R + 1)))
+       and then Same (Ch.Layer (Off_C), Alpha)
+       and then Same (Ch.Layer (Off_C + 1), Beta)
+       and then
+       (if Logv <= ST.SA.Max_Bindeq_Log
+          and then Logw <= ST.SA.Max_Bindeq_Log
+        then Same (V, ST.SA.EBQT_Ref (PH.Layer_Of (P, J),
+                                      PH.PC.Layer_Len (P, J), Logv,
+                                      G0, G1, HC0, HC1, Logw, Alpha, Beta))
+        else Same (V, ST.SA.EBQ_Ref (PH.Layer_Of (P, J),
+                                     PH.PC.Layer_Len (P, J), Logv,
+                                     G0, G1, HC0, HC1, Logw, Alpha, Beta))),
+     Post   => Same (V, ST.SV.BQ_Ref (Exp (P), Ch, J))
+   is
+      C  : constant Circuit := Exp (P);
+      SC : constant Shape := Exp_Shape (P);
+      T0 : constant Term_Array := PH.Layer_Of (P, J);
+   begin
+      --  The layer table of the expansion is the one of P; its shape is
+      --  SC; its layer J is T0, of the length the kernels name.
+      pragma Assert (C.Layers (J) = P.Layers (J));
+      pragma Assert (ST.SA.Shape_Of (C) = SC);
+      pragma Assert (ST.SV.Chal_Off (SC, J) = Off_C);
+      pragma Assert
+        (T0 = ST.SA.Layer_Terms (C, J)
+         and then T0'Length = PH.PC.Layer_Len (P, J));
+      pragma Assert
+        (Same (Alpha, Ch.Layer (ST.SV.Chal_Off (SC, J)))
+         and then Same (Beta, Ch.Layer (ST.SV.Chal_Off (SC, J) + 1)));
+      pragma Assert
+        (if Logv <= ST.SA.Max_Bindeq_Log
+           and then C.Layers (J).Logw <= ST.SA.Max_Bindeq_Log
+         then Same (V, ST.SA.EBQT_Ref (ST.SA.Layer_Terms (C, J),
+                                       ST.SA.Layer_Terms (C, J)'Length,
+                                       Logv, G0, G1, HC0, HC1,
+                                       C.Layers (J).Logw,
+                                       Ch.Layer (ST.SV.Chal_Off (SC, J)),
+                                       Ch.Layer (ST.SV.Chal_Off (SC, J)
+                                                 + 1)))
+         else Same (V, ST.SA.EBQ_Ref (ST.SA.Layer_Terms (C, J),
+                                      ST.SA.Layer_Terms (C, J)'Length,
+                                      Logv, G0, G1, HC0, HC1,
+                                      C.Layers (J).Logw,
+                                      Ch.Layer (ST.SV.Chal_Off (SC, J)),
+                                      Ch.Layer (ST.SV.Chal_Off (SC, J)
+                                                + 1))));
+      ST.SV.Lemma_BQ_Ref_From (C, Ch, J, Logv, G0, G1, HC0, HC1, V);
+   end Lemma_BQ_Layer;
 
    -------------------------------------------------------------------
    --  Sample_Pads
@@ -603,7 +757,8 @@ package body Sumcheck_Prover is
    --  One hand of round R: the challenge stored at R in the challenges
    --  of the hand (C0 for hand 0, C1 for hand 1), then Bind_H on the
    --  first NT terms, with the invariant of the rounds carried over to
-   --  the next hand (ADR 0071).
+   --  the next hand (ADR 0071). The layer of the invariant is layer J of
+   --  the expansion of P bound with g, Bound_Layer of Packed_HQuad.
    procedure Bind_Round
      (T      : in out Term_Array;
       NT     : in out Natural;
@@ -614,7 +769,8 @@ package body Sumcheck_Prover is
       Layer  : in out Element_Array;
       Off    : Natural;
       Tab    : Boolean;
-      T0     : Term_Array;
+      P      : Packed_Circuit;
+      J      : Natural;
       Logv   : Natural;
       G0, G1 : Element_Array;
       Alpha  : Element;
@@ -637,12 +793,14 @@ package body Sumcheck_Prover is
           and then (if H = 1 then Same (C0 (R), Layer (Off + 2 + 2 * R)))
           and then
           (if Tab then
-             G0'First = 0 and then G1'First = 0
+             PH.PC.Valid (P) and then PH.PC.Layers_Ok (P)
+             and then J <= P.Last_Layer
+             and then G0'First = 0 and then G1'First = 0
              and then Logv <= G0'Length and then Logv <= G1'Length
              and then Logv <= ST.SA.Max_Bindeq_Log
-             and then BQ.Inv (T, NT, BQ.Bound_Array (T0, Logv, G0, G1, Alpha,
-                                                     Beta), C0,
-                              (if H = 0 then R else R + 1), C1, R))),
+             and then BQ.Inv (T, NT,
+                              PH.Bound_Layer (P, J, Logv, G0, G1, Alpha, Beta),
+                              C0, (if H = 0 then R else R + 1), C1, R))),
      Post   =>
        (Runtime    => NT <= T'Length,
         Proof_Only =>
@@ -666,13 +824,18 @@ package body Sumcheck_Prover is
                 and then (for all I in C0'Range => Same (C0 (I), C0'Old (I))))
           and then
           (if Tab then
-             BQ.Inv (T, NT, BQ.Bound_Array (T0, Logv, G0, G1, Alpha, Beta), C0,
-                     R + 1, C1,
-                     (if H = 0 then R else R + 1))))
+             BQ.Inv (T, NT, PH.Bound_Layer (P, J, Logv, G0, G1, Alpha, Beta),
+                     C0, R + 1, C1, (if H = 0 then R else R + 1))))
    is
       Old : constant Term_Array := T (T'First .. T'First + NT - 1)
       with Ghost => Proof_Only;
       Sav : constant Element_Array := (if H = 0 then C0 else C1)
+      with Ghost => Proof_Only;
+      --  The layer of the invariant when the tables are in use; Old,
+      --  unused, otherwise (Bound_Layer asks for the tables).
+      T1  : constant Term_Array :=
+        (if Tab then PH.Bound_Layer (P, J, Logv, G0, G1, Alpha, Beta)
+         else Old)
       with Ghost => Proof_Only;
       NB  : Natural;
    begin
@@ -684,15 +847,11 @@ package body Sumcheck_Prover is
       end if;
       if Tab then
          if H = 0 then
-            BQ.Lemma_Inv_Frame (T, NT, BQ.Bound_Array (T0, Logv, G0, G1, Alpha,
-              Beta), Sav, C0, R, C1, C1, R);
-            BQ.Lemma_Inv_Slice (T, Old, NT, BQ.Bound_Array (T0, Logv, G0, G1,
-              Alpha, Beta), C0, R, C1, R);
+            BQ.Lemma_Inv_Frame (T, NT, T1, Sav, C0, R, C1, C1, R);
+            BQ.Lemma_Inv_Slice (T, Old, NT, T1, C0, R, C1, R);
          else
-            BQ.Lemma_Inv_Frame (T, NT, BQ.Bound_Array (T0, Logv, G0, G1, Alpha,
-              Beta), C0, C0, R + 1, Sav, C1, R);
-            BQ.Lemma_Inv_Slice (T, Old, NT, BQ.Bound_Array (T0, Logv, G0, G1,
-              Alpha, Beta), C0, R + 1, C1, R);
+            BQ.Lemma_Inv_Frame (T, NT, T1, C0, C0, R + 1, Sav, C1, R);
+            BQ.Lemma_Inv_Slice (T, Old, NT, T1, C0, R + 1, C1, R);
          end if;
       end if;
       HQ.Bind_H (T (T'First .. T'First + NT - 1), H, Chal, NB);
@@ -701,20 +860,16 @@ package body Sumcheck_Prover is
                              NB);
          if H = 0 then
             BQ.Lemma_Inv_Step0
-              (Old, T (T'First .. T'First + NT - 1), NB, BQ.Bound_Array (T0,
-                Logv, G0, G1, Alpha, Beta), C0, R, C1, R);
+              (Old, T (T'First .. T'First + NT - 1), NB, T1, C0, R, C1, R);
             BQ.Lemma_Inv_Slice
-              (T (T'First .. T'First + NT - 1), T, NB, BQ.Bound_Array (T0,
-                Logv, G0, G1, Alpha, Beta), C0, R + 1, C1, R);
+              (T (T'First .. T'First + NT - 1), T, NB, T1, C0, R + 1, C1, R);
          else
             BQ.Lemma_Inv_Step1
-              (Old, T (T'First .. T'First + NT - 1), NB, BQ.Bound_Array (T0,
-                Logv, G0, G1, Alpha, Beta),
-               C0, R + 1, C1, R);
+              (Old, T (T'First .. T'First + NT - 1), NB, T1, C0, R + 1, C1,
+               R);
             BQ.Lemma_Inv_Slice
-              (T (T'First .. T'First + NT - 1), T, NB, BQ.Bound_Array (T0,
-                Logv, G0, G1, Alpha, Beta),
-               C0, R + 1, C1, R + 1);
+              (T (T'First .. T'First + NT - 1), T, NB, T1, C0, R + 1, C1,
+               R + 1);
          end if;
       end if;
       NT := NB;
@@ -744,10 +899,13 @@ package body Sumcheck_Prover is
    --  One layer of sumcheck_prove: the binding of g, the 2 logw rounds
    --  of the two hands, the claims; Logv, Cur0 and Cur1 move on to the
    --  next layer, and so do the unpadded claims Cl0 and Cl1, from which
-   --  the claim of each round is tracked as upstream does (ADR 0075). A subprogram of its own, so that the proof of a layer
-   --  sees only this context (ADR 0071).
+   --  the claim of each round is tracked as upstream does (ADR 0075).
+   --  A subprogram of its own, so that the proof of a layer sees only
+   --  this context (ADR 0071). The circuit is the packed one: the
+   --  working array of the merged terms has one entry per run of equal
+   --  hands, filled from the walk by Bind_Merge (ADR 0080).
    procedure Prove_Layer
-     (C          : Circuit;
+     (P          : Packed_Circuit;
       J          : Natural;
       Wires      : Element_Array;
       Pads       : Element_Array;
@@ -762,60 +920,76 @@ package body Sumcheck_Prover is
      Always_Terminates => not ST.SA.F.Sampling_Rejects,
      Pre  =>
        (Runtime =>
-       J <= C.Last_Layer
+       J <= P.Last_Layer
+       and then PH.PC.Indices_Ok (P) and then PH.PC.Layers_Ok (P)
+       and then ST.SA.Shape_Ok (PH.PC.Shape_Of (P))
        and then Wires'First = 0
-       and then Wires'Length = ST.SA.Total_Wires (Shape_Of (C))
-       and then Pads'First = 0 and then Pads'Length = Pad_Total (Shape_Of (C))
+       and then Wires'Length = ST.SA.Total_Wires (Shape_Of (P))
+       and then Pads'First = 0
+       and then Pads'Length = Pad_Total (Shape_Of (P))
        and then Logv <= Max_Logw
        and then Cur0'First = 0 and then Cur0'Last = Max_Logw - 1
        and then Cur1'First = 0 and then Cur1'Last = Max_Logw - 1
        and then Nxt0'First = 0 and then Nxt0'Last = Max_Logw - 1
        and then Nxt1'First = 0 and then Nxt1'Last = Max_Logw - 1
-       and then Proof.Last + 1 = ST.SV.Proof_Total (Shape_Of (C))
-       and then Ch.Last + 1 = ST.SV.Chal_Total (Shape_Of (C)),
+       and then Proof.Last + 1 = ST.SV.Proof_Total (Shape_Of (P))
+       and then Ch.Last + 1 = ST.SV.Chal_Total (Shape_Of (P)),
         Proof_Only =>
-          Logv = ST.SV.Layer_Logv (Shape_Of (C), J)
+          PH.PC.Valid (P) and then PH.PC.Layers_Ok (P)
+          and then ST.SA.Well_Formed (PH.PC.Expand (P))
+          and then Logv = ST.SV.Layer_Logv (Exp_Shape (P), J)
           and then (for all R in 0 .. Logv - 1 =>
                       Same (Cur0 (R),
-                            ST.SV.Layer_G (Shape_Of (C), Ch, J, 0) (R))
+                            ST.SV.Layer_G (Exp_Shape (P), Ch, J, 0) (R))
                       and then
                       Same (Cur1 (R),
-                            ST.SV.Layer_G (Shape_Of (C), Ch, J, 1) (R)))),
+                            ST.SV.Layer_G (Exp_Shape (P), Ch, J, 1) (R)))),
      Post =>
        (Runtime    => Logv <= Max_Logw,
         Proof_Only =>
-          Same (BQJ, ST.SV.BQ_Ref (C, Ch, J))
-          and then Logv = C.Layers (J).Logw
+          Same (BQJ, ST.SV.BQ_Ref (Exp (P), Ch, J))
+          and then Logv = P.Layers (J).Logw
           and then (for all R in 0 .. Logv - 1 =>
                       Same (Cur0 (R),
-                            ST.SV.Hand_Chal (Shape_Of (C), Ch, J, 0) (R))
+                            ST.SV.Hand_Chal (Exp_Shape (P), Ch, J, 0) (R))
                       and then
                       Same (Cur1 (R),
-                            ST.SV.Hand_Chal (Shape_Of (C), Ch, J, 1) (R)))
+                            ST.SV.Hand_Chal (Exp_Shape (P), Ch, J, 1) (R)))
           and then Ch.Last = Ch'Old.Last
           and then (for all R in 0 .. Max_Logw - 1 =>
                       Same (Ch.G (R), Ch'Old.G (R)))
           and then (for all K in 0 .. Ch.Last =>
-                      (if K < ST.SV.Chal_Off (Shape_Of (C), J)
+                      (if K < ST.SV.Chal_Off (Exp_Shape (P), J)
                        then Same (Ch.Layer (K), Ch'Old.Layer (K)))))
    is
-      S     : constant Shape := Shape_Of (C);
+      S     : constant Shape := Shape_Of (P);
+      C     : constant Circuit := Exp (P) with Ghost => Proof_Only;
+      SC    : constant Shape := Exp_Shape (P) with Ghost => Proof_Only;
       Ch_In : constant Challenges := Ch with Ghost => Proof_Only;
       Alpha, Beta, Chal, Ev0, Ev2, Lead, P0, P2V, Sum : Element;
-      N0, N1, NT : Natural;
+      N0, N1, NT, NR : Natural;
    begin
+      --  The shape of the expansion is the shape of P, field by field;
+      --  Chal_Off needs the lemma, the other sizes show their bodies.
+      pragma Assert (Proof_Only => SC = S);
       Lemma_Layer_Fits (S, J);
       Lemma_Segment (S, J);
+      ST.SV.Lemma_Chal_Off_Eq (S, SC, J);
       declare
-         Logw  : constant Logw_Type := C.Layers (J).Logw;
-         NW    : constant Natural := C.Layers (J).NW_In;
+         Logw  : constant Logw_Type := S.Layers (J).Logw;
+         NW    : constant Natural := S.Layers (J).NW_In;
          Seg   : constant Natural := ST.SA.Off (S, J + 1);
          Off_P : constant Natural := ST.SV.Proof_Off (S, J);
          Off_C : constant Natural := ST.SV.Chal_Off (S, J);
          Off_D : constant Natural := ST.SV.Pad_Off (S, J, 0);
-         First : constant Positive := C.Layers (J).First;
-         Last  : constant Natural := C.Layers (J).Last;
-         T  : Terms_Access := new Term_Array'(C.Terms (First .. Last));
+         First : constant Positive := S.Layers (J).First;
+         --  The layer of the expansion, the model of the kernels.
+         T0 : constant Term_Array := PH.Layer_Of (P, J)
+         with Ghost => Proof_Only;
+         --  The working array of the merged terms, one entry per run of
+         --  equal hands (ADR 0080, block 2), never one per term.
+         T  : Terms_Access;
+         E  : Elems_Access;
          A0 : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
          A1 : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
          B0 : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
@@ -829,6 +1003,17 @@ package body Sumcheck_Prover is
            and then Logw <= ST.SA.Max_Bindeq_Log;
          BQ_J : Element := Zero;
       begin
+         pragma Assert
+           (Proof_Only =>
+              T0'First = First and then T0'Length = PH.PC.Layer_Len (P, J)
+              and then T0 = ST.SA.Layer_Terms (C, J));
+         pragma Assert
+           (Proof_Only =>
+              Off_C = ST.SV.Chal_Off (SC, J) and then Logw = SC.Layers (J).Logw
+              and then NW = SC.Layers (J).NW_In);
+         PH.Layer_Runs (P, J, NR);
+         T := new Term_Array'
+           (First .. First + NR - 1 => (K => Zero, G => 0, H0 => 0, H1 => 0));
          for I in 0 .. NW - 1 loop
             pragma Loop_Invariant (A0 /= null and then A1 /= null);
             pragma Loop_Invariant (A0'Length = NW and then A1'Length = NW);
@@ -842,27 +1027,20 @@ package body Sumcheck_Prover is
          Ch.Layer (Off_C + 1) := Beta;
          --  The claim of the first round (prover.rs, layer).
          First_Claim (Cl0, Cl1, Alpha, Sum);
-         --  bind_g with the eq2 table when it fits, then the runs of
-         --  equal hands merged: NT terms from here on.
+         --  bind_g and the runs of equal hands merged, from the walk
+         --  (Bind_Merge), with the eq2 table when it fits and an empty
+         --  table otherwise: NT terms from here on.
          if Logv <= ST.SA.Max_Bindeq_Log then
-            declare
-               E : Elems_Access := new Element_Array'
-                 (0 .. ST.SA.Table_Len (Logv) - 1 => Zero);
-            begin
-               ST.SA.Eq2_Table (Logv, Cur0, Cur1, Alpha, E.all);
-               HQ.Bind_G_T (T.all, E.all, Beta);
-               BQ.Lemma_T1_Bound
-                 (C.Terms (First .. Last), T.all, E.all, Logv, Cur0, Cur1,
-                  Alpha, Beta);
-               Free_Elems (E);
-            end;
+            E := new Element_Array'
+              (0 .. ST.SA.Table_Len (Logv) - 1 => Zero);
+            ST.SA.Eq2_Table (Logv, Cur0, Cur1, Alpha, E.all);
          else
-            ST.SA.Bind_G (T.all, Logv, Cur0, Cur1, Alpha, Beta);
+            E := new Element_Array'(0 .. -1 => Zero);
          end if;
-         HQ.Merge_Terms
-           (T.all, NT, Tab, C.Terms (First .. Last), Logv, Cur0, Cur1, Alpha,
-            Beta,
-            Nxt0, Nxt1);
+         PH.Bind_Merge
+           (P, J, E.all, Logv, Cur0, Cur1, Alpha, Beta, Nxt0, Nxt1, T.all,
+            NT);
+         Free_Elems (E);
          for R in 0 .. Logw - 1 loop
             pragma Loop_Invariant
               (T /= null and then A0 /= null and then A1 /= null
@@ -877,13 +1055,13 @@ package body Sumcheck_Prover is
                and then Q'Length = NW);
             pragma Loop_Invariant (N0 <= NW and then N1 <= NW);
             pragma Loop_Invariant (NT <= T'Length);
-            pragma Loop_Invariant (T'First = First and then T'Last = Last);
+            pragma Loop_Invariant (T'First = First);
             pragma Loop_Invariant
               (Proof_Only =>
                  (if Tab
                   then BQ.Inv (T.all, NT,
-                               BQ.Bound_Array (C.Terms (First .. Last), Logv,
-                                               Cur0, Cur1, Alpha, Beta),
+                               PH.Bound_Layer (P, J, Logv, Cur0, Cur1, Alpha,
+                                               Beta),
                                Nxt0, R, Nxt1, R)));
             pragma Loop_Invariant (Proof.Last + 1 = ST.SV.Proof_Total (S));
             pragma Loop_Invariant (Ch.Last + 1 = ST.SV.Chal_Total (S));
@@ -930,7 +1108,7 @@ package body Sumcheck_Prover is
             end;
             Bind_Round
               (T.all, NT, 0, Chal, R, Nxt0, Nxt1, Ch.Layer, Off_C,
-               Tab, C.Terms (First .. Last), Logv, Cur0, Cur1, Alpha, Beta);
+               Tab, P, J, Logv, Cur0, Cur1, Alpha, Beta);
             Round_Evals_Dense
               (T (T'First .. T'First + NT - 1), A1.all, N1, A0.all, N0, 1,
                P2, Sum, Q.all, Ev0, Ev2, Lead);
@@ -949,14 +1127,15 @@ package body Sumcheck_Prover is
             end;
             Bind_Round
               (T.all, NT, 1, Chal, R, Nxt0, Nxt1, Ch.Layer, Off_C,
-               Tab, C.Terms (First .. Last), Logv, Cur0, Cur1, Alpha, Beta);
+               Tab, P, J, Logv, Cur0, Cur1, Alpha, Beta);
          end loop;
          --  The bound quad: the coefficients left at hands (0, 0).
          pragma Assert
            (Proof_Only =>
               (if Tab
-               then BQ.Inv (T.all, NT, BQ.Bound_Array (C.Terms (First .. Last),
-                 Logv, Cur0, Cur1, Alpha, Beta),
+               then BQ.Inv (T.all, NT,
+                            PH.Bound_Layer (P, J, Logv, Cur0, Cur1, Alpha,
+                                            Beta),
                             Nxt0, Logw, Nxt1, Logw)));
          BQ.Lemma_W_Zero (T.all, 0, 0, 0);
          for I in 0 .. NT - 1 loop
@@ -968,28 +1147,19 @@ package body Sumcheck_Prover is
             pragma Loop_Invariant
               (Proof_Only => Same (BQ_J, BQ.W_Sum (T.all, I + 1, 0, 0, 0)));
          end loop;
-         if Tab then
-            BQ.Lemma_Inv_At
-              (T.all, NT, BQ.Bound_Array (C.Terms (First .. Last), Logv, Cur0,
-                                          Cur1, Alpha, Beta),
-               Nxt0, Logw, Nxt1, Logw, 0, 0);
-            BQ.Lemma_Hands_Below (C.Terms (First .. Last), NW, Logw);
-            BQ.Lemma_V_End
-              (BQ.Bound_Array (C.Terms (First .. Last), Logv, Cur0, Cur1,
-                               Alpha, Beta), C.Terms (First .. Last),
-               Last - First + 1, Logv, Cur0, Cur1, Nxt0, Nxt1, Logw,
-               Alpha, Beta);
-         end if;
-         pragma Assert
-           (Proof_Only =>
-              (if Tab
-               then Same (BQ_J,
-                          ST.SA.EBQT_Ref (C.Terms (First .. Last),
-                                          Last - First + 1, Logv,
-                                          Cur0, Cur1, Nxt0, Nxt1, Logw,
-                                          Alpha, Beta))));
          --  The bound quad of the layer: the terms left at hands (0, 0)
-         --  when the tables fit, term by term otherwise, as the verifier.
+         --  when the tables fit (Lemma_BQ_Table, the proof of
+         --  Bind_Quad_Packed), summed over the walk otherwise, as the
+         --  verifier.
+         if Tab then
+            Lemma_BQ_Table
+              (P, J, T.all, NT, Logv, Cur0, Cur1, Nxt0, Nxt1, Logw, Alpha,
+               Beta, BQ_J);
+            BQJ := BQ_J;
+         else
+            PH.Eval_Bound_Quad_Packed
+              (P, J, Logv, Cur0, Cur1, Nxt0, Nxt1, Logw, Alpha, Beta, BQJ);
+         end if;
          pragma Assert
            (Proof_Only =>
               (for all R in 0 .. Logw - 1 =>
@@ -998,43 +1168,19 @@ package body Sumcheck_Prover is
            (Proof_Only =>
               (for all R in 0 .. Logw - 1 =>
                  Same (Nxt1 (R), Ch.Layer (Off_C + 2 + 2 * R + 1))));
-         ST.SV.Lemma_Layer_G_Frame (S, Ch_In, Ch, J);
+         ST.SV.Lemma_Layer_G_Frame (SC, Ch_In, Ch, J);
          pragma Assert
            (Proof_Only =>
               (for all R in 0 .. Logv - 1 =>
-                 Same (Cur0 (R), ST.SV.Layer_G (S, Ch, J, 0) (R))
-                 and then Same (Cur1 (R), ST.SV.Layer_G (S, Ch, J, 1) (R))));
-         if Tab then
-            BQJ := BQ_J;
-         else
-            BQJ := ST.SA.Eval_Bound_Quad
-              (C.Terms (First .. Last), Logv, Cur0, Cur1, Nxt0, Nxt1, Logw,
-               Alpha, Beta);
-         end if;
-         --  The lemma names the offset through the shape of C; Off_C is
-         --  the same offset through S, the shape of C. The bound quad
-         --  in the lemma's terms is reached in two steps (the terms of
-         --  the layer and the layer's width, then the challenges in
-         --  Ch), each a small proof: in one step the provers reach
-         --  their step budget on the P-256 instance.
-         pragma Assert
-           (Proof_Only => Off_C = ST.SV.Chal_Off (Shape_Of (C), J));
-         pragma Assert
-           (Proof_Only =>
-              (if Tab
-               then Same (BQJ,
-                          ST.SA.EBQT_Ref (ST.SA.Layer_Terms (C, J),
-                                          ST.SA.Layer_Terms (C, J)'Length,
-                                          Logv, Cur0, Cur1, Nxt0, Nxt1,
-                                          C.Layers (J).Logw,
-                                          Alpha, Beta))));
-         pragma Assert
-           (Proof_Only =>
-              Same (Alpha, Ch.Layer (ST.SV.Chal_Off (Shape_Of (C), J)))
-              and then
-              Same (Beta, Ch.Layer (ST.SV.Chal_Off (Shape_Of (C), J) + 1)));
-         ST.SV.Lemma_BQ_Ref_From
-           (C, Ch, J, Logv, Cur0, Cur1, Nxt0, Nxt1, BQJ);
+                 Same (Cur0 (R), ST.SV.Layer_G (SC, Ch, J, 0) (R))
+                 and then Same (Cur1 (R), ST.SV.Layer_G (SC, Ch, J, 1) (R))));
+         pragma Assert (Proof_Only => Off_C + 2 * Logw + 2 <= Ch.Last + 1);
+         --  The bound quad in the verifier's terms, BQ_Ref on the
+         --  expansion: the bridge from P and Off_C to the expansion and
+         --  its shape is the lemma's own proof.
+         Lemma_BQ_Layer
+           (P, J, Ch, Off_C, Logv, Cur0, Cur1, Nxt0, Nxt1, Logw, Alpha,
+            Beta, BQJ);
          Cl0 := Ref (A0.all, N0, 0);
          Cl1 := Ref (A1.all, N1, 0);
          P0  := Cl0 - Pads (Off_D + 4 * Logw);
@@ -1045,8 +1191,8 @@ package body Sumcheck_Prover is
          Logv := Logw;
          Cur0 := Nxt0;
          Cur1 := Nxt1;
-         ST.SV.Lemma_Hand_Chal (S, Ch, J, 0, Cur0);
-         ST.SV.Lemma_Hand_Chal (S, Ch, J, 1, Cur1);
+         ST.SV.Lemma_Hand_Chal (SC, Ch, J, 0, Cur0);
+         ST.SV.Lemma_Hand_Chal (SC, Ch, J, 1, Cur1);
          Free_Terms (T);
          Free_Elems (A0);
          Free_Elems (A1);
@@ -1057,21 +1203,25 @@ package body Sumcheck_Prover is
    end Prove_Layer;
 
    procedure Prove
-     (C     : Circuit;
+     (P     : Packed_Circuit;
       Wires : Element_Array;
       Pads  : Element_Array;
       Proof : out Sumcheck_Proof;
       Ch    : out Challenges;
       BQ    : out Element_Array)
    is
-      S    : constant Shape := Shape_Of (C);
-      Logv : Natural := ST.SV.Ceil_Lg2 (C.Noutput);
+      S    : constant Shape := Shape_Of (P);
+      C    : constant Circuit := Exp (P) with Ghost => Proof_Only;
+      SC   : constant Shape := Exp_Shape (P) with Ghost => Proof_Only;
+      Logv : Natural := ST.SV.Ceil_Lg2 (S.Noutput);
       Cur0, Cur1 : Element_Array (0 .. Max_Logw - 1);
       Nxt0, Nxt1 : Element_Array (0 .. Max_Logw - 1) := [others => Zero];
       --  The unpadded claims of the previous layer, zero before the
       --  first (prover.rs, prove_core).
       Cl0, Cl1 : Element := Zero;
    begin
+      PH.PC.Lemma_Valid (P);
+      pragma Assert (Proof_Only => SC = S);
       Proof := (Last => Proof.Last, Evals => [others => Zero]);
       Ch := (Last        => Ch.Last,
              G           => [others => Zero],
@@ -1081,23 +1231,23 @@ package body Sumcheck_Prover is
       BQ := [others => Zero];
       Cur0 := Ch.G;
       Cur1 := Ch.G;
-      for J in 0 .. C.Last_Layer loop
+      for J in 0 .. P.Last_Layer loop
          pragma Loop_Invariant (Logv <= Max_Logw);
          pragma Loop_Invariant (Proof.Last + 1 = ST.SV.Proof_Total (S));
          pragma Loop_Invariant (Ch.Last + 1 = ST.SV.Chal_Total (S));
          pragma Loop_Invariant
            (Proof_Only =>
-              Logv = ST.SV.Layer_Logv (S, J)
+              Logv = ST.SV.Layer_Logv (SC, J)
               and then (for all R in 0 .. Logv - 1 =>
-                          Same (Cur0 (R), ST.SV.Layer_G (S, Ch, J, 0) (R))
+                          Same (Cur0 (R), ST.SV.Layer_G (SC, Ch, J, 0) (R))
                           and then
-                          Same (Cur1 (R), ST.SV.Layer_G (S, Ch, J, 1) (R)))
+                          Same (Cur1 (R), ST.SV.Layer_G (SC, Ch, J, 1) (R)))
               and then (for all J2 in 0 .. J - 1 =>
                           Same (BQ (J2), ST.SV.BQ_Ref (C, Ch, J2))));
          declare
             Ch_Before : constant Challenges := Ch with Ghost => Proof_Only;
          begin
-            Prove_Layer (C, J, Wires, Pads, Logv, Cur0, Cur1, Nxt0, Nxt1,
+            Prove_Layer (P, J, Wires, Pads, Logv, Cur0, Cur1, Nxt0, Nxt1,
                          Cl0, Cl1, Proof, Ch, BQ (J));
             ST.SV.Lemma_BQ_Ref_Frame_All (C, Ch, Ch_Before, J);
          end;
@@ -1106,7 +1256,7 @@ package body Sumcheck_Prover is
          Ch_Before : constant Challenges := Ch with Ghost => Proof_Only;
       begin
          ST.Sample (Ch.Alpha_Input);
-         ST.SV.Lemma_BQ_Ref_Frame_All (C, Ch, Ch_Before, C.Last_Layer + 1);
+         ST.SV.Lemma_BQ_Ref_Frame_All (C, Ch, Ch_Before, P.Last_Layer + 1);
       end;
    end Prove;
 

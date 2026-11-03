@@ -83,6 +83,7 @@ with Ligero_Prover;
 with Zk_Prover;
 with Zk_Verifier;
 with Packed_HQuad;
+with Packed_Eval;
 with Prover_Status;
 with Verifier_Status;
 with Simple_Rng;
@@ -114,6 +115,8 @@ with Zk_Verifier_GF2_128;
 with Zk_Verifier_P256;
 with Packed_HQuad_GF2_128;
 with Packed_HQuad_P256;
+with Packed_Eval_GF2_128;
+with Packed_Eval_P256;
 
 procedure Prover_KAT is
 
@@ -287,11 +290,14 @@ procedure Prover_KAT is
       with package LV is new Ligero_Verifier (ST => ST, LP => LP, L => L);
       with package CR is new Circuit_Reader (SA => SA, others => <>);
       with package PW is new Proof_Writer (LV => LV);
-      with package SPR is new Sumcheck_Prover (ST => ST, others => <>);
-      with package LPR is new Ligero_Prover (LV => LV, others => <>);
-      with package ZKP is new Zk_Prover (LPR => LPR, SPR => SPR, PW => PW);
       with package PH is new Packed_HQuad
         (SA => SA, PC => CR.PC, HQ => SV.HQ);
+      with package SPR is new Sumcheck_Prover
+        (ST => ST, PH => PH, others => <>);
+      with package LPR is new Ligero_Prover (LV => LV, others => <>);
+      with package PE is new Packed_Eval (SA => SA, PC => CR.PC);
+      with package ZKP is new Zk_Prover
+        (LPR => LPR, PH => PH, SPR => SPR, PW => PW, PE => PE);
       with package ZK is new Zk_Verifier (LV => LV, PH => PH);
       with function To_Element (S : String) return SA.Element;
    procedure Check_Sumcheck
@@ -307,8 +313,15 @@ procedure Prover_KAT is
       Op    : String)
    is
       use type Circuit_Status.Status;
-      use SA;
       use type FS.Element;
+      use type SA.Element_Array;
+      --  The operators of the algebra, named here rather than taken from
+      --  a use clause on SA: through the formal packages of the prover,
+      --  a use clause would make the field's own operators candidates as
+      --  well, and every sum would be ambiguous.
+      function "+" (A, B : SA.Element) return SA.Element renames SA."+";
+      function "-" (A, B : SA.Element) return SA.Element renames SA."-";
+      function "*" (A, B : SA.Element) return SA.Element renames SA."*";
       use type SV.Challenges;
 
       --  The commit and root lines.
@@ -514,6 +527,11 @@ procedure Prover_KAT is
          C     : CR.Circuit_Access;
          H     : CR.Header;
          CSt   : Circuit_Status.Status;
+         --  The packed form of the same bytes, which the prover takes
+         --  (ADR 0080); the expanded one keeps the header and the sizes.
+         PK    : CR.Packed_Access;
+         HK    : CR.Header;
+         PKSt  : Circuit_Status.Status;
          PSt   : Prover_Status.Status;
          VSt   : Verifier_Status.Status;
          Len   : Natural;
@@ -522,13 +540,16 @@ procedure Prover_KAT is
          Secs  : Duration;
          use type Ada.Calendar.Time;
 
+         use type CR.Header;
+
          function Got (S : String) return Boolean is
            (Ada.Characters.Handling.To_Lower (S) = Want);
 
          --  The prover of ADR 0053 that skips the checks: its proof of
          --  false inputs must be refused by the verifier.
          package ZKP_U is new Zk_Prover
-           (LPR => LPR, SPR => SPR, PW => PW, Validate => False);
+           (LPR => LPR, PH => PH, SPR => SPR, PW => PW, PE => PE,
+            Validate => False);
 
          --  The verifier takes the packed form of the circuit (ADR
          --  0080), loaded from the same bytes with the same header.
@@ -537,7 +558,6 @@ procedure Prover_KAT is
             Proof : Byte_Array;
             VSt   : out Verifier_Status.Status)
          is
-            use type CR.Header;
             P   : CR.Packed_Access;
             HP  : CR.Header;
             PSt : Circuit_Status.Status;
@@ -562,6 +582,12 @@ procedure Prover_KAT is
             Report_Failure (Name & ": circuit " & CSt'Image);
             return;
          end if;
+         CR.Read_Packed (Circ.all, False, [others => 0], PK, HK, PKSt);
+         if PKSt /= Circuit_Status.Ok or else HK /= H then
+            Report_Failure (Name & ": packed load " & PKSt'Image);
+            CR.Free (C);
+            return;
+         end if;
          if not Valid (Cfg)
            or else not ZKP.Config_Fits (Cfg, SA.Shape_Of (C.all))
          then
@@ -572,6 +598,7 @@ procedure Prover_KAT is
                Report_Failure (Name & ": config_invalid, expected " & Want);
             end if;
             CR.Free (C);
+            CR.Free_Packed (PK);
             Free (Circ);
             return;
          end if;
@@ -587,7 +614,7 @@ procedure Prover_KAT is
             end loop;
             Simple_Rng.Seed (Seed);
             T0 := Ada.Calendar.Clock;
-            ZKP.Prove (Label, H.Id, H.Subfield_Boundary, Cfg, C.all, W,
+            ZKP.Prove (Label, H.Id, H.Subfield_Boundary, Cfg, PK.all, W,
                        B.all, Len, PSt);
             Secs := Ada.Calendar.Clock - T0;
             if not Got (PSt'Image) then
@@ -595,6 +622,7 @@ procedure Prover_KAT is
                                & Ada.Characters.Handling.To_Lower (PSt'Image)
                                & ", expected " & Want);
                CR.Free (C);
+               CR.Free_Packed (PK);
                Free (B);
                return;
             end if;
@@ -602,6 +630,7 @@ procedure Prover_KAT is
                if Nin < C.Npublic then
                   Report_Failure (Name & ": public inputs");
                   CR.Free (C);
+                  CR.Free_Packed (PK);
                   Free (B);
                   return;
                end if;
@@ -610,6 +639,7 @@ procedure Prover_KAT is
                   Report_Failure (Name & ": the verifier reports "
                                   & VSt'Image & " on the proof");
                   CR.Free (C);
+                  CR.Free_Packed (PK);
                   Free (B);
                   return;
                end if;
@@ -620,12 +650,13 @@ procedure Prover_KAT is
                        | Prover_Status.Not_In_Subfield
             then
                Simple_Rng.Seed (Seed);
-               ZKP_U.Prove (Label, H.Id, H.Subfield_Boundary, Cfg, C.all, W,
+               ZKP_U.Prove (Label, H.Id, H.Subfield_Boundary, Cfg, PK.all, W,
                             B.all, Len, PSt);
                if PSt /= Prover_Status.Ok then
                   Report_Failure (Name & ": the unchecked prover reports "
                                   & PSt'Image);
                   CR.Free (C);
+                  CR.Free_Packed (PK);
                   Free (B);
                   return;
                end if;
@@ -634,6 +665,7 @@ procedure Prover_KAT is
                   Report_Failure (Name & ": the verifier accepts the proof"
                                   & " of false inputs");
                   CR.Free (C);
+                  CR.Free_Packed (PK);
                   Free (B);
                   return;
                end if;
@@ -647,6 +679,7 @@ procedure Prover_KAT is
             Free (B);
          end;
          CR.Free (C);
+         CR.Free_Packed (PK);
          Free (Circ);
          Passed := Passed + 1;
       end Check_Prove;
@@ -663,6 +696,12 @@ procedure Prover_KAT is
          C     : CR.Circuit_Access;
          H     : CR.Header;
          CSt   : Circuit_Status.Status;
+         --  The packed form of the same bytes, which the prover takes
+         --  (ADR 0080); the expanded one is the oracle.
+         PK    : CR.Packed_Access;
+         HK    : CR.Header;
+         PKSt  : Circuit_Status.Status;
+         use type CR.Header;
       begin
          if Count /= 10 + Nwit + Npads or else Root'Length /= 32 then
             raise Parse_Error with "sumcheck: field count or root";
@@ -670,6 +709,12 @@ procedure Prover_KAT is
          CR.Read (Circ.all, C, H, CSt);
          if CSt /= Circuit_Status.Ok then
             Report_Failure (Name & ": circuit " & CSt'Image);
+            return;
+         end if;
+         CR.Read_Packed (Circ.all, False, [others => 0], PK, HK, PKSt);
+         if PKSt /= Circuit_Status.Ok or else HK /= H then
+            Report_Failure (Name & ": packed load " & PKSt'Image);
+            CR.Free (C);
             return;
          end if;
          declare
@@ -687,15 +732,38 @@ procedure Prover_KAT is
             if Nwit /= C.Ninput or else Npads /= Pads'Length then
                Report_Failure (Name & ": witness or pad count");
                CR.Free (C);
+               CR.Free_Packed (PK);
                return;
             end if;
             for I in W'Range loop
                W (I) := To_Element (F (9 + I));
             end loop;
             SA.Eval_Circuit (C.all, W, Wires, Ok);
+            --  The wires from the packed form (Packed_Eval, ADR 0080)
+            --  against the expanded evaluation, the oracle.
+            declare
+               Wires_P : SA.Element_Array (Wires'Range) :=
+                 [others => SA.Zero];
+               Ok_P    : Boolean;
+            begin
+               PE.Eval_Circuit (PK.all, W, Wires_P, Ok_P);
+               for I in Wires'Range loop
+                  if Wires_P (I) /= Wires (I) then
+                     Ok_P := not Ok;
+                  end if;
+               end loop;
+               if Ok_P /= Ok then
+                  Report_Failure (Name & ": the wires from the packed form "
+                                  & "differ from the expanded evaluation");
+                  CR.Free (C);
+                  CR.Free_Packed (PK);
+                  return;
+               end if;
+            end;
             if not Ok then
                Report_Failure (Name & ": the witness does not satisfy");
                CR.Free (C);
+               CR.Free_Packed (PK);
                return;
             end if;
             Transcript.Reset (Label);
@@ -707,23 +775,25 @@ procedure Prover_KAT is
                if Pads (I) /= To_Element (F (10 + Nwit + I)) then
                   Report_Failure (Name & ": pad" & I'Image & " differs");
                   CR.Free (C);
+                  CR.Free_Packed (PK);
                   return;
                end if;
             end loop;
-            SPR.Prove (C.all, Wires, Pads, Proof, Ch, BQ);
+            SPR.Prove (PK.all, Wires, Pads, Proof, Ch, BQ);
             --  ADR 0071: the bound quad of every layer, from the sumcheck
-            --  of the prover, against the verifier's Eval_Bound_Quad_T
-            --  (term by term beyond the tables).
+            --  of the prover, against the verifier's, from the packed
+            --  form (Zk_Verifier.Bound_Quads).
             declare
                BQV : SA.Element_Array (0 .. C.Last_Layer);
             begin
-               SV.Bound_Quads (C.all, Ch, BQV);
+               ZK.Bound_Quads (PK.all, Sh, Ch, BQV);
                for J in BQ'Range loop
                   if BQ (J) /= BQV (J) then
                      Report_Failure (Name & ": the bound quad of layer"
                                      & J'Image & " differs from the "
                                      & "verifier's");
                      CR.Free (C);
+                     CR.Free_Packed (PK);
                      return;
                   end if;
                end loop;
@@ -766,6 +836,7 @@ procedure Prover_KAT is
                                         & "from the claims times the "
                                         & "bound quad");
                         CR.Free (C);
+                        CR.Free_Packed (PK);
                         return;
                      end if;
                   end;
@@ -776,6 +847,7 @@ procedure Prover_KAT is
                Report_Failure (Name & ": proof length" & Out_B'Length'Image
                                & ", expected" & Want'Length'Image);
                CR.Free (C);
+               CR.Free_Packed (PK);
                return;
             end if;
             for I in Out_B'Range loop
@@ -784,6 +856,7 @@ procedure Prover_KAT is
                                   & " differs (element"
                                   & Natural'Image (I / LP.Size) & ")");
                   CR.Free (C);
+                  CR.Free_Packed (PK);
                   return;
                end if;
             end loop;
@@ -825,6 +898,7 @@ procedure Prover_KAT is
                                         & " hand" & H'Image
                                         & ": dense round differs");
                         CR.Free (C);
+                        CR.Free_Packed (PK);
                         return;
                      end if;
                   end loop;
@@ -899,6 +973,7 @@ procedure Prover_KAT is
                                  & R'Image & " hand" & H'Image
                                  & ": merged terms differ");
                               CR.Free (C);
+                              CR.Free_Packed (PK);
                               return;
                            end if;
                            SPR.Update_Terms (TR, H, X);
@@ -932,12 +1007,14 @@ procedure Prover_KAT is
                if VSt /= ST.Ok then
                   Report_Failure (Name & ": replay " & VSt'Image);
                   CR.Free (C);
+                  CR.Free_Packed (PK);
                   return;
                end if;
                if Ch2 /= Ch then
                   Report_Failure (Name & ": the replayed challenges differ "
                                   & "from the recorded ones");
                   CR.Free (C);
+                  CR.Free_Packed (PK);
                   return;
                end if;
                SV.Verifier_Core (Sh, W (0 .. C.Npublic - 1), Proof, Ch,
@@ -945,6 +1022,7 @@ procedure Prover_KAT is
                if Wv'Length /= Npriv + Npads then
                   Report_Failure (Name & ": witness vector length");
                   CR.Free (C);
+                  CR.Free_Packed (PK);
                   return;
                end if;
                for K in 0 .. A.Count - 1 loop
@@ -956,6 +1034,7 @@ procedure Prover_KAT is
                      Report_Failure (Name & ": linear constraint" & J'Image
                                      & " not satisfied");
                      CR.Free (C);
+                     CR.Free_Packed (PK);
                      return;
                   end if;
                end loop;
@@ -964,6 +1043,7 @@ procedure Prover_KAT is
                      Report_Failure (Name & ": quadratic constraint" & Q'Image
                                      & " not satisfied");
                      CR.Free (C);
+                     CR.Free_Packed (PK);
                      return;
                   end if;
                end loop;
@@ -977,6 +1057,7 @@ procedure Prover_KAT is
             Passed := Passed + 1;
          end;
          CR.Free (C);
+         CR.Free_Packed (PK);
          Free (Root);
          Free (Circ);
          Free (Want);
@@ -1002,7 +1083,8 @@ procedure Prover_KAT is
       LV => Ligero_Verifier_GF2_128, CR => Circuit_Reader_GF2_128,
       PW => Proof_Writer_GF2_128, SPR => Sumcheck_Prover_GF2_128,
       LPR => Ligero_Prover_GF2_128, ZKP => Zk_Prover_GF2_128,
-      PH => Packed_HQuad_GF2_128, ZK => Zk_Verifier_GF2_128,
+      PH => Packed_HQuad_GF2_128, PE => Packed_Eval_GF2_128,
+      ZK => Zk_Verifier_GF2_128,
       To_Element => GF_To_Element);
    procedure Check_P is new Check_Sumcheck
      (FS => Field_P256.Sig,
@@ -1012,7 +1094,8 @@ procedure Prover_KAT is
       LV => Ligero_Verifier_P256, CR => Circuit_Reader_P256,
       PW => Proof_Writer_P256, SPR => Sumcheck_Prover_P256,
       LPR => Ligero_Prover_P256, ZKP => Zk_Prover_P256,
-      PH => Packed_HQuad_P256, ZK => Zk_Verifier_P256,
+      PH => Packed_HQuad_P256, PE => Packed_Eval_P256,
+      ZK => Zk_Verifier_P256,
       To_Element => P_To_Element);
 
    procedure Check_Line (Line : String) is

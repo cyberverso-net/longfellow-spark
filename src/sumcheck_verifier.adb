@@ -31,6 +31,15 @@ package body Sumcheck_Verifier is
       end if;
    end Lemma_Chal_Mono;
 
+   procedure Lemma_Chal_Off_Eq (S1, S2 : Shape; J : Natural) is
+   begin
+      for K in 0 .. J - 1 loop
+         pragma Loop_Invariant (Chal_Off (S1, K) = Chal_Off (S2, K));
+         Lemma_Chal_Step (S1, K);
+         Lemma_Chal_Step (S2, K);
+      end loop;
+   end Lemma_Chal_Off_Eq;
+
    procedure Lemma_Proof_Step (S : Shape; J : Natural) with
      Ghost, Global => null,
      Pre  => J <= S.Last_Layer,
@@ -640,65 +649,6 @@ package body Sumcheck_Verifier is
             Logw, Ch.Layer (Chal_Off (S, J)), Ch.Layer (Chal_Off (S, J) + 1));
       end if;
    end Lemma_BQ_Ref_From;
-
-   procedure Bound_Quads (C : Circuit; Ch : Challenges; BQ : out Element_Array)
-   is
-      S      : constant Shape := Shape_Of (C);
-      Logv   : Natural := Ceil_Lg2 (C.Noutput);
-      G0, G1 : Challenge_Vector := Ch.G;
-   begin
-      BQ := [others => Zero];
-      for J in 0 .. C.Last_Layer loop
-         pragma Loop_Invariant (Logv <= Max_Logw);
-         pragma Loop_Invariant
-           (Proof_Only =>
-              Logv = Layer_Logv (S, J)
-              and then (for all R in 0 .. Logv - 1 =>
-                          Same (G0 (R), Layer_G (S, Ch, J, 0) (R))
-                          and then Same (G1 (R), Layer_G (S, Ch, J, 1) (R)))
-              and then (for all J2 in 0 .. J - 1 =>
-                          Same (BQ (J2), BQ_Ref (C, Ch, J2))));
-         Lemma_Chal_Step (S, J);
-         Lemma_Chal_Mono (S, J + 1, C.Last_Layer + 1);
-         declare
-            Logw : constant Logw_Type := C.Layers (J).Logw;
-            CO   : constant Natural := Chal_Off (S, J);
-            HC0  : Challenge_Vector := [others => Zero];
-            HC1  : Challenge_Vector := [others => Zero];
-            V    : Element;
-         begin
-            for R in 0 .. Logw - 1 loop
-               HC0 (R) := Ch.Layer (CO + 2 + 2 * R);
-               HC1 (R) := Ch.Layer (CO + 2 + 2 * R + 1);
-               pragma Loop_Invariant
-                 (for all R2 in 0 .. R =>
-                    Same (HC0 (R2), Ch.Layer (CO + 2 + 2 * R2))
-                    and then Same (HC1 (R2), Ch.Layer (CO + 2 + 2 * R2 + 1)));
-            end loop;
-            --  The terms of the layer as a slice of the circuit, passed by
-            --  reference: Layer_Terms is the same value, but as a function
-            --  result it was copied, the size of the largest layer.
-            if Logv <= Max_Bindeq_Log and then Logw <= Max_Bindeq_Log then
-               HQ.Bind_Quad
-                 (C.Terms (C.Layers (J).First .. C.Layers (J).Last),
-                  Logv, G0, G1, HC0, HC1,
-                  Logw, Ch.Layer (CO), Ch.Layer (CO + 1), V);
-            else
-               V := Eval_Bound_Quad
-                 (C.Terms (C.Layers (J).First .. C.Layers (J).Last),
-                  Logv, G0, G1, HC0, HC1, Logw,
-                  Ch.Layer (CO), Ch.Layer (CO + 1));
-            end if;
-            Lemma_BQ_Ref_From (C, Ch, J, Logv, G0, G1, HC0, HC1, V);
-            Lemma_Hand_Chal (S, Ch, J, 0, HC0);
-            Lemma_Hand_Chal (S, Ch, J, 1, HC1);
-            BQ (J) := V;
-            Logv := Logw;
-            G0 := HC0;
-            G1 := HC1;
-         end;
-      end loop;
-   end Bound_Quads;
 
    procedure Verifier_Core
      (S       : Shape;

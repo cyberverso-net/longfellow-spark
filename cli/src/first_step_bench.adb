@@ -1,22 +1,28 @@
 --  FIRST_STEP_BENCH: the first step of a layer from the packed form
---  (ADR 0080, block 2) against the expanded path, on one circuit file.
---  For every layer: the terms, the runs of equal hands, the bytes of
---  the expanded layer and of the working array the packed path
---  allocates (one entry per run), and the time of Bind_Quad on the
---  expanded layer against Bind_Quad_Packed on the packed form, the
---  median of three calls each, with pseudo-random challenges; then the
---  sums over the layers. The two values are compared on every call.
+--  (ADR 0080, blocks 2 and 3) against the exact bound quad, on one
+--  circuit file. For every layer: the terms, the runs of equal hands,
+--  the bytes of the expanded layer and of the working array the packed
+--  path allocates (one entry per run), the time of the packed kernel
+--  (Bind_Quad_Packed when the eq tables fit the layer, as the verifier
+--  chooses; Eval_Bound_Quad_Packed otherwise), the median of three
+--  calls with pseudo-random challenges, and the value of Eval_Bound_Quad
+--  of Sumcheck_Algebra on the expanded layer, the exact oracle with
+--  which the packed value is compared; then the sums over the layers.
+--
+--  With --check the program is a test: one call of each kernel per
+--  layer, pass or fail on the agreement alone, no time printed. The
+--  cli step of make check runs it so on the two mDoc version 7 circuits;
+--  the times are a measurement and are never asserted.
 --
 --  Measurement code, outside the proof perimeter: SPARK_Mode is Off.
 --  Built in the release project cli/ (assertions off, -O3), the build
 --  whose times mean something: the assertion-enabled build of tests/
---  executes the loop invariants and the ghost references of the
---  kernels, at a cost quadratic in the table of eq and in the layer,
---  so circuit_kat compares the two paths there on the small layers
---  only. Not run by make check. Documentation: docs/guide/03-sumcheck.md
+--  executes the postcondition of Eval_Bound_Quad, a recursion over the
+--  terms of the layer, so circuit_kat compares the two paths there on
+--  the small layers only. Documentation: docs/guide/03-sumcheck.md
 --  (Section 3.5), docs/guide/performance.md.
 --
---  Usage: first_step_bench --field gf2_128|p256 --circuit FILE
+--  Usage: first_step_bench --field gf2_128|p256 --circuit FILE [--check]
 --  Exit status: 0 when every layer agrees, 1 when a layer disagrees or
 --  the file does not load, 2 on a usage error.
 
@@ -49,10 +55,11 @@ procedure First_Step_Bench is
    Usage_Error : exception;
 
    Usage : constant String :=
-     "usage: first_step_bench --field gf2_128|p256 --circuit FILE";
+     "usage: first_step_bench --field gf2_128|p256 --circuit FILE [--check]";
 
    type String_Access is access String;
    Field_Arg, Circuit_Arg : String_Access;
+   Check_Only : Boolean := False;
 
    type Byte_Array_Access is access Byte_Array;
    procedure Free is
@@ -170,8 +177,23 @@ procedure First_Step_Bench is
          return L;
       end Ceil_Log2;
 
+      J_Cur : Natural := 0;
+
+      --  The packed kernel of the layer, as the verifier chooses it.
+      procedure Packed_Kernel (Tables : Boolean; V : out SA.Element) is
+      begin
+         if Tables then
+            PQ.Bind_Quad_Packed (P.all, J_Cur, Logv, G0, G1, HC0, HC1,
+                                 Logw, Alpha, Beta, V);
+         else
+            PQ.Eval_Bound_Quad_Packed (P.all, J_Cur, Logv, G0, G1, HC0, HC1,
+                                       Logw, Alpha, Beta, V);
+         end if;
+      end Packed_Kernel;
+
       Sum_Terms, Sum_Runs, Sum_Layer, Sum_Work, Max_Layer, Max_Work,
-      Sum_Exp, Sum_Pck : Long_Long_Integer := 0;
+      Sum_Pck, Sum_Exact : Long_Long_Integer := 0;
+      Disagreed : Natural := 0;
    begin
       Agreed := True;
       CR.Read (B, C, H, St);
@@ -189,13 +211,16 @@ procedure First_Step_Bench is
          Agreed := False;
          return;
       end if;
-      TIO.Put_Line
-        ("packed form"
-         & Long_Long_Integer'Image (Long_Long_Integer (P.all'Size) / 8)
-         & " bytes, expanded"
-         & Long_Long_Integer'Image (Long_Long_Integer (C.all'Size) / 8)
-         & " bytes," & Natural'Image (P.Last_Layer + 1) & " layers");
+      if not Check_Only then
+         TIO.Put_Line
+           ("packed form"
+            & Long_Long_Integer'Image (Long_Long_Integer (P.all'Size) / 8)
+            & " bytes, expanded"
+            & Long_Long_Integer'Image (Long_Long_Integer (C.all'Size) / 8)
+            & " bytes," & Natural'Image (P.Last_Layer + 1) & " layers");
+      end if;
       for J in 0 .. P.Last_Layer loop
+         J_Cur := J;
          First := P.Layers (J).First;
          Last  := P.Layers (J).Last;
          Logw  := P.Layers (J).Logw;
@@ -209,60 +234,73 @@ procedure First_Step_Bench is
          end loop;
          Alpha := Random_Element;
          Beta  := Random_Element;
-         if Logv > SA.Max_Bindeq_Log or else Logw > SA.Max_Bindeq_Log then
-            TIO.Put_Line ("layer" & J'Image & ": beyond the tables (Logv"
-                          & Logv'Image & ", Logw" & Logw'Image
-                          & "), not timed");
-         else
-            PQ.Layer_Runs (P.all, J, NR);
-            declare
-               TE, TP      : Micros;
-               T0          : Ada.Real_Time.Time;
-               Terms       : constant Natural := Last + 1 - First;
-               Layer_Bytes : constant Long_Long_Integer :=
-                 Long_Long_Integer (Terms) * Term_Bytes;
-               Work_Bytes  : constant Long_Long_Integer :=
-                 Long_Long_Integer (NR) * Term_Bytes;
-            begin
-               for R in Micros'Range loop
-                  T0 := Ada.Real_Time.Clock;
-                  PQ.HQ.Bind_Quad (C.Terms (First .. Last), Logv, G0, G1,
-                                   HC0, HC1, Logw, Alpha, Beta, V1);
-                  TE (R) := Elapsed (T0);
-                  T0 := Ada.Real_Time.Clock;
-                  PQ.Bind_Quad_Packed (P.all, J, Logv, G0, G1, HC0, HC1,
-                                       Logw, Alpha, Beta, V2);
-                  TP (R) := Elapsed (T0);
-                  if V1 /= V2 then
-                     TIO.Put_Line ("layer" & J'Image
-                                   & ": the two paths disagree");
-                     Agreed := False;
-                  end if;
-               end loop;
+         PQ.Layer_Runs (P.all, J, NR);
+         declare
+            Tables      : constant Boolean :=
+              Logv <= SA.Max_Bindeq_Log and then Logw <= SA.Max_Bindeq_Log;
+            Terms       : constant Natural := Last + 1 - First;
+            Layer_Bytes : constant Long_Long_Integer :=
+              Long_Long_Integer (Terms) * Term_Bytes;
+            Work_Bytes  : constant Long_Long_Integer :=
+              Long_Long_Integer (NR) * Term_Bytes;
+            TP          : Micros := [others => 0];
+            TX          : Long_Long_Integer := 0;
+            T0          : Ada.Real_Time.Time;
+         begin
+            --  The exact bound quad on the expanded layer, the oracle.
+            T0 := Ada.Real_Time.Clock;
+            V1 := SA.Eval_Bound_Quad (C.Terms (First .. Last), Logv, G0, G1,
+                                      HC0, HC1, Logw, Alpha, Beta);
+            TX := Elapsed (T0);
+            for R in Micros'Range loop
+               T0 := Ada.Real_Time.Clock;
+               Packed_Kernel (Tables, V2);
+               TP (R) := Elapsed (T0);
+               if V1 /= V2 then
+                  TIO.Put_Line ("layer" & J'Image
+                                & ": the packed first step disagrees with"
+                                & " Eval_Bound_Quad");
+                  Agreed := False;
+                  Disagreed := Disagreed + 1;
+               end if;
+               exit when Check_Only;
+            end loop;
+            if not Check_Only then
                TIO.Put_Line
                  ("layer" & J'Image & ":" & Terms'Image & " terms,"
                   & NR'Image & " runs; layer" & Layer_Bytes'Image
                   & " bytes, working array" & Work_Bytes'Image
-                  & " bytes; Bind_Quad" & Median (TE)'Image
-                  & " us, Bind_Quad_Packed" & Median (TP)'Image & " us");
-               Sum_Terms := Sum_Terms + Long_Long_Integer (Terms);
-               Sum_Runs  := Sum_Runs + Long_Long_Integer (NR);
-               Sum_Layer := Sum_Layer + Layer_Bytes;
-               Sum_Work  := Sum_Work + Work_Bytes;
-               Max_Layer := Long_Long_Integer'Max (Max_Layer, Layer_Bytes);
-               Max_Work  := Long_Long_Integer'Max (Max_Work, Work_Bytes);
-               Sum_Exp   := Sum_Exp + Median (TE);
-               Sum_Pck   := Sum_Pck + Median (TP);
-            end;
-         end if;
+                  & " bytes; "
+                  & (if Tables then "Bind_Quad_Packed"
+                     else "Eval_Bound_Quad_Packed")
+                  & Median (TP)'Image & " us, Eval_Bound_Quad"
+                  & TX'Image & " us");
+            end if;
+            Sum_Terms := Sum_Terms + Long_Long_Integer (Terms);
+            Sum_Runs  := Sum_Runs + Long_Long_Integer (NR);
+            Sum_Layer := Sum_Layer + Layer_Bytes;
+            Sum_Work  := Sum_Work + Work_Bytes;
+            Max_Layer := Long_Long_Integer'Max (Max_Layer, Layer_Bytes);
+            Max_Work  := Long_Long_Integer'Max (Max_Work, Work_Bytes);
+            Sum_Pck   := Sum_Pck + Median (TP);
+            Sum_Exact := Sum_Exact + TX;
+         end;
       end loop;
-      TIO.Put_Line
-        ("all layers:" & Sum_Terms'Image & " terms," & Sum_Runs'Image
-         & " runs; layers" & Sum_Layer'Image & " bytes (largest"
-         & Max_Layer'Image & "), working arrays" & Sum_Work'Image
-         & " bytes (largest" & Max_Work'Image & "); Bind_Quad"
-         & Sum_Exp'Image & " us, Bind_Quad_Packed" & Sum_Pck'Image
-         & " us");
+      if Check_Only then
+         TIO.Put_Line
+           ("first_step_bench:" & Natural'Image (P.Last_Layer + 1)
+            & " layers," & Sum_Terms'Image & " terms; the packed first"
+            & " step agrees with Eval_Bound_Quad on"
+            & Natural'Image (P.Last_Layer + 1 - Disagreed) & " layers");
+      else
+         TIO.Put_Line
+           ("all layers:" & Sum_Terms'Image & " terms," & Sum_Runs'Image
+            & " runs; layers" & Sum_Layer'Image & " bytes (largest"
+            & Max_Layer'Image & "), working arrays" & Sum_Work'Image
+            & " bytes (largest" & Max_Work'Image & "); packed first step"
+            & Sum_Pck'Image & " us, Eval_Bound_Quad" & Sum_Exact'Image
+            & " us");
+      end if;
       CR.Free_Packed (P);
       CR.Free (C);
    end Bench;
@@ -292,6 +330,9 @@ procedure First_Step_Bench is
                Field_Arg := new String'(Value);
             elsif Opt = "--circuit" then
                Circuit_Arg := new String'(Value);
+            elsif Opt = "--check" then
+               Check_Only := True;
+               I := I + 1;
             elsif Opt = "--help" then
                TIO.Put_Line (Usage);
                raise Usage_Error with "";

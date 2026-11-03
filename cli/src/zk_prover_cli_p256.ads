@@ -6,8 +6,12 @@ with Zk_Prover;
 with Ligero_Prover_Cli_P256;
 with Sumcheck_Prover_Cli_P256;
 with Proof_Writer_P256;
+with Packed_HQuad_P256;
+with Packed_Eval_P256;
 
 package Zk_Prover_Cli_P256 is new Zk_Prover
   (LPR => Ligero_Prover_Cli_P256,
+   PH  => Packed_HQuad_P256,
    SPR => Sumcheck_Prover_Cli_P256,
-   PW  => Proof_Writer_P256);
+   PW  => Proof_Writer_P256,
+   PE  => Packed_Eval_P256);

@@ -346,7 +346,12 @@ procedure Circuit_KAT is
       --  layer. On the layers whose Logv is at most Table_Log, with the
       --  tables at the layer's own Logv and Logw: Bind_Merge against
       --  Bind_G_T and Merge_Runs, entry by entry, and Bind_Quad_Packed
-      --  against Bind_Quad. On the layers of at most No_Table_Layer
+      --  against Eval_Bound_Quad_T, the evaluation by tables, Gold
+      --  against the same reference (the exact Eval_Bound_Quad executes
+      --  its postcondition in this build, a recursion over the terms,
+      --  so it serves the small layers below; first_step_bench compares
+      --  with it on every layer in the release build). On the layers of
+      --  at most No_Table_Layer
       --  terms, without the tables (Logv = Logw = No_Table): Bind_Merge
       --  against Bind_G and Merge_Runs, and Eval_Bound_Quad_Packed
       --  against Eval_Bound_Quad. The two limits come from this build:
@@ -468,8 +473,8 @@ procedure Circuit_KAT is
             Ok := NR = Run_Count;
             if Logv <= Table_Log and then Logw <= SA.Max_Bindeq_Log then
                Merge_Both (Logv);
-               PQ.HQ.Bind_Quad (C1.Terms (First .. Last), Logv, G0, G1, HC0,
-                                HC1, Logw, Alpha, Beta, V1);
+               SA.Eval_Bound_Quad_T (C1.Terms (First .. Last), Logv, G0, G1,
+                                     HC0, HC1, Logw, Alpha, Beta, V1);
                PQ.Bind_Quad_Packed (P.all, J, Logv, G0, G1, HC0, HC1, Logw,
                                     Alpha, Beta, V2);
                Ok := Ok and then V1 = V2;

@@ -1,17 +1,21 @@
---  Sumcheck_HQuad: the bound quad of a layer by the merged terms of
---  upstream (rust/runtime/sumcheck/src/hquad.rs at d5e6be7: bind_g,
---  bind_h, scalar), shared by the prover and the verifier (ADR 0073).
---  The kernels bind g with the eq2 table, merge the consecutive terms
---  with the same hands, then bind one hand at a time; the coefficient
---  left at hands (0, 0) after the last round is the bound quad.
+--  Sumcheck_HQuad: the merged terms of upstream (rust/runtime/sumcheck/
+--  src/hquad.rs at d5e6be7: bind_g, bind_h, scalar), shared by the
+--  prover and the verifier (ADR 0073). The kernels bind g with the eq2
+--  table, merge the consecutive terms with the same hands, then bind
+--  one hand at a time; the coefficient left at hands (0, 0) after the
+--  last round is the bound quad.
 --
 --  The ghost package BQ holds the invariant of the rounds of ADR 0071:
 --  for every pair of hands, the sum of the coefficients of the merged
 --  terms equals the sum over the terms of the layer of Bound_KT times
 --  the factors of the challenges drawn so far. Merge_Terms gives it at
 --  round 0, each Bind_H carries it to the next hand, and at the end it
---  gives EBQT_Ref. The prover keeps it round by round in its sumcheck;
---  Bind_Quad, the verifier's form, runs the same rounds on its own.
+--  gives EBQT_Ref. Since the memory milestone (ADR 0080, block 3) the
+--  programs reach the first step of a layer through Packed_HQuad, from
+--  the packed circuit: Bind_Merge gives the invariant at round 0 and
+--  Bind_H, here, runs the rounds. Bind_G_T, Merge_Runs and Merge_Terms,
+--  the first step on an expanded layer, stay proved as the oracle the
+--  harnesses compare Bind_Merge with; they are not on the program path.
 --
 --  Generic over Sumcheck_Algebra; the sums of the proof are taken with
 --  its wrappers, so that the contracts of the field stay out of them.
@@ -198,9 +202,10 @@ package Sumcheck_HQuad is
    -------------------------------------------------------------------
    --  The bound quad of a layer (ADR 0071). The coefficients of the
    --  terms, summed by hands, are kept round by round: Bind_G_T and
-   --  Merge_Runs give the sums of Bound_KT, each Bind_H turns the low
-   --  bit of a hand into the factor of its challenge. After the last
-   --  round the sum at hands (0, 0) is EBQT_Ref.
+   --  Merge_Runs (Bind_Merge of Packed_HQuad on the programs' path) give
+   --  the sums of Bound_KT, each Bind_H turns the low bit of a hand into
+   --  the factor of its challenge. After the last round the sum at hands
+   --  (0, 0) is EBQT_Ref.
    -------------------------------------------------------------------
 
    --  The sums are taken with the wrappers of Sumcheck_Algebra, so that
@@ -1194,36 +1199,5 @@ package Sumcheck_HQuad is
         Proof_Only =>
           (if Tab then BQ.Inv (T, NT, BQ.Bound_Array (T0, Logv, G0, G1, Alpha,
                                                       Beta), C0, 0, C1, 0)));
-
-   -------------------------------------------------------------------
-   --  bind_quad of the verifier (ADR 0073), as upstream's
-   --  symbolic_sumcheck_verifier.rs: the bound quad of a layer by the
-   --  kernels above, with the same proof as the prover's.
-   -------------------------------------------------------------------
-
-   --  The terms of the layer bound with g by the eq2 table and merged,
-   --  then Logw rounds of both hands bound at HC0 (R) and HC1 (R); the
-   --  bound quad is the coefficient left at hands (0, 0). The terms are
-   --  copied on the heap, the copy and the table freed before return.
-   procedure Bind_Quad
-     (T           : Term_Array;
-      Logv        : Natural;
-      G0, G1      : Element_Array;
-      HC0, HC1    : Element_Array;
-      Logw        : Natural;
-      Alpha, Beta : Element;
-      V           : out Element)
-   with
-     Global => null,
-     Pre  => G0'First = 0 and then G1'First = 0
-       and then Logv <= G0'Length and then Logv <= G1'Length
-       and then Logv <= SA.Max_Bindeq_Log
-       and then HC0'First = 0 and then HC1'First = 0
-       and then Logw <= HC0'Length and then Logw <= HC1'Length
-       and then Logw <= SA.Max_Bindeq_Log,
-     Post => (Proof_Only =>
-                Same (V,
-                      SA.EBQT_Ref (T, T'Length, Logv, G0, G1, HC0, HC1,
-                                   Logw, Alpha, Beta)));
 
 end Sumcheck_HQuad;

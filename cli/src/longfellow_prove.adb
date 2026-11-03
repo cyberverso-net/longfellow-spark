@@ -8,7 +8,9 @@
 --
 --  A circuit file in Pinned_Circuits is loaded without recomputing its
 --  identifier, checked once already (ADR 0074); --check-circuit-id
---  recomputes it all the same.
+--  recomputes it all the same. The circuit is loaded in its packed form
+--  (Read_Packed, ADR 0080) and never expanded: the prover computes the
+--  wires and the sumcheck from the walk of the deltas.
 --
 --  Randomness: the operating system's generator (Os_Random) unless
 --  --seed N is given, which selects Simple_Rng of the upstream
@@ -36,11 +38,53 @@ with Transcript;
 with Ligero_Geometry;
 with Prover_Status;
 with Circuit_Status;
+with Field_Signature;
+with Field_GF2_128;
+with Field_P256;
+with Sumcheck_Algebra;
+with Sumcheck_Expression;
+with Sumcheck_Verifier;
+with Sumcheck_Transcript;
+with Ligero_Proof;
+with Lagrange;
+with Ligero_Verifier;
 with Circuit_Reader;
+with Packed_HQuad;
+with Packed_Eval;
+with Sampling;
+with Sumcheck_Prover;
+with Ligero_Prover;
+with Proof_Writer;
 with Zk_Prover;
 with Cli_Random;
+with Sumcheck_Algebra_GF2_128;
+with Sumcheck_Algebra_P256;
+with Sumcheck_Expression_GF2_128;
+with Sumcheck_Expression_P256;
+with Sumcheck_Verifier_GF2_128;
+with Sumcheck_Verifier_P256;
+with Sumcheck_Transcript_GF2_128;
+with Sumcheck_Transcript_P256;
+with Ligero_Proof_GF2_128;
+with Ligero_Proof_P256;
+with Lagrange_GF2_128;
+with Lagrange_P256;
+with Ligero_Verifier_GF2_128;
+with Ligero_Verifier_P256;
 with Circuit_Reader_GF2_128;
 with Circuit_Reader_P256;
+with Packed_HQuad_GF2_128;
+with Packed_HQuad_P256;
+with Packed_Eval_GF2_128;
+with Packed_Eval_P256;
+with Sampling_Cli_GF2_128;
+with Sampling_Cli_P256;
+with Sumcheck_Prover_Cli_GF2_128;
+with Sumcheck_Prover_Cli_P256;
+with Ligero_Prover_Cli_GF2_128;
+with Ligero_Prover_Cli_P256;
+with Proof_Writer_GF2_128;
+with Proof_Writer_P256;
 with Pinned_Circuits;
 with Zk_Prover_Cli_GF2_128;
 with Zk_Prover_Cli_P256;
@@ -258,10 +302,30 @@ procedure Longfellow_Prove is
        ("115792089210356248762697446949407573530086143415290314195533631308"
         & "867097853951");
 
+   --  The proving on one field. The chain of units is given in full, as
+   --  in longfellow_verify, so that the circuit the reader loads is the
+   --  circuit the prover takes: the packed kernels and the prover are
+   --  over the packed form of the reader.
    generic
-      with package ZKP is new Zk_Prover (<>);
-      with package CR is new Circuit_Reader
-        (SA => ZKP.LPR.LV.ST.SA, others => <>);
+      with package FS is new Field_Signature (<>);
+      with package SA is new Sumcheck_Algebra (F => FS);
+      with package SE is new Sumcheck_Expression (SA => SA);
+      with package SV is new Sumcheck_Verifier (SA => SA, SE => SE);
+      with package ST is new Sumcheck_Transcript
+        (SA => SA, SE => SE, SV => SV);
+      with package LP is new Ligero_Proof (SA => SA);
+      with package L is new Lagrange (F => FS);
+      with package LV is new Ligero_Verifier (ST => ST, LP => LP, L => L);
+      with package CR is new Circuit_Reader (SA => SA, others => <>);
+      with package PH is new Packed_HQuad
+        (SA => SA, PC => CR.PC, HQ => SV.HQ);
+      with package PE is new Packed_Eval (SA => SA, PC => CR.PC);
+      with package SP is new Sampling (F => FS, others => <>);
+      with package SPR is new Sumcheck_Prover (ST => ST, SP => SP, PH => PH);
+      with package LPR is new Ligero_Prover (LV => LV, others => <>);
+      with package PW is new Proof_Writer (LV => LV);
+      with package ZKP is new Zk_Prover
+        (LPR => LPR, PH => PH, SPR => SPR, PW => PW, PE => PE);
       Reduce : Boolean;
    function Run return CL.Exit_Status;
 
@@ -269,12 +333,12 @@ procedure Longfellow_Prove is
       pragma Suppress (Predicate_Check);
       use type Circuit_Status.Status;
       use type Prover_Status.Status;
-      package F renames ZKP.LPR.LV.ST.SA.F;
-      procedure Read_Circuit is new Pinned_Circuits.Read (CR);
+      package F renames FS;
+      procedure Read_Circuit is new Pinned_Circuits.Read_Packed (CR);
 
       Cfg : constant Ligero_Geometry.Config :=
         (Rate_Inv => Rate_Inv, Num_Queries => Nreq, Encoded_Len => Ncol);
-      C   : CR.Circuit_Access;
+      C   : CR.Packed_Access;
       H   : CR.Header;
       CSt : Circuit_Status.Status;
       PSt : Prover_Status.Status;
@@ -293,24 +357,29 @@ procedure Longfellow_Prove is
          TIO.Put_Line ("circuit " & Lower (CSt'Image));
          return 1;
       end if;
-      --  The predicate of the circuit, checked once here, where the
-      --  circuit enters the program; the calls below do not check it
-      --  again (ADR 0072). The loader proves it, so this test is the
-      --  run-time guard of the boundary, not a new property.
-      if not ZKP.LPR.LV.ST.SA.Well_Formed (C.all) then
+      --  The executable part of what the prover asks of the circuit,
+      --  checked once here, where the circuit enters the program: the
+      --  indices of the form, its layers and its shape (ADR 0072). The
+      --  loader proves it, so this test is the run-time guard of the
+      --  boundary, not a new property; the rest of the precondition is
+      --  at level Proof_Only and is the loader's postcondition.
+      if not (PH.PC.Indices_Ok (C.all)
+              and then PH.PC.Layers_Ok (C.all)
+              and then SA.Shape_Ok (PH.PC.Shape_Of (C.all)))
+      then
          TIO.Put_Line
            ("circuit " & Lower (Circuit_Status.Not_Well_Formed'Image));
-         CR.Free (C);
+         CR.Free_Packed (C);
          return 1;
       end if;
       if not ZKP.Config_Fits (Cfg, ZKP.Shape_Of (C.all)) then
          TIO.Put_Line ("config_invalid");
-         CR.Free (C);
+         CR.Free_Packed (C);
          return 1;
       end if;
       if C.Ninput = 0 then
          TIO.Put_Line ("circuit has no inputs");
-         CR.Free (C);
+         CR.Free_Packed (C);
          return 1;
       end if;
       declare
@@ -346,7 +415,7 @@ procedure Longfellow_Prove is
             end if;
             ZKP.Prove (Label, H.Id, H.Subfield_Boundary, Cfg, C.all,
                        Inputs, Out_B.all, Len, PSt);
-            CR.Free (C);
+            CR.Free_Packed (C);
             if PSt /= Prover_Status.Ok then
                TIO.Put_Line (Lower (PSt'Image));
                return 1;
@@ -360,12 +429,26 @@ procedure Longfellow_Prove is
    end Run;
 
    function Run_GF is new Run
-     (ZKP => Zk_Prover_Cli_GF2_128, CR => Circuit_Reader_GF2_128,
-      Reduce => False);
+     (FS => Field_GF2_128.Sig,
+      SA => Sumcheck_Algebra_GF2_128, SE => Sumcheck_Expression_GF2_128,
+      SV => Sumcheck_Verifier_GF2_128, ST => Sumcheck_Transcript_GF2_128,
+      LP => Ligero_Proof_GF2_128, L => Lagrange_GF2_128,
+      LV => Ligero_Verifier_GF2_128, CR => Circuit_Reader_GF2_128,
+      PH => Packed_HQuad_GF2_128, PE => Packed_Eval_GF2_128,
+      SP => Sampling_Cli_GF2_128, SPR => Sumcheck_Prover_Cli_GF2_128,
+      LPR => Ligero_Prover_Cli_GF2_128, PW => Proof_Writer_GF2_128,
+      ZKP => Zk_Prover_Cli_GF2_128, Reduce => False);
 
    function Run_P is new Run
-     (ZKP => Zk_Prover_Cli_P256, CR => Circuit_Reader_P256,
-      Reduce => True);
+     (FS => Field_P256.Sig,
+      SA => Sumcheck_Algebra_P256, SE => Sumcheck_Expression_P256,
+      SV => Sumcheck_Verifier_P256, ST => Sumcheck_Transcript_P256,
+      LP => Ligero_Proof_P256, L => Lagrange_P256,
+      LV => Ligero_Verifier_P256, CR => Circuit_Reader_P256,
+      PH => Packed_HQuad_P256, PE => Packed_Eval_P256,
+      SP => Sampling_Cli_P256, SPR => Sumcheck_Prover_Cli_P256,
+      LPR => Ligero_Prover_Cli_P256, PW => Proof_Writer_P256,
+      ZKP => Zk_Prover_Cli_P256, Reduce => True);
 
    procedure Parse_Arguments is
       I : Positive := 1;

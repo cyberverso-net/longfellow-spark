@@ -218,6 +218,10 @@ do_cli() {
    local c=tests/vectors/upstream/circuits status
    header "cli: interop_kat, the upstream proofs end to end"
    cli/bin/interop_kat
+   header "cli: first_step_bench --check, the packed first step against the exact bound quad on the mDoc version 7 circuits"
+   local m=tests/vectors/upstream/mdoc h=8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121
+   cli/bin/first_step_bench --field gf2_128 --circuit $m/${h}_hash.lfc2 --check
+   cli/bin/first_step_bench --field p256 --circuit $m/${h}_sig.lfc2 --check
    header "cli: longfellow_verify on the two upstream proofs"
    cli/bin/longfellow_verify --field gf2_128 --circuit $c/sha256_circuit.lfc2 \
       --proof $c/sha256_proof.bin --label sha256_spec_test \

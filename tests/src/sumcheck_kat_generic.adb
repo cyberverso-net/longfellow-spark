@@ -273,7 +273,12 @@ package body Sumcheck_KAT_Generic is
             --  Phase D, M1: the bound quad by the bindeq tables agrees
             --  with the bound quad term by term, on every layer, under
             --  challenges that depend on the layer (ADR 0057's rule: the
-            --  fast form is tested against the reference form).
+            --  fast form is tested against the reference form). The
+            --  packed form of the circuit (Pack, ADR 0080) for the bound
+            --  quad by the merged terms.
+            declare
+               PK : constant PH.PC.Packed_Circuit := PH.PC.Pack (C);
+            begin
             for J in 0 .. C.Last_Layer loop
                declare
                   Size : constant Natural := Seg_Size (Shape_Of (C), J);
@@ -300,16 +305,18 @@ package body Sumcheck_KAT_Generic is
                      C.Layers (J).Logw, G0 (J), H1 (J), Fast);
                   Check (Fast = Slow, "circuit " & Name & ": layer" & J'Image
                          & ", the bound quad by tables differs");
-                  --  ADR 0073: the bound quad of the verifier, by the
-                  --  merged terms, against both.
-                  SV.HQ.Bind_Quad
-                    (Layer_Terms (C, J), Logv, G0, G1, H0, H1,
+                  --  ADR 0073, ADR 0080: the bound quad of the verifier,
+                  --  by the merged terms from the packed form, against
+                  --  both.
+                  PH.Bind_Quad_Packed
+                    (PK, J, Logv, G0, G1, H0, H1,
                      C.Layers (J).Logw, G0 (J), H1 (J), Bound);
                   Check (Bound = Fast and then Bound = Slow,
                          "circuit " & Name & ": layer" & J'Image
                          & ", the bound quad by the merged terms differs");
                end;
             end loop;
+            end;
          end;
       end;
    end Finish_Circuit;
@@ -907,7 +914,7 @@ package body Sumcheck_KAT_Generic is
          declare
             BQ2 : Element_Array (0 .. C.Last_Layer);
          begin
-            SV.Bound_Quads (C, Ch2, BQ2);
+            ZK.Bound_Quads (PH.PC.Pack (C), Shape_Of (C), Ch2, BQ2);
             SV.Verifier_Core
               (Shape_Of (C), Pub, Prf, Ch2, BQ2, A2, B2, Lqc2);
          end;
@@ -952,9 +959,10 @@ package body Sumcheck_KAT_Generic is
       Zk_Nonce_Given := [others => False];
    end Check_Replay;
 
-   --  ADR 0073: the bound quads of Bound_Quads, by the merged terms of
-   --  Sumcheck_HQuad, against the evaluation by tables and the one term
-   --  by term, on every layer, under the recorded challenges.
+   --  ADR 0073, ADR 0080: the bound quads of Zk_Verifier.Bound_Quads,
+   --  by the merged terms from the packed form, against the evaluation
+   --  by tables and the one term by term on the expanded layer, on every
+   --  layer, under the recorded challenges.
    procedure Check_Bound_Quads
      (Name : String;
       C    : Circuit;
@@ -999,17 +1007,17 @@ package body Sumcheck_KAT_Generic is
 
    --  The memory milestone (ADR 0080): the circuit packed with Pack, the
    --  walk of each layer giving its terms back, and the bound quads of
-   --  the verifier from the packed form equal to those from the expanded
-   --  one, under the recorded challenges.
+   --  the verifier from the packed form under the recorded challenges,
+   --  which Check_Bound_Quads then compares with the two evaluations on
+   --  the expanded layers.
    procedure Check_Packed
      (Name : String;
       C    : Circuit;
       Ch   : SV.Challenges;
-      BQ   : Element_Array)
+      BQ   : out Element_Array)
    is
       use PH.PC;
       P   : constant Packed_Circuit := Pack (C);
-      BQP : Element_Array (0 .. C.Last_Layer);
       Ok  : Boolean := P.Layers = C.Layers and then P.NT = C.NT
         and then P.Noutput = C.Noutput and then P.Ninput = C.Ninput
         and then P.Npublic = C.Npublic;
@@ -1033,9 +1041,7 @@ package body Sumcheck_KAT_Generic is
       end loop;
       Check (Ok, "tier 3 " & Name
              & ": Pack then the walk does not give the terms back");
-      ZK.Bound_Quads (P, Shape_Of (C), Ch, BQP);
-      Check (BQP = BQ, "tier 3 " & Name
-             & ": Bound_Quads on the packed form differs");
+      ZK.Bound_Quads (P, Shape_Of (C), Ch, BQ);
    end Check_Packed;
 
    procedure Finish_Tier3 is
@@ -1114,9 +1120,8 @@ package body Sumcheck_KAT_Generic is
             declare
                BQ : Element_Array (0 .. C.Last_Layer);
             begin
-               SV.Bound_Quads (C, Ch, BQ);
-               Check_Bound_Quads (Name, C, Ch, BQ);
                Check_Packed (Name, C, Ch, BQ);
+               Check_Bound_Quads (Name, C, Ch, BQ);
                SV.Verifier_Core
                  (Shape_Of (C), Pub, Prf, Ch, BQ, A, B, Lqc);
             end;

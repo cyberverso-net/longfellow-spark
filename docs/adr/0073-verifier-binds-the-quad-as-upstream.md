@@ -4,6 +4,8 @@
 
 Proposed (2026-10-26, milestone M2 of Phase D).
 
+Note (2026-11-03, the memory milestone, ADR 0080, block 3): the verifier binds the quad of each layer from the packed circuit, with `Packed_HQuad.Bind_Quad_Packed` (block 2) through `Zk_Verifier.Bound_Quads`, and the prover's first step is `Bind_Merge` of the same unit. `Bind_Quad` and `Bind_Step` of `Sumcheck_HQuad`, and `Bound_Quads` of `Sumcheck_Verifier`, the forms of this record on an expanded layer, are removed; `Bind_Step` of `Packed_HQuad` is the one left. The exact `Eval_Bound_Quad` is the oracle the tests compare the packed kernel with. The decision stands: the verifier binds the quad as upstream does, now from the form upstream keeps.
+
 ## Date
 
 2026-10-26

@@ -147,6 +147,18 @@ package Sumcheck_Verifier is
      Post => Chal_Off (S, I) <= Chal_Off (S, J),
      Subprogram_Variant => (Decreases => J);
 
+   --  Chal_Off of two equal shapes. The equality of two shapes is the
+   --  equality of Ada, field by field and layer by layer, which the
+   --  provers cannot carry through the hidden recursion of Chal_Off by
+   --  themselves: the lemma walks it with Lemma_Chal_Step, one layer at
+   --  a time, and Chal_Size, whose body is visible, reads the same width
+   --  in both shapes. Zk_Verifier and Sumcheck_Prover call it where the
+   --  shape of the packed circuit meets the shape of its expansion.
+   procedure Lemma_Chal_Off_Eq (S1, S2 : Shape; J : Natural) with
+     Ghost => Proof_Only, Global => null,
+     Pre  => S1 = S2 and then J <= S1.Last_Layer + 1,
+     Post => Chal_Off (S1, J) = Chal_Off (S2, J);
+
    procedure Lemma_Pad_Step (S : Shape; J : Natural; Base : Natural) with
      Ghost, Global => null,
      Pre  => J <= S.Last_Layer and then Base <= Max_Wires,
@@ -513,20 +525,6 @@ package Sumcheck_Verifier is
                                   Ch.Layer (Chal_Off (Shape_Of (C), J)),
                                   Ch.Layer (Chal_Off (Shape_Of (C), J) + 1)))),
         Post => Same (V, BQ_Ref (C, Ch, J));
-
-   --  The bound quads of the verifier from an expanded circuit, layer by
-   --  layer as Verify_Layer computed them before ADR 0071. Since the
-   --  memory milestone (ADR 0080) the verifier computes them from the
-   --  packed circuit (Zk_Verifier.Bound_Quads); this form is proved and
-   --  kept as the oracle of sumcheck_kat, and is not on the program path.
-   procedure Bound_Quads (C : Circuit; Ch : Challenges; BQ : out Element_Array)
-   with
-     Global => null,
-     Pre    => Ch.Last + 1 = Chal_Total (Shape_Of (C))
-               and then BQ'First = 0 and then BQ'Length = C.Last_Layer + 1,
-     Post   => (Proof_Only =>
-                  (for all J in 0 .. C.Last_Layer =>
-                     Same (BQ (J), BQ_Ref (C, Ch, J))));
 
    --  One layer (Section 6.7, verify_layer): combines the two claims
    --  with alpha, runs the 2 logw symbolic rounds, subtracts the product
