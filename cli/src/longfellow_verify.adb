@@ -7,15 +7,17 @@
 --                      --label STRING --rate-inv N --nreq N --ncol N
 --                      [--public HEX]... [--check-circuit-id]
 --
---  Loads the LFC2 circuit (Circuit_Reader), runs Zk_Verifier.Verify on
---  the proof bytes under the circuit's identifier, the label and the
---  Ligero configuration, with the public inputs given as big-endian
---  hex integers (32 digits on GF(2^128), 64 on P-256), and prints the
---  status. A circuit file in Pinned_Circuits is loaded without
---  recomputing its identifier, checked once already (ADR 0074);
---  --check-circuit-id recomputes it all the same. Exit status: 0 when
---  the proof is accepted, 1 when it is refused or the circuit is not
---  accepted (the status is printed), 2 on a usage or file error.
+--  Loads the LFC2 circuit in its packed form (Circuit_Reader.Read_Packed,
+--  the memory milestone, ADR 0080: the expanded circuit is never built),
+--  runs Zk_Verifier.Verify on the proof bytes under the circuit's
+--  identifier, the label and the Ligero configuration, with the public
+--  inputs given as big-endian hex integers (32 digits on GF(2^128), 64
+--  on P-256), and prints the status. A circuit file in Pinned_Circuits
+--  is loaded without recomputing its identifier, checked once already
+--  (ADR 0074); --check-circuit-id recomputes it all the same. Exit
+--  status: 0 when the proof is accepted, 1 when it is refused or the
+--  circuit is not accepted (the status is printed), 2 on a usage or
+--  file error.
 --  Documentation: docs/guide/06-circuits.md, README "Verifying a
 --  proof".
 
@@ -45,6 +47,7 @@ with Sumcheck_Transcript;
 with Ligero_Proof;
 with Lagrange;
 with Ligero_Verifier;
+with Packed_HQuad;
 with Zk_Verifier;
 with Circuit_Reader;
 with Sumcheck_Algebra_GF2_128;
@@ -61,6 +64,8 @@ with Lagrange_GF2_128;
 with Lagrange_P256;
 with Ligero_Verifier_GF2_128;
 with Ligero_Verifier_P256;
+with Packed_HQuad_GF2_128;
+with Packed_HQuad_P256;
 with Zk_Verifier_GF2_128;
 with Zk_Verifier_P256;
 with Circuit_Reader_GF2_128;
@@ -189,20 +194,22 @@ procedure Longfellow_Verify is
       with package LP is new Ligero_Proof (SA => SA);
       with package L is new Lagrange (F => FS);
       with package LV is new Ligero_Verifier (ST => ST, LP => LP, L => L);
-      with package ZK is new Zk_Verifier (LV => LV);
       with package CR is new Circuit_Reader (SA => SA, others => <>);
+      with package PH is new Packed_HQuad
+        (SA => SA, PC => CR.PC, HQ => SV.HQ);
+      with package ZK is new Zk_Verifier (LV => LV, PH => PH);
       with function To_Element (S : String) return SA.Element;
    function Run return CL.Exit_Status;
 
    function Run return CL.Exit_Status is
       pragma Suppress (Predicate_Check);
-      procedure Read_Circuit is new Pinned_Circuits.Read (CR);
+      procedure Read_Circuit is new Pinned_Circuits.Read_Packed (CR);
       use type Circuit_Status.Status;
       use type Verifier_Status.Status;
       Cfg : constant Ligero_Geometry.Config :=
         (Rate_Inv => Rate_Inv, Num_Queries => Nreq, Encoded_Len => Ncol);
       Pub : SA.Element_Array (0 .. Npublic - 1);
-      C   : CR.Circuit_Access;
+      C   : CR.Packed_Access;
       H   : CR.Header;
       CSt : Circuit_Status.Status;
       VSt : Verifier_Status.Status;
@@ -222,14 +229,18 @@ procedure Longfellow_Verify is
          TIO.Put_Line ("circuit " & Lower (CSt'Image));
          return 1;
       end if;
-      --  The predicate of the circuit, checked once here, where the
-      --  circuit enters the program; the calls below do not check it
-      --  again (ADR 0072). The loader proves it, so this test is the
-      --  run-time guard of the boundary, not a new property.
-      if not SA.Well_Formed (C.all) then
+      --  The executable part of what the verifier asks of the circuit
+      --  (the indices of the packed form, its layers, the shape),
+      --  checked once here, where the circuit enters the program; the
+      --  calls below do not check it again (ADR 0072). The loader proves
+      --  it, so this test is the run-time guard of the boundary, not a
+      --  new property.
+      if not (PH.PC.Indices_Ok (C.all) and then PH.PC.Layers_Ok (C.all)
+              and then SA.Shape_Ok (PH.PC.Shape_Of (C.all)))
+      then
          TIO.Put_Line
            ("circuit " & Lower (Circuit_Status.Not_Well_Formed'Image));
-         CR.Free (C);
+         CR.Free_Packed (C);
          return 1;
       end if;
       declare
@@ -238,7 +249,7 @@ procedure Longfellow_Verify is
          ZK.Verify (To_Label (Label_Arg.all), H.Id, Cfg, C.all, Pub, P.all,
                     VSt);
       end;
-      CR.Free (C);
+      CR.Free_Packed (C);
       TIO.Put_Line (Lower (VSt'Image));
       return (if VSt = Verifier_Status.Ok then 0 else 1);
    end Run;
@@ -248,15 +259,17 @@ procedure Longfellow_Verify is
       SA => Sumcheck_Algebra_GF2_128, SE => Sumcheck_Expression_GF2_128,
       SV => Sumcheck_Verifier_GF2_128, ST => Sumcheck_Transcript_GF2_128,
       LP => Ligero_Proof_GF2_128, L => Lagrange_GF2_128,
-      LV => Ligero_Verifier_GF2_128, ZK => Zk_Verifier_GF2_128,
-      CR => Circuit_Reader_GF2_128, To_Element => GF_To_Element);
+      LV => Ligero_Verifier_GF2_128, CR => Circuit_Reader_GF2_128,
+      PH => Packed_HQuad_GF2_128, ZK => Zk_Verifier_GF2_128,
+      To_Element => GF_To_Element);
    function Run_P is new Run
      (FS => Field_P256.Sig,
       SA => Sumcheck_Algebra_P256, SE => Sumcheck_Expression_P256,
       SV => Sumcheck_Verifier_P256, ST => Sumcheck_Transcript_P256,
       LP => Ligero_Proof_P256, L => Lagrange_P256,
-      LV => Ligero_Verifier_P256, ZK => Zk_Verifier_P256,
-      CR => Circuit_Reader_P256, To_Element => P_To_Element);
+      LV => Ligero_Verifier_P256, CR => Circuit_Reader_P256,
+      PH => Packed_HQuad_P256, ZK => Zk_Verifier_P256,
+      To_Element => P_To_Element);
 
    procedure Parse_Arguments is
       I : Positive := 1;

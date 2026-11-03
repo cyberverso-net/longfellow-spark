@@ -4,10 +4,14 @@
 --  circuits, the identifier checked once and the circuit then kept as
 --  trusted). Each entry is the SHA-256 of the bytes of an LFC2 file and
 --  the identifier that a full Read of that file recomputed. A file in
---  the list is loaded by Read_Pinned, any other by Read. interop_kat
---  checks every entry against a full Read of its file in
---  tests/vectors. Outside the proof perimeter (SPARK_Mode Off); the
---  trust model lists the table as trusted.
+--  the list is loaded with the identifier pinned (Read_Pinned, or
+--  Read_Packed with Pinned True), any other with the identifier
+--  recomputed. The command-line verifier loads the packed form
+--  (Read_Packed below, the memory milestone, ADR 0080); the prover
+--  still loads the expanded one (Read). interop_kat checks every entry
+--  against a full load of its file in tests/vectors, in both forms.
+--  Outside the proof perimeter (SPARK_Mode Off); the trust model lists
+--  the table as trusted.
 
 pragma SPARK_Mode (Off);
 
@@ -32,14 +36,26 @@ package Pinned_Circuits is
    --  Whether B is the file of an entry, and its identifier if so.
    procedure Lookup (B : Byte_Array; Found : out Boolean; Id : out Bytes_32);
 
-   --  The load of the command line: Read_Pinned when B is in the list
-   --  and Full is False, Read otherwise.
+   --  The load of the expanded circuit: Read_Pinned when B is in the
+   --  list and Full is False, Read otherwise.
    generic
       with package CR is new Circuit_Reader (<>);
    procedure Read
      (B    : Byte_Array;
       Full : Boolean;
       C    : out CR.Circuit_Access;
+      H    : out CR.Header;
+      St   : out Circuit_Status.Status);
+
+   --  The load of the packed circuit: Read_Packed with the identifier
+   --  pinned when B is in the list and Full is False, recomputed
+   --  otherwise.
+   generic
+      with package CR is new Circuit_Reader (<>);
+   procedure Read_Packed
+     (B    : Byte_Array;
+      Full : Boolean;
+      P    : out CR.Packed_Access;
       H    : out CR.Header;
       St   : out Circuit_Status.Status);
 

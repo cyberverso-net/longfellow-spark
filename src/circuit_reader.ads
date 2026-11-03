@@ -25,6 +25,10 @@
 --  into Packed_Circuits, the form the file keeps, without expanding the
 --  terms. Its walks prove, at each step, that they read the layers of
 --  the ghost expansion Expand, so its checks are checks on Expand (P).
+--  It is the loader of the command-line verifier since block 3 of the
+--  milestone; Read and Read_Pinned load the expanded circuit for the
+--  prover, until it takes the packed form, and serve the tests as the
+--  oracle of Read_Packed.
 --  It keeps the dictionaries, so it bounds them over the whole circuit:
 --  deltas, segments, segment entries and kept tokens, each at most
 --  Max_Terms, beyond which Bound_Exceeded (guide chapter 6, 1.5).

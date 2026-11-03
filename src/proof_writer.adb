@@ -89,12 +89,12 @@ package body Proof_Writer is
 
    --  The offsets of the padded proof, as the reader has them: the
    --  hidden recursion unfolded one step, and the bound on the total.
-   procedure Lemma_Proof_Step (C : Circuit; J : Natural) with
+   procedure Lemma_Proof_Step (S : Shape; J : Natural) with
      Ghost  => Proof_Only,
      Global => null,
-     Pre    => J <= C.Last_Layer,
-     Post   => LV.ST.SV.Proof_Off (C, J + 1)
-               = LV.ST.SV.Proof_Off (C, J) + LV.ST.SV.Proof_Size (C, J)
+     Pre    => J <= S.Last_Layer,
+     Post   => LV.ST.SV.Proof_Off (S, J + 1)
+               = LV.ST.SV.Proof_Off (S, J) + LV.ST.SV.Proof_Size (S, J)
    is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body",
@@ -103,31 +103,31 @@ package body Proof_Writer is
       null;
    end Lemma_Proof_Step;
 
-   procedure Lemma_Proof_Mono (C : Circuit; I, J : Natural) with
+   procedure Lemma_Proof_Mono (S : Shape; I, J : Natural) with
      Ghost  => Proof_Only,
      Global => null,
-     Pre    => I <= J and then J <= C.Last_Layer + 1,
-     Post   => LV.ST.SV.Proof_Off (C, I) <= LV.ST.SV.Proof_Off (C, J),
+     Pre    => I <= J and then J <= S.Last_Layer + 1,
+     Post   => LV.ST.SV.Proof_Off (S, I) <= LV.ST.SV.Proof_Off (S, J),
      Subprogram_Variant => (Decreases => J)
    is
    begin
       if J > I then
-         Lemma_Proof_Step (C, J - 1);
-         Lemma_Proof_Mono (C, I, J - 1);
+         Lemma_Proof_Step (S, J - 1);
+         Lemma_Proof_Mono (S, I, J - 1);
       end if;
    end Lemma_Proof_Mono;
 
    --  Layer J's elements lie within the total.
-   procedure Lemma_Layer_Fits (C : Circuit; J : Natural) with
+   procedure Lemma_Layer_Fits (S : Shape; J : Natural) with
      Ghost  => Proof_Only,
      Global => null,
-     Pre    => J <= C.Last_Layer,
-     Post   => LV.ST.SV.Proof_Off (C, J) + LV.ST.SV.Proof_Size (C, J)
-               <= LV.ST.SV.Proof_Total (C)
+     Pre    => J <= S.Last_Layer,
+     Post   => LV.ST.SV.Proof_Off (S, J) + LV.ST.SV.Proof_Size (S, J)
+               <= LV.ST.SV.Proof_Total (S)
    is
    begin
-      Lemma_Proof_Step (C, J);
-      Lemma_Proof_Mono (C, J + 1, C.Last_Layer + 1);
+      Lemma_Proof_Step (S, J);
+      Lemma_Proof_Mono (S, J + 1, S.Last_Layer + 1);
    end Lemma_Layer_Fits;
 
    --  Element E into slot K of a string of Total slots.
@@ -153,27 +153,27 @@ package body Proof_Writer is
    end Put_Slot;
 
    procedure Write_Sumcheck_Proof
-     (C : Circuit;
+     (S : Shape;
       P : Sumcheck_Proof;
       B : out Byte_Array)
    is
-      Total : constant Natural := LV.ST.SV.Proof_Total (C);
+      Total : constant Natural := LV.ST.SV.Proof_Total (S);
       Off   : Natural;
       Logw  : LV.ST.SA.Logw_Type;
       K     : Natural := 0;
 
    begin
       B := [others => 0];
-      for J in 0 .. C.Last_Layer loop
-         pragma Loop_Invariant (K = LV.ST.SV.Proof_Off (C, J));
-         Lemma_Layer_Fits (C, J);
-         Off  := LV.ST.SV.Proof_Off (C, J);
-         Logw := C.Layers (J).Logw;
+      for J in 0 .. S.Last_Layer loop
+         pragma Loop_Invariant (K = LV.ST.SV.Proof_Off (S, J));
+         Lemma_Layer_Fits (S, J);
+         Off  := LV.ST.SV.Proof_Off (S, J);
+         Logw := S.Layers (J).Logw;
          for R in 0 .. Logw - 1 loop
             pragma Loop_Invariant
-              (Off = LV.ST.SV.Proof_Off (C, J)
-               and then Logw = C.Layers (J).Logw
-               and then Off + LV.ST.SV.Proof_Size (C, J) <= Total);
+              (Off = LV.ST.SV.Proof_Off (S, J)
+               and then Logw = S.Layers (J).Logw
+               and then Off + LV.ST.SV.Proof_Size (S, J) <= Total);
             pragma Loop_Invariant (K = Off + 4 * R);
             --  l (P0), r (P0), l (P2), r (P2): slots 0, 2, 1, 3 of the
             --  pad order (Read_Sumcheck_Proof).
@@ -186,7 +186,7 @@ package body Proof_Writer is
          Put_Slot (B, Total, K, P.Evals (Off + 4 * Logw));
          Put_Slot (B, Total, K + 1, P.Evals (Off + 4 * Logw + 1));
          K := K + 2;
-         Lemma_Proof_Step (C, J);
+         Lemma_Proof_Step (S, J);
       end loop;
    end Write_Sumcheck_Proof;
 
@@ -520,7 +520,7 @@ package body Proof_Writer is
    -------------------------------------------------------------------
 
    procedure Write_Proof
-     (C        : Circuit;
+     (S        : Shape;
       G        : Valid_Geometry;
       Sfb      : Natural;
       Root     : Bytes_32;
@@ -528,14 +528,14 @@ package body Proof_Writer is
       Lig      : Ligero_Part;
       B        : out Byte_Array)
    is
-      SL : constant Natural := Sumcheck_Len (C);
+      SL : constant Natural := Sumcheck_Len (S);
    begin
       B := [others => 0];
       B (0 .. 31) := Root;
       declare
          SB : Byte_Array (0 .. SL - 1);
       begin
-         Write_Sumcheck_Proof (C, Sumcheck, SB);
+         Write_Sumcheck_Proof (S, Sumcheck, SB);
          B (32 .. 32 + SL - 1) := SB;
       end;
       Write_Ligero_Proof (G, Sfb, Lig, B, 32 + SL);

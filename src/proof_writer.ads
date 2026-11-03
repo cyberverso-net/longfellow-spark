@@ -55,6 +55,7 @@ package Proof_Writer is
 
    subtype Element is LV.ST.SA.Element;
    subtype Circuit is LV.ST.SA.Circuit;
+   subtype Shape is LV.ST.SA.Shape;
    subtype Sumcheck_Proof is LV.ST.SV.Sumcheck_Proof;
    subtype Ligero_Part is LV.LP.Proof;
 
@@ -65,8 +66,8 @@ package Proof_Writer is
    --  Section 7.3
    -------------------------------------------------------------------
 
-   function Sumcheck_Len (C : Circuit) return Natural is
-     (LV.ST.SV.Proof_Total (C) * Size)
+   function Sumcheck_Len (S : Shape) return Natural is
+     (LV.ST.SV.Proof_Total (S) * Size)
    with Global => null;
 
    --  Slot K of a byte string of Size-byte elements.
@@ -78,14 +79,14 @@ package Proof_Writer is
                   and then B'Length <= Natural'Last / Size * Size;
 
    procedure Write_Sumcheck_Proof
-     (C : Circuit;
+     (S : Shape;
       P : Sumcheck_Proof;
       B : out Byte_Array)
    with
      Global => null,
      Pre    => B'First = 0
-               and then P.Last + 1 = LV.ST.SV.Proof_Total (C)
-               and then B'Length = Sumcheck_Len (C);
+               and then P.Last + 1 = LV.ST.SV.Proof_Total (S)
+               and then B'Length = Sumcheck_Len (S);
 
    -------------------------------------------------------------------
    --  Section 7.4
@@ -197,15 +198,15 @@ package Proof_Writer is
    -------------------------------------------------------------------
 
    function Proof_Len
-     (C : Circuit; G : Valid_Geometry; Sfb : Natural; Path_Count : Natural)
+     (S : Shape; G : Valid_Geometry; Sfb : Natural; Path_Count : Natural)
       return Natural
    is
-     (32 + Sumcheck_Len (C) + Ligero_Len (G, Sfb, Path_Count))
+     (32 + Sumcheck_Len (S) + Ligero_Len (G, Sfb, Path_Count))
    with Global => null,
         Pre    => LV.LP.Fits (G) and then Path_Count <= 2 * Merkle.Max_Leaves;
 
    procedure Write_Proof
-     (C        : Circuit;
+     (S        : Shape;
       G        : Valid_Geometry;
       Sfb      : Natural;
       Root     : Bytes_32;
@@ -217,13 +218,13 @@ package Proof_Writer is
      Pre    => B'First = 0
                and then LV.LP.Fits (G)
                and then LV.LP.Shape (Lig, G)
-               and then Sumcheck.Last + 1 = LV.ST.SV.Proof_Total (C)
-               and then B'Length = Proof_Len (C, G, Sfb, Lig.Path_Count),
+               and then Sumcheck.Last + 1 = LV.ST.SV.Proof_Total (S)
+               and then B'Length = Proof_Len (S, G, Sfb, Lig.Path_Count),
      Post   =>
        (Runtime    => B (0 .. 31) = Root,
         Proof_Only =>
           LV.LP.Well_Coded
-            (B, 32 + Sumcheck_Len (C) + LV.LP.Fixed_Len (G),
+            (B, 32 + Sumcheck_Len (S) + LV.LP.Fixed_Len (G),
              LV.LP.Opened (G), False, True));
 
 end Proof_Writer;

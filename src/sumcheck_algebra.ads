@@ -46,6 +46,13 @@
 --                       computed bit by bit for every term. That the two
 --                       sums agree is the tested fact that bindeq agrees
 --                       with eq; Eval_Bound_Quad stays as the reference.
+--    Shape_Of         : Gold by definition: the circuit without its
+--                       terms (the memory milestone, ADR 0080). The
+--                       sizes of the proof, the challenges, the pads and
+--                       the wires are functions of the shape, so that
+--                       the units that need sizes only never hold the
+--                       terms. Lemma_Shape_Of: a well-formed circuit has
+--                       a shape that satisfies Shape_Ok.
 --
 --  Errors are statuses (ADR 0022, D6): a Z assertion that fails or an
 --  output wire that is not Zero makes OK False; nothing is raised.
@@ -518,6 +525,55 @@ package Sumcheck_Algebra is
    subtype Circuit is Raw_Circuit
      with Dynamic_Predicate => Well_Formed (Circuit);
 
+   --  The shape of a circuit: the circuit without its terms (the memory
+   --  milestone, ADR 0080). The sizes of the proof, the challenges, the
+   --  pads and the wires depend on the shape alone, so the units that
+   --  need sizes only take it, and the packed form (Packed_Circuits)
+   --  gives its shape without expanding a term. Shape_Ok is what
+   --  Well_Formed says of the shape: every conjunct that names no term.
+   type Raw_Shape (Last_Layer : Layer_Last; NT : Term_Count) is record
+      Noutput : Wire_Count;
+      Ninput  : Wire_Count;
+      Npublic : Wire_Count;
+      Layers  : Layer_Array (0 .. Last_Layer);
+   end record;
+
+   function Shape_Ok (S : Raw_Shape) return Boolean is
+     (S.Npublic <= S.Ninput
+      and then S.Layers (0).First = 1
+      and then S.Layers (S.Last_Layer).Last = S.NT
+      and then (for all J in 1 .. S.Last_Layer =>
+                  S.Layers (J).First = S.Layers (J - 1).Last + 1)
+      and then (for all J in 0 .. S.Last_Layer =>
+                  S.Layers (J).Last + 1 >= S.Layers (J).First
+                  and then S.Layers (J).Last <= S.NT)
+      and then (for all J in 0 .. S.Last_Layer =>
+                  Unsigned_64 (S.Layers (J).NW_In)
+                    <= Shift_Left (1, S.Layers (J).Logw))
+      and then S.Layers (S.Last_Layer).NW_In = S.Ninput)
+   with Global => null;
+
+   subtype Shape is Raw_Shape
+     with Dynamic_Predicate => Shape_Ok (Shape);
+
+   --  The shape of a circuit: its header and its layer table.
+   function Shape_Of (C : Raw_Circuit) return Raw_Shape is
+     ((Last_Layer => C.Last_Layer,
+       NT         => C.NT,
+       Noutput    => C.Noutput,
+       Ninput     => C.Ninput,
+       Npublic    => C.Npublic,
+       Layers     => C.Layers))
+   with Global => null;
+
+   --  A well-formed circuit has a shape that satisfies Shape_Ok: the
+   --  conjuncts of Shape_Ok are conjuncts of Well_Formed.
+   procedure Lemma_Shape_Of (C : Raw_Circuit) with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => Well_Formed (C),
+     Post   => Shape_Ok (Shape_Of (C));
+
    --  The terms of layer J.
    function Layer_Terms (C : Circuit; J : Natural) return Term_Array is
      (C.Terms (C.Layers (J).First .. C.Layers (J).Last))
@@ -590,32 +646,33 @@ package Sumcheck_Algebra is
    --  Section 6.3: evaluation of the whole circuit into one buffer.
    --
    --  Segment J of the buffer holds V [J], the wires computed by layer
-   --  J (segment NL is the input W): Seg_Size (C, J) elements from
-   --  offset Off (C, J). Total_Wires (C) is the buffer length.
+   --  J (segment NL is the input W): Seg_Size (S, J) elements from
+   --  offset Off (S, J), S the shape of the circuit. Total_Wires (S) is
+   --  the buffer length.
    -------------------------------------------------------------------
 
-   function Seg_Size (C : Circuit; J : Natural) return Wire_Count is
-     (if J = 0 then C.Noutput else C.Layers (J - 1).NW_In)
-   with Global => null, Pre => J <= C.Last_Layer + 1;
+   function Seg_Size (S : Shape; J : Natural) return Wire_Count is
+     (if J = 0 then S.Noutput else S.Layers (J - 1).NW_In)
+   with Global => null, Pre => J <= S.Last_Layer + 1;
 
-   function Off (C : Circuit; J : Natural) return Natural is
-     (if J = 0 then 0 else Off (C, J - 1) + Seg_Size (C, J - 1))
+   function Off (S : Shape; J : Natural) return Natural is
+     (if J = 0 then 0 else Off (S, J - 1) + Seg_Size (S, J - 1))
    with Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre  => J <= C.Last_Layer + 2,
+        Pre  => J <= S.Last_Layer + 2,
         Post => Off'Result <= J * Max_Wires,
         Subprogram_Variant => (Decreases => J);
 
-   function Total_Wires (C : Circuit) return Natural is
-     (Off (C, C.Last_Layer + 2))
+   function Total_Wires (S : Shape) return Natural is
+     (Off (S, S.Last_Layer + 2))
    with Global => null;
 
    --  Segment J equals the quad sum of segment J + 1 (Section 6.3.2).
    function Layer_Holds (C : Circuit; Wires : Element_Array; J : Natural)
                          return Boolean is
-     (for all G in 0 .. Seg_Size (C, J) - 1 =>
-        Same (W_At (Wires, Off (C, J) + G),
-              Acc_Ref (Wires, Off (C, J + 1), Layer_Terms (C, J),
+     (for all G in 0 .. Seg_Size (Shape_Of (C), J) - 1 =>
+        Same (W_At (Wires, Off (Shape_Of (C), J) + G),
+              Acc_Ref (Wires, Off (Shape_Of (C), J + 1), Layer_Terms (C, J),
                        Layer_Terms (C, J)'Length, G)))
    with Ghost, Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
@@ -624,7 +681,7 @@ package Sumcheck_Algebra is
    --  The Z assertions of layer J hold on segment J + 1 (Section 6.3.3).
    function Layer_Z (C : Circuit; Wires : Element_Array; J : Natural)
                      return Boolean is
-     (Z_Ref (Wires, Off (C, J + 1), Layer_Terms (C, J),
+     (Z_Ref (Wires, Off (Shape_Of (C), J + 1), Layer_Terms (C, J),
              Layer_Terms (C, J)'Length))
    with Ghost, Global => null,
         Pre => Wires'First = 0 and then J <= C.Last_Layer;
@@ -634,9 +691,11 @@ package Sumcheck_Algebra is
    with
      Global => null,
      Pre  => W'First = 0 and then W'Length = C.Ninput
-       and then Wires'First = 0 and then Wires'Length = Total_Wires (C),
+       and then Wires'First = 0
+       and then Wires'Length = Total_Wires (Shape_Of (C)),
      Post => (for all I in 0 .. C.Ninput - 1 =>
-                Same (W_At (Wires, Off (C, C.Last_Layer + 1) + I), W (I)))
+                Same (W_At (Wires, Off (Shape_Of (C), C.Last_Layer + 1) + I),
+                      W (I)))
        and then (for all J in 0 .. C.Last_Layer => Layer_Holds (C, Wires, J))
        and then OK = ((for all J in 0 .. C.Last_Layer => Layer_Z (C, Wires, J))
                       and then (for all G in 0 .. C.Noutput - 1 =>

@@ -7,8 +7,10 @@
 --  the Challenges record, index names), 0023 (structural Gold), 0026
 --  (expressions); frame: ADR 0011, 0020, 0024, 0025.
 --
---  What it computes. Given a circuit, its public inputs, the padded
---  sumcheck proof and every verifier challenge, the core replays the
+--  What it computes. Given the shape of a circuit (Sumcheck_Algebra, the
+--  memory milestone), its public inputs, the bound quad of each layer,
+--  the padded sumcheck proof and every verifier challenge, the core
+--  replays the
 --  verifier of Section 6.7 on symbolic witnesses and emits the
 --  constraints that the Ligero layer checks: one linear constraint per
 --  layer and one after the input layer (A * W + b = 0, A as sparse
@@ -18,11 +20,11 @@
 --
 --  Layouts (ADR 0022). Challenges.G holds the MAX_LOGW output-binding
 --  challenges; the core reads the first Ceil_Lg2 (noutput). For layer J,
---  Challenges.Layer holds, from Chal_Off (C, J): alpha, beta, then one
+--  Challenges.Layer holds, from Chal_Off (S, J): alpha, beta, then one
 --  challenge per round r and hand h at 2 + 2 r + h. Sumcheck_Proof.Evals
---  holds, from Proof_Off (C, J): the padded p (0) and p (P2) of hand h
+--  holds, from Proof_Off (S, J): the padded p (0) and p (P2) of hand h
 --  in round r at 4 r + 2 h and 4 r + 2 h + 1, then the two padded
---  claims. The pad variables of layer J start at Pad_Off (C, J, Base):
+--  claims. The pad variables of layer J start at Pad_Off (S, J, Base):
 --  the same 4 r + 2 h + k for the round pads, then c0, c1, cr (Section
 --  6.5); Base is ninput - npublic (zk/verifier.rs).
 --
@@ -89,87 +91,100 @@ package Sumcheck_Verifier is
    Max_Proof_Size : constant := 4 * Max_Logw + 2;
    Max_Pad_Size   : constant := 4 * Max_Logw + 3;
 
-   function Chal_Size (C : Circuit; J : Natural) return Natural is
-     (2 * C.Layers (J).Logw + 2)
-   with Global => null, Pre => J <= C.Last_Layer;
+   function Chal_Size (S : Shape; J : Natural) return Natural is
+     (2 * S.Layers (J).Logw + 2)
+   with Global => null, Pre => J <= S.Last_Layer;
 
-   function Proof_Size (C : Circuit; J : Natural) return Natural is
-     (4 * C.Layers (J).Logw + 2)
-   with Global => null, Pre => J <= C.Last_Layer;
+   function Proof_Size (S : Shape; J : Natural) return Natural is
+     (4 * S.Layers (J).Logw + 2)
+   with Global => null, Pre => J <= S.Last_Layer;
 
-   function Pad_Size (C : Circuit; J : Natural) return Natural is
-     (4 * C.Layers (J).Logw + 3)
-   with Global => null, Pre => J <= C.Last_Layer;
+   function Pad_Size (S : Shape; J : Natural) return Natural is
+     (4 * S.Layers (J).Logw + 3)
+   with Global => null, Pre => J <= S.Last_Layer;
 
-   function Chal_Off (C : Circuit; J : Natural) return Natural is
-     (if J = 0 then 0 else Chal_Off (C, J - 1) + Chal_Size (C, J - 1))
+   function Chal_Off (S : Shape; J : Natural) return Natural is
+     (if J = 0 then 0 else Chal_Off (S, J - 1) + Chal_Size (S, J - 1))
    with Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre  => J <= C.Last_Layer + 1,
+        Pre  => J <= S.Last_Layer + 1,
         Post => Chal_Off'Result <= J * Max_Chal_Size
                 and then Chal_Off'Result >= 2 * J,
         Subprogram_Variant => (Decreases => J);
 
-   function Proof_Off (C : Circuit; J : Natural) return Natural is
-     (if J = 0 then 0 else Proof_Off (C, J - 1) + Proof_Size (C, J - 1))
+   function Proof_Off (S : Shape; J : Natural) return Natural is
+     (if J = 0 then 0 else Proof_Off (S, J - 1) + Proof_Size (S, J - 1))
    with Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre  => J <= C.Last_Layer + 1,
+        Pre  => J <= S.Last_Layer + 1,
         Post => Proof_Off'Result <= J * Max_Proof_Size
                 and then Proof_Off'Result >= 2 * J,
         Subprogram_Variant => (Decreases => J);
 
    --  Pad variables are numbered from Base (ninput - npublic).
-   function Pad_Off (C : Circuit; J : Natural; Base : Natural)
+   function Pad_Off (S : Shape; J : Natural; Base : Natural)
                      return Natural is
      (if J = 0 then Base
-      else Pad_Off (C, J - 1, Base) + Pad_Size (C, J - 1))
+      else Pad_Off (S, J - 1, Base) + Pad_Size (S, J - 1))
    with Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre  => J <= C.Last_Layer + 1 and then Base <= Max_Wires,
+        Pre  => J <= S.Last_Layer + 1 and then Base <= Max_Wires,
         Post => Pad_Off'Result <= Base + J * Max_Pad_Size
                 and then Pad_Off'Result >= Base + 3 * J,
         Subprogram_Variant => (Decreases => J);
 
-   --  One step and monotonicity of Pad_Off, from the hidden recursion.
-   procedure Lemma_Pad_Step (C : Circuit; J : Natural; Base : Natural) with
+   --  One step and monotonicity of Chal_Off and of Pad_Off, from the
+   --  hidden recursions. The two on Chal_Off serve the bound quads of
+   --  Zk_Verifier as well.
+   procedure Lemma_Chal_Step (S : Shape; J : Natural) with
      Ghost, Global => null,
-     Pre  => J <= C.Last_Layer and then Base <= Max_Wires,
-     Post => Pad_Off (C, J + 1, Base) = Pad_Off (C, J, Base) + Pad_Size (C, J);
+     Pre  => J <= S.Last_Layer,
+     Post => Chal_Off (S, J + 1) = Chal_Off (S, J) + Chal_Size (S, J);
 
-   procedure Lemma_Pad_Mono (C : Circuit; I, J : Natural; Base : Natural) with
+   procedure Lemma_Chal_Mono (S : Shape; I, J : Natural) with
      Ghost, Global => null,
-     Pre  => I <= J and then J <= C.Last_Layer + 1 and then Base <= Max_Wires,
-     Post => Pad_Off (C, I, Base) <= Pad_Off (C, J, Base),
+     Pre  => I <= J and then J <= S.Last_Layer + 1,
+     Post => Chal_Off (S, I) <= Chal_Off (S, J),
      Subprogram_Variant => (Decreases => J);
 
-   function Chal_Total (C : Circuit) return Natural is
-     (Chal_Off (C, C.Last_Layer + 1))
+   procedure Lemma_Pad_Step (S : Shape; J : Natural; Base : Natural) with
+     Ghost, Global => null,
+     Pre  => J <= S.Last_Layer and then Base <= Max_Wires,
+     Post => Pad_Off (S, J + 1, Base) = Pad_Off (S, J, Base) + Pad_Size (S, J);
+
+   procedure Lemma_Pad_Mono (S : Shape; I, J : Natural; Base : Natural) with
+     Ghost, Global => null,
+     Pre  => I <= J and then J <= S.Last_Layer + 1 and then Base <= Max_Wires,
+     Post => Pad_Off (S, I, Base) <= Pad_Off (S, J, Base),
+     Subprogram_Variant => (Decreases => J);
+
+   function Chal_Total (S : Shape) return Natural is
+     (Chal_Off (S, S.Last_Layer + 1))
    with Global => null;
 
-   function Proof_Total (C : Circuit) return Natural is
-     (Proof_Off (C, C.Last_Layer + 1))
+   function Proof_Total (S : Shape) return Natural is
+     (Proof_Off (S, S.Last_Layer + 1))
    with Global => null;
 
    --  The number of witnesses the commitment holds (nw of zk/verifier.rs
    --  and of Section 7.4: the private inputs then the pads of every
    --  layer, 4 logw + 3 each), the bound on every witness index the
    --  core emits.
-   function Witness_Count (C : Circuit) return Natural is
-     (Pad_Off (C, C.Last_Layer + 1, C.Ninput - C.Npublic))
+   function Witness_Count (S : Shape) return Natural is
+     (Pad_Off (S, S.Last_Layer + 1, S.Ninput - S.Npublic))
    with Global => null,
-        Post   => Witness_Count'Result >= C.Ninput - C.Npublic + 3
+        Post   => Witness_Count'Result >= S.Ninput - S.Npublic + 3
                   and then Witness_Count'Result
-                           <= C.Ninput + (C.Last_Layer + 1) * Max_Pad_Size;
+                           <= S.Ninput + (S.Last_Layer + 1) * Max_Pad_Size;
 
    --  Every quadratic triple of the core lies below Witness_Count: the
-   --  pads of layer J end at Pad_Off (C, J + 1, Base).
-   procedure Lemma_Pads_Below (C : Circuit) with
+   --  pads of layer J end at Pad_Off (S, J + 1, Base).
+   procedure Lemma_Pads_Below (S : Shape) with
      Ghost, Global => null,
      Post =>
-       (for all J in 0 .. C.Last_Layer =>
-          Pad_Off (C, J, C.Ninput - C.Npublic) + 4 * C.Layers (J).Logw + 3
-          <= Witness_Count (C));
+       (for all J in 0 .. S.Last_Layer =>
+          Pad_Off (S, J, S.Ninput - S.Npublic) + 4 * S.Layers (J).Logw + 3
+          <= Witness_Count (S));
 
    -------------------------------------------------------------------
    --  Inputs.
@@ -223,8 +238,8 @@ package Sumcheck_Verifier is
 
    --  An upper bound on the Ligero terms emitted: 4 logw + 5 per layer
    --  and ninput - npublic + 2 for the input constraint.
-   function A_Bound (C : Circuit) return Natural is
-     ((C.Last_Layer + 1) * (4 * Max_Logw + 5) + C.Ninput + 2)
+   function A_Bound (S : Shape) return Natural is
+     ((S.Last_Layer + 1) * (4 * Max_Logw + 5) + S.Ninput + 2)
    with Global => null;
 
    --  Appends the linear constraint "E = 0" as constraint number
@@ -329,48 +344,54 @@ package Sumcheck_Verifier is
 
    --  The challenges of hand H in the rounds of layer J, as Verify_Layer
    --  gathers them: Zero beyond logw.
-   function Hand_Chal (C : Circuit; Ch : Challenges; J : Natural; H : Natural)
+   function Hand_Chal (S : Shape; Ch : Challenges; J : Natural; H : Natural)
       return Challenge_Vector
    is
      ([for R in 0 .. Max_Logw - 1 =>
-         (if R < C.Layers (J).Logw
-          then Chv (Ch, Chal_Off (C, J) + 2 + 2 * R + H)
+         (if R < S.Layers (J).Logw
+          then Chv (Ch, Chal_Off (S, J) + 2 + 2 * R + H)
           else Zero)])
    with Ghost => Proof_Only, Global => null,
-        Pre => J <= C.Last_Layer and then H <= 1;
+        Pre => J <= S.Last_Layer and then H <= 1;
 
    --  The number of output variables of layer J, and the challenges
    --  that bind them: those of the circuit for layer 0, those of the
    --  rounds of the layer above otherwise.
-   function Layer_Logv (C : Circuit; J : Natural) return Natural is
-     (if J = 0 then Ceil_Lg2 (C.Noutput) else C.Layers (J - 1).Logw)
-   with Ghost => Proof_Only, Global => null, Pre => J <= C.Last_Layer;
+   function Layer_Logv (S : Shape; J : Natural) return Natural is
+     (if J = 0 then Ceil_Lg2 (S.Noutput) else S.Layers (J - 1).Logw)
+   with Ghost => Proof_Only, Global => null, Pre => J <= S.Last_Layer;
 
-   function Layer_G (C : Circuit; Ch : Challenges; J : Natural; H : Natural)
+   function Layer_G (S : Shape; Ch : Challenges; J : Natural; H : Natural)
       return Challenge_Vector
    is
-     (if J = 0 then Ch.G else Hand_Chal (C, Ch, J - 1, H))
+     (if J = 0 then Ch.G else Hand_Chal (S, Ch, J - 1, H))
    with Ghost => Proof_Only, Global => null,
-        Pre => J <= C.Last_Layer and then H <= 1;
+        Pre => J <= S.Last_Layer and then H <= 1;
 
    --  The bound quad of layer J: by the tables when they fit, term by
    --  term otherwise, as Verify_Layer chose before ADR 0071.
    function BQ_Ref (C : Circuit; Ch : Challenges; J : Natural) return Element
    is
-     (if Layer_Logv (C, J) <= Max_Bindeq_Log
+     (if Layer_Logv (Shape_Of (C), J) <= Max_Bindeq_Log
         and then C.Layers (J).Logw <= Max_Bindeq_Log
       then EBQT_Ref (Layer_Terms (C, J), Layer_Terms (C, J)'Length,
-                     Layer_Logv (C, J),
-                     Layer_G (C, Ch, J, 0), Layer_G (C, Ch, J, 1),
-                     Hand_Chal (C, Ch, J, 0), Hand_Chal (C, Ch, J, 1),
+                     Layer_Logv (Shape_Of (C), J),
+                     Layer_G (Shape_Of (C), Ch, J, 0),
+                     Layer_G (Shape_Of (C), Ch, J, 1),
+                     Hand_Chal (Shape_Of (C), Ch, J, 0),
+                     Hand_Chal (Shape_Of (C), Ch, J, 1),
                      C.Layers (J).Logw,
-                     Chv (Ch, Chal_Off (C, J)), Chv (Ch, Chal_Off (C, J) + 1))
+                     Chv (Ch, Chal_Off (Shape_Of (C), J)),
+                     Chv (Ch, Chal_Off (Shape_Of (C), J) + 1))
       else EBQ_Ref (Layer_Terms (C, J), Layer_Terms (C, J)'Length,
-                    Layer_Logv (C, J),
-                    Layer_G (C, Ch, J, 0), Layer_G (C, Ch, J, 1),
-                    Hand_Chal (C, Ch, J, 0), Hand_Chal (C, Ch, J, 1),
+                    Layer_Logv (Shape_Of (C), J),
+                    Layer_G (Shape_Of (C), Ch, J, 0),
+                    Layer_G (Shape_Of (C), Ch, J, 1),
+                    Hand_Chal (Shape_Of (C), Ch, J, 0),
+                    Hand_Chal (Shape_Of (C), Ch, J, 1),
                     C.Layers (J).Logw,
-                    Chv (Ch, Chal_Off (C, J)), Chv (Ch, Chal_Off (C, J) + 1)))
+                    Chv (Ch, Chal_Off (Shape_Of (C), J)),
+                    Chv (Ch, Chal_Off (Shape_Of (C), J) + 1)))
    with Ghost => Proof_Only, Global => null, Pre => J <= C.Last_Layer;
 
    --  BQ_Ref of layer J reads the challenges of the circuit and those
@@ -383,7 +404,8 @@ package Sumcheck_Verifier is
    with Ghost => Proof_Only, Global => null,
         Pre  => J <= C.Last_Layer
                 and then Ch1.Last = Ch2.Last
-                and then Chal_Off (C, J) + Chal_Size (C, J) <= Lim
+                and then Chal_Off (Shape_Of (C), J)
+                         + Chal_Size (Shape_Of (C), J) <= Lim
                 and then (for all R in 0 .. Max_Logw - 1 =>
                             Same (Ch1.G (R), Ch2.G (R)))
                 and then (for all K in 0 .. Ch1.Last =>
@@ -401,7 +423,7 @@ package Sumcheck_Verifier is
                 and then (for all R in 0 .. Max_Logw - 1 =>
                             Same (Ch1.G (R), Ch2.G (R)))
                 and then (for all K in 0 .. Ch1.Last =>
-                            (if K < Chal_Off (C, J)
+                            (if K < Chal_Off (Shape_Of (C), J)
                              then Same (Ch1.Layer (K), Ch2.Layer (K)))),
         Post => (for all J2 in 0 .. J - 1 =>
                    Same (BQ_Ref (C, Ch1, J2), BQ_Ref (C, Ch2, J2)));
@@ -409,40 +431,40 @@ package Sumcheck_Verifier is
    --  A vector that holds the challenges of hand H of layer J in its
    --  first logw entries agrees there with Hand_Chal.
    procedure Lemma_Hand_Chal
-     (C  : Circuit;
+     (S  : Shape;
       Ch : Challenges;
       J  : Natural;
       H  : Natural;
       V  : Element_Array)
    with Ghost => Proof_Only, Global => null,
-        Pre  => J <= C.Last_Layer and then H <= 1
-                and then V'First = 0 and then C.Layers (J).Logw <= V'Length
-                and then Chal_Off (C, J) + Chal_Size (C, J) <= Ch.Last + 1
-                and then (for all R in 0 .. C.Layers (J).Logw - 1 =>
+        Pre  => J <= S.Last_Layer and then H <= 1
+                and then V'First = 0 and then S.Layers (J).Logw <= V'Length
+                and then Chal_Off (S, J) + Chal_Size (S, J) <= Ch.Last + 1
+                and then (for all R in 0 .. S.Layers (J).Logw - 1 =>
                             Same (V (R),
-                                  Ch.Layer (Chal_Off (C, J) + 2 + 2 * R + H))),
-        Post => (for all R in 0 .. C.Layers (J).Logw - 1 =>
-                   Same (V (R), Hand_Chal (C, Ch, J, H) (R)));
+                                  Ch.Layer (Chal_Off (S, J) + 2 + 2 * R + H))),
+        Post => (for all R in 0 .. S.Layers (J).Logw - 1 =>
+                   Same (V (R), Hand_Chal (S, Ch, J, H) (R)));
 
    --  Layer_G of layer J reads the challenges of the circuit and those
    --  of the layers above J only.
    procedure Lemma_Layer_G_Frame
-     (C        : Circuit;
+     (S        : Shape;
       Ch1, Ch2 : Challenges;
       J        : Natural)
    with Ghost => Proof_Only, Global => null,
-        Pre  => J <= C.Last_Layer
+        Pre  => J <= S.Last_Layer
                 and then Ch1.Last = Ch2.Last
                 and then (for all R in 0 .. Max_Logw - 1 =>
                             Same (Ch1.G (R), Ch2.G (R)))
                 and then (for all K in 0 .. Ch1.Last =>
-                            (if K < Chal_Off (C, J)
+                            (if K < Chal_Off (S, J)
                              then Same (Ch1.Layer (K), Ch2.Layer (K)))),
         Post => (for all R in 0 .. Max_Logw - 1 =>
-                   Same (Layer_G (C, Ch1, J, 0) (R), Layer_G (C, Ch2, J,
+                   Same (Layer_G (S, Ch1, J, 0) (R), Layer_G (S, Ch2, J,
                                                               0) (R))
                    and then
-                   Same (Layer_G (C, Ch1, J, 1) (R), Layer_G (C, Ch2, J,
+                   Same (Layer_G (S, Ch1, J, 1) (R), Layer_G (S, Ch2, J,
                                                               1) (R)));
 
    --  A bound quad computed with vectors that agree with Layer_G on the
@@ -459,41 +481,48 @@ package Sumcheck_Verifier is
    with Ghost => Proof_Only, Global => null,
         Pre  =>
           J <= C.Last_Layer
-          and then Chal_Off (C, J) + Chal_Size (C, J) <= Ch.Last + 1
-          and then Logv = Layer_Logv (C, J)
+          and then Chal_Off (Shape_Of (C), J) + Chal_Size (Shape_Of (C), J)
+                   <= Ch.Last + 1
+          and then Logv = Layer_Logv (Shape_Of (C), J)
           and then G0'First = 0 and then G1'First = 0
           and then G0'Length = Max_Logw and then G1'Length = Max_Logw
           and then HC0'First = 0 and then HC1'First = 0
           and then HC0'Length = Max_Logw and then HC1'Length = Max_Logw
           and then (for all R in 0 .. Logv - 1 =>
-                      Same (G0 (R), Layer_G (C, Ch, J, 0) (R))
-                      and then Same (G1 (R), Layer_G (C, Ch, J, 1) (R)))
+                      Same (G0 (R), Layer_G (Shape_Of (C), Ch, J, 0) (R))
+                      and then
+                      Same (G1 (R), Layer_G (Shape_Of (C), Ch, J, 1) (R)))
           and then (for all R in 0 .. C.Layers (J).Logw - 1 =>
-                      Same (HC0 (R), Ch.Layer (Chal_Off (C, J) + 2 + 2 * R))
+                      Same (HC0 (R),
+                            Ch.Layer (Chal_Off (Shape_Of (C), J) + 2 + 2 * R))
                       and then
                       Same (HC1 (R),
-                            Ch.Layer (Chal_Off (C, J) + 2 + 2 * R + 1)))
+                            Ch.Layer (Chal_Off (Shape_Of (C), J)
+                                      + 2 + 2 * R + 1)))
           and then
           (if Logv <= Max_Bindeq_Log
              and then C.Layers (J).Logw <= Max_Bindeq_Log
            then Same (V, EBQT_Ref (Layer_Terms (C, J),
                                    Layer_Terms (C, J)'Length, Logv,
                                    G0, G1, HC0, HC1, C.Layers (J).Logw,
-                                   Ch.Layer (Chal_Off (C, J)),
-                                   Ch.Layer (Chal_Off (C, J) + 1)))
+                                   Ch.Layer (Chal_Off (Shape_Of (C), J)),
+                                   Ch.Layer (Chal_Off (Shape_Of (C), J) + 1)))
            else Same (V, EBQ_Ref (Layer_Terms (C, J),
                                   Layer_Terms (C, J)'Length, Logv,
                                   G0, G1, HC0, HC1, C.Layers (J).Logw,
-                                  Ch.Layer (Chal_Off (C, J)),
-                                  Ch.Layer (Chal_Off (C, J) + 1)))),
+                                  Ch.Layer (Chal_Off (Shape_Of (C), J)),
+                                  Ch.Layer (Chal_Off (Shape_Of (C), J) + 1)))),
         Post => Same (V, BQ_Ref (C, Ch, J));
 
-   --  The bound quads of the verifier, layer by layer as Verify_Layer
-   --  computed them before ADR 0071.
+   --  The bound quads of the verifier from an expanded circuit, layer by
+   --  layer as Verify_Layer computed them before ADR 0071. Since the
+   --  memory milestone (ADR 0080) the verifier computes them from the
+   --  packed circuit (Zk_Verifier.Bound_Quads); this form is proved and
+   --  kept as the oracle of sumcheck_kat, and is not on the program path.
    procedure Bound_Quads (C : Circuit; Ch : Challenges; BQ : out Element_Array)
    with
      Global => null,
-     Pre    => Ch.Last + 1 = Chal_Total (C)
+     Pre    => Ch.Last + 1 = Chal_Total (Shape_Of (C))
                and then BQ'First = 0 and then BQ'Length = C.Last_Layer + 1,
      Post   => (Proof_Only =>
                   (for all J in 0 .. C.Last_Layer =>
@@ -505,7 +534,7 @@ package Sumcheck_Verifier is
    --  linear constraint and the quadratic triple, and hands the next
    --  layer its two claims and binding challenges.
    procedure Verify_Layer
-     (C       : Circuit;
+     (S       : Shape;
       J       : Natural;
       Proof   : Sumcheck_Proof;
       Ch      : Challenges;
@@ -518,14 +547,14 @@ package Sumcheck_Verifier is
       Lqc     : out Lqc_Triple)
    with
      Global => null,
-     Pre  => J <= C.Last_Layer
+     Pre  => J <= S.Last_Layer
        and then Base <= Max_Wires
-       and then Base = C.Ninput - C.Npublic
-       and then Ch.Last + 1 = Chal_Total (C)
-       and then Proof.Last + 1 = Proof_Total (C)
+       and then Base = S.Ninput - S.Npublic
+       and then Ch.Last + 1 = Chal_Total (S)
+       and then Proof.Last + 1 = Proof_Total (S)
        and then State.Claim0.Length <= 1 and then State.Claim1.Length <= 1
-       and then Below (State.Claim0, Pad_Off (C, J, Base))
-       and then Below (State.Claim1, Pad_Off (C, J, Base))
+       and then Below (State.Claim0, Pad_Off (S, J, Base))
+       and then Below (State.Claim1, Pad_Off (S, J, Base))
        and then A.Max + 1 - A.Count >= 4 * Max_Logw + 5
        and then B'First = 0 and then B_Count < B'Length,
      Post => A.Count <= A.Count'Old + 4 * Max_Logw + 5
@@ -534,15 +563,15 @@ package Sumcheck_Verifier is
                    A.Witness (K) = A.Witness'Old (K)
                    and then A.Constraint (K) = A.Constraint'Old (K))
        and then (for all K in A.Count'Old .. A.Count - 1 =>
-                   A.Witness (K) < Pad_Off (C, J + 1, Base)
+                   A.Witness (K) < Pad_Off (S, J + 1, Base)
                    and then A.Constraint (K) = B_Count'Old)
-       and then State.Logv = C.Layers (J).Logw
+       and then State.Logv = S.Layers (J).Logw
        and then State.Claim0.Length = 1 and then State.Claim1.Length = 1
-       and then Below (State.Claim0, Pad_Off (C, J + 1, Base))
-       and then Below (State.Claim1, Pad_Off (C, J + 1, Base))
-       and then Lqc = (X => Pad_Off (C, J, Base) + 4 * C.Layers (J).Logw,
-                       Y => Pad_Off (C, J, Base) + 4 * C.Layers (J).Logw + 1,
-                       Z => Pad_Off (C, J, Base) + 4 * C.Layers (J).Logw + 2);
+       and then Below (State.Claim0, Pad_Off (S, J + 1, Base))
+       and then Below (State.Claim1, Pad_Off (S, J + 1, Base))
+       and then Lqc = (X => Pad_Off (S, J, Base) + 4 * S.Layers (J).Logw,
+                       Y => Pad_Off (S, J, Base) + 4 * S.Layers (J).Logw + 1,
+                       Z => Pad_Off (S, J, Base) + 4 * S.Layers (J).Logw + 2);
 
    --  The coefficient of input I in the input constraint: eq2 at I of
    --  the final binding, read from the eq2 table of bindeq when it fits
@@ -593,7 +622,7 @@ package Sumcheck_Verifier is
    --  same terms, in the same order and with the same values, as the
    --  sorted Expression of the reference.
    procedure Input_Constraint
-     (C       : Circuit;
+     (S       : Shape;
       Pub     : Element_Array;
       State   : Claims_State;
       Alpha   : Element;
@@ -602,45 +631,54 @@ package Sumcheck_Verifier is
       B_Count : in out Natural)
    with
      Global => null,
-     Pre  => Pub'First = 0 and then Pub'Length = C.Npublic
+     Pre  => Pub'First = 0 and then Pub'Length = S.Npublic
        and then State.Claim0.Length <= 1 and then State.Claim1.Length <= 1
-       and then Below (State.Claim0, Witness_Count (C))
-       and then Below (State.Claim1, Witness_Count (C))
-       and then A.Max + 1 - A.Count >= C.Ninput + 2
+       and then Below (State.Claim0, Witness_Count (S))
+       and then Below (State.Claim1, Witness_Count (S))
+       and then A.Max + 1 - A.Count >= S.Ninput + 2
        and then B'First = 0 and then B_Count < B'Length,
      Post =>
        (Runtime =>
-          A.Count <= A.Count'Old + C.Ninput + 2
+          A.Count <= A.Count'Old + S.Ninput + 2
           and then B_Count = B_Count'Old + 1
           and then (for all K in 0 .. A.Count'Old - 1 =>
                       A.Witness (K) = A.Witness'Old (K)
                       and then A.Constraint (K) = A.Constraint'Old (K))
           and then (for all K in A.Count'Old .. A.Count - 1 =>
-                      A.Witness (K) < Witness_Count (C)
+                      A.Witness (K) < Witness_Count (S)
                       and then A.Constraint (K) = B_Count'Old),
         Proof_Only =>
-          (for all W in 0 .. C.Ninput - C.Npublic - 1 =>
+          (for all W in 0 .. S.Ninput - S.Npublic - 1 =>
              A.Witness (A.Count'Old + W) = W
              and then A.Constraint (A.Count'Old + W) = B_Count'Old
              and then Same (A.Coeff (A.Count'Old + W),
-                            In_Coef (C.Npublic + W, State, Alpha)))
+                            In_Coef (S.Npublic + W, State, Alpha)))
           and then
           (declare
              T : constant Expression :=
-               Input_Tail (Pub_Binding_Ref (Pub, State, Alpha, C.Npublic),
+               Input_Tail (Pub_Binding_Ref (Pub, State, Alpha, S.Npublic),
                            State, Alpha);
-             S : constant Natural := A.Count'Old + (C.Ninput - C.Npublic);
+             Start : constant Natural :=
+               A.Count'Old + (S.Ninput - S.Npublic);
            begin
-             A.Count = S + T.Length
+             A.Count = Start + T.Length
              and then (for all I in 1 .. T.Length =>
-                         A.Witness (S + I - 1) = T.Terms (I).V
-                         and then A.Constraint (S + I - 1) = B_Count'Old
-                         and then Same (A.Coeff (S + I - 1), T.Terms (I).C))
+                         A.Witness (Start + I - 1) = T.Terms (I).V
+                         and then A.Constraint (Start + I - 1) = B_Count'Old
+                         and then Same (A.Coeff (Start + I - 1),
+                                        T.Terms (I).C))
              and then Same (B (B_Count'Old), T.Known)));
 
-   --  The whole core (Section 6.7, symbolic_sumcheck_verifier_core).
+   --  The whole core (Section 6.7, symbolic_sumcheck_verifier_core). It
+   --  reads the shape of the circuit only, never a term: BQ, the bound
+   --  quad of each layer, is an input (ADR 0071). That BQ holds the bound
+   --  quads of the challenges, BQ_Ref on the circuit, is a fact the
+   --  callers establish where the quads are produced and assert at the
+   --  call (Zk_Verifier after its Bound_Quads, Zk_Prover after the
+   --  prover's sumcheck); the core's own postcondition, the sizes
+   --  emitted and the pad indices of the triples, does not depend on it.
    procedure Verifier_Core
-     (C       : Circuit;
+     (S       : Shape;
       Pub     : Element_Array;
       Proof   : Sumcheck_Proof;
       Ch      : Challenges;
@@ -651,29 +689,23 @@ package Sumcheck_Verifier is
    with
      Global => null,
      Pre  =>
-       (Runtime    =>
-          Pub'First = 0 and then Pub'Length = C.Npublic
-          and then Ch.Last + 1 = Chal_Total (C)
-          and then Proof.Last + 1 = Proof_Total (C)
-          and then A.Max + 1 >= A_Bound (C)
-          and then B'First = 0 and then B'Length = C.Last_Layer + 2
-          and then Lqc'First = 0 and then Lqc'Last = C.Last_Layer
-          and then BQ'First = 0 and then BQ'Length = C.Last_Layer + 1,
-        --  The bound quads are those of the challenges (ADR 0071): the
-        --  verifier's from Bound_Quads, the prover's from its sumcheck.
-        Proof_Only =>
-          (for all J in 0 .. C.Last_Layer =>
-             Same (BQ (J), BQ_Ref (C, Ch, J)))),
-     Post => A.Count <= A_Bound (C)
+       Pub'First = 0 and then Pub'Length = S.Npublic
+       and then Ch.Last + 1 = Chal_Total (S)
+       and then Proof.Last + 1 = Proof_Total (S)
+       and then A.Max + 1 >= A_Bound (S)
+       and then B'First = 0 and then B'Length = S.Last_Layer + 2
+       and then Lqc'First = 0 and then Lqc'Last = S.Last_Layer
+       and then BQ'First = 0 and then BQ'Length = S.Last_Layer + 1,
+     Post => A.Count <= A_Bound (S)
        and then (for all K in 0 .. A.Count - 1 =>
-                   A.Witness (K) < Witness_Count (C)
-                   and then A.Constraint (K) <= C.Last_Layer + 1)
-       and then (for all J in 0 .. C.Last_Layer =>
-                   Lqc (J) = (X => Pad_Off (C, J, C.Ninput - C.Npublic)
-                                     + 4 * C.Layers (J).Logw,
-                              Y => Pad_Off (C, J, C.Ninput - C.Npublic)
-                                     + 4 * C.Layers (J).Logw + 1,
-                              Z => Pad_Off (C, J, C.Ninput - C.Npublic)
-                                     + 4 * C.Layers (J).Logw + 2));
+                   A.Witness (K) < Witness_Count (S)
+                   and then A.Constraint (K) <= S.Last_Layer + 1)
+       and then (for all J in 0 .. S.Last_Layer =>
+                   Lqc (J) = (X => Pad_Off (S, J, S.Ninput - S.Npublic)
+                                     + 4 * S.Layers (J).Logw,
+                              Y => Pad_Off (S, J, S.Ninput - S.Npublic)
+                                     + 4 * S.Layers (J).Logw + 1,
+                              Z => Pad_Off (S, J, S.Ninput - S.Npublic)
+                                     + 4 * S.Layers (J).Logw + 2));
 
 end Sumcheck_Verifier;

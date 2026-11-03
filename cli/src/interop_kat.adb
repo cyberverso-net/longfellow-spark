@@ -1,10 +1,11 @@
 --  INTEROP_KAT: the interop harness of Phase B (ADR 0048, tier 3): the
 --  proofs produced by the upstream prover on the upstream circuits,
 --  verified end to end by Zk_Verifier on the circuit loaded from its
---  LFC2 file, under the circuit's identifier, the label and the Ligero
---  configuration of the upstream reference test; then the same proof
---  with one byte altered in its root, in its sumcheck part and in its
---  Ligero part, each refused.
+--  LFC2 file in the packed form (Read_Packed, ADR 0080), under the
+--  circuit's identifier, the label and the Ligero configuration of the
+--  upstream reference test; then the same proof with one byte altered
+--  in its root, in its sumcheck part and in its Ligero part, each
+--  refused.
 --
 --  Test code, outside the proof perimeter: SPARK_Mode is Off. Reads
 --  the vector files given as arguments (default: interop.txt under
@@ -28,7 +29,8 @@
 --  Then the list of Pinned_Circuits (ADR 0074): for each entry, the
 --  file has the recorded digest, a full Read recomputes the recorded
 --  identifier, Read_Pinned gives the same circuit and header, and
---  Read_Pinned under another identifier refuses the file.
+--  Read_Pinned under another identifier refuses the file; the same on
+--  the packed form, the pinned load against the full one (ADR 0080).
 --
 --  Exit status: success only if at least one case ran and none failed.
 
@@ -59,6 +61,7 @@ with Sumcheck_Transcript;
 with Ligero_Proof;
 with Lagrange;
 with Ligero_Verifier;
+with Packed_HQuad;
 with Zk_Verifier;
 with Circuit_Reader;
 with Sumcheck_Algebra_GF2_128;
@@ -75,6 +78,8 @@ with Lagrange_GF2_128;
 with Lagrange_P256;
 with Ligero_Verifier_GF2_128;
 with Ligero_Verifier_P256;
+with Packed_HQuad_GF2_128;
+with Packed_HQuad_P256;
 with Zk_Verifier_GF2_128;
 with Zk_Verifier_P256;
 with Circuit_Reader_GF2_128;
@@ -236,8 +241,10 @@ procedure Interop_KAT is
       with package LP is new Ligero_Proof (SA => SA);
       with package L is new Lagrange (F => FS);
       with package LV is new Ligero_Verifier (ST => ST, LP => LP, L => L);
-      with package ZK is new Zk_Verifier (LV => LV);
       with package CR is new Circuit_Reader (SA => SA, others => <>);
+      with package PH is new Packed_HQuad
+        (SA => SA, PC => CR.PC, HQ => SV.HQ);
+      with package ZK is new Zk_Verifier (LV => LV, PH => PH);
       with function To_Element (S : String) return SA.Element;
    procedure Check_Case
      (Name  : String;
@@ -259,7 +266,7 @@ procedure Interop_KAT is
          Encoded_Len => Natural'Value (F (9)));
       Label   : constant Byte_Array := To_Label (F (6));
       Pub     : SA.Element_Array (0 .. Npublic - 1);
-      C       : CR.Circuit_Access;
+      C       : CR.Packed_Access;
       H       : CR.Header;
       CSt     : Circuit_Status.Status;
       Proof   : Byte_Array_Access;
@@ -279,7 +286,7 @@ procedure Interop_KAT is
          Bytes_C : Byte_Array_Access := Read_File (F (4));
       begin
          T0 := Ada.Calendar.Clock;
-         CR.Read (Bytes_C.all, C, H, CSt);
+         CR.Read_Packed (Bytes_C.all, False, [others => 0], C, H, CSt);
          Free (Bytes_C);
       end;
       if CSt /= Circuit_Status.Ok then
@@ -304,7 +311,7 @@ procedure Interop_KAT is
          --  part (its last byte, a path digest).
          declare
             Offsets : constant array (1 .. 3) of Natural :=
-              [0, 32 + ZK.Sumcheck_Len (C.all) / 2, Proof'Last];
+              [0, 32 + ZK.Sumcheck_Len (ZK.Shape_Of (C.all)) / 2, Proof'Last];
          begin
             for K in Offsets'Range loop
                declare
@@ -328,7 +335,7 @@ procedure Interop_KAT is
          end;
       end if;
       Free (Proof);
-      CR.Free (C);
+      CR.Free_Packed (C);
    end Check_Case;
 
    procedure Check_GF is new Check_Case
@@ -336,15 +343,17 @@ procedure Interop_KAT is
       SA => Sumcheck_Algebra_GF2_128, SE => Sumcheck_Expression_GF2_128,
       SV => Sumcheck_Verifier_GF2_128, ST => Sumcheck_Transcript_GF2_128,
       LP => Ligero_Proof_GF2_128, L => Lagrange_GF2_128,
-      LV => Ligero_Verifier_GF2_128, ZK => Zk_Verifier_GF2_128,
-      CR => Circuit_Reader_GF2_128, To_Element => GF_To_Element);
+      LV => Ligero_Verifier_GF2_128, CR => Circuit_Reader_GF2_128,
+      PH => Packed_HQuad_GF2_128, ZK => Zk_Verifier_GF2_128,
+      To_Element => GF_To_Element);
    procedure Check_P is new Check_Case
      (FS => Field_P256.Sig,
       SA => Sumcheck_Algebra_P256, SE => Sumcheck_Expression_P256,
       SV => Sumcheck_Verifier_P256, ST => Sumcheck_Transcript_P256,
       LP => Ligero_Proof_P256, L => Lagrange_P256,
-      LV => Ligero_Verifier_P256, ZK => Zk_Verifier_P256,
-      CR => Circuit_Reader_P256, To_Element => P_To_Element);
+      LV => Ligero_Verifier_P256, CR => Circuit_Reader_P256,
+      PH => Packed_HQuad_P256, ZK => Zk_Verifier_P256,
+      To_Element => P_To_Element);
 
    --  One entry of Pinned_Circuits against its file.
    generic
@@ -383,6 +392,31 @@ procedure Interop_KAT is
       end if;
       CR.Free (C1);
       CR.Free (C2);
+      --  The packed form (ADR 0080): the pinned load equal to the full
+      --  one, which recomputes the identifier.
+      declare
+         use type CR.Packed_Circuit;
+         P1, P2   : CR.Packed_Access;
+         HP1, HP2 : CR.Header;
+         SP1, SP2 : Circuit_Status.Status;
+      begin
+         CR.Read_Packed (B.all, False, [others => 0], P1, HP1, SP1);
+         CR.Read_Packed (B.all, True, Pinned_Circuits.Id (E), P2, HP2, SP2);
+         if SP1 /= Circuit_Status.Ok or else SP2 /= Circuit_Status.Ok then
+            Report_Failure (Name & ": packed read " & SP1'Image
+                            & ", pinned " & SP2'Image);
+         elsif HP1.Id /= Pinned_Circuits.Id (E) then
+            Report_Failure (Name & ": the packed recomputed identifier"
+                            & " differs");
+         elsif HP1 /= HP2 or else P1.all /= P2.all then
+            Report_Failure (Name & ": the pinned packed load gives another"
+                            & " circuit");
+         else
+            Passed := Passed + 1;
+         end if;
+         CR.Free_Packed (P1);
+         CR.Free_Packed (P2);
+      end;
       Other (0) := Other (0) xor 1;
       CR.Read_Pinned (B.all, Other, C2, H2, S2);
       if S2 /= Circuit_Status.Id_Mismatch then

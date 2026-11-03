@@ -40,6 +40,7 @@ with Ligero_Proof;
 with Lagrange;
 with Ligero_Verifier;
 with Zk_Verifier;
+with Packed_HQuad;
 with Circuit_Reader;
 with Proof_Writer;
 with Sumcheck_Algebra_GF2_128;
@@ -58,6 +59,8 @@ with Ligero_Verifier_GF2_128;
 with Ligero_Verifier_P256;
 with Zk_Verifier_GF2_128;
 with Zk_Verifier_P256;
+with Packed_HQuad_GF2_128;
+with Packed_HQuad_P256;
 with Circuit_Reader_GF2_128;
 with Circuit_Reader_P256;
 with Proof_Writer_GF2_128;
@@ -192,8 +195,10 @@ procedure Writer_KAT is
       with package LP is new Ligero_Proof (SA => SA);
       with package L is new Lagrange (F => FS);
       with package LV is new Ligero_Verifier (ST => ST, LP => LP, L => L);
-      with package ZK is new Zk_Verifier (LV => LV);
       with package CR is new Circuit_Reader (SA => SA, others => <>);
+      with package PH is new Packed_HQuad
+        (SA => SA, PC => CR.PC, HQ => SV.HQ);
+      with package ZK is new Zk_Verifier (LV => LV, PH => PH);
       with package PW is new Proof_Writer (LV => LV);
    procedure Round_Trip
      (Name : String; Circ, Proof : Byte_Array; Cfg : Ligero_Geometry.Config);
@@ -214,10 +219,11 @@ procedure Writer_KAT is
          return;
       end if;
       declare
+         Sh   : constant SA.Shape := SA.Shape_Of (C.all);
          G    : constant Ligero_Geometry.Valid_Geometry :=
-           ZK.Geometry_Of (Cfg, C.all);
+           ZK.Geometry_Of (Cfg, Sh);
          Root : Bytes_32;
-         Sum  : SV.Sumcheck_Proof (Last => SV.Proof_Total (C.all) - 1);
+         Sum  : SV.Sumcheck_Proof (Last => SV.Proof_Total (Sh) - 1);
          Lig  : LP.Proof
            (Ldt_Last    => G.Block_Len - 1,
             Linear_Last => G.Dblock_Len - 1,
@@ -227,7 +233,7 @@ procedure Writer_KAT is
             Col_Last    => LP.Opened (G) - 1,
             Path_Last   => 2 * Ligero_Geometry.Num_Leaves (G) - 1);
       begin
-         ZK.Read_Proof (Proof, C.all, G, Root, Sum, Lig, VSt);
+         ZK.Read_Proof (Proof, Sh, G, Root, Sum, Lig, VSt);
          if VSt /= Verifier_Status.Ok then
             Report_Failure (Name & ": read " & VSt'Image);
             CR.Free (C);
@@ -235,8 +241,8 @@ procedure Writer_KAT is
          end if;
          declare
             Len : constant Natural :=
-              PW.Proof_Len (C.all, G, H.Subfield_Boundary, Lig.Path_Count);
-            SL  : constant Natural := 32 + PW.Sumcheck_Len (C.all);
+              PW.Proof_Len (Sh, G, H.Subfield_Boundary, Lig.Path_Count);
+            SL  : constant Natural := 32 + PW.Sumcheck_Len (Sh);
             FL  : constant Natural := SL + LP.Fixed_Len (G);
             Out_B : Byte_Array (0 .. Len - 1);
          begin
@@ -246,8 +252,7 @@ procedure Writer_KAT is
                CR.Free (C);
                return;
             end if;
-            PW.Write_Proof (C.all, G, H.Subfield_Boundary, Root, Sum, Lig,
-                            Out_B);
+            PW.Write_Proof (Sh, G, H.Subfield_Boundary, Root, Sum, Lig, Out_B);
             for I in Out_B'Range loop
                if Out_B (I) /= Proof (I) then
                   Report_Failure
@@ -272,15 +277,17 @@ procedure Writer_KAT is
       SA => Sumcheck_Algebra_GF2_128, SE => Sumcheck_Expression_GF2_128,
       SV => Sumcheck_Verifier_GF2_128, ST => Sumcheck_Transcript_GF2_128,
       LP => Ligero_Proof_GF2_128, L => Lagrange_GF2_128,
-      LV => Ligero_Verifier_GF2_128, ZK => Zk_Verifier_GF2_128,
-      CR => Circuit_Reader_GF2_128, PW => Proof_Writer_GF2_128);
+      LV => Ligero_Verifier_GF2_128, CR => Circuit_Reader_GF2_128,
+      PH => Packed_HQuad_GF2_128, ZK => Zk_Verifier_GF2_128,
+      PW => Proof_Writer_GF2_128);
    procedure Trip_P is new Round_Trip
      (FS => Field_P256.Sig,
       SA => Sumcheck_Algebra_P256, SE => Sumcheck_Expression_P256,
       SV => Sumcheck_Verifier_P256, ST => Sumcheck_Transcript_P256,
       LP => Ligero_Proof_P256, L => Lagrange_P256,
-      LV => Ligero_Verifier_P256, ZK => Zk_Verifier_P256,
-      CR => Circuit_Reader_P256, PW => Proof_Writer_P256);
+      LV => Ligero_Verifier_P256, CR => Circuit_Reader_P256,
+      PH => Packed_HQuad_P256, ZK => Zk_Verifier_P256,
+      PW => Proof_Writer_P256);
 
    procedure Check_Line (Line : String) is
       Fields : Field_Array;

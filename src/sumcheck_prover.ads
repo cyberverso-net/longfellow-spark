@@ -71,6 +71,11 @@ package Sumcheck_Prover is
    subtype Element is ST.SA.Element;
    subtype Element_Array is ST.SA.Element_Array;
    subtype Circuit is ST.SA.Circuit;
+   subtype Shape is ST.SA.Shape;
+
+   --  The shape of the circuit, for the sizes (Sumcheck_Algebra).
+   function Shape_Of (C : Circuit) return Shape is (ST.SA.Shape_Of (C))
+   with Global => null;
    subtype Term is ST.SA.Term;
    subtype Term_Array is ST.SA.Term_Array;
    subtype Sumcheck_Proof is ST.SV.Sumcheck_Proof;
@@ -85,32 +90,32 @@ package Sumcheck_Prover is
 
    --  The pad variables of every layer, 4 logw + 3 each, numbered from
    --  0 (Pad_Off of the core with Base 0).
-   function Pad_Total (C : Circuit) return Natural is
-     (ST.SV.Pad_Off (C, C.Last_Layer + 1, 0))
+   function Pad_Total (S : Shape) return Natural is
+     (ST.SV.Pad_Off (S, S.Last_Layer + 1, 0))
    with Global => null;
 
    --  CircuitPad::sample: for every layer, for every round the two
    --  pads of hand 0 (p (0), p (P2)) then the two of hand 1, then the
    --  claim pads c0 and c1, and cr = c0 * c1 (computed).
-   procedure Sample_Pads (C : Circuit; Pads : out Element_Array) with
+   procedure Sample_Pads (S : Shape; Pads : out Element_Array) with
      Always_Terminates => not ST.SA.F.Sampling_Rejects,
-     Pre => Pads'First = 0 and then Pads'Length = Pad_Total (C);
+     Pre => Pads'First = 0 and then Pads'Length = Pad_Total (S);
 
    --  generate_lqc_triples of zk/common.rs: the quadratic constraint of
    --  layer J ties the claim pads c0, c1 and their product, numbered in
    --  the witness vector of the commitment (the private inputs first,
    --  then the pads), exactly the triples Verifier_Core emits.
-   procedure Lqc_Triples (C : Circuit; Lqc : out ST.SV.Lqc_Array) with
+   procedure Lqc_Triples (S : Shape; Lqc : out ST.SV.Lqc_Array) with
      Global => null,
-     Pre    => Lqc'First = 0 and then Lqc'Last = C.Last_Layer,
+     Pre    => Lqc'First = 0 and then Lqc'Last = S.Last_Layer,
      Post   =>
-       (for all J in 0 .. C.Last_Layer =>
-          Lqc (J) = (X => ST.SV.Pad_Off (C, J, C.Ninput - C.Npublic)
-                            + 4 * C.Layers (J).Logw,
-                     Y => ST.SV.Pad_Off (C, J, C.Ninput - C.Npublic)
-                            + 4 * C.Layers (J).Logw + 1,
-                     Z => ST.SV.Pad_Off (C, J, C.Ninput - C.Npublic)
-                            + 4 * C.Layers (J).Logw + 2));
+       (for all J in 0 .. S.Last_Layer =>
+          Lqc (J) = (X => ST.SV.Pad_Off (S, J, S.Ninput - S.Npublic)
+                            + 4 * S.Layers (J).Logw,
+                     Y => ST.SV.Pad_Off (S, J, S.Ninput - S.Npublic)
+                            + 4 * S.Layers (J).Logw + 1,
+                     Z => ST.SV.Pad_Off (S, J, S.Ninput - S.Npublic)
+                            + 4 * S.Layers (J).Logw + 2));
 
    -------------------------------------------------------------------
    --  eval_round_poly (Section 6.6)
@@ -394,10 +399,10 @@ package Sumcheck_Prover is
    with
      Always_Terminates => not ST.SA.F.Sampling_Rejects,
      Pre =>
-       Wires'First = 0 and then Wires'Length = ST.SA.Total_Wires (C)
-       and then Pads'First = 0 and then Pads'Length = Pad_Total (C)
-       and then Proof.Last + 1 = ST.SV.Proof_Total (C)
-       and then Ch.Last + 1 = ST.SV.Chal_Total (C)
+       Wires'First = 0 and then Wires'Length = ST.SA.Total_Wires (Shape_Of (C))
+       and then Pads'First = 0 and then Pads'Length = Pad_Total (Shape_Of (C))
+       and then Proof.Last + 1 = ST.SV.Proof_Total (Shape_Of (C))
+       and then Ch.Last + 1 = ST.SV.Chal_Total (Shape_Of (C))
        and then BQ'First = 0 and then BQ'Length = C.Last_Layer + 1,
      --  The bound quad of every layer, as the verifier computes it from
      --  the challenges (ADR 0071): Verifier_Core takes it from here.
