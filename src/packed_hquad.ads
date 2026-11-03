@@ -10,35 +10,35 @@
 --
 --  Layer_Runs counts the runs, so that the working array is allocated
 --  once at its size. Bind_Merge is the shared kernel: the verifier's
---  Bind_Quad_Packed uses it here, the prover in a later block. The
---  rounds then run Bind_H of Sumcheck_HQuad, unchanged, on the merged
---  entries. Eval_Bound_Quad_Packed is the verifier's form when the eq
+--  Bind_Quad_Packed uses it here, the prover in Sumcheck_Prover (block
+--  3 of the milestone). The rounds then run Bind_H of Sumcheck_HQuad,
+--  unchanged, on the merged entries: Bind_Step, one round of one hand
+--  with the invariant of the rounds carried over, is the verifier's
+--  form of it. Eval_Bound_Quad_Packed is the verifier's form when the eq
 --  tables do not fit (Logv or Logw above Max_Bindeq_Log): a sum over
---  the walk, with no array at all.
+--  the walk, with no array at all. Since block 3 these kernels are the
+--  only first step of a layer in the programs; the expanded path
+--  (Bind_G_T, Merge_Runs, Eval_Bound_Quad) stays in the library as the
+--  oracle of the tests.
 --
 --  The model is the layer of the ghost expansion, Layer_Of (P, J), the
 --  layer of PC.Expand (P). Every result is stated on it exactly as the
 --  kernels of Sumcheck_HQuad state theirs on the layer of an expanded
 --  circuit: Bind_Merge gives what Merge_Terms gives (the invariant of
---  the rounds at round 0), Bind_Quad_Packed what Bind_Quad gives
---  (EBQT_Ref), Eval_Bound_Quad_Packed what Eval_Bound_Quad gives
---  (EBQ_Ref). The coefficient of a term travels from the walk to the
---  model by Same, the logical equality (Lemma_Walked_Step of
---  Packed_Circuits), since the equality of the field may not be the
---  logical one.
---
---  Bind_Step_Packed is a copy of Bind_Step (the body of Sumcheck_HQuad)
---  with Layer_Of (P, J) where Bind_Step names the layer T0: on the
---  packed path the layer is a value of level Proof_Only, which SPARK does
---  not accept as the actual of a parameter that is not ghost. The copy is
---  temporary: it is removed when the expanded path leaves the executable
---  code (issue #59).
+--  the rounds at round 0), Bind_Quad_Packed gives EBQT_Ref,
+--  Eval_Bound_Quad_Packed gives EBQ_Ref, what Eval_Bound_Quad gives.
+--  The coefficient of a term travels from the walk to the model by
+--  Same, the logical equality (Lemma_Walked_Step of Packed_Circuits),
+--  since the equality of the field may not be the logical one.
 --
 --  Proof status: Gold for every subprogram against the references
 --  above, except that Bind_Merge without the eq2 table (Logv above
 --  Max_Bindeq_Log) states the run count only, as Merge_Terms does: its
---  coefficients are tested, not proved. No caller of this unit takes
---  that branch.
+--  coefficients are tested, not proved. The prover takes that branch on
+--  a layer whose Logv is above Max_Bindeq_Log, where the verifier sums
+--  the bound quad over the walk; the rounds on the merged entries then
+--  keep the assurance they have had since ADR 0063: tested against the
+--  reference terms by the harness.
 --  The kernels of Sumcheck_HQuad and their contracts are unchanged.
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, circuits and
@@ -163,10 +163,10 @@ package Packed_HQuad is
                         Bound_Layer (P, J, Logv, G0, G1, Alpha, Beta),
                         C0, 0, C1, 0)));
 
-   --  One round of one hand on the merged entries: Bind_Step of
-   --  Sumcheck_HQuad with Layer_Of (P, J) in place of T0 (see the
-   --  header). Removed with the expanded path (issue #59).
-   procedure Bind_Step_Packed
+   --  One round of one hand on the merged entries: the challenge of
+   --  hand H at round R bound with Bind_H, with the invariant of the
+   --  rounds on the layer of the expansion carried to the next hand.
+   procedure Bind_Step
      (T        : in out Term_Array;
       NT       : in out Natural;
       H        : HQ.Hand;
@@ -199,9 +199,10 @@ package Packed_HQuad is
           HQ.BQ.Inv (T, NT, Bound_Layer (P, J, Logv, G0, G1, Alpha, Beta),
                      HC0, R + 1, HC1, (if H = 0 then R else R + 1)));
 
-   --  bind_quad of the verifier (ADR 0073) on layer J of P: as
-   --  Bind_Quad of Sumcheck_HQuad on the layer of the expansion, with
-   --  the working array at the number of runs.
+   --  bind_quad of the verifier (ADR 0073) on layer J of P: the terms
+   --  bound with g by the eq2 table and merged from the walk, then Logw
+   --  rounds of both hands, the coefficient left at hands (0, 0); the
+   --  working array at the number of runs.
    procedure Bind_Quad_Packed
      (P           : PC.Packed_Circuit;
       J           : Natural;

@@ -47,6 +47,8 @@ python3 -I tests/vectors/gen_mdoc_vectors.py                  # the mDoc product
 
 The proof summary is written to `obj/development/gnatprove/gnatprove.out`. The expected outcome at every commit is "all checks proved" and a harness run with zero failures; the chapters quote the counts of the commit they describe.
 
+A rule for the harnesses, learnt in the memory milestone: in the assertion build, compare on small inputs; measure in the release build. The harnesses of `tests/` run every executable contract and ghost function, and some cost far more than the code they check: a postcondition that names a recursive reference, such as `Eval_Bound_Quad`'s `EBQ_Ref`, runs a recursion over the terms of the layer at every call, and the loop invariants of a table builder cost the size of the table at every iteration. `circuit_kat` therefore compares the packed first step with the expanded one on the small layers only (at most 128 terms without the eq tables, Logv and Logw at most 10 with them), and `first_step_bench` in the release build (`cli/`, assertions off) compares and times the two on every layer of the mDoc circuits (chapter 3, Section 3.5). A comparison on a large input belongs in the release build, as a test (`first_step_bench --check` in the `cli` step of `make check`) or as a measurement.
+
 ## Conventions used in the guide
 
 - Specification sections are cited by number (draft-irtf-cfrg-longfellow-00, see [ADR 0002](../adr/0002-pin-the-specification.md) and [ADR 0079](../adr/0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md)); the text is not reproduced.

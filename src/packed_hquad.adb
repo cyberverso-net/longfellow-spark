@@ -584,11 +584,11 @@ package body Packed_HQuad is
    end Bind_Merge;
 
    -------------------------------------------------------------------
-   --  Bind_Step_Packed: Bind_Step of Sumcheck_HQuad, T0 replaced by
-   --  Layer_Of (P, J) (see the header of the spec).
+   --  Bind_Step: one round of one hand on the merged entries, the
+   --  invariant of the rounds on the layer of the expansion.
    -------------------------------------------------------------------
 
-   procedure Bind_Step_Packed
+   procedure Bind_Step
      (T        : in out Term_Array;
       NT       : in out Natural;
       H        : HQ.Hand;
@@ -628,7 +628,7 @@ package body Packed_HQuad is
             R + 1);
       end if;
       NT := NB;
-   end Bind_Step_Packed;
+   end Bind_Step;
 
    -------------------------------------------------------------------
    --  Bind_Quad_Packed
@@ -673,9 +673,9 @@ package body Packed_HQuad is
          pragma Loop_Invariant (NT <= W'Length);
          pragma Loop_Invariant
            (Proof_Only => HQ.BQ.Inv (W.all, NT, T1, HC0, R, HC1, R));
-         Bind_Step_Packed
+         Bind_Step
            (W.all, NT, 0, R, HC0, HC1, P, J, Logv, G0, G1, Alpha, Beta);
-         Bind_Step_Packed
+         Bind_Step
            (W.all, NT, 1, R, HC0, HC1, P, J, Logv, G0, G1, Alpha, Beta);
       end loop;
       --  The scalar: the coefficients left at hands (0, 0).

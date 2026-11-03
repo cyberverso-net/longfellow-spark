@@ -6,9 +6,9 @@
 --  the identifier that a full Read of that file recomputed. A file in
 --  the list is loaded with the identifier pinned (Read_Pinned, or
 --  Read_Packed with Pinned True), any other with the identifier
---  recomputed. The command-line verifier loads the packed form
---  (Read_Packed below, the memory milestone, ADR 0080); the prover
---  still loads the expanded one (Read). interop_kat checks every entry
+--  recomputed. The two command-line programs load the packed form
+--  (Read_Packed below, the memory milestone, ADR 0080); Read, the
+--  expanded one, serves the tests. interop_kat checks every entry
 --  against a full load of its file in tests/vectors, in both forms.
 --  Outside the proof perimeter (SPARK_Mode Off); the trust model lists
 --  the table as trusted.

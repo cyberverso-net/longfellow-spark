@@ -4,13 +4,17 @@
 --  from the circuit and its inputs to the proof string of Section 7.5.
 --  Generic over the Ligero prover of a field (which carries the
 --  verifier units, the sampling instance and the randomness source),
---  the sumcheck prover over the same transcript glue and the writers.
+--  the sumcheck prover over the same transcript glue, the writers and
+--  the evaluation of the packed circuit. Since the memory milestone
+--  (ADR 0080) the circuit comes in its packed form, never expanded: the
+--  sizes from its shape, the wires from the walk (Packed_Eval), the
+--  sumcheck from the walk (Sumcheck_Prover with Packed_HQuad).
 --
 --  Prove validates first (ADR 0049): the inputs are ninput elements
 --  (Input_Length); the first is 1 when the circuit has public inputs
 --  (Input_Not_One, OneWire of ADR 0064); they satisfy the circuit
---  (Not_Satisfied, from Eval_Circuit of stage 3: every output of layer
---  0 zero and every Z assertion met); and the witnesses the writer will
+--  (Not_Satisfied, from Eval_Circuit of Packed_Eval: every output of
+--  layer 0 zero and every Z assertion met); and the witnesses the writer will
 --  project on the subfield lie in it (Not_In_Subfield): those of the
 --  witness rows wholly below the subfield boundary
 --  (Proof_Writer.Sub_Rows, the rows the reference writer projects and
@@ -56,11 +60,22 @@ with Ligero_Geometry;  use Ligero_Geometry;
 with Ligero_Prover;
 with Sumcheck_Prover;
 with Proof_Writer;
+with Packed_HQuad;
+with Packed_Eval;
+with Proof_Levels;
 
 generic
    with package LPR is new Ligero_Prover (<>);
-   with package SPR is new Sumcheck_Prover (ST => LPR.LV.ST, others => <>);
+   --  The first step of a layer from the packed circuit, over the
+   --  algebra and the kernels of the verifier units of LPR; the sumcheck
+   --  prover takes it, and the evaluation of the packed circuit shares
+   --  its packed form.
+   with package PH  is new Packed_HQuad
+     (SA => LPR.LV.ST.SA, HQ => LPR.LV.ST.SV.HQ, others => <>);
+   with package SPR is new Sumcheck_Prover
+     (ST => LPR.LV.ST, PH => PH, others => <>);
    with package PW  is new Proof_Writer (LV => LPR.LV);
+   with package PE  is new Packed_Eval (SA => LPR.LV.ST.SA, PC => PH.PC);
    --  Validate: the satisfiability and subfield checks run (every
    --  instance of the library and of the command-line prover). False
    --  exists for the test project only (ADR 0053): a prover that proves
@@ -68,21 +83,29 @@ generic
    Validate : Boolean := True;
 package Zk_Prover is
 
-   --  As in the body (ADR 0072): the predicate of Circuit is checked
-   --  once where a circuit enters the program, and the expression
-   --  functions below, which the command line calls with the circuit,
-   --  do not walk it again. GNATprove proves these checks as before.
+   --  As in the body (ADR 0072): the predicates of the circuit are
+   --  checked once where a circuit enters the program (the loader proves
+   --  them, the command line checks their executable part), and the
+   --  expression functions below, which the command line calls with the
+   --  circuit, do not walk it again. GNATprove proves these checks as
+   --  before.
    pragma Suppress (Predicate_Check);
 
    subtype Element is LPR.LV.ST.SA.Element;
    subtype Element_Array is LPR.LV.ST.SA.Element_Array;
-   subtype Circuit is LPR.LV.ST.SA.Circuit;
    subtype Shape is LPR.LV.ST.SA.Shape;
+   subtype Packed_Circuit is PH.PC.Packed_Circuit;
 
-   --  The shape of the circuit, for the sizes (Sumcheck_Algebra).
-   function Shape_Of (C : Circuit) return Shape is
-     (LPR.LV.ST.SA.Shape_Of (C))
-   with Global => null;
+   --  The shape of the packed circuit, for the sizes (Sumcheck_Algebra).
+   --  Its precondition is the executable part of what the loader proves
+   --  of the circuit, which the command line checks once where the
+   --  circuit enters the program (ADR 0072): the indices of the form,
+   --  its layers, Shape_Ok of its shape.
+   function Shape_Of (P : Packed_Circuit) return Shape is
+     (PH.PC.Shape_Of (P))
+   with Global => null,
+        Pre  => PH.PC.Indices_Ok (P) and then PH.PC.Layers_Ok (P)
+                and then LPR.LV.ST.SA.Shape_Ok (PH.PC.Shape_Of (P));
 
    use type LPR.LV.ST.SA.Element;
 
@@ -118,18 +141,20 @@ package Zk_Prover is
                     2 * Num_Leaves (Geometry_Of (Cfg, S))))
    with Pre => Config_Fits (Cfg, S);
 
-   --  The proof of C on Inputs under Label and Cfg, Id the circuit
-   --  identifier and Sfb the subfield boundary of the circuit file:
-   --  B (0 .. Len - 1) holds the proof string when St is Ok; otherwise
-   --  Len is 0 and B is zero. The global state is synthesised: the
-   --  transcript and the state of the randomness source behind SPR and
-   --  LPR, which the generic cannot name.
+   --  The proof of the packed circuit P on Inputs under Label and Cfg,
+   --  Id the circuit identifier and Sfb the subfield boundary of the
+   --  circuit file: B (0 .. Len - 1) holds the proof string when St is
+   --  Ok; otherwise Len is 0 and B is zero. The circuit is asked, at
+   --  level Proof_Only, what the loader proves of it: a valid form
+   --  whose expansion is well formed. The global state is synthesised:
+   --  the transcript and the state of the randomness source behind SPR
+   --  and LPR, which the generic cannot name.
    procedure Prove
      (Label  : Byte_Array;
       Id     : Bytes_32;
       Sfb    : Natural;
       Cfg    : Config;
-      C      : Circuit;
+      P      : Packed_Circuit;
       Inputs : Element_Array;
       B      : out Byte_Array;
       Len    : out Natural;
@@ -137,16 +162,22 @@ package Zk_Prover is
    with
      Always_Terminates => False,
      Pre               =>
-       Label'Length <= Transcript.Max_Payload
-       and then Config_Fits (Cfg, Shape_Of (C)) and then C.Ninput >= 1
-       and then Inputs'First = 0
-       and then B'First = 0
-       and then B'Length = Max_Proof_Len (Cfg, Shape_Of (C), Sfb),
+       (Runtime    =>
+          Label'Length <= Transcript.Max_Payload
+          and then PH.PC.Indices_Ok (P) and then PH.PC.Layers_Ok (P)
+          and then LPR.LV.ST.SA.Shape_Ok (PH.PC.Shape_Of (P))
+          and then Config_Fits (Cfg, Shape_Of (P)) and then P.Ninput >= 1
+          and then Inputs'First = 0
+          and then B'First = 0
+          and then B'Length = Max_Proof_Len (Cfg, Shape_Of (P), Sfb),
+        Proof_Only =>
+          PH.PC.Valid (P)
+          and then LPR.LV.ST.SA.Well_Formed (PH.PC.Expand (P))),
      Post              =>
        (if St = Ok then Len in 1 .. B'Length else Len = 0)
-       and then (St = Input_Length) = (Inputs'Length /= C.Ninput)
+       and then (St = Input_Length) = (Inputs'Length /= P.Ninput)
        and then (St = Input_Not_One)
-                = (Inputs'Length = C.Ninput and then C.Npublic > 0
+                = (Inputs'Length = P.Ninput and then P.Npublic > 0
                    and then Inputs (0) /= LPR.LV.ST.SA.One);
 
 end Zk_Prover;

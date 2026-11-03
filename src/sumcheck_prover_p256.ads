@@ -9,6 +9,8 @@ pragma SPARK_Mode (On);
 with Sumcheck_Prover;
 with Sumcheck_Transcript_P256;
 with Sampling_P256;
+with Packed_HQuad_P256;
 
 package Sumcheck_Prover_P256 is new Sumcheck_Prover
-  (ST => Sumcheck_Transcript_P256, SP => Sampling_P256);
+  (ST => Sumcheck_Transcript_P256, SP => Sampling_P256,
+   PH => Packed_HQuad_P256);

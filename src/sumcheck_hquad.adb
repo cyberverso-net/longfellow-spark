@@ -4,8 +4,7 @@ with Ada.Unchecked_Deallocation;
 
 package body Sumcheck_HQuad is
 
-   --  Heap buffers (ADR 0047): the copy of the terms and the eq2 table
-   --  of Bind_Quad.
+   --  Heap buffers (ADR 0047), for the kernels that allocate.
    type Elems_Access is access Element_Array;
    type Terms_Access is access Term_Array;
 
@@ -1194,128 +1193,5 @@ package body Sumcheck_HQuad is
                                                        Beta), C0, 0, C1, 0);
       end if;
    end Merge_Terms;
-
-   --  One hand of round R in Bind_Quad: Bind_H on the first NT terms at
-   --  the challenge of that hand, with the invariant of the rounds
-   --  carried over to the next hand.
-   procedure Bind_Step
-     (T        : in out Term_Array;
-      NT       : in out Natural;
-      H        : Hand;
-      R        : Natural;
-      HC0, HC1 : Element_Array;
-      T0       : Term_Array;
-      Logv     : Natural;
-      G0, G1   : Element_Array;
-      Alpha    : Element;
-      Beta     : Element)
-   with
-     Global => null,
-     Pre    =>
-       (Runtime    =>
-          NT <= T'Length
-          and then HC0'First = 0 and then HC1'First = 0
-          and then R < HC0'Length and then R < HC1'Length,
-        Proof_Only =>
-          G0'First = 0 and then G1'First = 0
-          and then Logv <= G0'Length and then Logv <= G1'Length
-          and then Logv <= SA.Max_Bindeq_Log
-          and then
-          BQ.Inv (T, NT, BQ.Bound_Array (T0, Logv, G0, G1, Alpha, Beta),
-                  HC0, (if H = 0 then R else R + 1), HC1, R)),
-     Post   =>
-       (Runtime    => NT <= T'Length,
-        Proof_Only =>
-          BQ.Inv (T, NT, BQ.Bound_Array (T0, Logv, G0, G1, Alpha, Beta),
-                  HC0, R + 1, HC1, (if H = 0 then R else R + 1)))
-   is
-      Chal : constant Element := (if H = 0 then HC0 (R) else HC1 (R));
-      Old  : constant Term_Array := T (T'First .. T'First + NT - 1)
-      with Ghost => Proof_Only;
-      NB   : Natural;
-   begin
-      BQ.Lemma_Inv_Slice
-        (T, Old, NT, BQ.Bound_Array (T0, Logv, G0, G1, Alpha, Beta),
-         HC0, (if H = 0 then R else R + 1), HC1, R);
-      Bind_H (T (T'First .. T'First + NT - 1), H, Chal, NB);
-      BQ.Lemma_Corners_W (Old, T (T'First .. T'First + NT - 1), H, Chal, NB);
-      if H = 0 then
-         BQ.Lemma_Inv_Step0
-           (Old, T (T'First .. T'First + NT - 1), NB,
-            BQ.Bound_Array (T0, Logv, G0, G1, Alpha, Beta), HC0, R, HC1, R);
-         BQ.Lemma_Inv_Slice
-           (T (T'First .. T'First + NT - 1), T, NB,
-            BQ.Bound_Array (T0, Logv, G0, G1, Alpha, Beta),
-            HC0, R + 1, HC1, R);
-      else
-         BQ.Lemma_Inv_Step1
-           (Old, T (T'First .. T'First + NT - 1), NB,
-            BQ.Bound_Array (T0, Logv, G0, G1, Alpha, Beta),
-            HC0, R + 1, HC1, R);
-         BQ.Lemma_Inv_Slice
-           (T (T'First .. T'First + NT - 1), T, NB,
-            BQ.Bound_Array (T0, Logv, G0, G1, Alpha, Beta),
-            HC0, R + 1, HC1, R + 1);
-      end if;
-      NT := NB;
-   end Bind_Step;
-
-   procedure Bind_Quad
-     (T           : Term_Array;
-      Logv        : Natural;
-      G0, G1      : Element_Array;
-      HC0, HC1    : Element_Array;
-      Logw        : Natural;
-      Alpha, Beta : Element;
-      V           : out Element)
-   is
-      W  : Terms_Access := new Term_Array'(T);
-      E  : Elems_Access :=
-        new Element_Array'(0 .. SA.Table_Len (Logv) - 1 => Zero);
-      NT : Natural;
-      S  : Element := Zero;
-   begin
-      --  bind_g with the eq2 table, then the runs of equal hands merged.
-      SA.Eq2_Table (Logv, G0, G1, Alpha, E.all);
-      Bind_G_T (W.all, E.all, Beta);
-      BQ.Lemma_T1_Bound (T, W.all, E.all, Logv, G0, G1, Alpha, Beta);
-      Free_Elems (E);
-      Merge_Terms
-        (W.all, NT, True, T, Logv, G0, G1, Alpha, Beta, HC0, HC1);
-      --  bind_h of hand 0 then hand 1, Logw rounds.
-      for R in 0 .. Logw - 1 loop
-         pragma Loop_Invariant (W /= null);
-         pragma Loop_Invariant (W'First = T'First and then W'Last = T'Last);
-         pragma Loop_Invariant (NT <= W'Length);
-         pragma Loop_Invariant
-           (Proof_Only =>
-              BQ.Inv (W.all, NT,
-                      BQ.Bound_Array (T, Logv, G0, G1, Alpha, Beta),
-                      HC0, R, HC1, R));
-         Bind_Step
-           (W.all, NT, 0, R, HC0, HC1, T, Logv, G0, G1, Alpha, Beta);
-         Bind_Step
-           (W.all, NT, 1, R, HC0, HC1, T, Logv, G0, G1, Alpha, Beta);
-      end loop;
-      --  The scalar: the coefficients left at hands (0, 0).
-      BQ.Lemma_W_Zero (W.all, 0, 0, 0);
-      for I in 0 .. NT - 1 loop
-         BQ.Lemma_W_Step (W.all, I, 0, 0, 0);
-         if W (W'First + I).H0 = 0 and then W (W'First + I).H1 = 0 then
-            SA.Lemma_Add_W (S, W (W'First + I).K);
-            S := S + W (W'First + I).K;
-         end if;
-         pragma Loop_Invariant
-           (Proof_Only => Same (S, BQ.W_Sum (W.all, I + 1, 0, 0, 0)));
-      end loop;
-      BQ.Lemma_Inv_At
-        (W.all, NT, BQ.Bound_Array (T, Logv, G0, G1, Alpha, Beta),
-         HC0, Logw, HC1, Logw, 0, 0);
-      BQ.Lemma_V_End_All
-        (BQ.Bound_Array (T, Logv, G0, G1, Alpha, Beta), T, T'Length,
-         Logv, G0, G1, HC0, HC1, Logw, Alpha, Beta);
-      V := S;
-      Free_Terms (W);
-   end Bind_Quad;
 
 end Sumcheck_HQuad;

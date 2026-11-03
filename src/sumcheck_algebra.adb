@@ -584,13 +584,6 @@ package body Sumcheck_Algebra is
    --  Lemmas for Eval_Circuit (ghost procedures, bodies proved).
    ----------------------------------------------------------------------
 
-   --  Off is non-decreasing in the segment index.
-   procedure Lemma_Off_Mono (S : Shape; I, J : Natural) with
-     Ghost, Global => null,
-     Pre  => I <= J and then J <= S.Last_Layer + 2,
-     Post => Off (S, I) <= Off (S, J),
-     Subprogram_Variant => (Decreases => J);
-
    procedure Lemma_Off_Mono (S : Shape; I, J : Natural) is
       pragma Annotate
         (GNATprove, Unhide_Info, "Expression_Function_Body", Off);
@@ -599,13 +592,6 @@ package body Sumcheck_Algebra is
          Lemma_Off_Mono (S, I, J - 1);
       end if;
    end Lemma_Off_Mono;
-
-   --  One step of the definition of Off, for the callers that do not see
-   --  its body.
-   procedure Lemma_Off_Step (S : Shape; J : Natural) with
-     Ghost, Global => null,
-     Pre  => J <= S.Last_Layer + 1,
-     Post => Off (S, J + 1) = Off (S, J) + Seg_Size (S, J);
 
    procedure Lemma_Off_Step (S : Shape; J : Natural) is
       pragma Annotate
@@ -649,22 +635,6 @@ package body Sumcheck_Algebra is
       end if;
    end Lemma_Acc_Frame;
 
-   --  Two buffers of the same length that agree from the offset of
-   --  segment From + 1 on: a layer J above From that holds in B1 holds
-   --  in B2, and its Z status is the same in both.
-   procedure Lemma_Layer_Frame (C : Circuit; B1, B2 : Element_Array;
-                                J, From : Natural)
-   with
-     Ghost, Global => null,
-     Pre  => B1'First = 0 and then B2'First = 0
-       and then B1'Length = B2'Length
-       and then From < J and then J <= C.Last_Layer
-       and then (for all K in Off (Shape_Of (C), From + 1) .. B1'Last =>
-                   Same (B1 (K), B2 (K)))
-       and then Layer_Holds (C, B1, J),
-     Post => Layer_Holds (C, B2, J)
-       and then Layer_Z (C, B1, J) = Layer_Z (C, B2, J);
-
    procedure Lemma_Layer_Frame (C : Circuit; B1, B2 : Element_Array;
                                 J, From : Natural)
    is
@@ -688,26 +658,6 @@ package body Sumcheck_Algebra is
                        Layer_Terms (C, J)'Length, 0);
    end Lemma_Layer_Frame;
 
-   --  Same agreement: the references of layer From (which read segment
-   --  From + 1 only) are the same in both buffers.
-   procedure Lemma_From_Frame (C : Circuit; B1, B2 : Element_Array;
-                               From : Natural)
-   with
-     Ghost, Global => null,
-     Pre  => B1'First = 0 and then B2'First = 0
-       and then B1'Length = B2'Length
-       and then From <= C.Last_Layer
-       and then (for all K in Off (Shape_Of (C), From + 1) .. B1'Last =>
-                   Same (B1 (K), B2 (K))),
-     Post => (for all G in 0 .. Seg_Size (Shape_Of (C), From) - 1 =>
-                Same (Acc_Ref (B1, Off (Shape_Of (C), From + 1),
-                               Layer_Terms (C, From),
-                               Layer_Terms (C, From)'Length, G),
-                      Acc_Ref (B2, Off (Shape_Of (C), From + 1),
-                               Layer_Terms (C, From),
-                               Layer_Terms (C, From)'Length, G)))
-       and then Layer_Z (C, B1, From) = Layer_Z (C, B2, From);
-
    procedure Lemma_From_Frame (C : Circuit; B1, B2 : Element_Array;
                                From : Natural)
    is
@@ -726,25 +676,6 @@ package body Sumcheck_Algebra is
       Lemma_Acc_Frame (B1, B2, Off (S, From + 1), Layer_Terms (C, From),
                        Layer_Terms (C, From)'Length, 0);
    end Lemma_From_Frame;
-
-   --  Segment J of Wires holds V, and V is the quad sum of segment J + 1
-   --  of Wires: then layer J holds in Wires.
-   procedure Lemma_Layer_Intro (C : Circuit; Wires : Element_Array;
-                                J : Natural; V : Element_Array)
-   with
-     Ghost, Global => null,
-     Pre  => Wires'First = 0 and then J <= C.Last_Layer
-       and then V'First = 0 and then V'Length = Seg_Size (Shape_Of (C), J)
-       and then Off (Shape_Of (C), J) + Seg_Size (Shape_Of (C), J)
-                <= Wires'Length
-       and then (for all G in V'Range =>
-                   Same (Wires (Off (Shape_Of (C), J) + G), V (G)))
-       and then (for all G in V'Range =>
-                   Same (V (G),
-                         Acc_Ref (Wires, Off (Shape_Of (C), J + 1),
-                                  Layer_Terms (C, J),
-                                  Layer_Terms (C, J)'Length, G))),
-     Post => Layer_Holds (C, Wires, J);
 
    procedure Lemma_Layer_Intro (C : Circuit; Wires : Element_Array;
                                 J : Natural; V : Element_Array)

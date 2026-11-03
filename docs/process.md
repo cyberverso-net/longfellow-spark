@@ -124,9 +124,11 @@ have in a project without proofs. They do three things:
   step; constant time is a coding discipline, checked on the generated code.
 
 Every test harness under `tests/` compiles the library with assertions on, so every executable
-contract and invariant runs; a contract violation is a test failure. `interop_kat` is the
-exception: it runs on the release build of the command line, without assertions, so it tests the
-verdict, not the contracts. The categories of test, each with its place in the repository:
+contract and invariant runs; a contract violation is a test failure. `interop_kat` and
+`first_step_bench --check` are the exceptions: they run on the release build of the command line,
+without assertions, so they test the verdict, not the contracts. In the assertion build a harness
+compares on small inputs, since executed contracts can cost far more than the code; large inputs
+are compared in the release build (the guide's README, "Building, proving and testing"). The categories of test, each with its place in the repository:
 
 | Category | What it checks | Where |
 | --- | --- | --- |

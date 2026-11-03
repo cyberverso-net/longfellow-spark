@@ -15,12 +15,12 @@
 --  the Challenges record of stage 3 and draws alpha_input last, so
 --  that Verifier_Core can be called with the challenges as input where
 --  the reference replays the core on a copy of the transcript (ADR
---  0049). The wires of every layer come from Eval_Circuit of stage 3,
---  the pads from Sample_Pads in the order the reference consumes its
---  randomness: per layer, per round the two pads of hand 0 then the
---  two of hand 1, then the two claim pads, the product pad computed.
---  Lqc_Triples numbers the quadratic constraints of the claim pads in
---  the witness vector of the commitment (generate_lqc_triples).
+--  0049). The wires of every layer come from Eval_Circuit of Packed_Eval
+--  (ADR 0080), the pads from Sample_Pads in the order the reference
+--  consumes its randomness: per layer, per round the two pads of hand 0
+--  then the two of hand 1, then the two claim pads, the product pad
+--  computed. Lqc_Triples numbers the quadratic constraints of the claim
+--  pads in the witness vector of the commitment (generate_lqc_triples).
 --
 --  Documentation: docs/guide/07-prover.md.
 --
@@ -35,11 +35,14 @@
 --  is the true sum (ADR 0075: two products per pair, p (1) from the
 --  claim, as upstream); Round_Evals stays as the reference, and the
 --  harness checks that the two agree. Prove keeps the terms merged as the
---  production prover does: Bind_G_T (Gold against the eq2 table),
---  Merge_Runs (Gold, structural, against Run_Id and Run_Sum) and Bind_H
---  (Gold, structural, against Rd and Corner_K); Bind_G and Update_Terms
---  stay as the reference, and the harness checks that the round
---  polynomials agree on every round.
+--  production prover does, from the packed circuit (ADR 0080, block 3):
+--  Bind_Merge of Packed_HQuad (Gold on the layer of the ghost expansion:
+--  bind_g with the eq2 table and the runs of equal hands merged from the
+--  walk, one entry per run) and Bind_H (Gold, structural, against Rd
+--  and Corner_K); the bound quad of a layer (ADR 0071) is Gold against
+--  BQ_Ref on the expansion. Bind_G and Update_Terms stay as the
+--  reference, and the harness checks that the round polynomials agree
+--  on every round.
 --  The padded values are the evaluations minus the pads by the two
 --  statements that compute them. Completeness (the verifier accepts the
 --  honest proof) is tested, not proved; so is the claim of each round
@@ -50,7 +53,7 @@
 --  and branches on the parity of a wire index of the term, public;
 --  Round_Evals_Dense writes at a wire index of the term and loops over
 --  the pairs of a public length; Merge_Runs and Bind_H compare the
---  wire indices of the terms, public, and Bind_G_T compares the
+--  wire indices of the terms, public, and Bind_Merge compares the
 --  constant of a term, public, with zero;
 --  Bind is a fixed loop; the pads depend on the randomness. The wires
 --  and the pads are secret, and so are the evaluations until padded.
@@ -62,20 +65,48 @@ pragma SPARK_Mode (On);
 with Proof_Levels;
 with Sumcheck_Transcript;
 with Sampling;
+with Packed_HQuad;
 
 generic
    with package ST is new Sumcheck_Transcript (<>);
    with package SP is new Sampling (F => ST.SA.F, others => <>);
+   --  The first step of a layer from the packed circuit (block 2 of the
+   --  memory milestone), over the algebra and the kernels of ST.
+   with package PH is new Packed_HQuad
+     (SA => ST.SA, HQ => ST.SV.HQ, others => <>);
 package Sumcheck_Prover is
 
    subtype Element is ST.SA.Element;
    subtype Element_Array is ST.SA.Element_Array;
    subtype Circuit is ST.SA.Circuit;
    subtype Shape is ST.SA.Shape;
+   subtype Packed_Circuit is PH.PC.Packed_Circuit;
 
-   --  The shape of the circuit, for the sizes (Sumcheck_Algebra).
-   function Shape_Of (C : Circuit) return Shape is (ST.SA.Shape_Of (C))
-   with Global => null;
+   --  The expansion of the packed circuit and its shape, the model the
+   --  references name (ADR 0080): a well-formed circuit, by the
+   --  postcondition of the loader, which the callers pass on. The
+   --  executable statements read Shape_Of (P), equal to it field by
+   --  field; Lemma_Chal_Off_Eq joins the two where Chal_Off hides its
+   --  recursion.
+   function Exp (P : Packed_Circuit) return Circuit is (PH.PC.Expand (P))
+   with Ghost => Proof_Only, Global => null,
+        Pre => PH.PC.Valid (P) and then ST.SA.Well_Formed (PH.PC.Expand (P));
+
+   function Exp_Shape (P : Packed_Circuit) return Shape is
+     (ST.SA.Shape_Of (PH.PC.Expand (P)))
+   with Ghost => Proof_Only, Global => null,
+        Pre => PH.PC.Valid (P) and then ST.SA.Well_Formed (PH.PC.Expand (P));
+
+   --  The shape of the packed circuit, a Shape, for the sizes. Its
+   --  precondition is the executable part of what the loader proves of
+   --  the circuit (the indices of the form, its layers, Shape_Ok of its
+   --  shape), which the command line checks once where the circuit
+   --  enters the program (ADR 0072).
+   function Shape_Of (P : Packed_Circuit) return Shape is
+     (PH.PC.Shape_Of (P))
+   with Global => null,
+        Pre  => PH.PC.Indices_Ok (P) and then PH.PC.Layers_Ok (P)
+                and then ST.SA.Shape_Ok (PH.PC.Shape_Of (P));
    subtype Term is ST.SA.Term;
    subtype Term_Array is ST.SA.Term_Array;
    subtype Sumcheck_Proof is ST.SV.Sumcheck_Proof;
@@ -83,6 +114,7 @@ package Sumcheck_Prover is
 
    use ST.SA.F;
    use type ST.SV.Lqc_Triple;
+   use type ST.SA.Raw_Shape;
 
    -------------------------------------------------------------------
    --  The pads (Section 6.5)
@@ -386,11 +418,13 @@ package Sumcheck_Prover is
    -------------------------------------------------------------------
 
    --  The padded proof and every challenge, on the live transcript
-   --  after the label, the root and the statement. Wires is the buffer
-   --  of Eval_Circuit (every layer's values, the inputs last), Pads the
-   --  pads of Sample_Pads.
+   --  after the label, the root and the statement, from the packed
+   --  circuit (ADR 0080). Wires is the buffer of Eval_Circuit (every
+   --  layer's values, the inputs last), Pads the pads of Sample_Pads.
+   --  The circuit is asked, at level Proof_Only, what the loader proves
+   --  of it: a valid form whose expansion is well formed.
    procedure Prove
-     (C     : Circuit;
+     (P     : Packed_Circuit;
       Wires : Element_Array;
       Pads  : Element_Array;
       Proof : out Sumcheck_Proof;
@@ -399,16 +433,24 @@ package Sumcheck_Prover is
    with
      Always_Terminates => not ST.SA.F.Sampling_Rejects,
      Pre =>
-       Wires'First = 0 and then Wires'Length = ST.SA.Total_Wires (Shape_Of (C))
-       and then Pads'First = 0 and then Pads'Length = Pad_Total (Shape_Of (C))
-       and then Proof.Last + 1 = ST.SV.Proof_Total (Shape_Of (C))
-       and then Ch.Last + 1 = ST.SV.Chal_Total (Shape_Of (C))
-       and then BQ'First = 0 and then BQ'Length = C.Last_Layer + 1,
+       (Runtime    =>
+          PH.PC.Indices_Ok (P) and then PH.PC.Layers_Ok (P)
+          and then ST.SA.Shape_Ok (PH.PC.Shape_Of (P))
+          and then Wires'First = 0
+          and then Wires'Length = ST.SA.Total_Wires (Shape_Of (P))
+          and then Pads'First = 0
+          and then Pads'Length = Pad_Total (Shape_Of (P))
+          and then Proof.Last + 1 = ST.SV.Proof_Total (Shape_Of (P))
+          and then Ch.Last + 1 = ST.SV.Chal_Total (Shape_Of (P))
+          and then BQ'First = 0 and then BQ'Length = P.Last_Layer + 1,
+        Proof_Only =>
+          PH.PC.Valid (P) and then ST.SA.Well_Formed (PH.PC.Expand (P))),
      --  The bound quad of every layer, as the verifier computes it from
-     --  the challenges (ADR 0071): Verifier_Core takes it from here.
+     --  the challenges (ADR 0071), on the expansion: Verifier_Core takes
+     --  it from here.
      Post =>
        (Proof_Only =>
-          (for all J in 0 .. C.Last_Layer =>
-             Same (BQ (J), ST.SV.BQ_Ref (C, Ch, J))));
+          (for all J in 0 .. P.Last_Layer =>
+             Same (BQ (J), ST.SV.BQ_Ref (Exp (P), Ch, J))));
 
 end Sumcheck_Prover;

@@ -222,15 +222,15 @@ package body Zk_Prover is
       Id     : Bytes_32;
       Sfb    : Natural;
       Cfg    : Config;
-      C      : Circuit;
+      P      : Packed_Circuit;
       Inputs : Element_Array;
       B      : out Byte_Array;
       Len    : out Natural;
       St     : out Status)
    is
-      S     : constant Shape := Shape_Of (C);
+      S     : constant Shape := Shape_Of (P);
       G     : constant Valid_Geometry := Geometry_Of (Cfg, S);
-      Npriv : constant Natural := C.Ninput - C.Npublic;
+      Npriv : constant Natural := P.Ninput - P.Npublic;
       Sfb_W : constant Natural := Boundary_Of (S, Sfb);
       NP    : constant Natural := SPR.Pad_Total (S);
       Wk    : Work_Access;
@@ -239,26 +239,26 @@ package body Zk_Prover is
    begin
       B   := [others => 0];
       Len := 0;
-      if Inputs'Length /= C.Ninput then
+      if Inputs'Length /= P.Ninput then
          St := Input_Length;
          return;
       end if;
-      if C.Npublic > 0 and then Inputs (0) /= LPR.LV.ST.SA.One then
+      if P.Npublic > 0 and then Inputs (0) /= LPR.LV.ST.SA.One then
          St := Input_Not_One;
          return;
       end if;
-      pragma Assert (S.Last_Layer = C.Last_Layer);
-      pragma Assert (S.Ninput = C.Ninput and then S.Npublic = C.Npublic);
+      pragma Assert (S.Last_Layer = P.Last_Layer);
+      pragma Assert (S.Ninput = P.Ninput and then S.Npublic = P.Npublic);
       pragma Assert
         (G.Num_Quad_Rows
-         = (C.Last_Layer + 1 + G.Witnesses_Per_Row - 1)
+         = (P.Last_Layer + 1 + G.Witnesses_Per_Row - 1)
            / G.Witnesses_Per_Row);
-      Lemma_Pad_Shift (S, C.Last_Layer + 1, Npriv);
+      Lemma_Pad_Shift (S, P.Last_Layer + 1, Npriv);
       Allocate_Work (S, G, Wk);
 
       --  Validation: the circuit is satisfied, the inputs below the
       --  boundary lie in the subfield.
-      LPR.LV.ST.SA.Eval_Circuit (C, Inputs, Wk.Wires, Ok_E);
+      PE.Eval_Circuit (P, Inputs, Wk.Wires, Ok_E);
       if Validate and then not Ok_E then
          Free_Work (Wk);
          St := Not_Satisfied;
@@ -277,14 +277,14 @@ package body Zk_Prover is
       --  commit: the pads, the witness vector, the triples, Ligero.
       SPR.Sample_Pads (S, Wk.Pads);
       for I in 0 .. Npriv - 1 loop
-         Wk.Wv (I) := Inputs (C.Npublic + I);
+         Wk.Wv (I) := Inputs (P.Npublic + I);
       end loop;
       for K in 0 .. NP - 1 loop
          Wk.Wv (Npriv + K) := Wk.Pads (K);
       end loop;
       SPR.Lqc_Triples (S, Wk.Lqc);
       SV.Lemma_Pads_Below (S);
-      pragma Assert (Wk.Lqc'Length = C.Last_Layer + 1);
+      pragma Assert (Wk.Lqc'Length = P.Last_Layer + 1);
       LPR.Commit (G, Wk.Wv, Wk.Lqc, Sfb_W, Com, Ok_C);
       if not Ok_C then
          Free_Work (Wk);
@@ -295,19 +295,19 @@ package body Zk_Prover is
       --  prove: the transcript, the sumcheck, the core, Ligero.
       Transcript.Reset (Label);
       Transcript.Write_Bytes (Com.Root);
-      LPR.LV.ST.Write_Sumcheck_Statement (Id, S, Inputs (0 .. C.Npublic - 1));
-      SPR.Prove (C, Wk.Wires, Wk.Pads, Wk.SProof, Wk.Ch, Wk.BQ);
+      LPR.LV.ST.Write_Sumcheck_Statement (Id, S, Inputs (0 .. P.Npublic - 1));
+      SPR.Prove (P, Wk.Wires, Wk.Pads, Wk.SProof, Wk.Ch, Wk.BQ);
       --  The bound quads the core receives are those of the challenges
-      --  (ADR 0071), from the prover's own sumcheck; the core reads the
-      --  shape only.
+      --  (ADR 0071), from the prover's own sumcheck, on the expansion of
+      --  the packed circuit; the core reads the shape only.
       pragma Assert
         (Proof_Only =>
-           (for all J in 0 .. C.Last_Layer =>
-              Same (Wk.BQ (J), SV.BQ_Ref (C, Wk.Ch, J))));
-      SV.Verifier_Core (S, Inputs (0 .. C.Npublic - 1), Wk.SProof, Wk.Ch,
+           (for all J in 0 .. P.Last_Layer =>
+              Same (Wk.BQ (J), SV.BQ_Ref (SPR.Exp (P), Wk.Ch, J))));
+      SV.Verifier_Core (S, Inputs (0 .. P.Npublic - 1), Wk.SProof, Wk.Ch,
                         Wk.BQ, Wk.A, Wk.Bv, Wk.Lqc2);
       LPR.LV.Lemma_Vector_Len_Covers (G);
-      pragma Assert (Wk.Lqc'Length = C.Last_Layer + 1);
+      pragma Assert (Wk.Lqc'Length = P.Last_Layer + 1);
       pragma Assert
         (G.Num_Quad_Rows
          = (Wk.Lqc'Length + G.Witnesses_Per_Row - 1) / G.Witnesses_Per_Row);
