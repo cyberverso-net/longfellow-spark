@@ -735,28 +735,6 @@ package body Sumcheck_Prover is
    --  Prove
    -------------------------------------------------------------------
 
-   --  bind of hand H: A (0 .. N - 1) into B (0 .. (N + 1) / 2 - 1).
-   procedure Bind_Hand
-     (A : Element_Array; B : Elems_Access; N : in out Natural; X : Element)
-   with
-     Global => null,
-     Pre    => B /= null
-               and then A'First = 0 and then B'First = 0
-               and then N <= A'Length and then N <= B'Length
-               and then N <= ST.SA.Max_Wires,
-     Post   => N = (N'Old + 1) / 2;
-
-   procedure Bind_Hand
-     (A : Element_Array; B : Elems_Access; N : in out Natural; X : Element)
-   is
-      M : constant Natural := (N + 1) / 2;
-   begin
-      if N > 0 then
-         ST.SA.Bind (A (0 .. N - 1), X, B (0 .. M - 1));
-      end if;
-      N := M;
-   end Bind_Hand;
-
    --  One hand of round R: the challenge stored at R in the challenges
    --  of the hand (C0 for hand 0, C1 for hand 1), then Bind_H on the
    --  first NT terms, with the invariant of the rounds carried over to
@@ -910,7 +888,7 @@ package body Sumcheck_Prover is
    procedure Prove_Layer
      (P          : Packed_Circuit;
       J          : Natural;
-      Wr         : ST.SA.Seg_Array;
+      Wr         : in out ST.SA.Seg_Array;
       Pads       : Element_Array;
       Logv       : in out Natural;
       Cur0, Cur1 : in out Element_Array;
@@ -927,8 +905,7 @@ package body Sumcheck_Prover is
        and then PH.PC.Indices_Ok (P) and then PH.PC.Layers_Ok (P)
        and then ST.SA.Shape_Ok (PH.PC.Shape_Of (P))
        and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
-       and then Wr (J + 1) /= null and then Wr (J + 1)'First = 0
-       and then Wr (J + 1)'Length = P.Layers (J).NW_In
+       and then ST.SA.Segs_From (Wr, Shape_Of (P), J + 1)
        and then Pads'First = 0
        and then Pads'Length = Pad_Total (Shape_Of (P))
        and then Logv <= Max_Logw
@@ -949,7 +926,8 @@ package body Sumcheck_Prover is
                       Same (Cur1 (R),
                             ST.SV.Layer_G (Exp_Shape (P), Ch, J, 1) (R)))),
      Post =>
-       (Runtime    => Logv <= Max_Logw,
+       (Runtime    => Logv <= Max_Logw
+                      and then ST.SA.Segs_From (Wr, Shape_Of (P), J + 1),
         Proof_Only =>
           Same (BQJ, ST.SV.BQ_Ref (Exp (P), Ch, J))
           and then Logv = P.Layers (J).Logw
@@ -993,10 +971,12 @@ package body Sumcheck_Prover is
          --  equal hands (ADR 0080, block 2), never one per term.
          T  : Terms_Access;
          E  : Elems_Access;
-         A0 : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
-         A1 : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
-         B0 : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
-         B1 : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
+         --  The two hands (ADR 0080, block 4, as layer of prover.rs):
+         --  hand 1 is the wires of the layer, segment J + 1, bound in
+         --  place; hand 0 reads the same segment at round 0 and is bound
+         --  out of place into H0, half the width, then in place. Q is
+         --  the accumulator of the round polynomial.
+         H0 : Elems_Access;
          Q  : Elems_Access := new Element_Array'(0 .. NW - 1 => Zero);
          --  The bound quad of the layer (ADR 0071), with the terms of
          --  the layer, the terms bound with g, and the challenges
@@ -1017,12 +997,6 @@ package body Sumcheck_Prover is
          PH.Layer_Runs (P, J, NR);
          T := new Term_Array'
            (First .. First + NR - 1 => (K => Zero, G => 0, H0 => 0, H1 => 0));
-         for I in 0 .. NW - 1 loop
-            pragma Loop_Invariant (A0 /= null and then A1 /= null);
-            pragma Loop_Invariant (A0'Length = NW and then A1'Length = NW);
-            A0 (I) := Wr (J + 1) (I);
-            A1 (I) := Wr (J + 1) (I);
-         end loop;
          N0 := NW;
          N1 := NW;
          ST.Begin_Layer (Alpha, Beta);
@@ -1044,19 +1018,19 @@ package body Sumcheck_Prover is
            (P, J, E.all, Logv, Cur0, Cur1, Alpha, Beta, Nxt0, Nxt1, T.all,
             NT);
          Free_Elems (E);
+         H0 := new Element_Array'(0 .. (NW + 1) / 2 - 1 => Zero);
          for R in 0 .. Logw - 1 loop
             pragma Loop_Invariant
-              (T /= null and then A0 /= null and then A1 /= null
-               and then B0 /= null and then B1 /= null
-               and then Q /= null);
+              (T /= null and then H0 /= null and then Q /= null);
             pragma Loop_Invariant
-              (A0'First = 0 and then A1'First = 0
-               and then B0'First = 0 and then B1'First = 0
-               and then Q'First = 0
-               and then A0'Length = NW and then A1'Length = NW
-               and then B0'Length = NW and then B1'Length = NW
-               and then Q'Length = NW);
-            pragma Loop_Invariant (N0 <= NW and then N1 <= NW);
+              (H0'First = 0 and then Q'First = 0
+               and then H0'Length = (NW + 1) / 2 and then Q'Length = NW);
+            pragma Loop_Invariant
+              (Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+               and then ST.SA.Segs_From (Wr, S, J + 1));
+            pragma Loop_Invariant
+              ((if R = 0 then N0 = NW else N0 <= (NW + 1) / 2)
+               and then N1 <= NW);
             pragma Loop_Invariant (NT <= T'Length);
             pragma Loop_Invariant (T'First = First);
             pragma Loop_Invariant
@@ -1090,11 +1064,18 @@ package body Sumcheck_Prover is
               (Proof_Only =>
                  (for all R2 in 0 .. R - 1 =>
                     Same (Nxt1 (R2), Ch.Layer (Off_C + 2 + 2 * R2 + 1))));
-            --  Hand 0 on A0 against A1, then hand 1 on A1 against the
-            --  bound A0, as the reference does.
-            Round_Evals_Dense
-              (T (T'First .. T'First + NT - 1), A0.all, N0, A1.all, N1, 0,
-               P2, Sum, Q.all, Ev0, Ev2, Lead);
+            --  Hand 0 against hand 1, then hand 1 against the bound hand
+            --  0, as the reference does. At round 0 both hands are the
+            --  segment; hand 0 then leaves it for H0.
+            if R = 0 then
+               Round_Evals_Dense
+                 (T (T'First .. T'First + NT - 1), Wr (J + 1).all, N0,
+                  Wr (J + 1).all, N1, 0, P2, Sum, Q.all, Ev0, Ev2, Lead);
+            else
+               Round_Evals_Dense
+                 (T (T'First .. T'First + NT - 1), H0.all, N0,
+                  Wr (J + 1).all, N1, 0, P2, Sum, Q.all, Ev0, Ev2, Lead);
+            end if;
             P0  := Ev0 - Pads (Off_D + 4 * R);
             P2V := Ev2 - Pads (Off_D + 4 * R + 1);
             ST.Round_Poly (P0, P2V, Chal);
@@ -1102,36 +1083,37 @@ package body Sumcheck_Prover is
             Next_Claim (Chal, Ev0, Lead, Sum);
             Proof.Evals (Off_P + 4 * R)     := P0;
             Proof.Evals (Off_P + 4 * R + 1) := P2V;
-            Bind_Hand (A0.all, B0, N0, Chal);
-            declare
-               Tmp : Elems_Access := A0;
-            begin
-               A0 := B0;
-               B0 := Tmp;
-            end;
+            if R = 0 then
+               ST.SA.Bind (Wr (J + 1).all (0 .. N0 - 1), Chal, H0.all);
+               N0 := (N0 + 1) / 2;
+            else
+               ST.SA.Bind_In_Place (H0.all, N0, Chal);
+            end if;
             Bind_Round
               (T.all, NT, 0, Chal, R, Nxt0, Nxt1, Ch.Layer, Off_C,
                Tab, P, J, Logv, Cur0, Cur1, Alpha, Beta);
             Round_Evals_Dense
-              (T (T'First .. T'First + NT - 1), A1.all, N1, A0.all, N0, 1,
-               P2, Sum, Q.all, Ev0, Ev2, Lead);
+              (T (T'First .. T'First + NT - 1), Wr (J + 1).all, N1, H0.all,
+               N0, 1, P2, Sum, Q.all, Ev0, Ev2, Lead);
             P0  := Ev0 - Pads (Off_D + 4 * R + 2);
             P2V := Ev2 - Pads (Off_D + 4 * R + 3);
             ST.Round_Poly (P0, P2V, Chal);
             Next_Claim (Chal, Ev0, Lead, Sum);
             Proof.Evals (Off_P + 4 * R + 2) := P0;
             Proof.Evals (Off_P + 4 * R + 3) := P2V;
-            Bind_Hand (A1.all, B1, N1, Chal);
-            declare
-               Tmp : Elems_Access := A1;
-            begin
-               A1 := B1;
-               B1 := Tmp;
-            end;
+            ST.SA.Bind_In_Place (Wr (J + 1).all, N1, Chal);
+            --  The segment is where it was, at its size: the array of
+            --  segments is as the layer found it (P-256 budget).
+            pragma Assert (ST.SA.Segs_From (Wr, S, J + 1));
             Bind_Round
               (T.all, NT, 1, Chal, R, Nxt0, Nxt1, Ch.Layer, Off_C,
                Tab, P, J, Logv, Cur0, Cur1, Alpha, Beta);
          end loop;
+         --  Hand 0 left the segment at round 0, or never had to: a layer
+         --  of one input wire has no round (Shape_Ok bounds NW by 2^Logw).
+         pragma Assert (if Logw = 0 then NW <= 1);
+         pragma Assert (N0 <= (NW + 1) / 2);
+         pragma Assert (ST.SA.Segs_From (Wr, S, J + 1));
          --  The challenges below the layer's offset are as they came, the
          --  frame the rounds kept: stated here, at the exit of the loop,
          --  so that the postcondition reads it instead of rebuilding it
@@ -1192,8 +1174,13 @@ package body Sumcheck_Prover is
          Lemma_BQ_Layer
            (P, J, Ch, Off_C, Logv, Cur0, Cur1, Nxt0, Nxt1, Logw, Alpha,
             Beta, BQJ);
-         Cl0 := Ref (A0.all, N0, 0);
-         Cl1 := Ref (A1.all, N1, 0);
+         --  The claims are the first wire of each bound hand. A layer of
+         --  one input wire has no round: hand 0 never left the segment,
+         --  and its claim is the wire, as the reference's (both hands
+         --  still share the vector there).
+         Cl0 := (if Logw = 0 then Ref (Wr (J + 1).all, N0, 0)
+                 else Ref (H0.all, N0, 0));
+         Cl1 := Ref (Wr (J + 1).all, N1, 0);
          P0  := Cl0 - Pads (Off_D + 4 * Logw);
          P2V := Cl1 - Pads (Off_D + 4 * Logw + 1);
          Proof.Evals (Off_P + 4 * Logw)     := P0;
@@ -1205,10 +1192,7 @@ package body Sumcheck_Prover is
          ST.SV.Lemma_Hand_Chal (SC, Ch, J, 0, Cur0);
          ST.SV.Lemma_Hand_Chal (SC, Ch, J, 1, Cur1);
          Free_Terms (T);
-         Free_Elems (A0);
-         Free_Elems (A1);
-         Free_Elems (B0);
-         Free_Elems (B1);
+         Free_Elems (H0);
          Free_Elems (Q);
       end;
    end Prove_Layer;
@@ -1248,11 +1232,7 @@ package body Sumcheck_Prover is
       --  (upstream's prove_core takes and drops each layer's vector).
       Free_Seg (Wr (0));
       for J in 0 .. P.Last_Layer loop
-         pragma Loop_Invariant (for all K in 0 .. J => Wr (K) = null);
-         pragma Loop_Invariant
-           (for all K in J + 1 .. P.Last_Layer + 1 =>
-              Wr (K) /= null and then Wr (K)'First = 0
-              and then Wr (K)'Length = ST.SA.Seg_Size (S, K));
+         pragma Loop_Invariant (ST.SA.Segs_From (Wr, S, J + 1));
          pragma Loop_Invariant (Logv <= Max_Logw);
          pragma Loop_Invariant (Proof.Last + 1 = ST.SV.Proof_Total (S));
          pragma Loop_Invariant (Ch.Last + 1 = ST.SV.Chal_Total (S));

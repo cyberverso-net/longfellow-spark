@@ -258,6 +258,30 @@ def zcheck():
             "layers": [(2, 3, layer0)]}
 
 
+def onewire(k):
+    """A layer that reads one wire and has no sumcheck round (logw 0,
+    nw_in 1): the regression case of the memory milestone, block 4b,
+    where the claims of such a layer are the wire itself. Layer 2 makes
+    v = w1 * w0 from the inputs (w0 = 1, so v = w1, not zero); layer 1
+    reads v alone and writes u0 = u1 = v * v; layer 0 checks
+    u0 * u0 - u0 * u1 = 0. Inputs [1, a, a] satisfy it for any a. k maps
+    a small integer to the field."""
+    layer2 = [(0, 1, 0, k(1))]
+    layer1 = [(0, 0, 0, k(1)), (1, 0, 0, k(1))]
+    layer0 = [(0, 0, 0, k(1)), (0, 0, 1, k(-1))]
+    return {"name": "onewire", "noutput": 1, "ninput": 3, "npublic": 1,
+            "layers": [(1, 2, layer0), (0, 1, layer1), (2, 3, layer2)]}
+
+
+def onewire_p256():
+    return onewire(P256.of_int)
+
+
+def onewire_gf2_128():
+    # the field has characteristic 2: -1 is 1
+    return onewire(lambda n: 1)
+
+
 # -------------------------------------------------------------- output
 
 def main() -> None:

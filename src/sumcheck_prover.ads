@@ -18,7 +18,10 @@
 --  0049). The wires of every layer come from Eval_Circuit of Packed_Eval
 --  (ADR 0080), one heap segment per layer, and Prove frees the segment
 --  of a layer once the layer is proved, as upstream's prove_core drops
---  each layer's vector; the pads from Sample_Pads in the order the reference
+--  each layer's vector, and binds the hands where they are (hand 1 in
+--  the segment itself, hand 0 in a vector of half its width made at
+--  round 0, Bind_In_Place of Sumcheck_Algebra), one accumulator for
+--  the round polynomial; the pads from Sample_Pads in the order the reference
 --  consumes its randomness: per layer, per round the two pads of hand 0
 --  then the two of hand 1, then the two claim pads, the product pad
 --  computed. Lqc_Triples numbers the quadratic constraints of the claim

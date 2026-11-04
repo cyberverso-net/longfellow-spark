@@ -70,7 +70,11 @@
 --
 --  The verifier handles public data; no constant-time requirement
 --  applies here (ADR 0022). The only branches on element values are
---  the tests k = Zero on circuit constants.
+--  the tests k = Zero on circuit constants. Bind and Bind_In_Place
+--  serve the prover as well, on the wires of a layer, private data:
+--  their loops are fixed by the lengths and read no element in a
+--  branch (ADR 0051); the guarantee is scoped to builds with
+--  assertions disabled (ADR 0006).
 
 pragma SPARK_Mode (On);
 
@@ -432,6 +436,24 @@ package Sumcheck_Algebra is
                 Same (B (I),
                       (One - X) * Pad (A, 2 * I) + X * Pad (A, 2 * I + 1)));
 
+   --  Bind in place (dense::bind of the reference, ADR 0080 block 4):
+   --  entry I of the first (N + 1) / 2 from entries 2 I and 2 I + 1 of
+   --  the first N of the array as it came, the entries from N on
+   --  untouched; N halves. The same reference as Bind, on A'Old. The
+   --  prover binds each hand's vector where it is, one of them the
+   --  wires of the layer, instead of writing a second vector.
+   procedure Bind_In_Place
+     (A : in out Element_Array; N : in out Natural; X : Element)
+   with
+     Global => null,
+     Pre  => A'First = 0 and then N <= A'Length and then N <= Max_Wires,
+     Post => N = (N'Old + 1) / 2
+       and then (for all I in 0 .. N - 1 =>
+                   Same (A (I),
+                         (One - X) * Pad (A'Old (0 .. N'Old - 1), 2 * I)
+                         + X * Pad (A'Old (0 .. N'Old - 1), 2 * I + 1)))
+       and then (for all K in N'Old .. A'Last => Same (A (K), A'Old (K)));
+
    -------------------------------------------------------------------
    --  Section 6.4: the Lagrange basis on the points 0, 1, P2.
    -------------------------------------------------------------------
@@ -697,6 +719,18 @@ package Sumcheck_Algebra is
       and then (for all J in Wr'Range =>
                   Wr (J) /= null and then Wr (J)'First = 0
                   and then Wr (J)'Length = Seg_Size (S, J)))
+   with Global => null;
+
+   --  The segments from J on allocated at their size, the ones below J
+   --  null: the state of the prover's array once the layers before J - 1
+   --  are proved and their segments freed (Segs_Shape is Segs_From at 0).
+   function Segs_From (Wr : Seg_Array; S : Shape; J : Natural)
+                       return Boolean is
+     (Wr'First = 0 and then Wr'Last = S.Last_Layer + 1
+      and then (for all K in Wr'Range =>
+                  (if K < J then Wr (K) = null
+                   else Wr (K) /= null and then Wr (K)'First = 0
+                        and then Wr (K)'Length = Seg_Size (S, K))))
    with Global => null;
 
    --  The array of Last_Layer + 2 segments, every one null.
