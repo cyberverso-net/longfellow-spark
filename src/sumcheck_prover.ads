@@ -16,7 +16,9 @@
 --  that Verifier_Core can be called with the challenges as input where
 --  the reference replays the core on a copy of the transcript (ADR
 --  0049). The wires of every layer come from Eval_Circuit of Packed_Eval
---  (ADR 0080), the pads from Sample_Pads in the order the reference
+--  (ADR 0080), one heap segment per layer, and Prove frees the segment
+--  of a layer once the layer is proved, as upstream's prove_core drops
+--  each layer's vector; the pads from Sample_Pads in the order the reference
 --  consumes its randomness: per layer, per round the two pads of hand 0
 --  then the two of hand 1, then the two claim pads, the product pad
 --  computed. Lqc_Triples numbers the quadratic constraints of the claim
@@ -419,13 +421,17 @@ package Sumcheck_Prover is
 
    --  The padded proof and every challenge, on the live transcript
    --  after the label, the root and the statement, from the packed
-   --  circuit (ADR 0080). Wires is the buffer of Eval_Circuit (every
-   --  layer's values, the inputs last), Pads the pads of Sample_Pads.
-   --  The circuit is asked, at level Proof_Only, what the loader proves
-   --  of it: a valid form whose expansion is well formed.
+   --  circuit (ADR 0080). Wr holds the segments of Eval_Circuit of
+   --  Packed_Eval (segment J the wires computed by layer J, the inputs
+   --  last), every one allocated at its size; Prove reads segment J + 1
+   --  for layer J and frees it once the layer is proved, segment 0 (the
+   --  outputs, read by no layer) first, and leaves every segment null.
+   --  Pads are the pads of Sample_Pads. The circuit is asked, at level
+   --  Proof_Only, what the loader proves of it: a valid form whose
+   --  expansion is well formed.
    procedure Prove
      (P     : Packed_Circuit;
-      Wires : Element_Array;
+      Wr    : in out ST.SA.Seg_Array;
       Pads  : Element_Array;
       Proof : out Sumcheck_Proof;
       Ch    : out Challenges;
@@ -436,8 +442,7 @@ package Sumcheck_Prover is
        (Runtime    =>
           PH.PC.Indices_Ok (P) and then PH.PC.Layers_Ok (P)
           and then ST.SA.Shape_Ok (PH.PC.Shape_Of (P))
-          and then Wires'First = 0
-          and then Wires'Length = ST.SA.Total_Wires (Shape_Of (P))
+          and then ST.SA.Segs_Shape (Wr, Shape_Of (P))
           and then Pads'First = 0
           and then Pads'Length = Pad_Total (Shape_Of (P))
           and then Proof.Last + 1 = ST.SV.Proof_Total (Shape_Of (P))
@@ -449,7 +454,8 @@ package Sumcheck_Prover is
      --  the challenges (ADR 0071), on the expansion: Verifier_Core takes
      --  it from here.
      Post =>
-       (Proof_Only =>
+       (Runtime    => ST.SA.Segs_Null (Wr),
+        Proof_Only =>
           (for all J in 0 .. P.Last_Layer =>
              Same (BQ (J), ST.SV.BQ_Ref (Exp (P), Ch, J))));
 

@@ -40,30 +40,16 @@ package body Zk_Prover is
       end if;
    end Lemma_Pad_Shift;
 
-   --  The wires buffer holds at least the inputs: Total_Wires = Off (S,
-   --  Last_Layer + 2) = Off (S, Last_Layer + 1) + Ninput.
-   procedure Lemma_Wires_Cover (S : Shape) with
-     Ghost, Global => null,
-     Post => LPR.LV.ST.SA.Total_Wires (S) >= S.Ninput
-   is
-      pragma Annotate
-        (GNATprove, Unhide_Info, "Expression_Function_Body",
-         LPR.LV.ST.SA.Off);
-   begin
-      null;
-   end Lemma_Wires_Cover;
-
    -------------------------------------------------------------------
    --  The working set (ADR 0047)
    -------------------------------------------------------------------
 
    type Work
-     (Wires_Last, Pads_Last, Wv_Last, Lqc_Last : Index;
-      Proof_Last, Chal_Last, Terms_Max, B_Last  : Index;
+     (Pads_Last, Wv_Last, Lqc_Last             : Index;
+      Proof_Last, Chal_Last, Terms_Max, B_Last : Index;
       Ldt_Last, Linear_Last, Low_Last, High_Last, Nonce_Last, Col_Last : Index;
       Path_Last : Merkle.Node_Index)
    is record
-      Wires  : Element_Array (0 .. Wires_Last);
       Pads   : Element_Array (0 .. Pads_Last);
       Wv     : Element_Array (0 .. Wv_Last);
       Lqc    : SV.Lqc_Array (0 .. Lqc_Last);
@@ -87,8 +73,7 @@ package body Zk_Prover is
    function Work_Shape
      (Wk : Work; S : Shape; G : Valid_Geometry) return Boolean
    is
-     (Wk.Wires_Last + 1 = LPR.LV.ST.SA.Total_Wires (S)
-      and then Wk.Pads_Last + 1 = SPR.Pad_Total (S)
+     (Wk.Pads_Last + 1 = SPR.Pad_Total (S)
       and then Wk.Wv_Last + 1 = Witness_Count (S)
       and then Wk.Lqc_Last = S.Last_Layer
       and then Wk.Proof_Last + 1 = SV.Proof_Total (S)
@@ -112,10 +97,8 @@ package body Zk_Prover is
      Post => Wk /= null and then Work_Shape (Wk.all, S, G)
    is
    begin
-      Lemma_Wires_Cover (S);
       Wk := new Work'
-        (Wires_Last  => LPR.LV.ST.SA.Total_Wires (S) - 1,
-         Pads_Last   => SPR.Pad_Total (S) - 1,
+        (Pads_Last   => SPR.Pad_Total (S) - 1,
          Wv_Last     => Witness_Count (S) - 1,
          Lqc_Last    => S.Last_Layer,
          Proof_Last  => SV.Proof_Total (S) - 1,
@@ -129,7 +112,6 @@ package body Zk_Prover is
          Nonce_Last  => G.Num_Queries - 1,
          Col_Last    => LP.Opened (G) - 1,
          Path_Last   => 2 * Num_Leaves (G) - 1,
-         Wires       => [others => Zero],
          Pads        => [others => Zero],
          Wv          => [others => Zero],
          Lqc         => [others => (X => 0, Y => 0, Z => 0)],
@@ -234,6 +216,7 @@ package body Zk_Prover is
       Sfb_W : constant Natural := Boundary_Of (S, Sfb);
       NP    : constant Natural := SPR.Pad_Total (S);
       Wk    : Work_Access;
+      Segs  : LPR.LV.ST.SA.Seg_Array_Access;
       Com   : LPR.Commitment_Access;
       Ok_E, Ok_C, Ok_P : Boolean;
    begin
@@ -257,9 +240,13 @@ package body Zk_Prover is
       Allocate_Work (S, G, Wk);
 
       --  Validation: the circuit is satisfied, the inputs below the
-      --  boundary lie in the subfield.
-      PE.Eval_Circuit (P, Inputs, Wk.Wires, Ok_E);
+      --  boundary lie in the subfield. The wires come one heap segment
+      --  per layer (ADR 0080, block 4); Sumcheck_Prover.Prove frees each
+      --  as its layer is proved, and the array goes right after.
+      LPR.LV.ST.SA.Allocate_Segs (S, Segs);
+      PE.Eval_Circuit (P, Inputs, Segs.all, Ok_E);
       if Validate and then not Ok_E then
+         LPR.LV.ST.SA.Release_Segs (Segs);
          Free_Work (Wk);
          St := Not_Satisfied;
          return;
@@ -269,6 +256,7 @@ package body Zk_Prover is
                   or else not Prefix_In_Subfield
                                (S, Inputs, Projected_Count (G, Sfb_W)))
       then
+         LPR.LV.ST.SA.Release_Segs (Segs);
          Free_Work (Wk);
          St := Not_In_Subfield;
          return;
@@ -287,6 +275,7 @@ package body Zk_Prover is
       pragma Assert (Wk.Lqc'Length = P.Last_Layer + 1);
       LPR.Commit (G, Wk.Wv, Wk.Lqc, Sfb_W, Com, Ok_C);
       if not Ok_C then
+         LPR.LV.ST.SA.Release_Segs (Segs);
          Free_Work (Wk);
          St := Config_Invalid;
          return;
@@ -296,7 +285,8 @@ package body Zk_Prover is
       Transcript.Reset (Label);
       Transcript.Write_Bytes (Com.Root);
       LPR.LV.ST.Write_Sumcheck_Statement (Id, S, Inputs (0 .. P.Npublic - 1));
-      SPR.Prove (P, Wk.Wires, Wk.Pads, Wk.SProof, Wk.Ch, Wk.BQ);
+      SPR.Prove (P, Segs.all, Wk.Pads, Wk.SProof, Wk.Ch, Wk.BQ);
+      LPR.LV.ST.SA.Release_Segs (Segs);
       --  The bound quads the core receives are those of the challenges
       --  (ADR 0071), from the prover's own sumcheck, on the expansion of
       --  the packed circuit; the core reads the shape only.

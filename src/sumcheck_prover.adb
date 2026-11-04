@@ -19,6 +19,7 @@ package body Sumcheck_Prover is
 
    use type ST.SA.Term_Array;
    use type ST.SA.Layer;
+   use type ST.SA.Seg_Access;
 
    subtype Logw_Type is ST.SA.Logw_Type;
    Max_Logw : constant := ST.SA.Max_Logw;
@@ -34,6 +35,9 @@ package body Sumcheck_Prover is
      new Ada.Unchecked_Deallocation (Element_Array, Elems_Access);
    procedure Free_Terms is
      new Ada.Unchecked_Deallocation (Term_Array, Terms_Access);
+   --  The segments of the wires (ADR 0080, block 4).
+   procedure Free_Seg is
+     new Ada.Unchecked_Deallocation (Element_Array, ST.SA.Seg_Access);
 
    -------------------------------------------------------------------
    --  The offsets of the core, unfolded one step (as the readers do)
@@ -116,25 +120,24 @@ package body Sumcheck_Prover is
       ST.SV.Lemma_Pad_Mono (S, J + 1, S.Last_Layer + 1, 0);
    end Lemma_Layer_Fits;
 
-   --  The input wires of layer J are segment J + 1 of the wires buffer.
-   procedure Lemma_Segment (S : Shape; J : Natural) with
+   --  The shape of the expansion is the shape of P, field by field: the
+   --  record equality the two expression functions unfold to, through
+   --  the postcondition of Expand. In a lemma of its own since block 4:
+   --  with the segments of the wires in the precondition of Prove_Layer,
+   --  the P-256 instance ran out of budget on the same assertion in the
+   --  context of the procedure.
+   procedure Lemma_Exp_Shape (P : Packed_Circuit) with
      Ghost  => Proof_Only,
      Global => null,
-     Pre    => J <= S.Last_Layer,
-     Post   => ST.SA.Off (S, J + 1) + S.Layers (J).NW_In
-               <= ST.SA.Total_Wires (S)
+     Pre    => PH.PC.Valid (P) and then PH.PC.Indices_Ok (P)
+               and then PH.PC.Layers_Ok (P)
+               and then ST.SA.Shape_Ok (PH.PC.Shape_Of (P))
+               and then ST.SA.Well_Formed (PH.PC.Expand (P)),
+     Post   => Exp_Shape (P) = Shape_Of (P)
    is
-      pragma Annotate
-        (GNATprove, Unhide_Info, "Expression_Function_Body", ST.SA.Off);
    begin
-      --  Off (S, J + 2) = Off (S, J + 1) + Seg_Size (S, J + 1), with
-      --  Seg_Size (S, J + 1) = NW_In of layer J, and Off is monotonic
-      --  up to Total_Wires = Off (S, Last_Layer + 2).
-      for K in J + 2 .. S.Last_Layer + 2 loop
-         pragma Loop_Invariant
-           (ST.SA.Off (S, J + 1) + S.Layers (J).NW_In <= ST.SA.Off (S, K));
-      end loop;
-   end Lemma_Segment;
+      null;
+   end Lemma_Exp_Shape;
 
    -------------------------------------------------------------------
    --  The bound quad of a layer, from the kernels to the reference of
@@ -907,7 +910,7 @@ package body Sumcheck_Prover is
    procedure Prove_Layer
      (P          : Packed_Circuit;
       J          : Natural;
-      Wires      : Element_Array;
+      Wr         : ST.SA.Seg_Array;
       Pads       : Element_Array;
       Logv       : in out Natural;
       Cur0, Cur1 : in out Element_Array;
@@ -923,8 +926,9 @@ package body Sumcheck_Prover is
        J <= P.Last_Layer
        and then PH.PC.Indices_Ok (P) and then PH.PC.Layers_Ok (P)
        and then ST.SA.Shape_Ok (PH.PC.Shape_Of (P))
-       and then Wires'First = 0
-       and then Wires'Length = ST.SA.Total_Wires (Shape_Of (P))
+       and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+       and then Wr (J + 1) /= null and then Wr (J + 1)'First = 0
+       and then Wr (J + 1)'Length = P.Layers (J).NW_In
        and then Pads'First = 0
        and then Pads'Length = Pad_Total (Shape_Of (P))
        and then Logv <= Max_Logw
@@ -971,14 +975,13 @@ package body Sumcheck_Prover is
    begin
       --  The shape of the expansion is the shape of P, field by field;
       --  Chal_Off needs the lemma, the other sizes show their bodies.
+      Lemma_Exp_Shape (P);
       pragma Assert (Proof_Only => SC = S);
       Lemma_Layer_Fits (S, J);
-      Lemma_Segment (S, J);
       ST.SV.Lemma_Chal_Off_Eq (S, SC, J);
       declare
          Logw  : constant Logw_Type := S.Layers (J).Logw;
          NW    : constant Natural := S.Layers (J).NW_In;
-         Seg   : constant Natural := ST.SA.Off (S, J + 1);
          Off_P : constant Natural := ST.SV.Proof_Off (S, J);
          Off_C : constant Natural := ST.SV.Chal_Off (S, J);
          Off_D : constant Natural := ST.SV.Pad_Off (S, J, 0);
@@ -1017,8 +1020,8 @@ package body Sumcheck_Prover is
          for I in 0 .. NW - 1 loop
             pragma Loop_Invariant (A0 /= null and then A1 /= null);
             pragma Loop_Invariant (A0'Length = NW and then A1'Length = NW);
-            A0 (I) := Wires (Seg + I);
-            A1 (I) := Wires (Seg + I);
+            A0 (I) := Wr (J + 1) (I);
+            A1 (I) := Wr (J + 1) (I);
          end loop;
          N0 := NW;
          N1 := NW;
@@ -1129,6 +1132,14 @@ package body Sumcheck_Prover is
               (T.all, NT, 1, Chal, R, Nxt0, Nxt1, Ch.Layer, Off_C,
                Tab, P, J, Logv, Cur0, Cur1, Alpha, Beta);
          end loop;
+         --  The challenges below the layer's offset are as they came, the
+         --  frame the rounds kept: stated here, at the exit of the loop,
+         --  so that the postcondition reads it instead of rebuilding it
+         --  from the invariant across the tail (block 4, P-256 budget).
+         pragma Assert
+           (Proof_Only =>
+              (for all K in 0 .. Ch.Last =>
+                 (if K < Off_C then Same (Ch.Layer (K), Ch_In.Layer (K)))));
          --  The bound quad: the coefficients left at hands (0, 0).
          pragma Assert
            (Proof_Only =>
@@ -1204,7 +1215,7 @@ package body Sumcheck_Prover is
 
    procedure Prove
      (P     : Packed_Circuit;
-      Wires : Element_Array;
+      Wr    : in out ST.SA.Seg_Array;
       Pads  : Element_Array;
       Proof : out Sumcheck_Proof;
       Ch    : out Challenges;
@@ -1221,6 +1232,7 @@ package body Sumcheck_Prover is
       Cl0, Cl1 : Element := Zero;
    begin
       PH.PC.Lemma_Valid (P);
+      Lemma_Exp_Shape (P);
       pragma Assert (Proof_Only => SC = S);
       Proof := (Last => Proof.Last, Evals => [others => Zero]);
       Ch := (Last        => Ch.Last,
@@ -1231,7 +1243,16 @@ package body Sumcheck_Prover is
       BQ := [others => Zero];
       Cur0 := Ch.G;
       Cur1 := Ch.G;
+      --  Segment 0, the outputs, is read by no layer: freed first. The
+      --  segment layer J reads, J + 1, is freed once the layer is proved
+      --  (upstream's prove_core takes and drops each layer's vector).
+      Free_Seg (Wr (0));
       for J in 0 .. P.Last_Layer loop
+         pragma Loop_Invariant (for all K in 0 .. J => Wr (K) = null);
+         pragma Loop_Invariant
+           (for all K in J + 1 .. P.Last_Layer + 1 =>
+              Wr (K) /= null and then Wr (K)'First = 0
+              and then Wr (K)'Length = ST.SA.Seg_Size (S, K));
          pragma Loop_Invariant (Logv <= Max_Logw);
          pragma Loop_Invariant (Proof.Last + 1 = ST.SV.Proof_Total (S));
          pragma Loop_Invariant (Ch.Last + 1 = ST.SV.Chal_Total (S));
@@ -1247,10 +1268,11 @@ package body Sumcheck_Prover is
          declare
             Ch_Before : constant Challenges := Ch with Ghost => Proof_Only;
          begin
-            Prove_Layer (P, J, Wires, Pads, Logv, Cur0, Cur1, Nxt0, Nxt1,
+            Prove_Layer (P, J, Wr, Pads, Logv, Cur0, Cur1, Nxt0, Nxt1,
                          Cl0, Cl1, Proof, Ch, BQ (J));
             ST.SV.Lemma_BQ_Ref_Frame_All (C, Ch, Ch_Before, J);
          end;
+         Free_Seg (Wr (J + 1));
       end loop;
       declare
          Ch_Before : constant Challenges := Ch with Ghost => Proof_Only;

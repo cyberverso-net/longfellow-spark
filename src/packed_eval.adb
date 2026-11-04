@@ -1,6 +1,5 @@
 pragma SPARK_Mode (On);
 
-with Ada.Unchecked_Deallocation;
 
 package body Packed_Eval is
 
@@ -8,6 +7,7 @@ package body Packed_Eval is
    use type SA.Term;
    use type SA.Term_Array;
    use type SA.Layer;
+   use type SA.Seg_Access;
 
    --  The sums and products of this body are the wrappers of
    --  Sumcheck_Algebra, the operations the references Acc_Ref and Z_Ref
@@ -94,34 +94,6 @@ package body Packed_Eval is
    begin
       null;
    end Lemma_Acc_Zero;
-
-   type Elems_Access is access Element_Array;
-
-   procedure Free_Elems is
-     new Ada.Unchecked_Deallocation (Element_Array, Elems_Access);
-
-   -------------------------------------------------------------------
-   --  Off of two equal shapes: the equality of Ada, field by field and
-   --  layer by layer, carried through the hidden recursion of Off one
-   --  step at a time (Lemma_Chal_Off_Eq of Sumcheck_Verifier does the
-   --  same for Chal_Off). Seg_Size shows its body and reads the same
-   --  count in both shapes.
-   -------------------------------------------------------------------
-
-   procedure Lemma_Off_Eq (S1, S2 : Shape; J : Natural) with
-     Ghost  => Proof_Only,
-     Global => null,
-     Pre    => S1 = S2 and then J <= S1.Last_Layer + 2,
-     Post   => SA.Off (S1, J) = SA.Off (S2, J);
-
-   procedure Lemma_Off_Eq (S1, S2 : Shape; J : Natural) is
-   begin
-      for K in 0 .. J - 1 loop
-         pragma Loop_Invariant (SA.Off (S1, K) = SA.Off (S2, K));
-         SA.Lemma_Off_Step (S1, K);
-         SA.Lemma_Off_Step (S2, K);
-      end loop;
-   end Lemma_Off_Eq;
 
    -------------------------------------------------------------------
    --  Eval_Layer
@@ -236,200 +208,174 @@ package body Packed_Eval is
    end Eval_Layer;
 
    -------------------------------------------------------------------
-   --  Layer J is done: segment J of Wires holds V, the quad sum of
-   --  segment J + 1 computed on Before, and Wires agrees with Before
-   --  from segment J + 1 on. Then layer J holds in Wires, the layers
-   --  above it still hold, and the Z status of every layer from J on is
-   --  the same in both buffers. The three lemmas of Sumcheck_Algebra,
-   --  ghost at the default level, cannot take the expansion, a value of
-   --  level Proof_Only, from executable code: this lemma, at that level,
-   --  calls them.
+   --  Lemma_Layer_Seg_Intro of Sumcheck_Algebra at level Proof_Only: the
+   --  expansion C is a Proof_Only constant, and a lemma at the default
+   --  ghost level cannot take it from executable code; this wrapper, at
+   --  that level, calls it.
    -------------------------------------------------------------------
 
-   procedure Lemma_Layer_Done
-     (C      : SA.Circuit;
-      Before : Element_Array;
-      Wires  : Element_Array;
-      J      : Natural;
-      V      : Element_Array)
+   procedure Lemma_Seg_Done
+     (C : SA.Circuit; Out_Seg, In_Seg : Element_Array; J : Natural)
    with
      Ghost  => Proof_Only,
      Global => null,
      Pre    =>
-       Before'First = 0 and then Wires'First = 0
-       and then Before'Length = Wires'Length
+       Out_Seg'First = 0 and then In_Seg'First = 0
        and then J <= C.Last_Layer
-       and then V'First = 0
-       and then V'Length = SA.Seg_Size (SA.Shape_Of (C), J)
-       and then SA.Off (SA.Shape_Of (C), J) + SA.Seg_Size (SA.Shape_Of (C), J)
-                <= Wires'Length
-       and then (for all K in SA.Off (SA.Shape_Of (C), J + 1) .. Wires'Last =>
-                   Same (Before (K), Wires (K)))
-       and then (for all G in V'Range =>
-                   Same (Wires (SA.Off (SA.Shape_Of (C), J) + G), V (G)))
-       and then (for all G in V'Range =>
-                   Same (V (G),
-                         SA.Acc_Ref (Before, SA.Off (SA.Shape_Of (C), J + 1),
-                                     SA.Layer_Terms (C, J),
-                                     SA.Layer_Terms (C, J)'Length, G)))
-       and then (for all J2 in J + 1 .. C.Last_Layer =>
-                   SA.Layer_Holds (C, Before, J2)),
-     Post   =>
-       (for all J2 in J .. C.Last_Layer => SA.Layer_Holds (C, Wires, J2))
-       and then (for all J2 in J + 1 .. C.Last_Layer =>
-                   SA.Layer_Z (C, Before, J2) = SA.Layer_Z (C, Wires, J2))
-       and then SA.Layer_Z (C, Before, J) = SA.Layer_Z (C, Wires, J);
+       and then Out_Seg'Length = SA.Seg_Size (SA.Shape_Of (C), J)
+       and then (for all G in Out_Seg'Range =>
+                   Same (Out_Seg (G),
+                         SA.Acc_Ref (In_Seg, 0, SA.Layer_Terms (C, J),
+                                     SA.Layer_Terms (C, J)'Length, G))),
+     Post   => SA.Layer_Holds_Seg (C, Out_Seg, In_Seg, J);
 
-   procedure Lemma_Layer_Done
-     (C      : SA.Circuit;
-      Before : Element_Array;
-      Wires  : Element_Array;
-      J      : Natural;
-      V      : Element_Array)
+   procedure Lemma_Seg_Done
+     (C : SA.Circuit; Out_Seg, In_Seg : Element_Array; J : Natural)
    is
    begin
-      for J2 in J + 1 .. C.Last_Layer loop
-         pragma Loop_Invariant
-           (for all J3 in J + 1 .. J2 - 1 =>
-              SA.Layer_Holds (C, Wires, J3)
-              and then SA.Layer_Z (C, Before, J3) = SA.Layer_Z (C, Wires, J3));
-         SA.Lemma_Layer_Frame (C, Before, Wires, J2, J);
-      end loop;
-      SA.Lemma_From_Frame (C, Before, Wires, J);
-      SA.Lemma_Layer_Intro (C, Wires, J, V);
-   end Lemma_Layer_Done;
+      SA.Lemma_Layer_Seg_Intro (C, Out_Seg, In_Seg, J);
+   end Lemma_Seg_Done;
+
+   --  Lemma_Layer_Z_Seg_Eq at level Proof_Only, for the same reason.
+   procedure Lemma_Z_Seg_Eq
+     (C : SA.Circuit; In_Seg : Element_Array; J : Natural)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => In_Seg'First = 0 and then J <= C.Last_Layer,
+     Post   => SA.Layer_Z_Seg (C, In_Seg, J)
+               = SA.Z_Ref (In_Seg, 0, SA.Layer_Terms (C, J),
+                           SA.Layer_Terms (C, J)'Length);
+
+   procedure Lemma_Z_Seg_Eq
+     (C : SA.Circuit; In_Seg : Element_Array; J : Natural)
+   is
+   begin
+      SA.Lemma_Layer_Z_Seg_Eq (C, In_Seg, J);
+   end Lemma_Z_Seg_Eq;
+
+   --  One step of the Z status over the layers: the status of the
+   --  layers above J and the status of J give the status from J on.
+   --  Stated on the array of segments as it is before segment J is
+   --  filled (the segments above J only are read).
+   procedure Lemma_Z_Step
+     (C : SA.Circuit; Wr : SA.Seg_Array; J : Natural;
+      Above, At_J : Boolean)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    =>
+       Wr'First = 0 and then J <= C.Last_Layer
+       and then Wr'Last = C.Last_Layer + 1
+       and then (for all K in J + 1 .. Wr'Last =>
+                   Wr (K) /= null and then Wr (K)'First = 0)
+       and then Above = (for all J2 in J + 1 .. C.Last_Layer =>
+                           SA.Layer_Z_Seg (C, Wr (J2 + 1).all, J2))
+       and then At_J = SA.Layer_Z_Seg (C, Wr (J + 1).all, J),
+     Post   =>
+       (Above and At_J)
+       = (for all J2 in J .. C.Last_Layer =>
+            SA.Layer_Z_Seg (C, Wr (J2 + 1).all, J2));
+
+   procedure Lemma_Z_Step
+     (C : SA.Circuit; Wr : SA.Seg_Array; J : Natural;
+      Above, At_J : Boolean)
+   is
+   begin
+      null;
+   end Lemma_Z_Step;
 
    -------------------------------------------------------------------
    --  Eval_Circuit: the body of Sumcheck_Algebra.Eval_Circuit with
-   --  Eval_Layer in place of Eval_Quad on Layer_Terms (C, J). S is the
-   --  shape of P, read by the executable statements; SC the shape of
-   --  the expansion C, which the references name.
+   --  Eval_Layer in place of Eval_Quad on Layer_Terms (C, J), and a heap
+   --  segment per layer in place of the single buffer (block 4). S is
+   --  the shape of P, read by the executable statements; the references
+   --  name the shape of the expansion C, equal to it field by field.
    -------------------------------------------------------------------
 
    procedure Eval_Circuit
-     (P     : Packed_Circuit;
-      W     : Element_Array;
-      Wires : in out Element_Array;
-      OK    : out Boolean)
+     (P  : Packed_Circuit;
+      W  : Element_Array;
+      Wr : in out SA.Seg_Array;
+      OK : out Boolean)
    is
-      C       : constant SA.Circuit := PC.Expand (P) with Ghost => Proof_Only;
-      S       : constant Shape := Shape_Of (P);
-      In_Base : constant Natural := SA.Off (S, P.Last_Layer + 1);
+      C  : constant SA.Circuit := PC.Expand (P) with Ghost => Proof_Only;
+      S  : constant Shape := Shape_Of (P);
+      NL : constant Natural := P.Last_Layer + 1;
    begin
       PC.Lemma_Valid (P);
       SA.Lemma_Shape_Of (C);
       pragma Assert (Proof_Only => SA.Shape_Of (C) = S);
-      declare
-         SC : constant Shape := SA.Shape_Of (C) with Ghost => Proof_Only;
-      begin
-         --  Segment NL is the input.
-         SA.Lemma_Off_Step (S, P.Last_Layer + 1);
-         SA.Lemma_Off_Step (S, P.Last_Layer);
-         SA.Lemma_Off_Mono (S, P.Last_Layer + 1, P.Last_Layer + 2);
-         Lemma_Off_Eq (S, SC, P.Last_Layer + 1);
-         for I in 0 .. P.Ninput - 1 loop
-            Wires (In_Base + I) := W (I);
-            pragma Loop_Invariant
-              (for all K in 0 .. I => Same (Wires (In_Base + K), W (K)));
-         end loop;
+      --  Segment NL is the input: Shape_Ok makes the last layer read
+      --  Ninput wires, so the segment has the size of W.
+      Wr (NL) := new Element_Array'(W);
+      pragma Assert (Wr (NL)'Length = SA.Seg_Size (S, NL));
 
-         OK := True;
-         for J in reverse 0 .. P.Last_Layer loop
-            pragma Loop_Invariant
-              (for all I in 0 .. P.Ninput - 1 =>
-                 Same (Wires (In_Base + I), W (I)));
-            pragma Loop_Invariant
+      OK := True;
+      for J in reverse 0 .. P.Last_Layer loop
+         pragma Loop_Invariant (for all K in 0 .. J => Wr (K) = null);
+         pragma Loop_Invariant
+           (for all K in J + 1 .. NL =>
+              Wr (K) /= null and then Wr (K)'First = 0
+              and then Wr (K)'Length = SA.Seg_Size (S, K));
+         pragma Loop_Invariant
+           (for all I in 0 .. P.Ninput - 1 => Same (Wr (NL) (I), W (I)));
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (for all J2 in J + 1 .. P.Last_Layer =>
+                 SA.Layer_Holds_Seg (C, Wr (J2).all, Wr (J2 + 1).all, J2)));
+         pragma Loop_Invariant
+           (Proof_Only =>
+              OK = (for all J2 in J + 1 .. P.Last_Layer =>
+                      SA.Layer_Z_Seg (C, Wr (J2 + 1).all, J2)));
+         declare
+            Size     : constant SA.Wire_Count := SA.Seg_Size (S, J);
+            V        : SA.Seg_Access :=
+              new Element_Array'(0 .. Size - 1 => Zero);
+            Layer_OK : Boolean;
+         begin
+            Eval_Layer (P, J, Wr (J + 1).all, 0, V.all, Layer_OK);
+            --  The layer under its two names: the walk and the slice of
+            --  the expansion; the segment's size in the two shapes; the
+            --  Z status of the layer in the reference's terms.
+            pragma Assert
               (Proof_Only =>
-                 (for all J2 in J + 1 .. P.Last_Layer =>
-                    SA.Layer_Holds (C, Wires, J2)));
-            pragma Loop_Invariant
+                 Layer_Of (P, J) = SA.Layer_Terms (C, J)
+                 and then PC.Layer_Len (P, J)
+                          = SA.Layer_Terms (C, J)'Length);
+            pragma Assert
+              (Proof_Only => Size = SA.Seg_Size (SA.Shape_Of (C), J));
+            Lemma_Z_Seg_Eq (C, Wr (J + 1).all, J);
+            pragma Assert
               (Proof_Only =>
-                 OK = (for all J2 in J + 1 .. P.Last_Layer =>
-                         SA.Layer_Z (C, Wires, J2)));
-            SA.Lemma_Off_Step (S, J);
-            SA.Lemma_Off_Step (S, J + 1);
-            SA.Lemma_Off_Mono (S, J + 2, P.Last_Layer + 2);
-            SA.Lemma_Off_Mono (S, J + 1, P.Last_Layer + 1);
-            Lemma_Off_Eq (S, SC, J);
-            Lemma_Off_Eq (S, SC, J + 1);
-            declare
-               Size     : constant SA.Wire_Count := SA.Seg_Size (S, J);
-               Base_In  : constant Natural := SA.Off (S, J + 1);
-               Base_Out : constant Natural := SA.Off (S, J);
-               V        : Elems_Access :=
-                 new Element_Array'(0 .. Size - 1 => Zero);
-               Layer_OK : Boolean;
-               Before   : constant Element_Array := Wires
-               with Ghost => Proof_Only;
-            begin
-               Eval_Layer (P, J, Wires, Base_In, V.all, Layer_OK);
-               OK := OK and Layer_OK;
-               for G in 0 .. Size - 1 loop
-                  Wires (Base_Out + G) := V (G);
-                  pragma Loop_Invariant
-                    (for all K in 0 .. G =>
-                       Same (Wires (Base_Out + K), V (K)));
-                  pragma Loop_Invariant
-                    (Proof_Only =>
-                       (for all K in Wires'Range =>
-                          (if K < Base_Out or else K > Base_Out + G
-                           then Same (Wires (K), Before (K)))));
-               end loop;
-               --  The offsets and the layer under their two names: the
-               --  shape of P and the shape of C, the walk and the slice.
-               pragma Assert
-                 (Proof_Only =>
-                    Base_In = SA.Off (SC, J + 1)
-                    and then Base_Out = SA.Off (SC, J)
-                    and then Size = SA.Seg_Size (SC, J));
-               pragma Assert
-                 (Proof_Only =>
-                    Layer_Of (P, J) = SA.Layer_Terms (C, J)
-                    and then PC.Layer_Len (P, J)
-                             = SA.Layer_Terms (C, J)'Length);
-               Lemma_Layer_Done (C, Before, Wires, J, V.all);
-               Free_Elems (V);
-            end;
-         end loop;
+                 Layer_OK = SA.Layer_Z_Seg (C, Wr (J + 1).all, J));
+            Lemma_Z_Step (C, Wr, J, OK, Layer_OK);
+            OK := OK and Layer_OK;
+            pragma Assert
+              (Proof_Only =>
+                 OK = (for all J2 in J .. P.Last_Layer =>
+                         SA.Layer_Z_Seg (C, Wr (J2 + 1).all, J2)));
+            Lemma_Seg_Done (C, V.all, Wr (J + 1).all, J);
+            --  The segment moves into the array; V is not read after.
+            Wr (J) := V;
+         end;
+      end loop;
 
-         pragma Assert
-           (Proof_Only =>
-              OK = (for all J in 0 .. P.Last_Layer =>
-                      SA.Layer_Z (C, Wires, J)));
-         --  The outputs are segment 0, inside the buffer.
-         SA.Lemma_Off_Step (S, 0);
-         SA.Lemma_Off_Mono (S, 1, P.Last_Layer + 2);
-         for G in 0 .. P.Noutput - 1 loop
-            if Wires (G) /= Zero then
-               OK := False;
-            end if;
-            pragma Loop_Invariant
-              (Proof_Only =>
-                 OK = ((for all J in 0 .. P.Last_Layer =>
-                          SA.Layer_Z (C, Wires, J))
-                       and then (for all K in 0 .. G => Wires (K) = Zero)));
-         end loop;
-         --  The postcondition, conjunct by conjunct, on the expansion.
-         pragma Assert
-           (Proof_Only =>
-              (for all I in 0 .. P.Ninput - 1 =>
-                 Same (SA.W_At (Wires, SA.Off (SC, P.Last_Layer + 1) + I),
-                       W (I))));
-         pragma Assert
-           (Proof_Only =>
-              (for all J in 0 .. P.Last_Layer =>
-                 SA.Layer_Holds (C, Wires, J)));
-         pragma Assert
-           (Proof_Only =>
-              (for all G in 0 .. P.Noutput - 1 =>
-                 SA.W_At (Wires, G) = Wires (G)));
-         pragma Assert
+      pragma Assert
+        (Proof_Only =>
+           OK = (for all J in 0 .. P.Last_Layer =>
+                   SA.Layer_Z_Seg (C, Wr (J + 1).all, J)));
+      --  The outputs are segment 0.
+      for G in 0 .. P.Noutput - 1 loop
+         if Wr (0) (G) /= Zero then
+            OK := False;
+         end if;
+         pragma Loop_Invariant
            (Proof_Only =>
               OK = ((for all J in 0 .. P.Last_Layer =>
-                       SA.Layer_Z (C, Wires, J))
-                    and then (for all G in 0 .. P.Noutput - 1 =>
-                                SA.W_At (Wires, G) = Zero)));
-      end;
+                       SA.Layer_Z_Seg (C, Wr (J + 1).all, J))
+                    and then (for all K in 0 .. G => Wr (0) (K) = Zero)));
+      end loop;
    end Eval_Circuit;
 
 end Packed_Eval;

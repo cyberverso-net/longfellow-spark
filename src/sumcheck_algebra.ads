@@ -672,6 +672,45 @@ package Sumcheck_Algebra is
      (Off (S, S.Last_Layer + 2))
    with Global => null;
 
+   -------------------------------------------------------------------
+   --  The wires one segment per layer (ADR 0080, block 4). The prover
+   --  holds segment J in its own heap array of Seg_Size (S, J) elements
+   --  and frees it once the layer that reads it is proved, as upstream's
+   --  prove_core takes and drops each layer's vector
+   --  (rust/runtime/sumcheck/src/prover.rs at d5e6be7). Segs_Null is
+   --  the array as Allocate_Segs leaves it, Segs_Shape the array with
+   --  every segment at its size. Layer_Holds_Seg and Layer_Z_Seg below
+   --  are Layer_Holds and Layer_Z with the segments in place of the
+   --  buffer and its offsets: the same references, read at base 0.
+   -------------------------------------------------------------------
+
+   type Seg_Access is access Element_Array;
+   type Seg_Array is array (Natural range <>) of Seg_Access;
+   type Seg_Array_Access is access Seg_Array;
+
+   function Segs_Null (Wr : Seg_Array) return Boolean is
+     (for all J in Wr'Range => Wr (J) = null)
+   with Global => null;
+
+   function Segs_Shape (Wr : Seg_Array; S : Shape) return Boolean is
+     (Wr'First = 0 and then Wr'Last = S.Last_Layer + 1
+      and then (for all J in Wr'Range =>
+                  Wr (J) /= null and then Wr (J)'First = 0
+                  and then Wr (J)'Length = Seg_Size (S, J)))
+   with Global => null;
+
+   --  The array of Last_Layer + 2 segments, every one null.
+   procedure Allocate_Segs (S : Shape; Wr : out Seg_Array_Access) with
+     Global => null,
+     Post   => Wr /= null and then Wr'First = 0
+               and then Wr'Last = S.Last_Layer + 1
+               and then Segs_Null (Wr.all);
+
+   --  Frees every segment still allocated, then the array.
+   procedure Release_Segs (Wr : in out Seg_Array_Access) with
+     Global => null,
+     Post   => Wr = null;
+
    --  Segment J equals the quad sum of segment J + 1 (Section 6.3.2).
    function Layer_Holds (C : Circuit; Wires : Element_Array; J : Natural)
                          return Boolean is
@@ -690,6 +729,57 @@ package Sumcheck_Algebra is
              Layer_Terms (C, J)'Length))
    with Ghost, Global => null,
         Pre => Wires'First = 0 and then J <= C.Last_Layer;
+
+   --  Layer_Holds on the segments: Out_Seg, the wires computed by layer
+   --  J, is the quad sum of In_Seg, the wires layer J reads, the
+   --  references at base 0 (Section 6.3.2). Hidden as Layer_Holds is;
+   --  Lemma_Layer_Seg_Intro introduces it from the values.
+   function Layer_Holds_Seg
+     (C : Circuit; Out_Seg, In_Seg : Element_Array; J : Natural)
+      return Boolean is
+     (for all G in 0 .. Seg_Size (Shape_Of (C), J) - 1 =>
+        Same (Out_Seg (G),
+              Acc_Ref (In_Seg, 0, Layer_Terms (C, J),
+                       Layer_Terms (C, J)'Length, G)))
+   with Ghost, Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre => Out_Seg'First = 0 and then In_Seg'First = 0
+               and then J <= C.Last_Layer
+               and then Out_Seg'Length = Seg_Size (Shape_Of (C), J);
+
+   --  Layer_Z on the segment layer J reads (Section 6.3.3). Hidden as
+   --  well: quantified over the layers in a loop invariant, its body
+   --  (the slice of the layer inside Z_Ref) is more than the provers
+   --  carry across an iteration; Lemma_Layer_Z_Seg_Eq opens it where
+   --  the status of one layer is established.
+   function Layer_Z_Seg (C : Circuit; In_Seg : Element_Array; J : Natural)
+                         return Boolean is
+     (Z_Ref (In_Seg, 0, Layer_Terms (C, J), Layer_Terms (C, J)'Length))
+   with Ghost, Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre => In_Seg'First = 0 and then J <= C.Last_Layer;
+
+   procedure Lemma_Layer_Z_Seg_Eq
+     (C : Circuit; In_Seg : Element_Array; J : Natural)
+   with
+     Ghost, Global => null,
+     Pre  => In_Seg'First = 0 and then J <= C.Last_Layer,
+     Post => Layer_Z_Seg (C, In_Seg, J)
+             = Z_Ref (In_Seg, 0, Layer_Terms (C, J),
+                      Layer_Terms (C, J)'Length);
+
+   procedure Lemma_Layer_Seg_Intro
+     (C : Circuit; Out_Seg, In_Seg : Element_Array; J : Natural)
+   with
+     Ghost, Global => null,
+     Pre  => Out_Seg'First = 0 and then In_Seg'First = 0
+             and then J <= C.Last_Layer
+             and then Out_Seg'Length = Seg_Size (Shape_Of (C), J)
+             and then (for all G in Out_Seg'Range =>
+                         Same (Out_Seg (G),
+                               Acc_Ref (In_Seg, 0, Layer_Terms (C, J),
+                                        Layer_Terms (C, J)'Length, G))),
+     Post => Layer_Holds_Seg (C, Out_Seg, In_Seg, J);
 
    procedure Eval_Circuit (C : Circuit; W : Element_Array;
                            Wires : in out Element_Array; OK : out Boolean)
