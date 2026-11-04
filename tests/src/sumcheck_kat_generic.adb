@@ -1316,9 +1316,20 @@ package body Sumcheck_KAT_Generic is
                Want : constant Element_Array :=
                  Elements (4 + Len, (Len + 1) / 2);
                B    : Element_Array (0 .. (Len + 1) / 2 - 1);
+               --  Bind_In_Place on a copy of A with two spare entries
+               --  beyond Len, which it must leave as they are.
+               C    : Element_Array (0 .. Len + 1) :=
+                 [others => One];
+               N    : Natural := Len;
             begin
                Bind (A, X, B);
                Check (B = Want, "bind len=" & Len'Image);
+               C (0 .. Len - 1) := A;
+               Bind_In_Place (C, N, X);
+               Check (N = (Len + 1) / 2
+                      and then C (0 .. N - 1) = Want
+                      and then C (Len) = One and then C (Len + 1) = One,
+                      "bind_in_place len=" & Len'Image);
             end;
          elsif Op = "lagrange" then
             declare

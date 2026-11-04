@@ -157,7 +157,17 @@ The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. I
 | verifier, signature | 11 MB | 11 MB | |
 
   The hash proof's peak falls by 26.7 MB, the wires of layers 0 to 12 that the prover frees before it reaches layer 13 (the segments alive there are those of layers 13 to 16, 28.6 MB, as upstream's); it is under the criterion of the milestone, 214 MB, and takes 1.86 times upstream's peak for both circuits, from 2.11. The maximum resident set agrees (234 MB to 206 MB). The round trip does not move: the hash proof 5.02 s before and after, the signature proof 0.49 s, the verifications 2.45 s and 0.29 s. The proofs are identical byte for byte.
-- Next: the working vectors of the rounds (#61, second part); the second table of `Eq2_Table` (#105).
+- Block 4, second part (#108): the working vectors of the rounds in upstream's form, the hands bound where they are (hand 1 in the wire segment, hand 0 in a vector of half the width from round 0), one accumulator: one and a half vectors of the layer's width beside the segment, where there were five (72.2 MB at layer 13 of the hash circuit). Measured in one session (4 November, main 79bad92 against c8bb1af, three runs each, the peaks identical from run to run; upstream's prover under the same counter in the same session):
+
+| Peak heap | before (main 79bad92) | after block 4b | upstream (both circuits) |
+|---|---|---|---|
+| prover, hash | 199 MB | 142 MB | 107 MB |
+| prover, signature | 23 MB | 20 MB | |
+| verifier, hash | 79 MB | 79 MB | 48 MB |
+| verifier, signature | 11 MB | 11 MB | |
+
+  The hash proof's peak falls by 57.8 MB, within 32 bytes of the five vectors of layer 13 less the accumulator that stays; the peak is still inside `Eq2_Table` of layer 13, before the half-width vector of hand 0 exists, so the two eq2 tables (33.6 MB, #105) and the merged terms (36.9 MB) are now its largest pieces. It is 1.32 times upstream's peak for both circuits in one process, from 1.86, and 66 % of the criterion of the milestone. The maximum resident set agrees (206 MB to 148 MB). The hash proof is 0.09 s faster (4.96 to 4.87 s, no copy of the wires per hand); the signature proof 0.48 s; the verifications unchanged. The proofs are identical byte for byte.
+- Next: the second table of `Eq2_Table` (#105).
 
 ## After M2
 

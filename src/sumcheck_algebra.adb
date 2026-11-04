@@ -547,6 +547,30 @@ package body Sumcheck_Algebra is
       end loop;
    end Bind;
 
+   procedure Bind_In_Place
+     (A : in out Element_Array; N : in out Natural; X : Element)
+   is
+      M      : constant Natural := (N + 1) / 2;
+      A0, A1 : Element;
+   begin
+      --  Entry I is written after entries 2 I and 2 I + 1 are read, and
+      --  2 I >= I: the entries still to read are the ones that came in.
+      for I in 0 .. M - 1 loop
+         pragma Loop_Invariant
+           (for all K in I .. A'Last => Same (A (K), A'Loop_Entry (K)));
+         pragma Loop_Invariant
+           (for all J in 0 .. I - 1 =>
+              Same (A (J),
+                    (One - X) * Pad (A'Loop_Entry (0 .. N - 1), 2 * J)
+                    + X * Pad (A'Loop_Entry (0 .. N - 1), 2 * J + 1)));
+         A0 := Pad (A (0 .. N - 1), 2 * I);
+         A1 := Pad (A (0 .. N - 1), 2 * I + 1);
+         A (I) := A0 + X * (A1 - A0);
+         RL.Lemma_Bind_Pair (X, A0, A1);
+      end loop;
+      N := M;
+   end Bind_In_Place;
+
    ----------------------------------------------------------------------
    --  Eval_Quad
    ----------------------------------------------------------------------

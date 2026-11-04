@@ -83,6 +83,7 @@ Each Gold kernel has a ghost reference that transcribes the formula with the ope
 Since milestone M2 ([ADR 0070](../adr/0070-sumcheck-and-ligero-kernels-as-upstream.md)), the bodies of `Bind` and `Bindeq` compute in upstream's form, with fewer products, and reach the same references through the ring laws of `Field_Signature`:
 
 - `Bind` writes a + x (b - a), one product, for (1 - x) a + x b.
+- `Bind_In_Place` (block 4 of the memory milestone, [ADR 0080](../adr/0080-milestone-memory.md)) writes the same values where they are, entry i from entries 2i and 2i + 1, which are read before they are overwritten since 2i is at least i; the first n entries shrink to (n + 1) / 2, the rest are untouched. Its postcondition is `Bind`'s on the vector as it came (`A'Old`). The prover binds the vectors of its two hands with it, one of them the wire segment of the layer, as upstream's `dense::bind` does; `sumcheck_kat` checks it against `Bind` on the same vectors.
 - `Bindeq` writes c t and t - c t, one product per pair. It is `Bindeq_From` started from One.
 - `Eq2_Table` starts the second table from alpha, so no product remains in the sum.
 - The laws are ghost lemmas, proved by each field. `Ring_Laws` derives from them the identities the kernels use. It is instantiated on the hidden wrappers, so that the contracts of the field, `Mul_Ref` or the integer model, stay out of these proofs: with them in the context the provers do not close even a four-step lemma.

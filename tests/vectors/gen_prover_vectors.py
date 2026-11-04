@@ -489,6 +489,11 @@ def prove_cases(lines):
         ("gf2_128", SC.zcheck(), [1, 0, 7], 3, (4, 6, 64), 0, "ok"),
         ("p256", SC.sgonal_p256(), [1, 45, 5, 6], 123456789, (4, 6, 64), 0, "ok"),
         ("p256", SC.sgonal_p256(), [1, 45, 5, 6], 11, (4, 6, 64), 0, "ok"),
+        # a layer of one wire and no round (block 4b of the memory
+        # milestone): its claims are the wire, in both hands
+        ("gf2_128", SC.onewire_gf2_128(), [1, 0x6C, 0x6C], 5, (4, 6, 64), 0,
+         "ok"),
+        ("p256", SC.onewire_p256(), [1, 45, 45], 9, (4, 6, 64), 0, "ok"),
         ("gf2_128", SC.sgonal_gf2_128(), [1, 0x6C, 5], 1, (4, 6, 64), 0,
          "input_length"),
         ("gf2_128", SC.sgonal_gf2_128(), [1, 0x6C, 5, 7], 1, (4, 6, 64), 0,
