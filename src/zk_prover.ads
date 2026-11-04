@@ -33,9 +33,10 @@
 --  (Sumcheck_Prover.Prove), the verifier core on those challenges for
 --  the constraints (ADR 0022, 0049), the Ligero proof under the fixed
 --  statement hash of zk/ common.rs (Exhausted when the generator passes
---  its bound), and the bytes (Write_Proof). Memory: the wires, the
---  pads, the witness vector, the proofs and the constraints live on the
---  heap (ADR 0047).
+--  its bound), and the bytes (Write_Proof). Memory: the pads, the
+--  witness vector, the proofs and the constraints live on the heap
+--  (ADR 0047); the wires one heap segment per layer, each freed by the
+--  sumcheck prover once its layer is proved (ADR 0080, block 4).
 --
 --  Documentation: docs/guide/07-prover.md.
 --

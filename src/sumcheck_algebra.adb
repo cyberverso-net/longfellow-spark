@@ -12,6 +12,12 @@ package body Sumcheck_Algebra is
    procedure Free_Elems is
      new Ada.Unchecked_Deallocation (Element_Array, Elems_Access);
 
+   --  The segments of the prover's wires (ADR 0080, block 4).
+   procedure Free_Seg is
+     new Ada.Unchecked_Deallocation (Element_Array, Seg_Access);
+   procedure Free_Seg_Array is
+     new Ada.Unchecked_Deallocation (Seg_Array, Seg_Array_Access);
+
    function "+" (A, B : Element) return Element is (F."+" (A, B));
    function "-" (A, B : Element) return Element is (F."-" (A, B));
    function "*" (A, B : Element) return Element is (F."*" (A, B));
@@ -762,6 +768,45 @@ package body Sumcheck_Algebra is
                   and then (for all K in 0 .. G => Wires (K) = Zero)));
       end loop;
    end Eval_Circuit;
+
+   -------------------------------------------------------------------
+   --  The wires one segment per layer (ADR 0080, block 4)
+   -------------------------------------------------------------------
+
+   procedure Allocate_Segs (S : Shape; Wr : out Seg_Array_Access) is
+   begin
+      Wr := new Seg_Array'(0 .. S.Last_Layer + 1 => null);
+   end Allocate_Segs;
+
+   procedure Release_Segs (Wr : in out Seg_Array_Access) is
+   begin
+      if Wr /= null then
+         for J in Wr'Range loop
+            pragma Loop_Invariant
+              (for all K in Wr'First .. J - 1 => Wr (K) = null);
+            Free_Seg (Wr (J));
+         end loop;
+         Free_Seg_Array (Wr);
+      end if;
+   end Release_Segs;
+
+   procedure Lemma_Layer_Seg_Intro
+     (C : Circuit; Out_Seg, In_Seg : Element_Array; J : Natural)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Layer_Holds_Seg);
+   begin
+      null;
+   end Lemma_Layer_Seg_Intro;
+
+   procedure Lemma_Layer_Z_Seg_Eq
+     (C : Circuit; In_Seg : Element_Array; J : Natural)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Layer_Z_Seg);
+   begin
+      null;
+   end Lemma_Layer_Z_Seg_Eq;
 
    ----------------------------------------------------------------------
    --  Bind_G

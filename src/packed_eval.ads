@@ -5,8 +5,9 @@
 --  terms of a layer are rebuilt one at a time from the deltas
 --  (Packed_Circuits, the walk) and accumulated as they come. Eval_Layer
 --  is Eval_Quad of Sumcheck_Algebra over the walk; Eval_Circuit drives
---  the layers into one buffer exactly as the expanded Eval_Circuit does,
---  with the lemmas of its proof.
+--  the layers as the expanded Eval_Circuit does, each layer's wires in
+--  a heap segment of its own (block 4), so that the prover frees them
+--  once the layer is proved.
 --
 --  The model is the ghost expansion Expand (P). Every result is stated
 --  on it, at level Proof_Only, exactly as Eval_Quad and Eval_Circuit
@@ -117,16 +118,21 @@ package Packed_Eval is
                    SA.Acc_Ref (W, Base, Layer_Of (P, J),
                                PC.Layer_Len (P, J), G))));
 
-   --  Eval_Circuit of Sumcheck_Algebra from the packed form: segment J
-   --  of Wires holds the wires computed by layer J, the last segment the
-   --  inputs W, and OK says whether every Z assertion holds and every
-   --  output of layer 0 is zero. The postcondition is the one of the
-   --  expanded Eval_Circuit on the expansion of P.
+   --  Eval_Circuit of Sumcheck_Algebra from the packed form, the wires
+   --  one segment per layer (ADR 0080, block 4): Wr comes with every
+   --  segment null (Allocate_Segs) and leaves with segment J the wires
+   --  computed by layer J and the last segment the inputs W, each in
+   --  its own heap array of Seg_Size (S, J) elements; OK says whether
+   --  every Z assertion holds and every output of layer 0 is zero. The
+   --  postcondition is the one of the expanded Eval_Circuit on the
+   --  expansion of P, stated layer by layer on the segments
+   --  (Layer_Holds_Seg, Layer_Z_Seg), so that the prover can free the
+   --  segment of a layer once the layer is proved.
    procedure Eval_Circuit
-     (P     : Packed_Circuit;
-      W     : Element_Array;
-      Wires : in out Element_Array;
-      OK    : out Boolean)
+     (P  : Packed_Circuit;
+      W  : Element_Array;
+      Wr : in out SA.Seg_Array;
+      OK : out Boolean)
    with
      Global => null,
      Pre    =>
@@ -134,25 +140,24 @@ package Packed_Eval is
           PC.Indices_Ok (P) and then PC.Layers_Ok (P)
           and then SA.Shape_Ok (PC.Shape_Of (P))
           and then W'First = 0 and then W'Length = P.Ninput
-          and then Wires'First = 0
-          and then Wires'Length = SA.Total_Wires (Shape_Of (P)),
+          and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+          and then SA.Segs_Null (Wr),
         Proof_Only =>
           PC.Valid (P) and then SA.Well_Formed (PC.Expand (P))),
      Post   =>
-       (Proof_Only =>
+       (Runtime    => SA.Segs_Shape (Wr, Shape_Of (P)),
+        Proof_Only =>
           (for all I in 0 .. P.Ninput - 1 =>
-             SA.F.Same (SA.W_At (Wires,
-                            SA.Off (SA.Shape_Of (PC.Expand (P)),
-                                    P.Last_Layer + 1) + I),
-                   W (I)))
+             SA.F.Same (Wr (P.Last_Layer + 1) (I), W (I)))
           and then
           (for all J in 0 .. P.Last_Layer =>
-             SA.Layer_Holds (PC.Expand (P), Wires, J))
+             SA.Layer_Holds_Seg (PC.Expand (P), Wr (J).all, Wr (J + 1).all,
+                                 J))
           and then
           OK = ((for all J in 0 .. P.Last_Layer =>
-                   SA.Layer_Z (PC.Expand (P), Wires, J))
+                   SA.Layer_Z_Seg (PC.Expand (P), Wr (J + 1).all, J))
                 and then
                 (for all G in 0 .. P.Noutput - 1 =>
-                   SA.F."=" (SA.W_At (Wires, G), Zero))));
+                   SA.F."=" (Wr (0) (G), Zero))));
 
 end Packed_Eval;

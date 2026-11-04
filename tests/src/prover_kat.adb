@@ -722,6 +722,7 @@ procedure Prover_KAT is
             W     : SA.Element_Array (0 .. Nwit - 1);
             Wires : SA.Element_Array (0 .. SA.Total_Wires (Sh) - 1) :=
               [others => SA.Zero];
+            Segs  : SA.Seg_Array_Access;
             Pads  : SA.Element_Array (0 .. SPR.Pad_Total (Sh) - 1);
             Proof : SV.Sumcheck_Proof (Last => SV.Proof_Total (Sh) - 1);
             Ch    : SV.Challenges (Last => SV.Chal_Total (Sh) - 1);
@@ -739,22 +740,25 @@ procedure Prover_KAT is
                W (I) := To_Element (F (9 + I));
             end loop;
             SA.Eval_Circuit (C.all, W, Wires, Ok);
-            --  The wires from the packed form (Packed_Eval, ADR 0080)
-            --  against the expanded evaluation, the oracle.
+            --  The wires from the packed form (Packed_Eval, ADR 0080),
+            --  one segment per layer, against the expanded evaluation
+            --  in its single buffer, the oracle: segment by segment.
             declare
-               Wires_P : SA.Element_Array (Wires'Range) :=
-                 [others => SA.Zero];
-               Ok_P    : Boolean;
+               Ok_P : Boolean;
             begin
-               PE.Eval_Circuit (PK.all, W, Wires_P, Ok_P);
-               for I in Wires'Range loop
-                  if Wires_P (I) /= Wires (I) then
-                     Ok_P := not Ok;
-                  end if;
+               SA.Allocate_Segs (Sh, Segs);
+               PE.Eval_Circuit (PK.all, W, Segs.all, Ok_P);
+               for J in 0 .. C.Last_Layer + 1 loop
+                  for G in 0 .. SA.Seg_Size (Sh, J) - 1 loop
+                     if Segs (J) (G) /= Wires (SA.Off (Sh, J) + G) then
+                        Ok_P := not Ok;
+                     end if;
+                  end loop;
                end loop;
                if Ok_P /= Ok then
                   Report_Failure (Name & ": the wires from the packed form "
                                   & "differ from the expanded evaluation");
+                  SA.Release_Segs (Segs);
                   CR.Free (C);
                   CR.Free_Packed (PK);
                   return;
@@ -762,6 +766,7 @@ procedure Prover_KAT is
             end;
             if not Ok then
                Report_Failure (Name & ": the witness does not satisfy");
+               SA.Release_Segs (Segs);
                CR.Free (C);
                CR.Free_Packed (PK);
                return;
@@ -774,12 +779,15 @@ procedure Prover_KAT is
             for I in Pads'Range loop
                if Pads (I) /= To_Element (F (10 + Nwit + I)) then
                   Report_Failure (Name & ": pad" & I'Image & " differs");
+                  SA.Release_Segs (Segs);
                   CR.Free (C);
                   CR.Free_Packed (PK);
                   return;
                end if;
             end loop;
-            SPR.Prove (PK.all, Wires, Pads, Proof, Ch, BQ);
+            --  The sumcheck on the segments, which it frees one by one.
+            SPR.Prove (PK.all, Segs.all, Pads, Proof, Ch, BQ);
+            SA.Release_Segs (Segs);
             --  ADR 0071: the bound quad of every layer, from the sumcheck
             --  of the prover, against the verifier's, from the packed
             --  form (Zk_Verifier.Bound_Quads).

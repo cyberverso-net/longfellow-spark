@@ -467,6 +467,13 @@ package body Sumcheck_HQuad is
          end if;
       end Lemma_V_Out;
 
+      --  The sums are taken one step at a time (Lemma_W_Step) with W_Sum
+      --  hidden, instead of unfolding its definition over the whole
+      --  lemma: with the definition open, the P-256 instance proved this
+      --  postcondition at 83 % of the step budget, and ran past it when
+      --  the memory milestone (block 4) added declarations to the
+      --  algebra, which every verification condition of an instance of
+      --  this generic carries in its context. The contract is unchanged.
       procedure Lemma_Bind_H_Step
         (T0, T : Term_Array;
          H     : Hand;
@@ -474,9 +481,6 @@ package body Sumcheck_HQuad is
          K     : Natural;
          A, B  : Natural)
       is
-         pragma Unreferenced (T);
-         pragma Annotate
-           (GNATprove, Unhide_Info, "Expression_Function_Body", W_Sum);
          P   : constant Natural := Rd (T0, H, K - 1);
          X0  : constant Natural := Hand_Index (T0 (T0'First + P), H);
          Y0  : constant Natural := Hand_Index (T0 (T0'First + P), 1 - H);
@@ -485,7 +489,15 @@ package body Sumcheck_HQuad is
          Wo1 : constant Element := W_Sum (T0, P, H, 2 * A + 1, B);
       begin
          Lemma_Rd_Step (T0, H, K);
+         --  The merged sum at K from the sum at K - 1 and term K - 1; the
+         --  corner sums at P + 1 (and P + 2 when two corners are read)
+         --  from the sums at P and the corners.
+         Lemma_W_Step (T, K - 1, H, A, B);
+         Lemma_W_Step (T0, P, H, 2 * A, B);
+         Lemma_W_Step (T0, P, H, 2 * A + 1, B);
          if Two (T0, P, H) then
+            Lemma_W_Step (T0, P + 1, H, 2 * A, B);
+            Lemma_W_Step (T0, P + 1, H, 2 * A + 1, B);
             if X0 / 2 = A and then Y0 = B then
                SA.RL.Lemma_Split_LR
                  (One - R, R, Wo0, Wo1, Kp, T0 (T0'First + P + 1).K);

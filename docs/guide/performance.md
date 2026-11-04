@@ -147,7 +147,17 @@ The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. I
 | verifier, signature | 11 MB | 11 MB | |
 
   The peaks are identical from run to run. The prover's peak falls 2.7 times on the hash circuit and 2.2 times on the signature circuit; the hash proof alone takes 2.1 times upstream's peak for both circuits, from 5.8 times. The maximum resident set agrees (629 MB to 234 MB on the hash circuit). The fall, 395 MB, is again more than the expanded circuit (248 MB): the per-layer term arrays of the expanded path went with it. The round trip does not move: the hash proof takes 5.01 s (from 5.05 s), the signature proof 0.49 s, the verifications 2.43 s and 0.29 s as in the first part; the proofs are identical byte for byte. `first_step_bench` on the hash circuit, three processes: the packed first step over the 17 layers 1.44 s, the exact `Eval_Bound_Quad` 22.6 s (it visits every term for each of the 2 × Logw bound coefficients; the kernel merges the runs first); on the signature circuit 92 ms against 1.01 s. The largest object either program now allocates for a layer is the working array of the rounds, 36.9 MB on layer 13 of the hash circuit (1,153,333 runs of 32 bytes), freed with the layer: it is most of the verifier's 79 MB above the packed form. The prover holds beside it the wires of every layer, the pads, the Ligero tableau and the proof.
-- Next: the prover's wires (#60, #61).
+- Block 4, first part (#106): the prover's wires in one heap segment per layer, freed as the layer is proved. The profile of #60 (3 November, same session as upstream's prover under the same counter, both at the peak of the hash proof, layer 13): the wires alive 55.2 MB here against 28.6 MB upstream, the five working vectors of the rounds 72.2 against 21.7, the merged terms 36.9 against 27.7, the eq2 tables alive inside `Eq2_Table` 33.6 against none; these four explain the 119 MB between the two peaks. Measured in one session (4 November, main af26481 against 6889a56, three runs each, the peaks identical from run to run; upstream's prover under the same counter in the same session):
+
+| Peak heap | before (main af26481) | after block 4a | upstream (both circuits) |
+|---|---|---|---|
+| prover, hash | 226 MB | 199 MB | 107 MB |
+| prover, signature | 27 MB | 23 MB | |
+| verifier, hash | 79 MB | 79 MB | 48 MB |
+| verifier, signature | 11 MB | 11 MB | |
+
+  The hash proof's peak falls by 26.7 MB, the wires of layers 0 to 12 that the prover frees before it reaches layer 13 (the segments alive there are those of layers 13 to 16, 28.6 MB, as upstream's); it is under the criterion of the milestone, 214 MB, and takes 1.86 times upstream's peak for both circuits, from 2.11. The maximum resident set agrees (234 MB to 206 MB). The round trip does not move: the hash proof 5.02 s before and after, the signature proof 0.49 s, the verifications 2.45 s and 0.29 s. The proofs are identical byte for byte.
+- Next: the working vectors of the rounds (#61, second part); the second table of `Eq2_Table` (#105).
 
 ## After M2
 
