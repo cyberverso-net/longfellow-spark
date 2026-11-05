@@ -75,6 +75,17 @@
 --  their loops are fixed by the lengths and read no element in a
 --  branch (ADR 0051); the guarantee is scoped to builds with
 --  assertions disabled (ADR 0006).
+--
+--  Eq2_Table is filled by recursion, as upstream's fill_recursive
+--  (rust/runtime/sumcheck/src/eq.rs at d5e6be7, ADR 0080 #105): the
+--  entries split at their high bit, the weights of the two tables
+--  carried down, in one array. The depth is L, at most Max_Bindeq_Log
+--  (24), bounded by a Subprogram_Variant: the stack holds 24 frames of
+--  two weights each. It is the third recursion of the library's
+--  executable code, after the transforms of Additive_FFT and
+--  Rfft_P256. The table depends on public data only (the challenges);
+--  the recursion branches on L alone, so the constant-time discipline
+--  is not engaged.
 
 pragma SPARK_Mode (On);
 

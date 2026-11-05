@@ -932,31 +932,281 @@ package body Sumcheck_Algebra is
       return Len;
    end Table_Len;
 
+   ----------------------------------------------------------------------
+   --  Eq2_Table: fill_recursive of eq.rs (ADR 0080, #105)
+   --
+   --  The table is filled in one array, as upstream's eq2: the entries
+   --  below 2^L split at their high bit, the low half weighted by
+   --  (1 - g [L - 1]), the high half by g [L - 1], the two weights of
+   --  the two tables carried down the recursion; a leaf is w0 + w1. No
+   --  second table. The recursion is of depth L, at most Max_Bindeq_Log
+   --  (24), bounded by its variant; the table depends on public data
+   --  only (the challenges), and the recursion branches on L alone.
+   ----------------------------------------------------------------------
+
+   --  2^L is twice 2^(L - 1).
+   procedure Lemma_TL_Step (L : Positive) with
+     Ghost => Proof_Only, Global => null,
+     Pre  => L <= Max_Bindeq_Log,
+     Post => Table_Len (L) = 2 * Table_Len (L - 1);
+
+   procedure Lemma_TL_Step (L : Positive) is
+   begin
+      pragma Assert (Pow2 (L) = 2 * Pow2 (L - 1));
+      pragma Assert (To_Big_Integer (Table_Len (L))
+                     = 2 * To_Big_Integer (Table_Len (L - 1)));
+      pragma Assert (To_Big_Integer (Table_Len (L))
+                     = To_Big_Integer (2 * Table_Len (L - 1)));
+   end Lemma_TL_Step;
+
+   --  The factor of the high bit of an index, H.
+   function High_F (G : Element_Array; L : Positive; B : Natural)
+                    return Element is
+     (if B = 1 then G (L - 1) else One - G (L - 1))
+   with Ghost => Proof_Only, Global => null,
+        Pre => G'First = 0 and then L <= G'Length;
+
+   --  bindeq peeled at the high bit: for X below 2^(L - 1 - K), the
+   --  reference of G (0 .. L - 1) from K at X, plus 2^(L - 1 - K) when
+   --  B is 1, is the reference of G (0 .. L - 2) from K at X times the
+   --  factor of bit L - 1. Bindeq_Ref recurses on the low bit, the
+   --  recursion of the table on the high one; associativity joins them.
+   procedure Lemma_Peel
+     (G : Element_Array; L : Positive; K, X, B : Natural)
+   with
+     Ghost  => Proof_Only, Global => null,
+     Pre    => G'First = 0 and then L <= G'Length
+               and then L <= Max_Bindeq_Log
+               and then K <= L - 1 and then B <= 1
+               and then X < Table_Len (L - 1 - K),
+     Post   =>
+       Same (Bindeq_Ref (G (0 .. L - 1), K,
+                         X + (if B = 1 then Table_Len (L - 1 - K) else 0)),
+             Bindeq_Ref (G (0 .. L - 2), K, X) * High_F (G, L, B)),
+     Subprogram_Variant => (Decreases => L - 1 - K);
+
+   procedure Lemma_Peel
+     (G : Element_Array; L : Positive; K, X, B : Natural)
+   is
+      H : constant Element := High_F (G, L, B);
+   begin
+      if K = L - 1 then
+         --  X is 0, the index is B: the factor of bit L - 1 times the
+         --  empty product, against the empty product times it.
+         pragma Assert (Table_Len (0) = 1);
+         pragma Assert (X = 0);
+         pragma Assert
+           (Bindeq_Ref (G (0 .. L - 1), K, B) = H * One);
+         pragma Assert (Bindeq_Ref (G (0 .. L - 2), K, 0) = One);
+         Lemma_Mul_One (H);
+         Lemma_Mul_Comm (One, H);
+      else
+         Lemma_TL_Step (L - 1 - K);
+         declare
+            S : constant Positive := Table_Len (L - 2 - K);
+            I : constant Natural := X + (if B = 1 then 2 * S else 0);
+            F : constant Element :=
+              (if X mod 2 = 0 then One - G (K) else G (K));
+         begin
+            pragma Assert (I mod 2 = X mod 2);
+            pragma Assert (I / 2 = X / 2 + (if B = 1 then S else 0));
+            pragma Assert (X / 2 < S);
+            Lemma_Peel (G, L, K + 1, X / 2, B);
+            pragma Assert
+              (Bindeq_Ref (G (0 .. L - 1), K, I)
+               = F * Bindeq_Ref (G (0 .. L - 1), K + 1, I / 2));
+            pragma Assert
+              (Bindeq_Ref (G (0 .. L - 2), K, X)
+               = F * Bindeq_Ref (G (0 .. L - 2), K + 1, X / 2));
+            Lemma_Mul_Assoc (F, Bindeq_Ref (G (0 .. L - 2), K + 1, X / 2), H);
+         end;
+      end if;
+   end Lemma_Peel;
+
+   --  The weights of the two halves: (w - w h) r = w (r (1 - h)) and
+   --  (w h) r = w (r h).
+   procedure Lemma_Weight (W, H, R : Element) with
+     Ghost => Proof_Only, Global => null,
+     Post  => Same ((W - W * H) * R, W * (R * (One - H)))
+              and then Same ((W * H) * R, W * (R * H));
+
+   procedure Lemma_Weight (W, H, R : Element) is
+   begin
+      --  w - w h = w (1 - h)
+      Lemma_Mul_Distrib_Sub (W, One, H);
+      Lemma_Mul_One (W);
+      --  (w (1 - h)) r = w ((1 - h) r) = w (r (1 - h))
+      Lemma_Mul_Assoc (W, One - H, R);
+      Lemma_Mul_Comm (One - H, R);
+      --  (w h) r = w (h r) = w (r h)
+      Lemma_Mul_Assoc (W, H, R);
+      Lemma_Mul_Comm (H, R);
+   end Lemma_Weight;
+
+   --  The value of Fill at an entry.
+   function Fill_Ref
+     (G0, G1 : Element_Array; L : Natural; W0, W1 : Element; X : Natural)
+      return Element
+   is
+     (W0 * Bindeq_Ref (G0 (0 .. L - 1), 0, X)
+      + W1 * Bindeq_Ref (G1 (0 .. L - 1), 0, X))
+   with Ghost => Proof_Only, Global => null,
+        Pre => G0'First = 0 and then G1'First = 0
+               and then L <= G0'Length and then L <= G1'Length
+               and then L <= Max_Bindeq_Log;
+
+   --  One level of Fill: the two halves filled with the weights of the
+   --  high bit give the whole block.
+   procedure Lemma_Fill_Step
+     (E : Element_Array; Lo : Natural; L : Positive;
+      G0, G1 : Element_Array; W0, W1 : Element)
+   with
+     Ghost  => Proof_Only, Global => null,
+     Pre    => G0'First = 0 and then G1'First = 0
+               and then L <= G0'Length and then L <= G1'Length
+               and then L <= Max_Bindeq_Log
+               and then Table_Len (L) = 2 * Table_Len (L - 1)
+               and then E'First = 0
+               and then Lo <= E'Last
+               and then Table_Len (L) - 1 <= E'Last - Lo
+               and then
+               (for all X in 0 .. Table_Len (L - 1) - 1 =>
+                  Same (E (Lo + X),
+                        Fill_Ref (G0, G1, L - 1, W0 - W0 * G0 (L - 1),
+                                  W1 - W1 * G1 (L - 1), X)))
+               and then
+               (for all X in 0 .. Table_Len (L - 1) - 1 =>
+                  Same (E (Lo + Table_Len (L - 1) + X),
+                        Fill_Ref (G0, G1, L - 1, W0 * G0 (L - 1),
+                                  W1 * G1 (L - 1), X))),
+     Post   =>
+       (for all X in 0 .. Table_Len (L) - 1 =>
+          Same (E (Lo + X), Fill_Ref (G0, G1, L, W0, W1, X)));
+
+   procedure Lemma_Fill_Step
+     (E : Element_Array; Lo : Natural; L : Positive;
+      G0, G1 : Element_Array; W0, W1 : Element)
+   is
+      S : constant Positive := Table_Len (L - 1);
+   begin
+      pragma Assert (L - 1 - 0 = L - 1);
+      for X in 0 .. S - 1 loop
+         Lemma_Peel (G0, L, 0, X, 0);
+         Lemma_Peel (G1, L, 0, X, 0);
+         Lemma_Peel (G0, L, 0, X, 1);
+         Lemma_Peel (G1, L, 0, X, 1);
+         Lemma_Weight (W0, G0 (L - 1), Bindeq_Ref (G0 (0 .. L - 2), 0, X));
+         Lemma_Weight (W1, G1 (L - 1), Bindeq_Ref (G1 (0 .. L - 2), 0, X));
+         pragma Assert
+           (Same (E (Lo + X), Fill_Ref (G0, G1, L, W0, W1, X)));
+         pragma Assert
+           (Same (E (Lo + S + X), Fill_Ref (G0, G1, L, W0, W1, S + X)));
+         pragma Loop_Invariant
+           (for all X2 in 0 .. X =>
+              Same (E (Lo + X2), Fill_Ref (G0, G1, L, W0, W1, X2))
+              and then
+              Same (E (Lo + S + X2), Fill_Ref (G0, G1, L, W0, W1, S + X2)));
+      end loop;
+   end Lemma_Fill_Step;
+
+   --  E (Lo + X) = W0 bindeq (G0) (X) + W1 bindeq (G1) (X) for X below
+   --  2^L, the other entries of E untouched.
+   procedure Fill
+     (E      : in out Element_Array;
+      Lo     : Natural;
+      L      : Natural;
+      G0, G1 : Element_Array;
+      W0, W1 : Element)
+   with
+     Global => null,
+     Pre    => G0'First = 0 and then G1'First = 0
+               and then L <= G0'Length and then L <= G1'Length
+               and then L <= Max_Bindeq_Log
+               and then E'First = 0
+               and then Lo <= E'Last
+               and then Table_Len (L) - 1 <= E'Last - Lo,
+     Post   =>
+       (Proof_Only =>
+          (for all X in 0 .. Table_Len (L) - 1 =>
+             Same (E (Lo + X), Fill_Ref (G0, G1, L, W0, W1, X)))
+          and then
+          (for all K in E'Range =>
+             (if K < Lo or else K > Lo + Table_Len (L) - 1
+              then Same (E (K), E'Old (K))))),
+     Subprogram_Variant => (Decreases => L);
+
+   procedure Fill
+     (E      : in out Element_Array;
+      Lo     : Natural;
+      L      : Natural;
+      G0, G1 : Element_Array;
+      W0, W1 : Element)
+   is
+   begin
+      if L = 0 then
+         E (Lo) := W0 + W1;
+         Lemma_Mul_One (W0);
+         Lemma_Mul_One (W1);
+         pragma Assert
+           (Proof_Only =>
+              Bindeq_Ref (G0 (0 .. -1), 0, 0) = One
+              and then Bindeq_Ref (G1 (0 .. -1), 0, 0) = One);
+      else
+         declare
+            S    : constant Positive := Table_Len (L - 1);
+            W0hi : constant Element := W0 * G0 (L - 1);
+            W1hi : constant Element := W1 * G1 (L - 1);
+            W0lo : constant Element := W0 - W0hi;
+            W1lo : constant Element := W1 - W1hi;
+         begin
+            Lemma_TL_Step (L);
+            Fill (E, Lo, L - 1, G0, G1, W0lo, W1lo);
+            Fill (E, Lo + S, L - 1, G0, G1, W0hi, W1hi);
+            Lemma_Fill_Step (E, Lo, L, G0, G1, W0, W1);
+         end;
+      end if;
+   end Fill;
+
+   --  One times bindeq (G0) is bindeq (G0): the form of Beq2.
+   procedure Lemma_Fill_Beq2
+     (E : Element_Array; L : Natural; G0, G1 : Element_Array;
+      Alpha : Element)
+   with
+     Ghost  => Proof_Only, Global => null,
+     Pre    => G0'First = 0 and then G1'First = 0
+               and then L <= G0'Length and then L <= G1'Length
+               and then L <= Max_Bindeq_Log
+               and then E'First = 0 and then E'Last = Table_Len (L) - 1
+               and then
+               (for all X in E'Range =>
+                  Same (E (X), Fill_Ref (G0, G1, L, One, Alpha, X))),
+     Post   =>
+       (for all X in E'Range => Same (E (X), Beq2 (X, L, G0, G1, Alpha)));
+
+   procedure Lemma_Fill_Beq2
+     (E : Element_Array; L : Natural; G0, G1 : Element_Array;
+      Alpha : Element)
+   is
+   begin
+      for X in E'Range loop
+         Lemma_Mul_Comm (One, Bindeq_Ref (G0 (0 .. L - 1), 0, X));
+         Lemma_Mul_One (Bindeq_Ref (G0 (0 .. L - 1), 0, X));
+         pragma Loop_Invariant
+           (for all X2 in 0 .. X =>
+              Same (E (X2), Beq2 (X2, L, G0, G1, Alpha)));
+      end loop;
+   end Lemma_Fill_Beq2;
+
    procedure Eq2_Table
      (L      : Natural;
       G0, G1 : Element_Array;
       Alpha  : Element;
       E      : out Element_Array)
    is
-      N  : constant Positive := Table_Len (L);
-      B1 : Elems_Access := new Element_Array'(0 .. N - 1 => Zero);
    begin
-      --  The second table starts from alpha (eq.rs, fill_recursive), so
-      --  no product remains in the sum (ADR 0070).
-      Bindeq (G0 (0 .. L - 1), E);
-      Bindeq_From (G1 (0 .. L - 1), Alpha, B1.all);
-      for X in 0 .. N - 1 loop
-         E (X) := E (X) + B1 (X);
-         pragma Loop_Invariant
-           (Proof_Only =>
-              (for all X2 in 0 .. X =>
-                 Same (E (X2), Beq2 (X2, L, G0, G1, Alpha))));
-         pragma Loop_Invariant
-           (Proof_Only =>
-              (for all X2 in X + 1 .. N - 1 =>
-                 Same (E (X2), Bindeq_Ref (G0 (0 .. L - 1), 0, X2))));
-      end loop;
-      Free_Elems (B1);
+      E := [others => Zero];
+      Fill (E, 0, L, G0, G1, One, Alpha);
+      Lemma_Fill_Beq2 (E, L, G0, G1, Alpha);
    end Eq2_Table;
 
    procedure Eval_Bound_Quad_T
