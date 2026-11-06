@@ -21,7 +21,7 @@
 #  in each function itself (*.self.txt). Call graphs need a build with
 #  frame pointers (-cargs -fno-omit-frame-pointer); the timing runs use
 #  the plain release build.
-set -eu
+set -euo pipefail
 cd "$(dirname "$0")/.."
 ulimit -s "${MEASURE_STACK_KB:-65520}"
 BIN="${MEASURE_BIN:-cli/bin}"
@@ -32,18 +32,24 @@ else
    TIME=(/usr/bin/time -l)
    KEEP="ok:|^ok|real|user|maximum resident|_failed|error|exhausted|encoding|length"
 fi
-#  run <name> <command...>: timed, and under perf when profiling.
+#  run <name> <command...>: timed, and under perf when profiling. A
+#  command that fails ends the script with its last lines: a prover or
+#  verifier that refuses the case must not pass for a measurement.
 run() {
-   local name="$1"; shift
+   local name="$1" out; shift
    if [ -n "${MEASURE_PROFILE:-}" ]; then
-      perf record -q -F 99 -g -o "cli/out/$name.perf.data" -- "$@" 2>&1 | grep -E "$KEEP" || true
+      out="$(perf record -q -F 99 -g -o "cli/out/$name.perf.data" -- "$@" 2>&1)" \
+         || { echo "$out" | tail -20; echo "measure-mdoc: $name failed" >&2; return 1; }
+      echo "$out" | grep -E "$KEEP" || true
       perf report -i "cli/out/$name.perf.data" --children --sort symbol --stdio \
          --percent-limit 0.5 2> /dev/null | grep -v '^$' > "cli/out/$name.children.txt" || true
       perf report -i "cli/out/$name.perf.data" --no-children --sort symbol --stdio \
          --percent-limit 0.5 -g none 2> /dev/null | grep -v '^$' > "cli/out/$name.self.txt" || true
       echo "profile: cli/out/$name.children.txt, cli/out/$name.self.txt"
    else
-      "${TIME[@]}" "$@" 2>&1 | grep -E "$KEEP" || true
+      out="$("${TIME[@]}" "$@" 2>&1)" \
+         || { echo "$out" | tail -20; echo "measure-mdoc: $name failed" >&2; return 1; }
+      echo "$out" | grep -E "$KEEP" || true
    fi
 }
 M=tests/vectors/upstream/mdoc
@@ -63,13 +69,25 @@ cfg_of() {
       v6_sig)  echo "4 128 2945" ;;
    esac
 }
+#  The public inputs of each circuit, from tests/vectors/mdoc_summary.txt
+#  (the sixth field of its summary rows): the hash circuits differ.
+public_of() {
+   case $1 in
+      v7_hash) echo 952 ;;
+      v6_hash) echo 944 ;;
+      *)       echo 900 ;;
+   esac
+}
 mkdir -p cli/out
-for v in ${1:-v7 v6}; do
-   for c in ${2:-hash sig}; do
+#  The arguments are read once, before the loops: nothing below may
+#  reassign the positional parameters.
+VERSIONS="${1:-v7 v6}"
+CASES="${2:-hash sig}"
+for v in $VERSIONS; do
+   for c in $CASES; do
       h=$(hash_of "$v")
       case $c in hash) f=gf2_128; s=16 ;; sig) f=p256; s=32 ;; esac
-      # shellcheck disable=SC2046 # the three numbers are split on purpose
-      set -- $(cfg_of "${v}_$c")
+      read -r rate nreq ncol <<< "$(cfg_of "${v}_$c")"
       in=cli/out/mdoc_${v}_${c}_inputs.json
       python3 - "$M/${h}_${c}_witness.bin" "$s" "$in" <<'PY'
 import json, sys
@@ -77,19 +95,19 @@ raw = open(sys.argv[1], "rb").read(); size = int(sys.argv[2])
 vals = [str(int.from_bytes(raw[i:i + size], "little")) for i in range(0, len(raw), size)]
 open(sys.argv[3], "w").write(json.dumps(vals))
 PY
-      echo "=== $v $c: prove (rate $1, nreq $2, ncol $3) ==="
+      echo "=== $v $c: prove (rate $rate, nreq $nreq, ncol $ncol) ==="
       run mdoc_${v}_${c}_prove "$BIN/longfellow_prove" --field $f --circuit $M/${h}_$c.lfc2 \
-         --inputs $in --label mdoc_${c}_test --rate-inv $1 --nreq $2 --ncol $3 \
+         --inputs $in --label mdoc_${c}_test --rate-inv $rate --nreq $nreq --ncol $ncol \
          --seed 1 --out cli/out/mdoc_${v}_$c.bin
       echo "=== $v $c: verify ==="
-      case $c in hash) np=952 ;; sig) np=900 ;; esac
+      np=$(public_of "${v}_$c")
       python3 - "$in" "$np" "$s" > cli/out/mdoc_${v}_${c}_public.args <<'PY'
 import json, sys
 vals = json.load(open(sys.argv[1])); n = int(sys.argv[2]); digits = 2 * int(sys.argv[3])
 print(" ".join("--public %0*x" % (digits, int(x)) for x in vals[:n]))
 PY
       run mdoc_${v}_${c}_verify "$BIN/longfellow_verify" --field $f --circuit $M/${h}_$c.lfc2 \
-         --proof cli/out/mdoc_${v}_$c.bin --label mdoc_${c}_test --rate-inv $1 --nreq $2 --ncol $3 \
+         --proof cli/out/mdoc_${v}_$c.bin --label mdoc_${c}_test --rate-inv $rate --nreq $nreq --ncol $ncol \
          $(cat cli/out/mdoc_${v}_${c}_public.args)
    done
 done

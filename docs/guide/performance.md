@@ -109,7 +109,7 @@ The product is the same algorithm as upstream's generic code (ADR 0065), proved 
 
 ## Memory
 
-The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. Its criterion: the peak heap within twice upstream's, by the same measure, the bytes allocated at the peak of each process (an `LD_PRELOAD` counter on malloc, on both sides).
+The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. Its criterion: the peak heap within twice upstream's, by the same measure, the bytes allocated at the peak of each process (an `LD_PRELOAD` counter on malloc, on both sides). The counter, `heapshim.c`, and upstream's driver, `heap_v7.rs` (one proof or one verification of the version 7 flow on upstream's runtime at d5e6be7, generic arithmetic, baseline processor target), are in `scripts/measure/`, with the build and run commands that reproduce every peak below: `scripts/measure-mdoc.sh` under the counter on our side, the driver under the same counter on upstream's. Each series is one session of the proving machine, three runs per commit; the peaks were identical from run to run in every series, so the tables give them without a spread.
 
 | Peak heap | close of M2 (88835f2) | first step (ADR 0080) | upstream (both circuits) |
 |---|---|---|---|
