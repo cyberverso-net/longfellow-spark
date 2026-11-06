@@ -55,7 +55,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0049](0049-phase-c-scope-the-prover.md) | Phase C scope: the prover and its exit criterion | Accepted | 2026-10-17 |
 | [0050](0050-randomness-as-a-byte-stream.md) | Randomness as a byte stream, and its sources | Accepted | 2026-10-17 |
 | [0051](0051-constant-time-in-the-prover.md) | Constant time in the prover, unit by unit | Accepted | 2026-10-17 |
-| [0052](0052-gold-perimeter-for-the-prover.md) | Gold perimeter for the prover | Accepted | 2026-10-17 |
+| [0052](0052-gold-perimeter-for-the-prover.md) | Gold perimeter for the prover | Accepted, amended by 0083 | 2026-10-17 |
 | [0053](0053-prover-vectors-and-cross-verification.md) | Prover vectors and cross-verification | Accepted | 2026-10-17 |
 | [0054](0054-prove-job-limit-sixty-minutes.md) | Prove job limit raised to sixty minutes and the prover partition split | Accepted, amended by 0060 | 2026-10-19 |
 | [0055](0055-phase-d-scope-mdoc-scale.md) | Phase D scope: the mDoc scale and the proof of age | Proposed, amended by 0067 and 0082, M2 closed by 0078 | 2026-10-19 |
@@ -86,3 +86,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0080](0080-milestone-memory.md) | A memory milestone, before the certification block and M3 | Proposed, amended by 0082 | 2026-10-29 |
 | [0081](0081-audience-certification-evaluators.md) | The audience: evaluators in a certification laboratory | Proposed | 2026-10-30 |
 | [0082](0082-order-after-the-memory-milestone.md) | The order after the memory milestone | Proposed | 2026-10-30 |
+| [0083](0083-claims-corrected-at-the-milestone-review.md) | Claims corrected at the milestone review of the memory milestone | Proposed | 2026-11-06 |
