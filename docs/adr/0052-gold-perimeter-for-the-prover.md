@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-18, at the close of block 6 of Phase C; proposed 2026-10-17 and edited until then)
+Accepted (2026-10-18, at the close of block 6 of Phase C; proposed 2026-10-17 and edited until then). Amended 2026-11-06 by [ADR 0083](0083-claims-corrected-at-the-milestone-review.md): the element-wise serialisation of the fixed part of each writer is proved write by write and tested as a whole, not stated as a postcondition of the writers.
 
 ## Date
 
