@@ -167,7 +167,16 @@ The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. I
 | verifier, signature | 11 MB | 11 MB | |
 
   The hash proof's peak falls by 57.8 MB, within 32 bytes of the five vectors of layer 13 less the accumulator that stays; the peak is still inside `Eq2_Table` of layer 13, before the half-width vector of hand 0 exists, so the two eq2 tables (33.6 MB, #105) and the merged terms (36.9 MB) are now its largest pieces. It is 1.32 times upstream's peak for both circuits in one process, from 1.86, and 66 % of the criterion of the milestone. The maximum resident set agrees (206 MB to 148 MB). The hash proof is 0.09 s faster (4.96 to 4.87 s, no copy of the wires per hand); the signature proof 0.48 s; the verifications unchanged. The proofs are identical byte for byte.
-- Next: the second table of `Eq2_Table` (#105).
+- The eq2 table in one array (#105): `Eq2_Table` fills its table by upstream's recursion (`fill_recursive` of `eq.rs`), the weights of the two challenges carried down the recursion, where it built a second table of the same length and added it (chapter 3, Section 3.3). Measured in one session (5 November, main b28a8a9 against 1b4cabb, three runs each, the peaks identical from run to run; upstream's prover and verifier under the same counter in the same session):
+
+| Peak heap | before (main b28a8a9) | after #105 | upstream (both circuits) |
+|---|---|---|---|
+| prover, hash | 142 MB | 125 MB | 107 MB |
+| prover, signature | 20 MB | 20 MB | |
+| verifier, hash | 79 MB | 62 MB | 48 MB |
+| verifier, signature | 11 MB | 9.5 MB | |
+
+  Both hash peaks fall by the second table of layer 13, 2^20 entries of 16 bytes (16,777,216 bytes; the prover's fall is within 8 bytes of it, the verifier's within 4,080). The hash proof is 1.17 times upstream's peak for both circuits in one process, from 1.32, and 58 % of the criterion of the milestone; the hash verification 1.30 times upstream's verifier, from 1.64. The signature proof's peak is elsewhere and does not move. The maximum resident set agrees on the hash circuit (prove 144 MB to 128 MB, verify 81 MB to 68 MB); on the signature verification it rises by 2.4 MB (13.9 MB to 16.3 MB) while the peak heap falls, so the rise is in what the allocator keeps resident, not in what the program allocates; it is not investigated further. Times do not move: the hash proof 4.56 s (4.59 s before in this session), the verification 2.28 s (2.30 s). The proofs are identical byte for byte.
 
 ## After M2
 
