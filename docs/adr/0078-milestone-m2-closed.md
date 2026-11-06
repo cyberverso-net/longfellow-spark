@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-29, close of milestone M2 of Phase D).
+Accepted (2026-10-29, at the merge of pull request #50; proposed 2026-10-29, close of milestone M2 of Phase D).
 
 ## Date
 
