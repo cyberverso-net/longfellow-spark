@@ -32,7 +32,7 @@ The other premises upstream lists are:
 - **The challenge sampler.** Each transcript answer is an ideal uniform coin, with exact balance for every decoder role. The correspondence with SHA-256, the AES expansion and the rejection samplers is not proved.
 - **The hash model.** A Merkle random oracle and an independent transcript oracle.
 - **The commitments and the transcript.** The byte encodings, the field arithmetic and the byte-level transcript are implementation obligations.
-- **The MAC.** Each circuit enforces its own tag equation, tag = (av + share) · message, on the common value. This is a property of the circuits, assumed.
+- **The MAC.** Each circuit enforces its own tag equation, tag = (av + share) · message, on the common value. This is a property of the circuits, assumed. The end-to-end statement adds a condition on the key: the MAC key share `av` supplied with the proof is the transcript oracle's answer at the two Merkle roots (the Lean reading notes `kmac`, `hmac`: the share is decoded from the answer at the key point, balanced over 2^128 values). In words: the key is drawn from the transcript after both commitments, so that neither circuit's prover can choose it after seeing the other. This is an obligation of the mDoc layer (#66): the prover derives `av` from the transcript at the two roots as `mac.rs` does, and the verifier recomputes it there; the correspondence table carries it in the MAC row.
 
 ## The implementation obligations, and what this project proves of them
 
@@ -72,7 +72,7 @@ For each element of the Lean model, the unit of this project that implements it,
 | The Merkle opening check (`Merkle.MH.PrefixBindingGame`) | `Merkle.Verify` (Gold) | Proved against the node model. |
 | The leaf codec: nonce ‖ column, 256-bit digests | `Ligero_Proof.Read`, the leaves of `Ligero_Verifier` and `Merkle` | Proved for the layout; SHA-256 itself is tested (FIPS vectors). |
 | Fresh challenges, drawn in protocol order, never re-absorbed | `Transcript`, `Sumcheck_Transcript.Replay_Challenges` | The order is tested byte for byte against Appendix B.2 and the upstream proofs. The ideal sampler stays an assumption, here as upstream. |
-| The two-field MAC, a private MAC witness per circuit, tag = (av + share) · message | not implemented yet: the mDoc layer of ADR 0058 | To follow upstream's `mac.rs` exactly (at d5e6be7 `rust/applications/mdoc_zk/runtime/src/mac.rs`, at 7bf8a6b `.../src/v1/mac.rs`), as the Lean proof requires: the old shared-blind argument fails for separate blinds (`SoundnessAudit.separate_blinds_collision`). |
+| The two-field MAC, a private MAC witness per circuit, tag = (av + share) · message; the key share `av` is the transcript oracle's answer at the two Merkle roots (the conjunct of the end-to-end statement, `v7P256Sha{1,2,3,4}_zk_circuit_tsec_sepMac`) | not implemented yet: the mDoc layer of ADR 0058 | To follow upstream's `mac.rs` exactly (at d5e6be7 `rust/applications/mdoc_zk/runtime/src/mac.rs`, at 7bf8a6b `.../src/v1/mac.rs`), as the Lean proof requires: the key share derived from the transcript after both commitments, and separate blinds, since the old shared-blind argument fails for them (`SoundnessAudit.separate_blinds_collision`). |
 
 ## What this means for the trust model
 
