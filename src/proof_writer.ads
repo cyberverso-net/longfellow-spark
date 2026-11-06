@@ -27,14 +27,19 @@
 --
 --  Proof status (per instance). Silver. Gold, structural: the 7.4
 --  writer produces bytes that satisfy Well_Coded of the reader at the
---  reader's offset, with the length the length functions state; the
---  fixed part of each writer (root, polynomials, nonces, path) is the
---  element-wise serialisation of the record. That Read (Write (P)) = P
---  follows from these layouts and the field-level facts (To_Bytes and
---  From_Bytes are inverses, chapters 1 and 2); it is tested on every
---  proof file of the repository (writer_kat), since the readers state
---  their structure, not the values they read, and the encodings are
---  formals of the field signature without contracts.
+--  reader's offset, with the length the length functions state;
+--  Write_Proof writes the root first and exactly Proof_Len bytes. The
+--  element-wise correspondence between the record and the bytes is
+--  proved for each write (Put_Element, Put_Slot, Put_32, Put_Size_4:
+--  the bytes at the position are To_Bytes of the element, or the
+--  digest, or the count) and is not composed into a postcondition of
+--  the writers: Write_Sumcheck_Proof has none, Write_Ligero_Proof
+--  states the frame and Well_Coded. That Read (Write (P)) = P would
+--  follow from such a composition and the field-level facts (To_Bytes
+--  and From_Bytes are inverses, chapters 1 and 2); it is tested on
+--  every proof file of the repository (writer_kat), since the readers
+--  state their structure, not the values they read, and the encodings
+--  are formals of the field signature without contracts.
 --
 --  Constant-time discipline (ADR 0006, ADR 0051): the run structure
 --  depends on the geometry and the subfield boundary, never on an

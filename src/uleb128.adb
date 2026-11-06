@@ -17,6 +17,12 @@ package body Uleb128 is
       Long := False;
       for I in 0 .. Max_Bytes - 1 loop
          pragma Loop_Invariant (Pos = Pos'Loop_Entry);
+         pragma Loop_Invariant (not Ok and then not Long and then V = 0);
+         --  Every byte read so far was there and continued.
+         pragma Loop_Invariant
+           (for all K in 0 .. I - 1 =>
+              B'Length - Pos > K
+              and then (B (Pos + K) and 16#80#) /= 0);
          pragma Loop_Invariant (Acc = Payload (B, Pos, I));
          pragma Loop_Invariant (Acc < Pow128 (I));
          if B'Length - Pos <= I then

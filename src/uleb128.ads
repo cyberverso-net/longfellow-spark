@@ -10,10 +10,13 @@
 --
 --  Documentation: docs/guide/06-circuits.md.
 --
---  Proof status. Gold: Read returns the value of the bytes it consumed
---  (Payload), consumes one to four bytes, and fails exactly when no
---  terminating byte lies within four bytes of the file; Zigzag is its
---  definition. Silver on everything.
+--  Proof status. Gold: Read succeeds exactly when a byte without the
+--  continuation bit lies within four bytes of Pos; on success it
+--  consumes the bytes up to and including the first such byte, one to
+--  four, and returns their value (Payload); on failure Pos and V are
+--  unchanged and Long tells a long integer (four bytes available, all
+--  continuing) from a truncated one (the file ends first). Zigzag is
+--  its definition. Silver on everything.
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037:
 --  a circuit file is public data.
@@ -56,11 +59,12 @@ package Uleb128 is
         Post => Payload'Result < Pow128 (N),
         Subprogram_Variant => (Decreases => N);
 
-   --  Ok when a byte without the continuation bit lies within four
-   --  bytes from Pos: V is the value and Pos advances past that byte.
-   --  Otherwise V is 0 and Pos is unchanged (Truncated when the file
-   --  ends first, Bad_Integer when a fourth byte continues; Long says
-   --  which).
+   --  Ok exactly when a byte without the continuation bit lies within
+   --  four bytes from Pos: V is the value and Pos advances past the
+   --  first such byte, every byte before it continuing. Otherwise V is
+   --  0 and Pos is unchanged (Truncated when the file ends first,
+   --  Bad_Integer when a fourth byte continues; Long says which: it is
+   --  True exactly when four bytes were available).
    procedure Read
      (B    : Byte_Array;
       Pos  : in out Natural;
@@ -71,13 +75,20 @@ package Uleb128 is
      Global => null,
      Pre    => B'First = 0 and then Pos <= B'Length,
      Post   =>
+       Ok = (for some I in 0 .. Max_Bytes - 1 =>
+               B'Length - Pos'Old > I
+               and then (B (Pos'Old + I) and 16#80#) = 0)
+       and then
        (if Ok then
           Pos - Pos'Old in 1 .. Max_Bytes
           and then Pos <= B'Length
           and then (B (Pos - 1) and 16#80#) = 0
+          and then (for all I in Pos'Old .. Pos - 2 =>
+                      (B (I) and 16#80#) /= 0)
           and then V = Payload (B, Pos'Old, Pos - Pos'Old)
           and then not Long
-        else Pos = Pos'Old and then V = 0);
+        else Pos = Pos'Old and then V = 0
+             and then Long = (B'Length - Pos'Old >= Max_Bytes));
 
    --  decode_delta_u32: the signed delta of a value.
    function Zigzag (V : Value) return Integer is

@@ -167,9 +167,9 @@ package body Packed_Eval is
               Same (SA.W_At (W, Base + Tm.H1), W (Base + Tm.H1))
               and then Same (SA.W_At (W, Base + Tm.H0), W (Base + Tm.H0)));
          if Tm.K = Zero then
-            if W (Base + Tm.H1) * W (Base + Tm.H0) /= Zero then
-               OK := False;
-            end if;
+            --  The Z test accumulates without a branch on the product
+            --  (ADR 0051): `and`, not `and then`.
+            OK := OK and (W (Base + Tm.H1) * W (Base + Tm.H0) = Zero);
             pragma Assert (Proof_Only => OK = SA.Z_Ref (W, Base, T0, K));
             for G in V'Range loop
                Lemma_Acc_Step (W, Base, T0, K, G);
@@ -367,14 +367,20 @@ package body Packed_Eval is
                    SA.Layer_Z_Seg (C, Wr (J + 1).all, J)));
       --  The outputs are segment 0.
       for G in 0 .. P.Noutput - 1 loop
-         if Wr (0) (G) /= Zero then
-            OK := False;
-         end if;
          pragma Loop_Invariant
            (Proof_Only =>
               OK = ((for all J in 0 .. P.Last_Layer =>
                        SA.Layer_Z_Seg (C, Wr (J + 1).all, J))
-                    and then (for all K in 0 .. G => Wr (0) (K) = Zero)));
+                    and then (for all K in 0 .. G - 1 => Wr (0) (K) = Zero)));
+         --  The output test accumulates without a branch on the wire. The
+         --  local copy is what keeps the compiled comparison branch-free:
+         --  compared straight from memory, the limbs of a P-256 element
+         --  were short-circuited one by one (the inspection of #63).
+         declare
+            E : constant Element := Wr (0) (G);
+         begin
+            OK := OK and (E = Zero);
+         end;
       end loop;
    end Eval_Circuit;
 

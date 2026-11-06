@@ -47,10 +47,13 @@
 --
 --  Constant-time discipline (ADR 0051): the two branches on witness-
 --  derived values are the satisfiability check and the subfield check,
---  each a fixed loop accumulating a mask and one branch on the result,
---  the prover's own decision whether to produce a proof. The rest is
---  constant time by construction in the units it calls. The guarantee
---  is scoped to builds with assertions disabled (ADR 0006).
+--  each a fixed loop accumulating its result without a branch on the
+--  values (a byte mask in the subfield check, a Boolean `and` on the
+--  comparison with Zero in Packed_Eval.Eval_Circuit) and one branch
+--  on the result, the prover's own decision whether to produce a
+--  proof. The rest is constant time by construction in the units it
+--  calls. The guarantee is scoped to builds with assertions disabled
+--  (ADR 0006).
 
 pragma SPARK_Mode (On);
 

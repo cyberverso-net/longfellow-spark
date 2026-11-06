@@ -25,10 +25,19 @@
 --
 --  Constant-time discipline (ADR 0051): as Eval_Quad, which Eval_Layer
 --  follows statement by statement. The branch on k = Zero reads a
---  circuit constant, public; the Z test of a term sets OK from a product
---  of wires, the satisfiability check of the prover (header of
---  zk_prover.ads). The guarantee is scoped to builds with assertions
---  disabled (ADR 0006).
+--  circuit constant, public. The Z test of a term and the test of each
+--  output wire accumulate into OK with `and` (not `and then`), a value
+--  operation on the comparison with Zero: no branch of the source
+--  depends on a wire, and the one branch on OK is the prover's
+--  decision whether to produce a proof (header of zk_prover.ads). The
+--  output test reads the wire into a local constant first: compared
+--  straight from memory, the limbs of a P-256 element were
+--  short-circuited by the compiler with a branch per limb. That copy
+--  is a remedy for the code this compiler (GCC, gnat_native 16.1.0)
+--  generates on the targets inspected, arm64 and x86-64, not a
+--  guarantee for another; the check of the generated code is #70.
+--  The guarantee is scoped to builds with assertions disabled
+--  (ADR 0006).
 
 pragma SPARK_Mode (On);
 
