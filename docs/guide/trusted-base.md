@@ -1,0 +1,109 @@
+# Trusted base register
+
+This register lists everything the project's assurance takes on trust, one row per item. Each row says what depends on the item, where the trust is stated, and what would discharge it or reduce it.
+
+It is a living document. It started at the close of the memory milestone ([ADR 0082](../adr/0082-order-after-the-memory-milestone.md)). Every block that adds a trusted item adds its row in the same pull request, and every block that discharges one says so in its row instead of deleting it.
+
+How it relates to the other documents:
+
+- The [trust model](trust-model.md) says, part by part, what is proved, what is tested and what is trusted. This register takes the trusted part and gives each item an identifier, so that a traceability matrix or an evaluation report can cite it.
+- The [verification approach](verification-approach.md) explains why the line between proof and trust falls where it does.
+- The package headers state the same facts for their own subprograms. If a header, the trust model and this register disagree, the header is checked first, then the other two are corrected.
+
+The identifiers are stable. A row that no longer applies keeps its identifier and says when and how it was discharged.
+
+## Reading a row
+
+- **Item.** What is assumed.
+- **What depends on it.** The claims that would fail if the item were false.
+- **Stated in.** The records and the guide sections that state it.
+- **Discharge or reduce.** What would remove the item from the register, or make it smaller. "Reduced by" names what the project already does.
+
+## 1. Tools
+
+| Id | Item | What depends on it | Stated in | Discharge or reduce |
+|----|------|--------------------|-----------|---------------------|
+| T1 | The GNAT compiler (`gnat_native` 16.1.0) and the builder (`gprbuild` 26.0.1) translate the source faithfully. | Every proved property holds for the source. That the executable has it rests on the compiler. | Trust model, "Tools"; `alire.toml` pins the versions. | Reduced by the known-answer vectors and the byte identity with upstream's proofs, run on the compiled code. Discharged only by a qualified compiler or a check of the object code, neither in place. |
+| T2 | GNATprove 16.1.0, with Why3 1.8.2, generates the verification conditions of the SPARK semantics correctly. | Every proved property. | Trust model, "Tools"; `alire.toml` pins `gnatprove` 16.1.0. | Reduced by keeping the proof free of `pragma Assume` and of justifications, so every check reaches a prover. |
+| T3 | The SMT solvers bundled with that GNATprove are sound: CVC5 1.3.2, Z3 4.15.4, Alt-Ergo 2.6.1. They run with the settings of [ADR 0020](../adr/0020-prover-configuration-step-budget.md) (600,000 steps, 120 s). | Every proved property. | Trust model, "Tools"; `longfellow_spark.gpr`. | Reduced where a check is proved by more than one solver. Section 8 lists the hardest proofs that are closed by one solver only. |
+| T4 | GNATprove's model of `Big_Integers` is the mathematical integers. | The ghost integer model of the P-256 field (`To_Int`, `P`), hence every Gold contract of `P256_Field`. | Trust model, "Tools"; [ADR 0014](../adr/0014-p256-functional-specification-and-ghost-model.md). | None planned. It is part of the SPARK language as GNATprove implements it. |
+| T5 | SPARKlib 16.1.0's functional sequences behave as their contracts say. | The ghost sequence of absorbed bytes in `Transcript`, hence the proved frames of the transcript. | Trust model, "Tools"; [ADR 0031](../adr/0031-transcript-gold-perimeter.md). | None planned. SPARKlib is itself proved, with its own trusted parts. |
+| T6 | `Same`, the logical equality of each field wrapper, is the equality of its element type. Its body is the predefined `=`, outside SPARK. GNATprove sees only its declaration and the annotation `Logical_Equal`. | Every Gold contract stated with `Same`, which is every functional contract of the protocol code ([ADR 0023](../adr/0023-gold-perimeter-for-protocol-code.md)). | Trust model, "Tools"; `src/field_gf2_128.adb`, `src/field_p256.adb`; chapter 3, Section 4.1. | Reduced by the test build, which executes `Same` as `=` in every contract that runs. |
+| T7 | The release build relies on the proof instead of checking at run time. The units of `src/` are compiled without run-time checks; the units of `cli/src/` keep theirs. | That no run-time error can occur in the release programs. The proof covers it only under each unit's preconditions. | Trust model, "Tools"; [ADR 0068](../adr/0068-release-build-without-run-time-checks.md), [ADR 0072](../adr/0072-predicate-checks-in-the-prover-instances.md). | Reduced by `scripts/check.sh cli`, which reads each unit's switches from its ALI file and fails on a wrong one. The command line establishes the preconditions of the library's entry points in code before each call (row C2). |
+| T8 | For the contracts at the assertion level `Proof_Only`, the compiled code agrees with the source GNATprove proved. These contracts are proved for all inputs but are never compiled, so no build checks them at run time. | The functional contracts of the two fields ([ADR 0044](../adr/0044-field-contracts-at-proof-only-level.md)), the structural references of Lagrange, the Ligero reader and verifier ([ADR 0038](../adr/0038-gold-perimeter-for-merkle-and-ligero.md)), and the costly references of the circuit, sumcheck and prover units since. At this commit: `GF2_128`, `Clmul64`, `P256_Field`, `Field_Signature`, `Field_GF2_128`, `Field_P256` and their `Laws`, `Ring_Laws`, `Lagrange`, `Ligero_Proof`, `Ligero_Verifier`, `Ligero_Prover`, `Circuit_Reader`, `Packed_Circuits`, `Packed_Eval`, `Packed_HQuad`, `Sumcheck_Algebra`, `Sumcheck_HQuad`, `Sumcheck_Verifier`, `Sumcheck_Prover`, `Proof_Writer`, `Zk_Verifier`, `Zk_Prover`. | `src/proof_levels.ads`; ADR 0044; each unit's header. | Reduced by the known-answer vectors on the compiled code, which is what ADR 0044 relies on. The same agreement for executable contracts is also checked by running them in the test build. |
+
+## 2. Code outside SPARK
+
+| Id | Item | What depends on it | Stated in | Discharge or reduce |
+|----|------|--------------------|-----------|---------------------|
+| C1 | `Os_Random` reads `/dev/urandom`, the operating system's cryptographically secure generator, and returns fresh unpredictable bytes. | Zero knowledge of the proofs `longfellow_prove` makes without `--seed`. A proof made with `--seed` is predictable by design. | Trust model, "Randomness"; [ADR 0050](../adr/0050-randomness-as-a-byte-stream.md); `cli/src/os_random.ads`. | The generator of the platform is the platform's responsibility (row P4). The prover is proved for any byte stream, so only the quality of the bytes is trusted, not their use. |
+| C2 | The command-line programs (`longfellow_prove`, `longfellow_verify`, `Cli_Random`, `Pinned_Circuits` and the instances of the library's generics in `cli/src/`) are outside SPARK. They establish the preconditions of `Circuit_Reader.Read_Packed`, `Zk_Verifier.Verify` and `Zk_Prover.Prove` in code before each call. `Cli_Random.Fill` changes no state the prover reads. | Row T7: the absence of run-time errors in the library, which is proved only under those preconditions. | Trust model, "Tools"; [ADR 0068](../adr/0068-release-build-without-run-time-checks.md), [ADR 0072](../adr/0072-predicate-checks-in-the-prover-instances.md), ADR 0074. | Reduced by the run-time checks kept in `cli/src/`. Discharged by bringing the programs into SPARK, which needs a model of their file input and output. |
+
+The harnesses of `tests/` and the two programs `interop_kat` and `first_step_bench` of `cli/` are also outside SPARK. They are tests, not part of the product: they produce evidence, and nothing in the two programs depends on them.
+
+## 3. Inputs and references
+
+| Id | Item | What depends on it | Stated in | Discharge or reduce |
+|----|------|--------------------|-----------|---------------------|
+| R1 | The pinned specification, draft-irtf-cfrg-longfellow-00, describes the intended protocol. | Every reference the code is proved against transcribes a section of it. | Trust model, "Inputs and references"; [ADR 0002](../adr/0002-pin-the-specification.md), [ADR 0079](../adr/0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md). | Reduced by the interoperability with upstream's code (proofs verified both ways, proofs reproduced byte for byte) and by upstream's Lean proofs of a model of the verifier (row S1). |
+| R2 | The upstream circuit files compute what they claim, the credential property they enforce, including the tag equation of the MAC that upstream's Lean model assumes of each circuit. Their shape is proved `Well_Formed` on load and their identifier is recomputed; their meaning is not checked. | That a proof accepted by this verifier says something about an mDoc credential. | Trust model, "Inputs and references"; [ADR 0011](../adr/0011-circuits-as-data.md), ADR 0046; the verification approach, "Circuits as data". | Discharged by the circuit compiler of Phase E ([ADR 0055](../adr/0055-phase-d-scope-mdoc-scale.md)), with the property stated and proved. Reduced by upstream's Lean development where it covers the circuits. |
+| R3 | The list of `Pinned_Circuits`: the digest of each circuit file and its identifier. A file in the list is loaded without recomputing its identifier. | That the identifier the command line uses for a pinned file is the one a full load would compute. | Trust model, "Inputs and references"; ADR 0074. | Reduced by `interop_kat`, which loads each pinned file with a full `Read` and compares, at every `make check`. |
+| R4 | The upstream production reader at d5e6be7 defines the LFC2 format. | The loader's decoding of a file. Its structure is proved; that the decoding is upstream's is tested. | Trust model, "Inputs and references"; chapter 6. | Reduced by the independent Python reader and writer of `gen_circuit_vectors.py` and the two upstream files. |
+| R5 | The recordings of the upstream Ligero verifier, the sumcheck core and the transcript under `tests/vectors/upstream/` are faithful to d5e6be7. They are produced outside this repository. | The step-by-step tests of the verifier against upstream. | Trust model, "Inputs and references" and "What is tested"; ADR 0027, ADR 0040. | Reduced by the end-to-end tests that need no recording: upstream's proofs accepted from their files, and reproduced byte for byte. |
+| R6 | The fixed statement hash `DEFAULT_STATEMENT_HASH` of upstream's `zk/common.rs`. | The bytes the prover and the verifier absorb for the statement. | Trust model, "Randomness and the protocol's theorems"; ADR 0035. | Reduced by the byte identity of the prover's output with upstream's proofs. |
+| R7 | `Simple_Rng` is the generator of upstream's reference test. It was transcribed from upstream. | That `--seed` reproduces upstream's proofs, the exit criterion of Phase C. | Trust model, "Randomness and the protocol's theorems"; ADR 0050. | Reduced by the byte identity itself, which would fail on any difference in the draws. |
+
+## 4. The protocol and its security properties
+
+| Id | Item | What depends on it | Stated in | Discharge or reduce |
+|----|------|--------------------|-----------|---------------------|
+| S1 | The soundness, completeness and zero-knowledge theorems of the padded sumcheck, of Ligero and of their composition. Upstream proves soundness and zero knowledge in Lean for a model of the version 7 verifier. The link between that model and this code is mostly by reading. | That accepting a proof means a witness exists, and that a proof reveals nothing beyond the statement. | Trust model, "Randomness and the protocol's theorems" and "Outside the proofs"; [the Lean correspondence](lean-correspondence.md); ADR 0035, ADR 0050, ADR 0052. | Reduced by fidelity to the pinned specification, each step citing its section. A formal bridge between the SPARK contracts and the Lean model is a research phase, not planned. |
+| S2 | The ideal objects of upstream's Lean model. Each challenge of the transcript is an ideal uniform coin. The Merkle tree's hash is a random oracle, and the transcript an independent one. That SHA-256, the AES expansion and the rejection samplers realise these objects is not proved, here or upstream. | The soundness and zero-knowledge bounds of row S1, which are proved for the ideal objects. | [The Lean correspondence](lean-correspondence.md), "The other premises". | None planned. These are standard cryptographic premises of the protocol's analysis. Row V1 tests that SHA-256 and AES-256 are the functions the specification names, which is a different fact. |
+| S3 | The Fiat-Shamir transcript absorbs every public value before each challenge. Omitting one would let a prover choose it after seeing the challenge. | Soundness of the non-interactive protocol. | Trust model, "Outside the proofs" and "Properties tested but not proved"; [ADR 0028](../adr/0028-stage-4-scope-and-challenge-replay.md). | Reduced by the absorption checklist (the sequence of calls in `Replay_Challenges`), compared with upstream by reading, and by the byte identity with upstream's proofs, which tests every draw and every absorption of the prover. |
+| S4 | Constant time. The executable code avoids branches and indexing on secrets, as a coding discipline. The guarantee holds only for builds without assertions. The multiplication in GF(2^128) assumes, as upstream does, that the processor's multiplier takes a time independent of its operands. Two branches on values derived from the witness are declared. | That the prover's running time does not reveal the witness. | Trust model, "Outside the proofs"; [ADR 0006](../adr/0006-constant-time-discipline-and-scope.md), ADR 0051, ADR 0065; each unit's header. | Reduced by the discipline, unit by unit, stated in each header. A check of the generated code is planned (#70); a timing campaign belongs to the certification block. |
+
+## 5. Properties tested but not proved
+
+These are properties of this project's own code that the proofs do not reach. Each is tested; the test is the evidence, and the property beyond the tested cases is trusted.
+
+| Id | Item | What depends on it | Stated in | Discharge or reduce |
+|----|------|--------------------|-----------|---------------------|
+| V1 | `Sha256` and `Aes256` compute SHA-256 and AES-256 beyond the NIST vectors and those of Appendix B.2. Both are Silver. | The transcript and the Merkle tree. | Trust model, "Properties tested but not proved"; ADR 0029. | Discharged by Gold contracts against the FIPS definitions. Reduced by the FIPS 180-4, CAVP, FIPS 197 and SP 800-38A vectors. |
+| V2 | The two FFTs and the Lagrange encoder agree beyond the tested rows. The algorithms are those upstream implements: Lin, Chung and Han on GF(2^128), the real FFT over F_p^2 on P-256. | The parity part of every encoded row, hence the prover's commitment. | Trust model, "Properties tested but not proved"; [ADR 0057](../adr/0057-additive-fft.md); chapter 8. | Discharged by a Gold proof that each transform equals the Lagrange evaluation. Reduced by `fft_kat` and by the prover's commitments, unchanged from the Lagrange encoder. |
+| V3 | Fermat's little theorem, behind the test anchors of both `Inv`. | That `Inv` returns the inverse. On the verification path every inverse is checked at run time by `Checked_Inv`, so a wrong inverse cannot make the verifier accept: soundness does not depend on it. Completeness does: if an inverse were wrong, `Lagrange.Build` would fail and the verifier would refuse a valid proof with `Matrix_Failed`. | Trust model, "Properties tested but not proved"; ADR 0008, [ADR 0037](../adr/0037-checked-inv-and-public-data-scope.md). | Reduced by two independent references in the generators and by the run-time check, which turns a failure into a status rather than a wrong verdict. |
+| V4 | The rejection samplers terminate. `Transcript.Nat` draws the indices of the Ligero columns through `Choose`, on both fields; on P-256 the field elements are also sampled by rejection. It is a probabilistic property, declared with `Always_Terminates => False` on the samplers and on their callers, up to `Zk_Verifier.Verify` and `Zk_Prover.Prove`. | Termination of the verifier and the prover on both fields. | Trust model, "Properties tested but not proved"; [ADR 0030](../adr/0030-literal-rejection-sampling.md). | None in SPARK, which proves termination only when it holds for every input. Each attempt of `Nat` fails with probability at most one half, each attempt of the P-256 sampler with probability below 2^-32 (ADR 0030). |
+
+The absorption of the transcript (row S3) is also of this kind.
+
+## 6. The platform
+
+| Id | Item | What depends on it | Stated in | Discharge or reduce |
+|----|------|--------------------|-----------|---------------------|
+| P1 | Enough memory for one circuit and the working sets of a verification or a proof, all on the heap. A failed allocation raises `Storage_Error`, which is outside the proofs. | Availability. Not correctness: a failed allocation stops the program, it does not change a result. | Trust model, "The machine"; ADR 0047. | Reduced by the memory milestone, which measures the peaks ([performance](performance.md)). A profile of the supported circuits, with their bounds, is later work. |
+| P2 | GNAT builds an aggregate allocator in place, without a temporary on the stack. The spike of ADR 0047 observed it; the language does not guarantee it. | That large allocations do not exhaust the stack. | Trust model, "The machine"; ADR 0047. | Reduced by the tests on the mDoc circuits, the largest supported. |
+| P3 | A 64-bit target, which provides `Unsigned_128`. | The products of the P-256 field. | Trust model, "The machine"; ADR 0012. | Reduced by building on the targets used: macOS on arm64 for the author, Linux on x86-64 for the proving machine and the continuous integration. |
+| P4 | The operating system provides a cryptographically secure generator at `/dev/urandom`. | Row C1. | ADR 0050. | The platform's own evaluation. |
+
+## 7. Changes to this register
+
+- **6 November 2026.** Created, from the trust model at the close of the memory milestone (#62). No item discharged yet.
+
+## 8. Fragilities: proofs that depend on one prover
+
+These are not trusted items. Each proof exists and is checked at every `make check`. But each is close to the step budget and was closed by one solver only, so a change of that solver's heuristics, or a declaration that enlarges the proof's context, could make it fail. A failure would show as an unproved check at the gate. It could not go unnoticed, but it could stop a toolchain update. Issue #92 keeps watch on them.
+
+The checks above half the step budget (300,000 of 600,000), each goal with a successful attempt by one solver only, from the gate of dfc3db8 (block 4a of the memory milestone):
+
+| Check | Subprogram | Steps | Of budget | Solver |
+|-------|------------|------:|----------:|--------|
+| `gf2_128.adb:319`, assertion | `Lemma_Shl_Step` | 463,202 | 77 % | Z3 |
+| `clmul64.adb:620`, assertion | `Lemma_Rev_Xor` | 406,582 | 68 % | Z3 |
+| `gf2_128.adb:291`, assertion | `Lemma_Shl_Step` | 402,206 | 67 % | Z3 |
+| `sumcheck_hquad.ads:127`, postcondition (P-256) | `Merge_Runs` | 361,777 | 60 % | Z3 or Alt-Ergo, one per goal |
+| `ligero_proof.adb:237`, assertion (P-256) | `Read` | 346,300 | 58 % | Alt-Ergo |
+| `sumcheck_hquad.ads:186`, postcondition (P-256) | `Bind_H` | 336,993 | 56 % | CVC5, Z3 or Alt-Ergo, one per goal |
+| `ligero_proof.adb:237`, assertion (GF(2^128)) | `Read` | 330,329 | 55 % | Alt-Ergo |
+
+The list had an eighth entry when #92 opened: the postcondition of `Lemma_Bind_H_Step` on P-256, at 83 % of the budget with Z3 alone. Its proof was split at block 4a; it now takes 2,942 steps with Z3, 685 with CVC5 and 87,210 with Alt-Ergo, so it has three solvers and left the list.
+
+The rules of #92 apply. The list is recomputed at every change of the toolchain or of a solver, at the close of each milestone, and whenever a declaration is added to the formal package of a generic. A proof above 80 % of the budget is split before a toolchain update. The highest value, `max steps used for successful proof` in the output of `make check`, has stayed at 463,202 since that gate.
