@@ -157,7 +157,8 @@ A block is done when:
   in that record;
 - the tests and vectors it owes are in the repository;
 - the documentation it owes is written: the chapter, the records (*Accepted* when the code that
-  realises them is merged), the package headers, the trust model, the changelog;
+  realises them is merged), the package headers, the trust model, the trusted base register
+  for an item it adds or discharges, the changelog;
 - the pull request has been reviewed against the checklist below.
 
 ## Review checklist
@@ -165,7 +166,7 @@ A block is done when:
 - Does the code follow the specification section and the upstream file it cites, and is every
   divergence recorded?
 - Is every new contract either proved or stated as tested or trusted, in the header and in the
-  trust model?
+  trust model? Does every new trusted item have its row in the trusted base register?
 - Is any secret-dependent branch or index in executable library code?
 - Do the measurements satisfy the measurement rules, and is the comparison with upstream at equal
   scope?

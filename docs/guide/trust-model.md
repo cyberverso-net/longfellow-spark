@@ -8,7 +8,7 @@ Every claim this project makes about its code falls into one of three groups ([A
 
 A fourth group covers what SPARK cannot express at all, such as soundness or constant time, and says what stands in for a proof there.
 
-The [verification approach](verification-approach.md) explains why the line falls where it does. Each package header gives the same information for its own subprograms. If a header and this page disagree, the header is the one to fix.
+The [verification approach](verification-approach.md) explains why the line falls where it does. The [trusted base register](trusted-base.md) lists the trusted items one per row, each with an identifier, what depends on it and what would discharge it. Each package header gives the same information for its own subprograms. If a header and this page disagree, the header is the one to fix.
 
 ## In short
 
@@ -155,6 +155,8 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 
 ## What is trusted
 
+Each item below has a row in the [trusted base register](trusted-base.md).
+
 **Randomness and the protocol's theorems.**
 
 - The operating system's generator, `/dev/urandom`, read outside SPARK by `Os_Random`. Zero knowledge of the proofs `longfellow_prove` makes without `--seed` depends on it. A proof made with `--seed` is predictable by design.
@@ -184,7 +186,7 @@ The `upstream/` recordings are produced outside this repository, by the instrume
 - That the two FFTs and the Lagrange encoder agree beyond the tested rows, and the algorithms as the reference implements them: Lin, Chung and Han on GF(2^128), the real FFT over F_p^2 with the reference's root of unity on P-256 (ADR 0057).
 - Fermat's little theorem, behind the test anchors of both `Inv`. On the verification path every inverse is checked at run time by `Checked_Inv` (ADR 0037).
 - That the absorption into the transcript is complete beyond the two Appendix B.3 proofs. The sequence of calls in `Replay_Challenges` is the checklist.
-- The termination of `Transcript.Nat`, of the P-256 sampler and of their callers in the P-256 instance. It is a probabilistic property, declared with `Always_Terminates` (ADR 0030).
+- The termination of the rejection samplers and of their callers. `Transcript.Nat` draws the Ligero columns through `Choose`, on both fields, and on P-256 the field elements are also sampled by rejection, so the verifier and the prover of both fields are declared possibly non-terminating. It is a probabilistic property, declared with `Always_Terminates` (ADR 0030).
 
 **The machine.**
 
