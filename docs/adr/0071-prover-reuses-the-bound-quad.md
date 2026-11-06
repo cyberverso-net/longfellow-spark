@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-24, milestone M2 of Phase D).
+Accepted (2026-10-26, at the merge of pull request #38; proposed 2026-10-24, milestone M2 of Phase D).
 
 Note (2026-11-03, the memory milestone, ADR 0080, block 3): the prover's first step is `Bind_Merge` of `Packed_HQuad`, from the packed circuit, with a working array of one entry per run of equal hands; the invariant of this record is carried on the layer of the ghost expansion bound with g, and the postcondition of `Prove`, each bound quad equal to `BQ_Ref`, is stated on the expansion. The decision stands.
 

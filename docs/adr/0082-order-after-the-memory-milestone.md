@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-30, during the memory milestone of Phase D).
+Accepted (2026-10-30, at the merge of pull request #54; proposed 2026-10-30, during the memory milestone of Phase D).
 
 ## Date
 
