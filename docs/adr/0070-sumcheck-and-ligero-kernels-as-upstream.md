@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-23, milestone M2 of Phase D). Amended 2026-10-27 by [ADR 0075](0075-round-evaluations-from-the-claim.md): the round evaluations take two products per pair, p (1) from the claim of the round.
+Accepted (2026-10-24, at the merge of pull request #36; proposed 2026-10-23, milestone M2 of Phase D). Amended 2026-10-27 by [ADR 0075](0075-round-evaluations-from-the-claim.md): the round evaluations take two products per pair, p (1) from the claim of the round.
 
 ## Date
 

@@ -74,8 +74,9 @@ Two cases get `prove` without a proof run, because they cannot change what the p
 - A change without code: nothing under `src/`, `tests/` or `scripts/`, and not `alire.toml`.
   `scripts/remote-check.sh --text-only` checks that only Markdown files, LICENSE and the
   configuration files under `.github/` (the issue forms, `CODEOWNERS`, `dependabot.yml`, the
-  pull request template; never the workflows) changed since a proved commit, and posts the
-  status naming that commit.
+  pull request template; never the workflows) changed since a proved commit, an ancestor
+  along any parent whose status `prove` is success and whose code is the commit's, and posts
+  the status naming that commit. Without such an ancestor it refuses, and the full gate is due.
 - A merge of `main` into the branch of an open pull request that brings no such change: the
   complete diff between the merge commit and the proved commit touches only the files
   `--text-only` accepts, so the project files, the workflows and every other input of the

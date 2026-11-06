@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-27, milestone M2 of Phase D). Takes up the alternative that [ADR 0070](0070-sumcheck-and-ligero-kernels-as-upstream.md) left for later.
+Accepted (2026-10-27, at the merge of pull request #45; proposed 2026-10-27, milestone M2 of Phase D). Takes up the alternative that [ADR 0070](0070-sumcheck-and-ligero-kernels-as-upstream.md) left for later.
 
 ## Date
 

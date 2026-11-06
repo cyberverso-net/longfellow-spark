@@ -22,11 +22,12 @@
 #     Checks that the commit changes only text (Markdown files and
 #     LICENSE) and the configuration files under .github/ (the issue
 #     forms, CODEOWNERS, dependabot.yml, the pull request template; not
-#     the workflows) since a commit already proved: the nearest ancestor
-#     whose status `prove` is success, or else origin/main. Then posts
-#     `prove` as passed, naming that commit, without starting the VM.
-#     Anything under src/, tests/ or scripts/, and alire.toml, is code
-#     for this purpose and needs the proof.
+#     the workflows) since a commit already proved: an ancestor, along
+#     every parent, whose status `prove` is success and whose code is
+#     the commit's. Then posts `prove` as passed, naming that commit,
+#     without starting the VM. Without such an ancestor it refuses, and
+#     the full gate is due. Anything under src/, tests/ or scripts/, and
+#     alire.toml, is code for this purpose and needs the proof.
 #
 #  scripts/remote-check.sh --tree [make target...]
 #     Copies the working tree as it is, committed or not, and runs the
@@ -208,13 +209,31 @@ if [ "$MODE" != text ]; then
    need_user
 fi
 
-#  The nearest ancestor of $SHA, at most 50 first-parent steps back,
-#  whose status `prove` is success; empty if none.
-proved_ancestor() {
+#  Text and configuration that cannot change the proof. The workflows
+#  are not in the list: they are code.
+TEXT_ONLY='(\.md$|^LICENSE$|^\.github/(ISSUE_TEMPLATE/[^/]+|CODEOWNERS|dependabot\.yml|pull_request_template\.md)$)'
+
+#  The files of $1 and $2 that differ and are not text or .github
+#  configuration; empty when the two trees hold the same code.
+code_diff() {
+   git diff --name-only "$1" "$2" | grep -v -E "$TEXT_ONLY" || true
+}
+
+#  An ancestor of $SHA whose status `prove` is success and whose tree
+#  holds the same code as $SHA's (code_diff empty); empty if none within
+#  200 commits. The walk is topological (children before parents) over
+#  every parent of a merge, not the first parents only: the proved head
+#  of a branch is the second parent of its merge into main, and a walk
+#  along the first parents would miss every one of them. The walk
+#  starts from every parent of $SHA ($SHA^@), since $SHA may itself be
+#  a merge whose proved head is its second parent. A status posted on a
+#  merge of main without code (docs/process.md) counts.
+proved_base() {
    local c
-   for c in $(git rev-list --first-parent --max-count=50 "$SHA^" 2> /dev/null); do
+   for c in $(git rev-list --topo-order --max-count=200 "$SHA^@" 2> /dev/null); do
       if [ "$(gh api "repos/$(repo)/commits/$c/statuses" \
-                --jq "[.[] | select(.context == \"$CONTEXT\")][0].state" 2> /dev/null)" = success ]; then
+                --jq "[.[] | select(.context == \"$CONTEXT\")][0].state" 2> /dev/null)" = success ] \
+         && [ -z "$(code_diff "$c" "$SHA")" ]; then
          echo "$c"
          return 0
       fi
@@ -224,22 +243,17 @@ proved_ancestor() {
 if [ "$MODE" = text ]; then
    commit_preconditions
    git fetch -q origin main
-   BASE="$(proved_ancestor)"
-   if [ -n "$BASE" ]; then
-      RANGE="$BASE..$SHA"; FROM="${BASE:0:7}, proved"
-   else
-      RANGE="origin/main...$SHA"; FROM="main"
-   fi
-   #  Text and configuration that cannot change the proof. The workflows
-   #  are not in the list: they are code.
-   TEXT_ONLY='(\.md$|^LICENSE$|^\.github/(ISSUE_TEMPLATE/[^/]+|CODEOWNERS|dependabot\.yml|pull_request_template\.md)$)'
-   others="$(git diff --name-only "$RANGE" | grep -v -E "$TEXT_ONLY" || true)"
-   if [ -n "$others" ]; then
-      echo "remote-check: files that are not text or .github configuration changed since $FROM:" >&2
-      echo "$others" >&2
+   BASE="$(proved_base)"
+   if [ -z "$BASE" ]; then
+      echo "remote-check: no ancestor of $SHA within 200 commits is proved with the same code (the status prove is not success, or files that are not text or .github configuration differ): run the full gate" >&2
+      others="$(code_diff "origin/main" "$SHA")"
+      if [ -n "$others" ]; then
+         echo "remote-check: files that are not text or .github configuration changed since main:" >&2
+         echo "$others" >&2
+      fi
       exit 1
    fi
-   post_status success "Text only since $FROM: Markdown, LICENSE and .github configuration, proof not run"
+   post_status success "Text only since ${BASE:0:7}, proved: Markdown, LICENSE and .github configuration, proof not run"
    exit 0
 fi
 
