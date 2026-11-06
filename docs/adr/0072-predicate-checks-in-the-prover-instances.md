@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-26, milestone M2 of Phase D). Amended 2026-10-28: the command-line programs check the predicate of the circuit once, explicitly, after the load, and suppress the predicate checks of their own calls and of the expression functions of `Zk_Prover`'s specification, which walked the circuit again about four times (0.18 s of the hash proof); the contracts and the proofs do not change.
+Accepted (2026-10-26, at the merge of pull request #40; proposed 2026-10-26, milestone M2 of Phase D). Amended 2026-10-28: the command-line programs check the predicate of the circuit once, explicitly, after the load, and suppress the predicate checks of their own calls and of the expression functions of `Zk_Prover`'s specification, which walked the circuit again about four times (0.18 s of the hash proof); the contracts and the proofs do not change.
 
 ## Date
 

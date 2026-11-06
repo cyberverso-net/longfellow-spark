@@ -66,23 +66,23 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0060](0060-proving-machine-on-google-cloud.md) | A proving machine on Google Cloud: prove as one job, make check remote | Accepted, amended by 0062 | 2026-10-19 |
 | [0061](0061-readme-as-front-page.md) | The README as a front page, the trust model in the guide | Accepted | 2026-10-19 |
 | [0062](0062-proof-on-demand.md) | The proof on demand, posted as a commit status | Accepted | 2026-10-19 |
-| [0063](0063-milestone-m1-algorithmic-parity.md) | Milestone M1: algorithmic parity with the production verifier and prover | Proposed, amended by 0066, M1 closed | 2026-10-21 |
+| [0063](0063-milestone-m1-algorithmic-parity.md) | Milestone M1: algorithmic parity with the production verifier and prover | Accepted, amended by 0066, M1 closed | 2026-10-21 |
 | [0064](0064-lean-circuit-premises.md) | The circuit premises of upstream's Lean proofs, checked and proved | Accepted, amended by 0079 | 2026-10-21 |
-| [0065](0065-carry-less-multiplication-in-gf2-128.md) | The carry-less multiplication of upstream in GF(2^128), proved Gold | Proposed | 2026-10-21 |
-| [0066](0066-lagrange-tables-by-prefix-and-suffix.md) | The verifier's Lagrange tables by prefix and suffix products, proved | Proposed, amended by 0070 | 2026-10-22 |
-| [0067](0067-performance-milestones-by-trust.md) | Performance milestones by trust: the Gold limit, then a tested variant | Proposed, M2 closed by 0078 | 2026-10-22 |
-| [0068](0068-release-build-without-run-time-checks.md) | The release build without run-time checks in the proved units | Proposed, amended by 0072 | 2026-10-22 |
-| [0069](0069-p256-montgomery-multiplication.md) | P-256 in Montgomery form, with the multiplication of upstream | Proposed, amended by 0070, 0077 | 2026-10-22 |
-| [0070](0070-sumcheck-and-ligero-kernels-as-upstream.md) | The sumcheck and Ligero kernels in upstream's form | Proposed, amended by 0075 | 2026-10-23 |
-| [0071](0071-prover-reuses-the-bound-quad.md) | The prover reuses the bound quad of its own sumcheck, proved | Proposed | 2026-10-24 |
-| [0072](0072-predicate-checks-in-the-prover-instances.md) | The prover instances of the command line do not check the circuit predicate again | Proposed, amended 2026-10-28 | 2026-10-26 |
-| [0073](0073-verifier-binds-the-quad-as-upstream.md) | The verifier binds the quad of each layer as upstream does | Proposed | 2026-10-26 |
-| [0074](0074-circuit-identifier-checked-once.md) | The command line checks the identifier of a known circuit once, not on every load | Proposed | 2026-10-27 |
-| [0075](0075-round-evaluations-from-the-claim.md) | The prover's round evaluations take p (1) from the claim of the round, as upstream | Proposed | 2026-10-27 |
-| [0076](0076-field-operations-without-call-and-finalisation-overhead.md) | The field operations without call and finalisation overhead | Proposed | 2026-10-27 |
-| [0077](0077-p256-montgomery-round-as-cios.md) | The Montgomery round of P-256 as upstream's CIOS step | Proposed | 2026-10-28 |
-| [0078](0078-milestone-m2-closed.md) | Milestone M2 closed: the Gold limit at 8.13 seconds | Proposed | 2026-10-29 |
-| [0079](0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md) | The specification migrated to draft-irtf-cfrg-longfellow-00, and upstream's new home | Proposed | 2026-10-29 |
+| [0065](0065-carry-less-multiplication-in-gf2-128.md) | The carry-less multiplication of upstream in GF(2^128), proved Gold | Accepted | 2026-10-21 |
+| [0066](0066-lagrange-tables-by-prefix-and-suffix.md) | The verifier's Lagrange tables by prefix and suffix products, proved | Accepted, amended by 0070 | 2026-10-22 |
+| [0067](0067-performance-milestones-by-trust.md) | Performance milestones by trust: the Gold limit, then a tested variant | Accepted, M2 closed by 0078 | 2026-10-22 |
+| [0068](0068-release-build-without-run-time-checks.md) | The release build without run-time checks in the proved units | Accepted, amended by 0072 | 2026-10-22 |
+| [0069](0069-p256-montgomery-multiplication.md) | P-256 in Montgomery form, with the multiplication of upstream | Accepted, amended by 0070, 0077 | 2026-10-22 |
+| [0070](0070-sumcheck-and-ligero-kernels-as-upstream.md) | The sumcheck and Ligero kernels in upstream's form | Accepted, amended by 0075 | 2026-10-23 |
+| [0071](0071-prover-reuses-the-bound-quad.md) | The prover reuses the bound quad of its own sumcheck, proved | Accepted | 2026-10-24 |
+| [0072](0072-predicate-checks-in-the-prover-instances.md) | The prover instances of the command line do not check the circuit predicate again | Accepted, amended 2026-10-28 | 2026-10-26 |
+| [0073](0073-verifier-binds-the-quad-as-upstream.md) | The verifier binds the quad of each layer as upstream does | Accepted | 2026-10-26 |
+| [0074](0074-circuit-identifier-checked-once.md) | The command line checks the identifier of a known circuit once, not on every load | Accepted | 2026-10-27 |
+| [0075](0075-round-evaluations-from-the-claim.md) | The prover's round evaluations take p (1) from the claim of the round, as upstream | Accepted | 2026-10-27 |
+| [0076](0076-field-operations-without-call-and-finalisation-overhead.md) | The field operations without call and finalisation overhead | Accepted | 2026-10-27 |
+| [0077](0077-p256-montgomery-round-as-cios.md) | The Montgomery round of P-256 as upstream's CIOS step | Accepted | 2026-10-28 |
+| [0078](0078-milestone-m2-closed.md) | Milestone M2 closed: the Gold limit at 8.13 seconds | Accepted | 2026-10-29 |
+| [0079](0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md) | The specification migrated to draft-irtf-cfrg-longfellow-00, and upstream's new home | Accepted | 2026-10-29 |
 | [0080](0080-milestone-memory.md) | A memory milestone, before the certification block and M3 | Proposed, amended by 0082 | 2026-10-29 |
-| [0081](0081-audience-certification-evaluators.md) | The audience: evaluators in a certification laboratory | Proposed | 2026-10-30 |
-| [0082](0082-order-after-the-memory-milestone.md) | The order after the memory milestone | Proposed | 2026-10-30 |
+| [0081](0081-audience-certification-evaluators.md) | The audience: evaluators in a certification laboratory | Accepted | 2026-10-30 |
+| [0082](0082-order-after-the-memory-milestone.md) | The order after the memory milestone | Accepted | 2026-10-30 |

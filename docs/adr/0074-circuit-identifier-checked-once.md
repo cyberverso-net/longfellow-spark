@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-27, milestone M2 of Phase D). Amends [ADR 0046](0046-phase-b-scope-lfc2-loader-and-interop.md) for the command line: `Read` still recomputes the identifier; the command line loads the circuits of a fixed list without recomputing it.
+Accepted (2026-10-27, at the merge of pull request #43; proposed 2026-10-27, milestone M2 of Phase D). Amends [ADR 0046](0046-phase-b-scope-lfc2-loader-and-interop.md) for the command line: `Read` still recomputes the identifier; the command line loads the circuits of a fixed list without recomputing it.
 
 ## Date
 
