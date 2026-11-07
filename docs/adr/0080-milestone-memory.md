@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-29, after milestone M2 of Phase D). Amended 2026-10-30 by [ADR 0082](0082-order-after-the-memory-milestone.md): the order after this milestone is the mDoc layer, the guide, the certification block, then M3.
+Accepted (2026-11-07, at the merge of pull request #121, the close of the milestone; proposed 2026-10-29, after milestone M2 of Phase D). Amended 2026-10-30 by [ADR 0082](0082-order-after-the-memory-milestone.md): the order after this milestone is the mDoc layer, the guide, the certification block, then M3. The milestone closed 2026-11-07 by [ADR 0084](0084-memory-milestone-closed.md): the criterion met, the peak heap on the hash circuit 1.17 times upstream's for the prover and 1.30 times for the verifier; the run entry of the merged terms (#110) and the truncation of the eq2 table (#120) remain as issues.
 
 ## Date
 

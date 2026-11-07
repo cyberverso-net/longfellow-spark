@@ -91,23 +91,24 @@ The absorption of the transcript (row S3) is also of this kind.
 - **6 November 2026.** Created, from the trust model at the close of the memory milestone (#62). No item discharged yet.
 - **6 November 2026.** V5 (the Silver units whose agreement with the reference is tested) and V6 (the completeness of the prover) added at the milestone review (#63): both were in the trust model and missing here.
 - **7 November 2026.** V6 reduced: the round trip on the four production mDoc circuits enters the `cli` step of `make check` at the close of the memory milestone (#64); it ran only in the measurement series before.
+- **7 November 2026.** The list of Section 8 recomputed from the gate of the release 0.4.0 (a4a3836), as the rules of #92 ask at the close of a milestone: the same seven checks, the highest at 463,202 steps.
 
 ## 8. Fragilities: proofs that depend on one prover
 
 These are not trusted items. Each proof exists and is checked at every `make check`. But each is close to the step budget and was closed by one solver only, so a change of that solver's heuristics, or a declaration that enlarges the proof's context, could make it fail. A failure would show as an unproved check at the gate. It could not go unnoticed, but it could stop a toolchain update. Issue #92 keeps watch on them.
 
-The checks above half the step budget (300,000 of 600,000), each goal with a successful attempt by one solver only, from the gate of dfc3db8 (block 4a of the memory milestone):
+The checks above half the step budget (300,000 of 600,000), each goal with a successful attempt by one solver only, from the gate of a4a3836 (release 0.4.0, the close of the memory milestone):
 
 | Check | Subprogram | Steps | Of budget | Solver |
 |-------|------------|------:|----------:|--------|
 | `gf2_128.adb:319`, assertion | `Lemma_Shl_Step` | 463,202 | 77 % | Z3 |
 | `clmul64.adb:620`, assertion | `Lemma_Rev_Xor` | 406,582 | 68 % | Z3 |
 | `gf2_128.adb:291`, assertion | `Lemma_Shl_Step` | 402,206 | 67 % | Z3 |
-| `sumcheck_hquad.ads:127`, postcondition (P-256) | `Merge_Runs` | 361,777 | 60 % | Z3 or Alt-Ergo, one per goal |
+| `sumcheck_hquad.ads:127`, postcondition (P-256) | `Merge_Runs` | 361,777 | 60 % | CVC5, Z3 or Alt-Ergo, one per goal |
 | `ligero_proof.adb:237`, assertion (P-256) | `Read` | 346,300 | 58 % | Alt-Ergo |
 | `sumcheck_hquad.ads:186`, postcondition (P-256) | `Bind_H` | 336,993 | 56 % | CVC5, Z3 or Alt-Ergo, one per goal |
 | `ligero_proof.adb:237`, assertion (GF(2^128)) | `Read` | 330,329 | 55 % | Alt-Ergo |
 
 The list had an eighth entry when #92 opened: the postcondition of `Lemma_Bind_H_Step` on P-256, at 83 % of the budget with Z3 alone. Its proof was split at block 4a; it now takes 2,942 steps with Z3, 685 with CVC5 and 87,210 with Alt-Ergo, so it has three solvers and left the list.
 
-The rules of #92 apply. The list is recomputed at every change of the toolchain or of a solver, at the close of each milestone, and whenever a declaration is added to the formal package of a generic. A proof above 80 % of the budget is split before a toolchain update. The highest value, `max steps used for successful proof` in the output of `make check`, has stayed at 463,202 since that gate.
+The rules of #92 apply. The list is recomputed at every change of the toolchain or of a solver, at the close of each milestone, and whenever a declaration is added to the formal package of a generic. A proof above 80 % of the budget is split before a toolchain update. The highest value, `max steps used for successful proof` in the output of `make check`, has stayed at 463,202 since the gate of block 4a. Recomputed at the close of the memory milestone from the gate of a4a3836: the same seven checks at the same steps; one goal of the postcondition of `Merge_Runs` is now cheapest with CVC5 where Z3 or Alt-Ergo closed it before, the others unchanged.

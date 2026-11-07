@@ -1,6 +1,6 @@
 # Performance
 
-This page records how fast the project proves and verifies the production mDoc circuits, how it got there, and how it compares with upstream. The milestones are set by [ADR 0055](../adr/0055-phase-d-scope-mdoc-scale.md) and [ADR 0067](../adr/0067-performance-milestones-by-trust.md); M2 closes with [ADR 0078](../adr/0078-milestone-m2-closed.md).
+This page records how fast the project proves and verifies the production mDoc circuits, how it got there, and how it compares with upstream. The milestones are set by [ADR 0055](../adr/0055-phase-d-scope-mdoc-scale.md) and [ADR 0067](../adr/0067-performance-milestones-by-trust.md); M2 closes with [ADR 0078](../adr/0078-milestone-m2-closed.md), the memory milestone with [ADR 0084](../adr/0084-memory-milestone-closed.md).
 
 ## What is measured
 
@@ -13,7 +13,7 @@ This page records how fast the project proves and verifies the production mDoc c
   - a 64 MB stack for all;
   - upstream's bench in the same session, generic for the baseline processor.
 - **Sessions differ.** The same commit can be up to 8 % slower in one session than in another. Only figures from the same session are compared.
-- **The scripts:** `scripts/measure-mdoc.sh` times the four runs, and with `MEASURE_PROFILE=1` profiles them with `perf`.
+- **The scripts:** `scripts/measure-mdoc.sh` times the four runs, and with `MEASURE_PROFILE=1` profiles them with `perf`. The `cli` step of `make check` runs it once, untimed, with the default stack, as the test that every proof of the four production circuits is accepted.
 
 ## The milestones
 
@@ -21,7 +21,7 @@ This page records how fast the project proves and verifies the production mDoc c
 |---|---|---|---|
 | M1 | Algorithmic parity: the eq tables, the verifier's Lagrange tables, the sumcheck prover realigned | at most 100 s | closed at about 126 s |
 | M2 | The Gold limit: as fast as the code goes while every contract stays proved | upstream generic | closed at 8.13 s (ADR 0078) |
-| Memory | The peak heap within twice upstream's, by the same measure, in Gold | upstream's peak heap | in progress (ADR 0080) |
+| Memory | The peak heap within twice upstream's, by the same measure, in Gold | upstream's peak heap | closed at 1.17 and 1.30 times upstream's (ADR 0084) |
 | M3 | A tested variant chosen at build time: hardware carry-less product, the verifier's encoding by FFT | upstream hardware, 0.69 s | next |
 | M4 | Parallelism | to be set | optional |
 
@@ -178,6 +178,19 @@ The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. I
 
   Both hash peaks fall by the second table of layer 13, 2^20 entries of 16 bytes (16,777,216 bytes; the prover's fall is within 8 bytes of it, the verifier's within 4,080). The hash proof is 1.17 times upstream's peak for both circuits in one process, from 1.32, and 58 % of the criterion of the milestone; the hash verification 1.30 times upstream's verifier, from 1.64. The signature proof's peak is elsewhere and does not move. The maximum resident set agrees on the hash circuit (prove 144 MB to 128 MB, verify 81 MB to 68 MB); on the signature verification it rises by 2.4 MB (13.9 MB to 16.3 MB) while the peak heap falls, so the rise is in what the allocator keeps resident, not in what the program allocates; it is not investigated further. Times do not move: the hash proof 4.56 s (4.59 s before in this session), the verification 2.28 s (2.30 s). The proofs are identical byte for byte.
 
+### At the close of the memory milestone
+
+The milestone closes with [ADR 0084](../adr/0084-memory-milestone-closed.md). The final measurement, one session of 7 November on the release commit (a4a3836), three runs of each program on each circuit, the peaks identical from run to run, upstream's `heap_v7` under the same counter in the same session:
+
+| Peak heap, mDoc v7 | close of M2 (88835f2) | release 0.4.0 (a4a3836) | upstream (both circuits) | ratio | share of the criterion |
+|---|---|---|---|---|---|
+| prover, hash | 645 MB | 125 MB | 107 MB | 1.17 | 58 % |
+| prover, signature | 78 MB | 20 MB | | | |
+| verifier, hash | 515 MB | 62 MB | 48 MB | 1.30 | 65 % |
+| verifier, signature | 44 MB | 9.5 MB | | | |
+
+The criterion of ADR 0080, twice upstream's peak (214 MB for the prover, 96 MB for the verifier), is met with margin. The times in the same session, median of three: the hash proof 4.69 s, its verification 2.34 s, the signature proof 0.46 s, its verification 0.28 s; the round trip has not moved across the milestone (sessions differ by up to 8 %). The proofs are identical byte for byte to those of every step above. What remains above upstream at the prover's peak, layer 13 of the hash circuit, is recorded as issues: the run entry of the merged terms, 32 bytes against 24 (#110, 9.2 MB), and the eq2 table filled to the power of two above the layer's wire count (#120).
+
 ## After M2
 
 Recorded here and handled after M2, each with its own record:
@@ -185,6 +198,6 @@ Recorded here and handled after M2, each with its own record:
 - **A scalar GF(2^128) product with fewer multiplications:** five classes and 128-bit integer products, no bit reversal; about 75 multiplications instead of 96. To be prototyped and measured first.
 - **The P-256 sum and difference:** an unproved prototype without the generic loop of `Add_Words` takes 5.7 ns against 11.3; the product 16 against 20 ns.
 - **The carry idiom** that GCC compiles to add with carry: proved, but slower in the loop form of `Add_Words` (ADR 0077); to be tried again with the prototype's form.
-- **Memory:** now its own milestone (ADR 0080), before the certification block and M3.
+- **Memory:** its own milestone (ADR 0080), closed with ADR 0084; what remains above upstream is #110 and #120.
 
 M3 then brings the hardware carry-less product, the verifier's encoding by FFT and the SHA instructions, as a tested build chosen at build time, with the Gold build as the default and the reference.
