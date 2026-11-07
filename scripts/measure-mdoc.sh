@@ -28,6 +28,13 @@
 #  the plain release build.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+#  The two labels of every series (#127): this project's commit, from
+#  git or from MEASURE_COMMIT where the tree is not a repository (the
+#  copy on the proving machine), and the upstream commit measured in
+#  the same session, d5e6be7 (the pin) unless MEASURE_UPSTREAM says
+#  otherwise. The pin does not move when a newer upstream is measured.
+OURS="${MEASURE_COMMIT:-$(git describe --always --dirty --tags 2> /dev/null || echo unknown)}"
+echo "measure-mdoc: longfellow-spark $OURS, upstream ${MEASURE_UPSTREAM:-d5e6be7}"
 ulimit -s "${MEASURE_STACK_KB:-65520}"
 BIN="${MEASURE_BIN:-cli/bin}"
 if [ "$(uname)" = Linux ]; then
