@@ -607,7 +607,7 @@ procedure Prover_KAT is
             --  circuit has none, one fewer otherwise.
             Wrong  : constant SA.Element_Array
               (0 .. (if Npub = 0 then 0 else Npub - 2)) :=
-              [others => SA.F.One];
+              [others => SA.One];
 
             procedure Fail (Msg : String) is
             begin
