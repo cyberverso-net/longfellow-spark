@@ -16,7 +16,12 @@
 --  hands them with the number of witnesses (Witness_Count of the core)
 --  to the Ligero verifier under the fixed statement hash of the
 --  reference, DEFAULT_STATEMENT_HASH (ADR 0035: everything
---  statement-specific is already in the transcript).
+--  statement-specific is already in the transcript). Since ADR 0085 it
+--  is the composition of the two phases of ZkVerifier on a fresh
+--  transcript: Receive (the proof read from the start of a buffer, the
+--  root written) and Verify_Received (the statement, the replay, the
+--  core, Ligero), which a flow with two proofs on one transcript (the
+--  mDoc layer, ADR 0058) drives itself.
 --
 --  The circuit is the packed form (Packed_Circuits, the memory
 --  milestone, ADR 0080): its shape gives every size, the walk of each
@@ -58,6 +63,7 @@ pragma SPARK_Mode (On);
 
 with Proof_Levels;
 with Bytes;            use Bytes;
+with Merkle;
 with Transcript;
 with Ligero_Geometry;  use Ligero_Geometry;
 with Verifier_Status;  use Verifier_Status;
@@ -140,6 +146,35 @@ package Zk_Verifier is
        and then Lig.Path_Last + 1 = 2 * Num_Leaves (G),
      Post   => St in Ok | Proof_Encoding;
 
+   --  Read_Proof for a proof that starts at Off in a buffer that holds
+   --  more (the mDoc proof of ADR 0058: six MACs, the hash proof, the
+   --  signature proof): Next is the offset after it, at most B'Length.
+   --  Read_Proof is this at Off = 0 with Next = B'Length required.
+   procedure Read_Proof_Prefix
+     (B        : Byte_Array;
+      Off      : Natural;
+      S        : Shape;
+      G        : Valid_Geometry;
+      Root     : out Bytes_32;
+      Sumcheck : out Sumcheck_Proof;
+      Lig      : out Ligero_Part;
+      Next     : out Natural;
+      St       : out Status)
+   with
+     Global => null,
+     Pre    =>
+       B'First = 0 and then Off <= B'Length and then LV.LP.Fits (G)
+       and then Sumcheck.Last + 1 = LV.ST.SV.Proof_Total (S)
+       and then Lig.Ldt_Last + 1 = G.Block_Len
+       and then Lig.Linear_Last + 1 = G.Dblock_Len
+       and then Lig.Low_Last + 1 = G.Num_Queries
+       and then Lig.High_Last + 1 = G.Dblock_Len - G.Block_Len
+       and then Lig.Nonce_Last + 1 = G.Num_Queries
+       and then Lig.Col_Last + 1 = LV.LP.Opened (G)
+       and then Lig.Path_Last + 1 = 2 * Num_Leaves (G),
+     Post   => St in Ok | Proof_Encoding
+               and then (if St = Ok then Next in Off .. B'Length);
+
    --  The bound quads of the verifier (ADR 0071, ADR 0073), layer by
    --  layer from the packed circuit: Bind_Quad_Packed when the eq tables
    --  fit, Eval_Bound_Quad_Packed otherwise, the choice BQ_Ref makes. S
@@ -166,12 +201,96 @@ package Zk_Verifier is
              LV.ST.SA.Same (BQ (J),
                             LV.ST.SV.BQ_Ref (PH.PC.Expand (P), Ch, J))));
 
+   --  The two phases of ZkVerifier (recv_commitment, verify) for a
+   --  transcript the caller opened (ADR 0085): Receive reads the proof
+   --  at Off in B and writes its root to the transcript;
+   --  Verify_Received replays the statement and the challenges, runs the
+   --  core and the Ligero verifier, and frees the record. A flow with two
+   --  proofs on one transcript (the mDoc layer, ADR 0058) receives both
+   --  before it verifies either; Verify below is the two phases on a
+   --  fresh transcript for one proof. Between the phases Received holds
+   --  the proof read, on the heap under the ownership rules of ADR 0047,
+   --  freed by Verify_Received or by Release.
+   type Received is private;
+
+   --  Nothing held: after Receive failed, Verify_Received, or Release.
+   function Is_Null (R : Received) return Boolean with Global => null;
+
+   --  The record holds a proof for a circuit of the shape of P under
+   --  Cfg: the precondition of Verify_Received, the postcondition of a
+   --  Receive that succeeded.
+   function Fits (R : Received; Cfg : Config; P : Packed_Circuit)
+                  return Boolean
+   with
+     Global => null,
+     Pre    => (Runtime    => Valid (Cfg),
+                Proof_Only =>
+                  PH.PC.Valid (P)
+                  and then LV.ST.SA.Well_Formed (PH.PC.Expand (P)));
+
+   --  The offset after the proof read, in the buffer given to Receive.
+   function After (R : Received) return Natural with Global => null;
+
+   procedure Release (R : in out Received) with
+     Global => null,
+     Post   => Is_Null (R);
+
+   procedure Receive
+     (B   : Byte_Array;
+      Off : Natural;
+      Cfg : Config;
+      P   : Packed_Circuit;
+      R   : out Received;
+      St  : out Status)
+   with
+     Global => (In_Out => (Transcript.State, Transcript.Absorbed)),
+     Pre    =>
+       (Runtime    =>
+          Valid (Cfg) and then B'First = 0 and then Off <= B'Length,
+        Proof_Only =>
+          PH.PC.Valid (P)
+          and then LV.ST.SA.Well_Formed (PH.PC.Expand (P))),
+     Post   =>
+       St in Ok | Proof_Encoding
+       and then (if St = Ok then Fits (R, Cfg, P)
+                                 and then After (R) in Off .. B'Length
+                 else Is_Null (R));
+
+   procedure Verify_Received
+     (Id  : Bytes_32;
+      Cfg : Config;
+      P   : Packed_Circuit;
+      Pub : Element_Array;
+      R   : in out Received;
+      St  : out Status)
+   with
+     Global            => (In_Out => (Transcript.State, Transcript.Absorbed)),
+     Always_Terminates => False,
+     --  Fits is stated after the loader's postcondition, which its own
+     --  precondition needs; at the proof-only level it is still what the
+     --  body is proved from.
+     Pre               =>
+       (Runtime    => Valid (Cfg) and then Pub'First = 0,
+        Proof_Only =>
+          PH.PC.Valid (P)
+          and then LV.ST.SA.Well_Formed (PH.PC.Expand (P))
+          and then Fits (R, Cfg, P)),
+     Post              =>
+       Is_Null (R)
+       and then St not in Queried_Columns_Length | Polynomial_Lengths
+       and then (St = Public_Input_Length) = (Pub'Length /= P.Npublic)
+       and then (St = Public_Input_Not_One)
+                = (Pub'Length = P.Npublic and then P.Npublic > 0
+                   and then Pub (0) /= LV.ST.SA.One);
+
    --  ZkVerifier::verify: Label the transcript label, Id the circuit
    --  identifier of the statement (Section 3.3), Cfg the Ligero
    --  configuration, P the circuit in its packed form, Pub the public
    --  inputs, B the proof string. Proof_Encoding also when the
    --  geometry's opened columns do not fit this implementation (ADR
-   --  0039). The precondition on P is the postcondition of the loader.
+   --  0039) and when bytes follow the proof. The precondition on P is
+   --  the postcondition of the loader. The body is the two checks on
+   --  Pub, Reset with the label, Receive at 0, Verify_Received.
    procedure Verify
      (Label : Byte_Array;
       Id    : Bytes_32;
@@ -198,5 +317,89 @@ package Zk_Verifier is
        and then (St = Public_Input_Not_One)
                 = (Pub'Length = P.Npublic and then P.Npublic > 0
                    and then Pub (0) /= LV.ST.SA.One);
+
+private
+
+   -------------------------------------------------------------------
+   --  The working set of one verification, in one allocation on the
+   --  heap (ADR 0047): the padded sumcheck proof, the Ligero part, the
+   --  challenges, the constraint terms, the constants b and the
+   --  quadratic triples, each sized by the circuit or the geometry
+   --  through a discriminant. Here rather than in the body so that
+   --  Received can hold it between the two phases.
+   -------------------------------------------------------------------
+
+   subtype Index is LV.ST.SA.Index;
+   subtype Merkle_Node_Index is Merkle.Node_Index;
+
+   type Work
+     (Sum_Last    : Index;
+      Ldt_Last    : Index;
+      Linear_Last : Index;
+      Low_Last    : Index;
+      High_Last   : Index;
+      Nonce_Last  : Index;
+      Col_Last    : Index;
+      Path_Last   : Merkle_Node_Index;
+      Ch_Last     : Index;
+      A_Max       : Index;
+      B_Last      : Index;
+      Lqc_Last    : Index)
+   is record
+      Sumcheck : Sumcheck_Proof (Sum_Last);
+      Lig      : Ligero_Part (Ldt_Last, Linear_Last, Low_Last, High_Last,
+                              Nonce_Last, Col_Last, Path_Last);
+      Ch       : LV.ST.SV.Challenges (Ch_Last);
+      A        : LV.ST.SV.Ligero_Terms (A_Max);
+      B_Vec    : Element_Array (0 .. B_Last);
+      Lqc      : LV.ST.SV.Lqc_Array (0 .. Lqc_Last);
+      BQ       : Element_Array (0 .. Lqc_Last);
+   end record;
+
+   type Work_Access is access Work;
+
+   --  The discriminants of W are those of S under G.
+   function Work_Shape
+     (W : Work; S : Shape; G : Valid_Geometry) return Boolean
+   is
+     (W.Sum_Last + 1 = LV.ST.SV.Proof_Total (S)
+      and then W.Ldt_Last + 1 = G.Block_Len
+      and then W.Linear_Last + 1 = G.Dblock_Len
+      and then W.Low_Last + 1 = G.Num_Queries
+      and then W.High_Last + 1 = G.Dblock_Len - G.Block_Len
+      and then W.Nonce_Last + 1 = G.Num_Queries
+      and then W.Col_Last + 1 = LV.LP.Opened (G)
+      and then W.Path_Last + 1 = 2 * Num_Leaves (G)
+      and then W.Ch_Last + 1 = LV.ST.SV.Chal_Total (S)
+      and then W.A_Max = LV.ST.SV.A_Bound (S)
+      and then W.B_Last = S.Last_Layer + 1
+      and then W.Lqc_Last = S.Last_Layer)
+   with Global => null, Pre => LV.LP.Fits (G);
+
+   type Shape_Access is access Shape;
+
+   --  The root, the offset after the proof, the working set with the
+   --  proof read, and the shape the proof was read under, layer by
+   --  layer, which Verify_Received requires of its circuit.
+   type Received is record
+      Root : Bytes_32;
+      Next : Natural;
+      W    : Work_Access;
+      S    : Shape_Access;
+   end record;
+
+   function Is_Null (R : Received) return Boolean is
+     (R.W = null and then R.S = null);
+
+   function After (R : Received) return Natural is (R.Next);
+
+   function Fits (R : Received; Cfg : Config; P : Packed_Circuit)
+                  return Boolean
+   is
+     (R.W /= null and then R.S /= null
+      and then R.S.all = Shape_Of (P)
+      and then LV.LP.Fits (Geometry_Of (Cfg, Shape_Of (P)))
+      and then Work_Shape (R.W.all, Shape_Of (P),
+                           Geometry_Of (Cfg, Shape_Of (P))));
 
 end Zk_Verifier;
