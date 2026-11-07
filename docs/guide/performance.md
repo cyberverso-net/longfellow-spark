@@ -11,9 +11,10 @@ This page records how fast the project proves and verifies the production mDoc c
   - one series per comparison, all commits in the same session of the machine;
   - three runs of each commit, the median reported;
   - a 64 MB stack for all;
-  - upstream's bench in the same session, generic for the baseline processor.
+  - upstream's bench in the same session, generic for the baseline processor;
+  - two labels on every series: this project's commit or tag, and the upstream commit measured in the same session. Every series on this page measured upstream at d5e6be7, the pin. Upstream's main has moved since (one crate, the algebra rewritten, a carry fix in the generic multiply-accumulate), so its time and memory can change without this project changing anything; a figure against upstream is read with the upstream commit beside it. Measuring a newer upstream, when it comes, does not move the pin of the code and the interoperability (ADR 0002, ADR 0079).
 - **Sessions differ.** The same commit can be up to 8 % slower in one session than in another. Only figures from the same session are compared.
-- **The scripts:** `scripts/measure-mdoc.sh` times the four runs, and with `MEASURE_PROFILE=1` profiles them with `perf`. The `cli` step of `make check` runs it once, untimed, with the default stack, as the test that every proof of the four production circuits is accepted.
+- **The scripts:** `scripts/measure-mdoc.sh` times the four runs, prints the two labels first (`MEASURE_COMMIT` and `MEASURE_UPSTREAM` where git or the default d5e6be7 do not apply), and with `MEASURE_PROFILE=1` profiles them with `perf`; `scripts/measure/heap_v7.rs`, upstream's driver under the heap counter, prints the upstream commit it was built for. The `cli` step of `make check` runs it once, untimed, with the default stack, as the test that every proof of the four production circuits is accepted.
 
 ## The milestones
 
