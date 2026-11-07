@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-18, at the close of block 6 of Phase C; proposed 2026-10-17 and edited until then). Amended 2026-10-30: the re-injection of the subfield check, `GF2_128.Inject`, branched on each bit of the private coordinates and now selects the basis elements with masks, as the rule above requires.
+Accepted (2026-10-18, at the close of block 6 of Phase C; proposed 2026-10-17 and edited until then). Amended 2026-10-30: the re-injection of the subfield check, `GF2_128.Inject`, branched on each bit of the private coordinates and now selects the basis elements with masks, as the rule above requires. Amended 2026-11-07 by [ADR 0083](0083-claims-corrected-at-the-milestone-review.md): the satisfiability check of `Packed_Eval` branched on each assertion product and on each output wire, against the fixed loop this record declares; both tests now accumulate with a Boolean `and` on the comparison with zero, and the generated code was inspected on arm64 and x86-64 (#63).
 
 ## Date
 

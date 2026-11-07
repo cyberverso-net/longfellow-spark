@@ -3,8 +3,12 @@
 #  circuits (Phase D, block 1): time and peak memory of longfellow_prove
 #  and longfellow_verify on the four circuits of tests/vectors/upstream/
 #  mdoc/ with the upstream witnesses, under the configurations of
-#  runtime/src/zk_spec.rs. Not part of make check: it takes minutes to
-#  hours while the encoder is the Lagrange one. Writes under cli/out/.
+#  runtime/src/zk_spec.rs. Writes under cli/out/. A prover or verifier
+#  that fails ends the script with a non-zero status, so the cli step
+#  of make check runs it once, with the default stack, as the test that
+#  every proof of the four production circuits is accepted (the trusted
+#  base register, V6): the proofs state the structure of the prover,
+#  not that the verifier accepts its output.
 #
 #  Usage: scripts/measure-mdoc.sh [v7|v6] [hash|sig]
 #  Needs the release build (make cli) and python3 for the witness
@@ -13,7 +17,8 @@
 #  the prover and the verifier fit the default stack).
 #
 #  Runs on macOS (time -l) and on Linux (GNU time -v), the proving
-#  machine of ADR 0060 included. MEASURE_BIN names another directory of
+#  machine of ADR 0060 included; without /usr/bin/time (a hosted runner)
+#  the commands run untimed. MEASURE_BIN names another directory of
 #  binaries (default cli/bin). MEASURE_PROFILE=1 runs each command under
 #  perf record at 99 samples a second with call graphs, and writes two
 #  reports per run under cli/out/: the time per function including its
@@ -32,6 +37,10 @@ else
    TIME=(/usr/bin/time -l)
    KEEP="ok:|^ok|real|user|maximum resident|_failed|error|exhausted|encoding|length"
 fi
+if [ ! -x /usr/bin/time ]; then
+   echo "measure-mdoc: no /usr/bin/time, the runs are not timed"
+   TIME=()
+fi
 #  run <name> <command...>: timed, and under perf when profiling. A
 #  command that fails ends the script with its last lines: a prover or
 #  verifier that refuses the case must not pass for a measurement.
@@ -47,7 +56,9 @@ run() {
          --percent-limit 0.5 -g none 2> /dev/null | grep -v '^$' > "cli/out/$name.self.txt" || true
       echo "profile: cli/out/$name.children.txt, cli/out/$name.self.txt"
    else
-      out="$("${TIME[@]}" "$@" 2>&1)" \
+      #  The expansion is written so that an empty TIME is no error
+      #  under set -u in the bash of macOS (3.2).
+      out="$(${TIME[@]+"${TIME[@]}"} "$@" 2>&1)" \
          || { echo "$out" | tail -20; echo "measure-mdoc: $name failed" >&2; return 1; }
       echo "$out" | grep -E "$KEEP" || true
    fi
