@@ -597,7 +597,17 @@ procedure Prover_KAT is
             L1, L2 : Natural;
             S1, S2 : Prover_Status.Status;
             V1, V2 : Verifier_Status.Status;
-            Draw   : Byte_Array (0 .. 15);
+            --  The sixteen bytes drawn between the commitments and the
+            --  proofs, on each side: equal, since both sides absorbed
+            --  the same bytes up to there (the mDoc layer puts them in
+            --  the public inputs of both circuits).
+            Draw_P : Byte_Array (0 .. 15);
+            Draw_V : Byte_Array (0 .. 15);
+            --  Public inputs of the wrong count: one element when the
+            --  circuit has none, one fewer otherwise.
+            Wrong  : constant SA.Element_Array
+              (0 .. (if Npub = 0 then 0 else Npub - 2)) :=
+              [others => SA.F.One];
 
             procedure Fail (Msg : String) is
             begin
@@ -626,7 +636,7 @@ procedure Prover_KAT is
                Fail ("commit " & S1'Image & " " & S2'Image);
                return;
             end if;
-            Transcript.Get_Random_Bytes (Draw);
+            Transcript.Get_Random_Bytes (Draw_P);
             ZKP.Prove_Committed (H.Id, H.Subfield_Boundary, Cfg, PK.all, Pub,
                                  C1, B1.all, L1, S1);
             ZKP.Prove_Committed (H.Id, H.Subfield_Boundary, Cfg, PK.all, Pub,
@@ -653,7 +663,11 @@ procedure Prover_KAT is
                Fail ("receive 2 " & V2'Image);
                return;
             end if;
-            Transcript.Get_Random_Bytes (Draw);
+            Transcript.Get_Random_Bytes (Draw_V);
+            if Draw_V /= Draw_P then
+               Fail ("the two sides drew different bytes");
+               return;
+            end if;
             ZK.Verify_Received (H.Id, Cfg, PK.all, Pub, R1, V1);
             ZK.Verify_Received (H.Id, Cfg, PK.all, Pub, R2, V2);
             if V1 /= Verifier_Status.Ok or else V2 /= Verifier_Status.Ok
@@ -673,7 +687,7 @@ procedure Prover_KAT is
                Fail ("receive 1 again " & V1'Image);
                return;
             end if;
-            Transcript.Get_Random_Bytes (Draw);
+            Transcript.Get_Random_Bytes (Draw_V);
             ZK.Verify_Received (H.Id, Cfg, PK.all, Pub, R1, V1);
             if V2 = Verifier_Status.Ok then
                ZK.Verify_Received (H.Id, Cfg, PK.all, Pub, R2, V2);
@@ -697,7 +711,7 @@ procedure Prover_KAT is
             --  status of the count, the record freed.
             Transcript.Reset (Label);
             ZK.Receive (Buf.all, 0, Cfg, PK.all, R1, V1);
-            ZK.Verify_Received (H.Id, Cfg, PK.all, W (0 .. Npub - 2), R1, V1);
+            ZK.Verify_Received (H.Id, Cfg, PK.all, Wrong, R1, V1);
             if V1 /= Verifier_Status.Public_Input_Length
               or else not ZK.Is_Null (R1)
             then
@@ -707,7 +721,7 @@ procedure Prover_KAT is
             Transcript.Reset (Label);
             ZKP.Commit (H.Subfield_Boundary, Cfg, PK.all, Priv, C1, S1);
             ZKP.Prove_Committed (H.Id, H.Subfield_Boundary, Cfg, PK.all,
-                                 W (0 .. Npub - 2), C1, B1.all, L1, S1);
+                                 Wrong, C1, B1.all, L1, S1);
             if S1 /= Prover_Status.Input_Length or else not ZKP.Is_Null (C1)
             then
                Fail ("public inputs of the prover " & S1'Image);
@@ -717,9 +731,9 @@ procedure Prover_KAT is
             Free (B2);
             Free (Buf);
             TIO.Put_Line ("  " & Name & ": two proofs on one transcript,"
-                          & " both accepted; the altered second proof,"
-                          & " the short buffer and the wrong public"
-                          & " inputs refused");
+                          & " both accepted, the same bytes drawn on both"
+                          & " sides; the altered second proof, the short"
+                          & " buffer and the wrong public inputs refused");
             Good := True;
          end Check_Two_Phases;
       begin
