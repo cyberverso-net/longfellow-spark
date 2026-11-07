@@ -227,10 +227,8 @@ package body Sumcheck_Transcript is
       End_Layer (LP (4 * Logw), LP (4 * Logw + 1));
    end Replay_Layer;
 
-   procedure Replay_Challenges
-     (Label : Byte_Array;
-      Root  : Bytes_32;
-      Id    : Bytes_32;
+   procedure Replay_From_Statement
+     (Id    : Bytes_32;
       S     : Shape;
       Pub   : Element_Array;
       Proof : Sumcheck_Proof;
@@ -242,8 +240,6 @@ package body Sumcheck_Transcript is
              G           => [others => Zero],
              Layer       => [others => Zero],
              Alpha_Input => Zero);
-      Transcript.Reset (Label);
-      Transcript.Write_Bytes (Root);
       Write_Sumcheck_Statement (Id, S, Pub);
       Begin_Circuit (Ch.G);
       for J in 0 .. S.Last_Layer loop
@@ -263,6 +259,22 @@ package body Sumcheck_Transcript is
       end loop;
       Sample (Ch.Alpha_Input);
       St := (if Transcript.Is_Exhausted then Exhausted else Ok);
+   end Replay_From_Statement;
+
+   procedure Replay_Challenges
+     (Label : Byte_Array;
+      Root  : Bytes_32;
+      Id    : Bytes_32;
+      S     : Shape;
+      Pub   : Element_Array;
+      Proof : Sumcheck_Proof;
+      Ch    : out Challenges;
+      St    : out Status)
+   is
+   begin
+      Transcript.Reset (Label);
+      Transcript.Write_Bytes (Root);
+      Replay_From_Statement (Id, S, Pub, Proof, Ch, St);
    end Replay_Challenges;
 
    ----------------------------------------------------------------------

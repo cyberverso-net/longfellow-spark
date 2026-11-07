@@ -225,11 +225,35 @@ package Sumcheck_Transcript is
    --  The replay and the reader
    ----------------------------------------------------------------------
 
-   --  Every challenge the core consumes, from the proof: Ch.G, per
-   --  layer alpha, beta and the round challenges at Chal_Off (C, J),
-   --  Ch.Alpha_Input. St is Exhausted when the generator passed its
-   --  bound during the replay (ADR 0028); the record is then not to be
-   --  used.
+   --  The statement and the replay on the transcript as it is, the label
+   --  and the commitment root already written: a flow that commits two
+   --  circuits on one transcript before it proves either (the mDoc
+   --  layer, ADR 0058, ADR 0085) writes both roots first and replays
+   --  each proof from here. Every challenge the core consumes, from the
+   --  proof: Ch.G, per layer alpha, beta and the round challenges at
+   --  Chal_Off (C, J), Ch.Alpha_Input. St is Exhausted when the
+   --  generator passed its bound during the replay (ADR 0028); the
+   --  record is then not to be used.
+   procedure Replay_From_Statement
+     (Id    : Bytes_32;
+      S     : Shape;
+      Pub   : Element_Array;
+      Proof : Sumcheck_Proof;
+      Ch    : out Challenges;
+      St    : out Status)
+   with
+     Global            => (In_Out => (Transcript.State, Transcript.Absorbed)),
+     Always_Terminates => not SA.F.Sampling_Rejects,
+     Pre               =>
+       Pub'First = 0 and then Pub'Length = S.Npublic
+       and then Proof.Last + 1 = Proof_Total (S)
+       and then Ch.Last + 1 = Chal_Total (S),
+     Post              => St in Ok | Exhausted
+       and then (St = Ok) = not Transcript.Is_Exhausted;
+
+   --  One proof on its own transcript: Reset with the label, the root,
+   --  then Replay_From_Statement (ZkVerifier::verify of the reference
+   --  for a single circuit).
    procedure Replay_Challenges
      (Label : Byte_Array;
       Root  : Bytes_32;

@@ -6,6 +6,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Changed
 
+- `Zk_Prover` and `Zk_Verifier` in two phases, as upstream's `commit`/`prove` and `recv_commitment`/`verify` (ADR 0085, #125): `Commit` takes the private inputs, builds the commitment and writes its root to the transcript the caller opened; `Prove_Committed` takes the public inputs, evaluates the circuit, checks the satisfiability and proves; `Receive` reads a proof at an offset of a buffer and writes its root; `Verify_Received` replays and verifies; `Sumcheck_Transcript.Replay_From_Statement` replays without the reset and the root. `Prove` and `Verify` keep their contracts as the composition of the phases on a fresh transcript; the two upstream example proofs are reproduced byte for byte as before. One change of order for the single proof: `Not_Satisfied` is found after the commitment, since the circuit can be evaluated only with the public inputs (ADR 0049 amended). For the mDoc layer, which commits two circuits before it proves either (#65).
 - The trusted base register notes upstream's commit 7ec62ec (24 October 2026), the fix of the carries in the multiply-accumulate of the delayed reduction of `fp_generic.rs`, and why the fault has no counterpart here: every product is reduced (ADR 0070) and the P-256 multiplication is proved against the integer model. No row changes; the pin stays at d5e6be7 (#123).
 
 ## [0.4.0] - 2026-11-07

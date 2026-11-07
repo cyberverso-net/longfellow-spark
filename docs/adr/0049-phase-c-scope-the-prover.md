@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-18, at the close of block 6 of Phase C; proposed 2026-10-17 and edited until then)
+Accepted (2026-10-18, at the close of block 6 of Phase C; proposed 2026-10-17 and edited until then). Amended 2026-11-07 by [ADR 0085](0085-prover-and-verifier-in-two-phases.md): the prover is two phases, commit and prove. The checks that do not depend on the public inputs (their count, the first input, the subfield) stay before the commitment; only `Not_Satisfied` moves after it, because in a bound pair the public inputs contain `av` and the MACs, which exist only after both commitments. The cost falls on the error path only, no output is produced there, the contracts are unchanged, and the structure is upstream's.
 
 ## Date
 

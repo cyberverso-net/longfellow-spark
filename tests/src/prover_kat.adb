@@ -573,6 +573,155 @@ procedure Prover_KAT is
             ZK.Verify (Label, HP.Id, Cfg, P.all, Pub, Proof, VSt);
             CR.Free_Packed (P);
          end Verify_Packed;
+
+         --  The two phases of ADR 0085 on one transcript, as the mDoc
+         --  layer drives them: two commitments of the same circuit and
+         --  inputs, sixteen bytes drawn between the commitments and the
+         --  proofs, then the two proofs into one buffer; the verifier
+         --  receives both from the buffer at their offsets, draws, and
+         --  verifies both. Then the negative cases: a byte of the second
+         --  proof altered, the buffer cut short, the public inputs of
+         --  the wrong count on both sides, each record freed.
+         procedure Check_Two_Phases (W : SA.Element_Array; Max : Natural;
+                                     Good : out Boolean)
+         is
+            Npub   : constant Natural := C.Npublic;
+            Npriv  : constant Natural := Nin - Npub;
+            Pub    : constant SA.Element_Array := W (0 .. Npub - 1);
+            Priv   : SA.Element_Array (0 .. Npriv - 1);
+            C1, C2 : ZKP.Committed;
+            R1, R2 : ZK.Received;
+            B1     : Byte_Array_Access := new Byte_Array (0 .. Max - 1);
+            B2     : Byte_Array_Access := new Byte_Array (0 .. Max - 1);
+            Buf    : Byte_Array_Access;
+            L1, L2 : Natural;
+            S1, S2 : Prover_Status.Status;
+            V1, V2 : Verifier_Status.Status;
+            Draw   : Byte_Array (0 .. 15);
+
+            procedure Fail (Msg : String) is
+            begin
+               Report_Failure (Name & ": two phases: " & Msg);
+               ZKP.Release (C1);
+               ZKP.Release (C2);
+               ZK.Release (R1);
+               ZK.Release (R2);
+               Free (B1);
+               Free (B2);
+               if Buf /= null then
+                  Free (Buf);
+               end if;
+            end Fail;
+         begin
+            Good := False;
+            for I in Priv'Range loop
+               Priv (I) := W (Npub + I);
+            end loop;
+            --  The prover.
+            Simple_Rng.Seed (Seed);
+            Transcript.Reset (Label);
+            ZKP.Commit (H.Subfield_Boundary, Cfg, PK.all, Priv, C1, S1);
+            ZKP.Commit (H.Subfield_Boundary, Cfg, PK.all, Priv, C2, S2);
+            if S1 /= Prover_Status.Ok or else S2 /= Prover_Status.Ok then
+               Fail ("commit " & S1'Image & " " & S2'Image);
+               return;
+            end if;
+            Transcript.Get_Random_Bytes (Draw);
+            ZKP.Prove_Committed (H.Id, H.Subfield_Boundary, Cfg, PK.all, Pub,
+                                 C1, B1.all, L1, S1);
+            ZKP.Prove_Committed (H.Id, H.Subfield_Boundary, Cfg, PK.all, Pub,
+                                 C2, B2.all, L2, S2);
+            if S1 /= Prover_Status.Ok or else S2 /= Prover_Status.Ok
+              or else not ZKP.Is_Null (C1) or else not ZKP.Is_Null (C2)
+            then
+               Fail ("prove " & S1'Image & " " & S2'Image);
+               return;
+            end if;
+            Buf := new Byte_Array (0 .. L1 + L2 - 1);
+            Buf (0 .. L1 - 1) := B1 (0 .. L1 - 1);
+            Buf (L1 .. L1 + L2 - 1) := B2 (0 .. L2 - 1);
+            --  The verifier, on the same transcript bytes.
+            Transcript.Reset (Label);
+            ZK.Receive (Buf.all, 0, Cfg, PK.all, R1, V1);
+            if V1 /= Verifier_Status.Ok or else ZK.After (R1) /= L1 then
+               Fail ("receive 1 " & V1'Image);
+               return;
+            end if;
+            ZK.Receive (Buf.all, ZK.After (R1), Cfg, PK.all, R2, V2);
+            if V2 /= Verifier_Status.Ok or else ZK.After (R2) /= Buf'Length
+            then
+               Fail ("receive 2 " & V2'Image);
+               return;
+            end if;
+            Transcript.Get_Random_Bytes (Draw);
+            ZK.Verify_Received (H.Id, Cfg, PK.all, Pub, R1, V1);
+            ZK.Verify_Received (H.Id, Cfg, PK.all, Pub, R2, V2);
+            if V1 /= Verifier_Status.Ok or else V2 /= Verifier_Status.Ok
+              or else not ZK.Is_Null (R1) or else not ZK.Is_Null (R2)
+            then
+               Fail ("verify " & V1'Image & " " & V2'Image);
+               return;
+            end if;
+            --  A byte of the second proof altered: refused at the receipt
+            --  (a non-canonical element) or at the verification; the first
+            --  proof still accepted.
+            Buf (L1 + L2 / 2) := Buf (L1 + L2 / 2) xor 1;
+            Transcript.Reset (Label);
+            ZK.Receive (Buf.all, 0, Cfg, PK.all, R1, V1);
+            ZK.Receive (Buf.all, L1, Cfg, PK.all, R2, V2);
+            if V1 /= Verifier_Status.Ok then
+               Fail ("receive 1 again " & V1'Image);
+               return;
+            end if;
+            Transcript.Get_Random_Bytes (Draw);
+            ZK.Verify_Received (H.Id, Cfg, PK.all, Pub, R1, V1);
+            if V2 = Verifier_Status.Ok then
+               ZK.Verify_Received (H.Id, Cfg, PK.all, Pub, R2, V2);
+            end if;
+            if V1 /= Verifier_Status.Ok or else V2 = Verifier_Status.Ok
+              or else not ZK.Is_Null (R1) or else not ZK.Is_Null (R2)
+            then
+               Fail ("altered proof " & V1'Image & " " & V2'Image);
+               return;
+            end if;
+            Buf (L1 + L2 / 2) := Buf (L1 + L2 / 2) xor 1;
+            --  The buffer cut short: Proof_Encoding, nothing held.
+            Transcript.Reset (Label);
+            ZK.Receive (Buf (0 .. L1 + L2 / 2), L1, Cfg, PK.all, R2, V2);
+            if V2 /= Verifier_Status.Proof_Encoding or else not ZK.Is_Null (R2)
+            then
+               Fail ("short buffer " & V2'Image);
+               return;
+            end if;
+            --  The public inputs of the wrong count, on both sides: the
+            --  status of the count, the record freed.
+            Transcript.Reset (Label);
+            ZK.Receive (Buf.all, 0, Cfg, PK.all, R1, V1);
+            ZK.Verify_Received (H.Id, Cfg, PK.all, W (0 .. Npub - 2), R1, V1);
+            if V1 /= Verifier_Status.Public_Input_Length
+              or else not ZK.Is_Null (R1)
+            then
+               Fail ("public inputs " & V1'Image);
+               return;
+            end if;
+            Transcript.Reset (Label);
+            ZKP.Commit (H.Subfield_Boundary, Cfg, PK.all, Priv, C1, S1);
+            ZKP.Prove_Committed (H.Id, H.Subfield_Boundary, Cfg, PK.all,
+                                 W (0 .. Npub - 2), C1, B1.all, L1, S1);
+            if S1 /= Prover_Status.Input_Length or else not ZKP.Is_Null (C1)
+            then
+               Fail ("public inputs of the prover " & S1'Image);
+               return;
+            end if;
+            Free (B1);
+            Free (B2);
+            Free (Buf);
+            TIO.Put_Line ("  " & Name & ": two proofs on one transcript,"
+                          & " both accepted; the altered second proof,"
+                          & " the short buffer and the wrong public"
+                          & " inputs refused");
+            Good := True;
+         end Check_Two_Phases;
       begin
          if Count /= 10 + Nin then
             raise Parse_Error with "prove: field count";
@@ -646,6 +795,17 @@ procedure Prover_KAT is
                TIO.Put_Line ("  " & Name & ":" & Len'Image
                              & " bytes, accepted by Zk_Verifier ("
                              & Duration'Image (Secs) & " s)");
+               declare
+                  Good : Boolean;
+               begin
+                  Check_Two_Phases (W, Max, Good);
+                  if not Good then
+                     CR.Free (C);
+                     CR.Free_Packed (PK);
+                     Free (B);
+                     return;
+                  end if;
+               end;
             elsif PSt in Prover_Status.Not_Satisfied
                        | Prover_Status.Not_In_Subfield
             then
