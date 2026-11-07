@@ -2,6 +2,12 @@
 
 All notable changes to this project are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project does not yet follow semantic versioning in the strict sense, since its interface is the pinned specification rather than an API. Every entry names the decision records (`docs/adr/`) and the guide chapter (`docs/guide/`) that describe it; the trust model that says what is proved, tested and trusted is in the README.
 
+## [Unreleased]
+
+### Changed
+
+- The trusted base register notes upstream's commit 7ec62ec (24 October 2026), the fix of the carries in the multiply-accumulate of the delayed reduction of `fp_generic.rs`, and why the fault has no counterpart here: every product is reduced (ADR 0070) and the P-256 multiplication is proved against the integer model. No row changes; the pin stays at d5e6be7 (#123).
+
 ## [0.4.0] - 2026-11-07
 
 Phase D, performance and memory: the production mDoc circuits of upstream at full scale, proved and verified with every contract proved. Milestone M2 closed the round trip at 8.13 s (ADR 0078); the memory milestone closes with the peak heap at 1.17 times upstream's for the prover and 1.30 times for the verifier on the hash circuit (ADR 0084), after a review of the whole repository (ADR 0083). The mDoc layer and the proof of age follow in 0.5.0 (ADR 0082).
