@@ -26,9 +26,15 @@
 --  180-4 (the length field is 64 bits of bit length); the byte counter
 --  is modular and no precondition states the bound.
 --
---  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0029.
---  This package processes public data only, the content of a proof
---  string; it MUST NOT be used on secret data.
+--  Constant-time discipline (ADR 0006): NOT APPLICABLE to the
+--  verifier's use, by ADR 0029: the transcript and the Merkle check
+--  process the public content of a proof string. The prover hashes the
+--  nonces and the columns of the committed tableau (Ligero_Prover.
+--  Hash_Leaves), which are secret until the proof is written; ADR 0051
+--  admits that use because the compression function has
+--  data-independent control flow and memory access, and each leaf is
+--  hashed over a fixed length. No other use on secret data is admitted
+--  without a new decision.
 
 pragma SPARK_Mode (On);
 
