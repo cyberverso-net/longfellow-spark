@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-11-06, at the milestone review of the memory milestone, #63).
+Accepted (2026-11-07, at the merge of pull request #117, the last of the milestone review; proposed 2026-11-06, at the milestone review of the memory milestone, #63).
 
 ## Date
 

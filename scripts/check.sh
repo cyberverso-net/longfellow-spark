@@ -175,7 +175,12 @@ do_test() {
 #  meant to run. interop_kat verifies the two upstream proofs end to
 #  end and refuses the altered copies; the verifier accepts the same
 #  two proofs with exit status 0, refuses with 1 under a wrong label and
-#  reports a usage error with 2.
+#  reports a usage error with 2. The step ends with the round trip on
+#  the four production mDoc circuits (scripts/measure-mdoc.sh, once,
+#  with the default 8 MB stack of ADR 0056): the proofs state what the
+#  prover computes, not that the verifier accepts it, so completeness
+#  on the circuits the project is about is tested here (the trusted
+#  base register, V6).
 #  In the build "proved" the run-time checks are suppressed (-gnatp) in
 #  the library units of src/ only (ADR 0068). The switches each unit was
 #  compiled with are read from its ALI file (lines "A"), so the check
@@ -290,6 +295,9 @@ do_cli() {
       exit 1
    fi
    echo "cli: both upstream proofs reproduced byte for byte, other proofs accepted"
+   header "cli: the round trip on the four mDoc circuits, default stack (measure-mdoc.sh)"
+   MEASURE_STACK_KB=8192 scripts/measure-mdoc.sh
+   echo "cli: the four mDoc proofs made from the upstream witnesses and accepted"
 }
 
 do_vectors() {

@@ -11,9 +11,9 @@ The project is built in phases, each released when complete:
 | A | A complete verifier, from the proof string to a verdict, in five stages: GF(2^128), the P-256 base field, the sumcheck algebra, the Fiat-Shamir transcript, Ligero | 0.1.0 | 10738 |
 | B | A loader for the circuits the upstream compiler produces, and the upstream proofs accepted from their files | 0.2.0 | 11967 |
 | C | The prover, which reproduces the two upstream example proofs byte for byte | 0.3.0 | 16671 |
-| D | The production mDoc circuits at full scale: performance and memory (0.4.0), then the mDoc layer and the proof of age (0.5.0) | in progress | |
+| D | The production mDoc circuits at full scale: performance and memory (0.4.0), then the mDoc layer and the proof of age (0.5.0) | 0.4.0, then 0.5.0 | 33276 at 0.4.0 |
 
-In Phase D, milestone M2 closed at a round trip of 8.13 s for the two mDoc proofs and their verifications, with every contract proved; [the performance page](docs/guide/performance.md) gives the steps and the comparison with upstream.
+In Phase D, milestone M2 closed at a round trip of 8.13 s for the two mDoc proofs and their verifications, and the memory milestone at a peak heap of 1.17 times upstream's for the prover and 1.30 times for the verifier on the hash circuit, with every contract proved; [the performance page](docs/guide/performance.md) gives the steps and the comparison with upstream. Release 0.4.0 closes the memory milestone; the mDoc layer follows.
 
 [CHANGELOG.md](CHANGELOG.md) describes each release.
 

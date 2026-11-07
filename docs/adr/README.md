@@ -54,7 +54,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0048](0048-circuit-vectors-and-interop-proofs.md) | Circuit vectors and the upstream interop proofs | Accepted | 2026-10-16 |
 | [0049](0049-phase-c-scope-the-prover.md) | Phase C scope: the prover and its exit criterion | Accepted | 2026-10-17 |
 | [0050](0050-randomness-as-a-byte-stream.md) | Randomness as a byte stream, and its sources | Accepted | 2026-10-17 |
-| [0051](0051-constant-time-in-the-prover.md) | Constant time in the prover, unit by unit | Accepted | 2026-10-17 |
+| [0051](0051-constant-time-in-the-prover.md) | Constant time in the prover, unit by unit | Accepted, amended by 0083 | 2026-10-17 |
 | [0052](0052-gold-perimeter-for-the-prover.md) | Gold perimeter for the prover | Accepted, amended by 0083 | 2026-10-17 |
 | [0053](0053-prover-vectors-and-cross-verification.md) | Prover vectors and cross-verification | Accepted | 2026-10-17 |
 | [0054](0054-prove-job-limit-sixty-minutes.md) | Prove job limit raised to sixty minutes and the prover partition split | Accepted, amended by 0060 | 2026-10-19 |
@@ -83,7 +83,8 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0077](0077-p256-montgomery-round-as-cios.md) | The Montgomery round of P-256 as upstream's CIOS step | Accepted | 2026-10-28 |
 | [0078](0078-milestone-m2-closed.md) | Milestone M2 closed: the Gold limit at 8.13 seconds | Accepted | 2026-10-29 |
 | [0079](0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md) | The specification migrated to draft-irtf-cfrg-longfellow-00, and upstream's new home | Accepted | 2026-10-29 |
-| [0080](0080-milestone-memory.md) | A memory milestone, before the certification block and M3 | Proposed, amended by 0082 | 2026-10-29 |
+| [0080](0080-milestone-memory.md) | A memory milestone, before the certification block and M3 | Accepted, amended by 0082, closed by 0084 | 2026-10-29 |
 | [0081](0081-audience-certification-evaluators.md) | The audience: evaluators in a certification laboratory | Accepted | 2026-10-30 |
 | [0082](0082-order-after-the-memory-milestone.md) | The order after the memory milestone | Accepted | 2026-10-30 |
-| [0083](0083-claims-corrected-at-the-milestone-review.md) | Claims corrected at the milestone review of the memory milestone | Proposed | 2026-11-06 |
+| [0083](0083-claims-corrected-at-the-milestone-review.md) | Claims corrected at the milestone review of the memory milestone | Accepted | 2026-11-06 |
+| [0084](0084-memory-milestone-closed.md) | The memory milestone closed: the peak heap at 1.17 and 1.30 times upstream's | Accepted | 2026-11-07 |
