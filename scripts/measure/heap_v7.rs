@@ -1,6 +1,8 @@
 // One v2 proof or one v2 verification of the mDoc v7 flow, for the heap
 // profile: `heap_v7 prove FILE` writes the proof, `heap_v7 verify FILE`
 // checks it. The setup is that of benches/mdoc_zk_bench_v7.rs at d5e6be7.
+// It prints the upstream commit it was built for (MEASURE_UPSTREAM at build
+// time, d5e6be7 by default), the second label of every series.
 use compile_algebra::CompileNat;
 use core_algebra::Nat;
 use mdoc_zk_circuits::parse_test_data;
@@ -9,6 +11,7 @@ use mdoc_zk_runtime::{req_attr, run_mdoc_prover_inner, run_mdoc_verifier_inner, 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let (mode, file) = (args[1].as_str(), args[2].as_str());
+    println!("upstream {}", option_env!("MEASURE_UPSTREAM").unwrap_or("d5e6be7"));
     let (issuer_pk, parsed, now) =
         parse_test_data::<4, CompileNat<4>>(&mdoc_zk_testcases::vectors::TEST_DATA);
     let req_attrs: Vec<RequestedAttribute> = parsed
