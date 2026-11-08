@@ -182,7 +182,7 @@ Criterion 2: `longfellow_verify_mdoc` accepts upstream's example proof of each a
 
 ### 5.3 Times and memory
 
-The first session of the proving machine on this block measures the two programs against upstream's `heap_v7` in the same session ([ADR 0067](../adr/0067-performance-milestones-by-trust.md)): the time and the peak heap of `longfellow_prove_mdoc` and `longfellow_verify_mdoc` on the version 7 pair, both circuits in one process as upstream's driver, with the two labels of every series. The figures are on the performance page, "The mDoc proof of age".
+The first session of the proving machine on this block (8 November, commit e5d208e against upstream d5e6be7, [ADR 0067](../adr/0067-performance-milestones-by-trust.md)) measured the two programs against upstream's `heap_v7`, the same flow on both sides: both circuits of the version 7 pair in one process, generic arithmetic, baseline processor target, three runs each, the median. The proof takes 4.47 s and a peak heap of 132 MB against upstream's 4.06 s and 107 MB (1.10 and 1.23 times); the verification 2.55 s and 64 MB against 1.61 s and 48 MB (1.58 and 1.33 times). The criterion of the memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)), twice upstream's peak, holds for the complete proof of age: 61 % of it for the prover, 67 % for the verifier. The version 6 pair, one run: 3.88 s and 111 MB to prove, 2.34 s and 59 MB to verify. The tables, the resident sets and the comparison with the single-circuit programs in the same session are on [the performance page](performance.md), "The mDoc proof of age".
 
 ### 5.4 The vectors and the harness
 

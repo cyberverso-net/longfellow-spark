@@ -151,7 +151,7 @@ At Phase C each took about six seconds on the author's laptop; Phase D has made 
 scripts/measure-mdoc.sh mdoc
 ```
 
-The proofs come out in about six seconds and verify in about three on the author's laptop; the verifier accepts upstream's own example proofs too. To check a proof with upstream's mDoc verifier, see `tests/vectors/upstream/verify_mdoc.rs`. Building the witnesses from the credential itself is the next block (#66).
+On the proving machine the proof of age takes 4.47 s and a peak heap of 132 MB, its verification 2.55 s and 64 MB, against 4.06 s and 107 MB, 1.61 s and 48 MB for upstream's generic code in the same session (1.10 and 1.23 times for the proof, 1.58 and 1.33 for the verification; [the performance page](docs/guide/performance.md), "The mDoc proof of age"); about six and three seconds on the author's laptop. The verifier accepts upstream's own example proofs too. To check a proof with upstream's mDoc verifier, see `tests/vectors/upstream/verify_mdoc.rs`. Building the witnesses from the credential itself is the next block (#66).
 
 ## Continuous integration
 

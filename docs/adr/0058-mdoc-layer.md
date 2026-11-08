@@ -29,7 +29,7 @@ A Longfellow proof is accepted by an mDoc verifier only inside the construction 
 
 - New units, a proof partition `mdoc`, chapter 9 (and a chapter 10 for the witness if its size asks for it).
 - The trust model gains the mDoc entries; the README documents the two tools.
-- Block 5: the `cli` step of `make check` ends with the mDoc proof of age on both archives (`scripts/measure-mdoc.sh mdoc`): made from the witness files, accepted, upstream's example proofs accepted, five refusals.
+- Block 5: the `cli` step of `make check` ends with the mDoc proof of age on both archives (`scripts/measure-mdoc.sh mdoc`): made from the witness files, accepted, upstream's example proofs accepted, thirteen refusals per archive with their typed status (five of the proof, six of the request through both programs, two of the files).
 
 ## Verification impact
 
