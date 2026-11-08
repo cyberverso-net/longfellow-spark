@@ -192,6 +192,23 @@ The milestone closes with [ADR 0084](../adr/0084-memory-milestone-closed.md). Th
 
 The criterion of ADR 0080, twice upstream's peak (214 MB for the prover, 96 MB for the verifier), is met with margin. The times in the same session, median of three: the hash proof 4.69 s, its verification 2.34 s, the signature proof 0.46 s, its verification 0.28 s; the round trip has not moved across the milestone (sessions differ by up to 8 %). The proofs are identical byte for byte to those of every step above. What remains above upstream at the prover's peak, layer 13 of the hash circuit, is recorded as issues: the run entry of the merged terms, 32 bytes against 24 (#110, 9.2 MB), and the eq2 table filled to the power of two above the layer's wire count (#120).
 
+## The mDoc proof of age
+
+The mDoc layer (chapter 9, [ADR 0058](../adr/0058-mdoc-layer.md)) makes the two proofs in one process on one transcript, as upstream's `applications/mdoc_zk` does: two commitments, the draw of `av`, the six tags, then the two proofs. `longfellow_prove_mdoc` and `longfellow_verify_mdoc` are therefore measured against upstream's `heap_v7` directly, the same flow on both sides, both circuits of the version 7 pair in one process, generic arithmetic, baseline processor target. One session of the proving machine (8 November, commit e5d208e, upstream d5e6be7), three runs of each program plain for the times and the resident set and three under the counter for the peak heap, upstream's driver three times plain and once under the counter; the peaks were identical from run to run, the times within 0.02 s. The scripts are those of the memory milestone (`scripts/measure/heapshim.c`, `scripts/measure/heap_v7.rs`), the round trip is `scripts/measure-mdoc.sh mdoc v7`.
+
+| mDoc v7, both circuits in one process | this project (e5d208e) | upstream (d5e6be7) | ratio | share of the ADR 0080 criterion |
+|---|---|---|---|---|
+| proof, time | 4.47 s | 4.06 s | 1.10 | |
+| proof, peak heap | 132 MB (131,513,608 B) | 107 MB (107,020,208 B) | 1.23 | 61 % |
+| verification, time | 2.55 s | 1.61 s | 1.58 | |
+| verification, peak heap | 64 MB (63,996,664 B) | 48 MB (48,161,640 B) | 1.33 | 67 % |
+
+The maximum resident set agrees: 133 MB against 115 MB for the proof, 70 MB against 56 MB for the verification. The criterion of the memory milestone, twice upstream's peak for the same flow (214 MB and 96 MB), holds for the complete proof of age as it held for the hash circuit alone. The round trip, one proof and one verification, is 7.02 s against upstream's 5.67 s, 1.24 times, from 8.13 against 5.83 at the close of M2; the gap is the one of "Where the gap goes" above, and it sits in the verification (1.58 times) more than in the proof (1.10 times).
+
+In the same session, the single-circuit programs on the same pair, for the scale: the hash proof 4.58 s and 125 MB, the signature proof 0.45 s and 20 MB, the verifications 2.28 s and 62 MB, 0.27 s and 9.5 MB; the peaks within a few hundred bytes of the release's. The two-circuit prover's peak is 6.6 MB above the hash proof's alone: the signature circuit's packed form, its witness and its commitment are held while the hash proof is made, since upstream's order commits both circuits before it proves either. The two-circuit verifier's peak is 1.6 MB above the hash verification's. The two-circuit proof is 0.11 s faster than the hash proof alone, within the spread of a session and not attributed. This project's verification of upstream's example proof takes the same time as the verification of its own, 2.55 s, and the same peak.
+
+The version 6 pair, one run in the same session: the proof 3.88 s and 111 MB (111,180,360 B), the verification 2.34 s and 59 MB (58,587,032 B). Upstream's driver covers the version 7 flow only, so the version 6 figures stand without a reference.
+
 ## After M2
 
 Recorded here and handled after M2, each with its own record:

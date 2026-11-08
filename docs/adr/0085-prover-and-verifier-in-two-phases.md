@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-11-07, block 5 of Phase D, the mDoc layer; sub-issue #125 of #65).
+Accepted (2026-11-08, at the merge of #125, pull request #130; proposed 2026-11-07). The gate of the pull request held 33,709 checks, all proved, 449 of them added by the split, in 165 minutes; the mDoc layer of #126 drives the four phases as the Consequences foresee.
 
 ## Date
 

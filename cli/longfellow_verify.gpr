@@ -14,6 +14,8 @@
 --  Build:  alr exec -- gprbuild -P cli/longfellow_verify.gpr -p -s
 --  Run:    cli/bin/longfellow_verify --help
 --          cli/bin/longfellow_prove --help
+--          cli/bin/longfellow_prove_mdoc --help
+--          cli/bin/longfellow_verify_mdoc --help
 --          cli/bin/interop_kat [vector files]
 
 with "sparklib";
@@ -30,7 +32,8 @@ project Longfellow_Verify is
    for Create_Missing_Dirs use "True";
    for Main use
      ("longfellow_verify.adb", "interop_kat.adb", "longfellow_prove.adb",
-      "first_step_bench.adb");
+      "first_step_bench.adb", "longfellow_prove_mdoc.adb",
+      "longfellow_verify_mdoc.adb");
 
    --  The build, chosen with LONGFELLOW_CLI_BUILD:
    --  o2     -O2, every run-time check on (the build until ADR 0068);
@@ -60,7 +63,12 @@ project Longfellow_Verify is
             for Switches ("ligero_prover_cli_gf2_128.ads") use Fast;
             for Switches ("ligero_prover_cli_p256.ads") use Fast;
             for Switches ("longfellow_prove.adb") use Fast;
+            for Switches ("longfellow_prove_mdoc.adb") use Fast;
             for Switches ("longfellow_verify.adb") use Fast;
+            for Switches ("longfellow_verify_mdoc.adb") use Fast;
+            for Switches ("mdoc_cli.adb") use Fast;
+            for Switches ("mdoc_cli.ads") use Fast;
+            for Switches ("mdoc_prover_cli.ads") use Fast;
             for Switches ("os_random.adb") use Fast;
             for Switches ("os_random.ads") use Fast;
             for Switches ("pinned_circuits.adb") use Fast;

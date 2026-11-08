@@ -18,7 +18,7 @@ Each stage of the implementation has a chapter with the same shape: the mathemat
 10. [Chapter 6, the circuit loader, the heap and the interop proofs](06-circuits.md): the LFC2 format of the upstream compiler as a representation of the quad circuits of Section 6.3, the loader that proves the shape of what it returns, access types under SPARK's ownership rules, the working sets on the heap, the command-line verifier, and the two upstream proofs accepted from their files; Phase B.
 11. [Chapter 7, the prover](07-prover.md): the sumcheck from the prover's side with its one-time pads, the Ligero commitment and proof, randomness as a generic formal so that a program is proved for any source, the writers as inverses of the readers, the subfield projection as a fixed linear map, the command-line prover, and the two upstream proofs reproduced byte for byte from their inputs and seeds; Phase C.
 12. [Chapter 8, the additive FFT](08-additive-fft.md): the Reed-Solomon code on GF(2^128) by the FFT of Lin, Chung and Han, its subspace polynomials and novel basis, a small example by hand, the encoder of the prover switched to it, and what is proved and what is tested; Phase D.
-13. [Chapter 9, the mDoc layer](09-mdoc.md): an outline, written as the mDoc blocks of Phase D land.
+13. [Chapter 9, the mDoc layer](09-mdoc.md): how two Longfellow proofs become one mDoc proof of age in upstream's format, the tags that bind the two circuits and why the challenge comes after both commitments, the public inputs and the one transcript, the proof format, the test case recovered from upstream's witness files, the two programs, and the four conditions of the EU Age Verification profile against what the layer covers; the witness from the credential is the next block.
 14. [Performance](performance.md): how fast the mDoc circuits are proved and verified, the milestones, every optimisation step with its measurement, and the comparison with upstream.
 15. The [architecture decision records](../adr/README.md), referenced from the chapters where a choice is explained.
 
@@ -32,7 +32,7 @@ Requirements: [Alire](https://alire.ada.dev) with a GNAT toolchain selected (`al
 alr build                                                     # the library
 alr exec -- gnatprove -P longfellow_spark.gpr
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p   # the test harness, assertions on
-make test                                                     # the nine harnesses, concurrently
+make test                                                     # the ten harnesses, concurrently
 make cli                                                      # the release build: interop harness, command-line verifier and prover
 python3 -I tests/vectors/gen_gf2_128_vectors.py               # regenerate vectors (optional)
 python3 -I tests/vectors/gen_p256_vectors.py

@@ -83,7 +83,7 @@ This is not the constant-time build. Never measure or ship binaries built from `
 
 ```bash
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
-make test        # the nine harnesses, concurrently, in about a minute
+make test        # the ten harnesses, concurrently, in about a minute
 ```
 
 Each harness reads its vector files from `tests/vectors/` by default, prints pass and fail counts, and fails if any case fails or none ran. The [trust model](docs/guide/trust-model.md) maps each file to its generator and harness.
@@ -142,6 +142,16 @@ cmp /tmp/ecdsa2_proof.bin tests/vectors/upstream/circuits/ecdsa2_proof.bin
 ```
 
 At Phase C each took about six seconds on the author's laptop; Phase D has made the prover much faster since ([the performance page](docs/guide/performance.md)). Without `--seed` the proof changes at every run, and `longfellow_verify` accepts it. To check a proof with the upstream verifier, see `tests/vectors/upstream/verify_proof_file.rs`.
+
+## The mDoc proof of age
+
+`cli/bin/longfellow_prove_mdoc` and `cli/bin/longfellow_verify_mdoc` make and check an mDoc proof of age in the format of upstream's `applications/mdoc_zk` (chapter 9, ADR 0058): two proofs, over the hash circuit and the signature circuit of one of the archives this project holds, bound by six tags on one transcript. The prover takes the archive by its combined identifier (`--spec`), the two upstream witness files, in which it places fresh one-time pads, and the relying party's request: the issuer's key, the session transcript, the date, the document type and the attribute with the value asked for. The verifier takes the same request and the proof. The witness files under `tests/vectors/upstream/mdoc/` were made by upstream on its test case `FAMILYNAME_MUSTERMANN_MDOC_3` (the attribute `family_name` with the text value `Mustermann`), whose parameters `scripts/measure-mdoc.sh` holds; the round trip on both archives, with the upstream example proofs and the refusals:
+
+```bash
+scripts/measure-mdoc.sh mdoc
+```
+
+On the proving machine the proof of age takes 4.47 s and a peak heap of 132 MB, its verification 2.55 s and 64 MB, against 4.06 s and 107 MB, 1.61 s and 48 MB for upstream's generic code in the same session (1.10 and 1.23 times for the proof, 1.58 and 1.33 for the verification; [the performance page](docs/guide/performance.md), "The mDoc proof of age"); about six and three seconds on the author's laptop. The verifier accepts upstream's own example proofs too. To check a proof with upstream's mDoc verifier, see `tests/vectors/upstream/verify_mdoc.rs`. Building the witnesses from the credential itself is the next block (#66).
 
 ## Continuous integration
 

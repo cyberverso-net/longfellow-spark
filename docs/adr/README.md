@@ -61,7 +61,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0055](0055-phase-d-scope-mdoc-scale.md) | Phase D scope: the mDoc scale and the proof of age | Proposed, amended by 0067 and 0082, M2 closed by 0078 | 2026-10-19 |
 | [0056](0056-linear-input-constraint.md) | The input constraint in linear time | Accepted | 2026-10-19 |
 | [0057](0057-additive-fft.md) | The additive FFT for the Reed-Solomon code | Accepted | 2026-10-19 |
-| [0058](0058-mdoc-layer.md) | The mDoc layer: MACs, public inputs, transcript, proof format and witness | Proposed | 2026-10-19 |
+| [0058](0058-mdoc-layer.md) | The mDoc layer: MACs, public inputs, transcript, proof format and witness | Accepted for block 5 | 2026-10-19 |
 | [0059](0059-mdoc-vectors-and-measurement.md) | mDoc vectors, witness inputs and measurement | Proposed | 2026-10-19 |
 | [0060](0060-proving-machine-on-google-cloud.md) | A proving machine on Google Cloud: prove as one job, make check remote | Accepted, amended by 0062 | 2026-10-19 |
 | [0061](0061-readme-as-front-page.md) | The README as a front page, the trust model in the guide | Accepted | 2026-10-19 |
@@ -88,4 +88,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0082](0082-order-after-the-memory-milestone.md) | The order after the memory milestone | Accepted | 2026-10-30 |
 | [0083](0083-claims-corrected-at-the-milestone-review.md) | Claims corrected at the milestone review of the memory milestone | Accepted | 2026-11-06 |
 | [0084](0084-memory-milestone-closed.md) | The memory milestone closed: the peak heap at 1.17 and 1.30 times upstream's | Accepted | 2026-11-07 |
-| [0085](0085-prover-and-verifier-in-two-phases.md) | The prover and the verifier in two phases: commit, then prove, on a transcript the caller opens | Proposed | 2026-11-07 |
+| [0085](0085-prover-and-verifier-in-two-phases.md) | The prover and the verifier in two phases: commit, then prove, on a transcript the caller opens | Accepted | 2026-11-07 |
