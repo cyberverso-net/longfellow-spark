@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-19, block 1 of Phase D; realised in blocks 5 and 6)
+Accepted for block 5 (2026-11-08, issue #126, pull request of the layer; proposed 2026-10-19 at block 1 of Phase D and edited until then). Block 6, the witness in Ada, remains to be realised and will amend this record with the constant-time account of the parse. The split of `Zk_Prover` and `Zk_Verifier` that the one transcript needs is [ADR 0085](0085-prover-and-verifier-in-two-phases.md).
 
 ## Date
 
@@ -14,25 +14,27 @@ A Longfellow proof is accepted by an mDoc verifier only inside the construction 
 
 ## Decision
 
-- **Block 5, the layer on upstream witnesses.** In SPARK: the proof format, the MACs (legacy for version 7, modern for 8), the public inputs as `push_input_hash` and `push_input_sig` build them (952 and 900 elements; in block 5 read from the helper's files, in block 6 built), the one transcript as `Transcript::new (transcript)` with the order of draws above and the two circuits' own identifiers in the statements, the table of specifications (version, attributes, circuit hashes, configurations, as `zk_spec.rs`). Two tools in `cli/`: `longfellow_prove_mdoc`, from the circuits, the two witnesses, `mac_ap`, the public inputs and the transcript to the mDoc proof; `longfellow_verify_mdoc`, the two `Zk_Verifier` plus the MACs. A Rust helper beside the recorders runs the upstream prover's path on the `age_over_18` test case up to the witnesses and writes witnesses, `mac_ap`, public inputs, transcript and the upstream proof to files; the author runs it with cargo. Criterion: our mDoc proof accepted by `run_mdoc_verifier` upstream; the upstream example proof accepted by `longfellow_verify_mdoc`.
+- **Block 5, the layer on upstream witnesses.** In SPARK: the proof format (`Mdoc_Proof`), the MACs in the legacy form of versions 5 to 7 (`Mdoc_Mac`; the modern form of version 8 has no archive at d5e6be7 and is not in the project), the public inputs as `push_legacy_input_hash` and `push_legacy_input_sig` build them for versions 6 and 7 (`Mdoc_Inputs`: 952 and 900 elements for the version 7 pair, 944 for the version 6 hash circuit; in block 5 the witnesses are read from upstream's files, in block 6 built), the device authentication digest `e2` (`Device_Auth`), the one transcript as `Transcript::new (transcript)` with the order of draws above and the two circuits' own identifiers in the statements (`Mdoc_Prover`, `Mdoc_Verifier`, on the two phases of ADR 0085), the table of the specifications held (`Mdoc_Spec`, two rows of `zk_spec.rs`, selected by combined identifier and checked against the circuits' identifiers), and the session transcript bounded at 65,000 bytes, as upstream's pull request 223 proposes (not merged; re-read in #122), a status of the library and a check of the tools; the document type bounded at 65,535 bytes, the longest a CBOR head of three bytes carries, where upstream takes any length: a bound for the proofs of the lengths, far above any document type of ISO 18013-5. Two tools in `cli/`: `longfellow_prove_mdoc`, from the specification, the two witness files and the request to the mDoc proof; `longfellow_verify_mdoc`, from the proof and the request to a verdict. No Rust helper was needed: the witness files carry the three values the MACs bind (the first 768 private elements of the hash witness, as bits) and `mac_ap` (its last six elements, and the tail of the signature witness as two-bit elements), which the prover replaces with fresh pads in both witnesses, since a proof under the file's pads beside upstream's own would give the bound values away; and their public parts identify the test case they were made from, `FAMILYNAME_MUSTERMANN_MDOC_3` of upstream's `testcases/src/vectors.rs` (the attribute `family_name` with the value `"Mustermann"`, not the `age_over_18` case the plan expected), whose parameters the example proofs also match (chapter 9 Section 2.2). Criterion: our mDoc proof accepted by `run_mdoc_verifier` upstream (`tests/vectors/upstream/verify_mdoc.rs`, run by the author); the upstream example proof of each archive accepted by `longfellow_verify_mdoc` (the `cli` step).
 - **Block 6, the witness in Ada.** From the mDoc (CBOR), the issuer's public key, the transcript, the requested attributes and the date: the two witnesses and the MACs, following the concrete and legacy forms of version 7 (`parse_mdoc`, the SHA-256 trace of the MSO, the attribute positions, the ECDSA witness of the issuer's signature, the device key). Criterion of the phase: `longfellow_prove_mdoc` from the test mDoc alone produces a proof accepted by `run_mdoc_verifier`, within the targets of ADR 0055.
 - **Constant time.** CBOR parsing depends on the data, and the data is the secret; this record, completed at block 6, says which parts are constant time (the field arithmetic, the hashes over fixed-length buffers, the proof), which are not (the parse of a variable-length document and the search for attribute positions) and why the reference is not either, as [ADR 0051](0051-constant-time-in-the-prover.md) did for the prover.
-- **Trust.** The upstream verifier as the arbiter of the format; the upstream test mDoc as the fixture; the mDoc layer's cryptography (MAC construction, ECDSA witness) as specified by the reference's code, since no document of the pinned draft covers it.
+- **Trust.** The upstream verifier as the arbiter of the format; the upstream test mDoc as the fixture; the mDoc layer's cryptography (MAC construction, the layouts of the public inputs, the fixed headers of `e2`, ECDSA witness) as specified by the reference's code, since no document of the pinned draft covers it; the parameters of the test case, recovered from the files by matching. The trusted base register has the rows (R8 to R10).
 
 ## Alternatives considered
 
 - **Instrumenting the production runtime for byte identity.** Not taken unless the author asks: the randomness is the system's; the recorders remain the tool held in reserve, as [ADR 0053](0053-prover-vectors-and-cross-verification.md).
 - **Generating the witness in Rust only.** Rejected for the goal: the proof must come from this project alone, from the mDoc.
+- **A memory option for the split** (keeping the wires between the two phases) was proposed in the design of block 5 and found impossible: the commitment phase has no public inputs, since `av` and the MACs are among them, so the circuit cannot be evaluated before both commitments. The structure is upstream's; the peak is measured, not chosen (ADR 0085).
 
 ## Consequences
 
 - New units, a proof partition `mdoc`, chapter 9 (and a chapter 10 for the witness if its size asks for it).
 - The trust model gains the mDoc entries; the README documents the two tools.
+- Block 5: the `cli` step of `make check` ends with the mDoc proof of age on both archives (`scripts/measure-mdoc.sh mdoc`): made from the witness files, accepted, upstream's example proofs accepted, five refusals.
 
 ## Verification impact
 
-- Provable: absence of run-time errors on any byte string for the format and the CBOR parse; the layout of the mDoc proof; the MACs as fixed computations.
-- Tested: acceptance upstream; the example proof; the witnesses against the upstream helper's files.
+- Provable: absence of run-time errors on any byte string for the format and the CBOR parse; the layout of the mDoc proof; the MACs as fixed computations. Block 5: Gold on the MAC equation, the CBOR heads, the counts and fixed positions of the public inputs, the tags at the front of the proof; Silver with the ownership checks on the two phases of each circuit.
+- Tested: acceptance upstream; the example proofs; the layouts against an independent Python transcription and against the public parts of upstream's witness files (`gen_mdoc_layer_vectors.py`, `mdoc_kat`); block 6, the witnesses against upstream's files.
 - Trusted: as the Decision says.
 - Constant time: as the Decision says, completed at block 6.
 

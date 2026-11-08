@@ -145,7 +145,7 @@ do_partitions_check() {
 do_test() {
    header "test: build the harnesses (assertions on)"
    alr -n exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
-   local harnesses="gf2_128_kat p256_kat sumcheck_kat transcript_kat ligero_kat circuit_kat writer_kat prover_kat fft_kat"
+   local harnesses="gf2_128_kat p256_kat sumcheck_kat transcript_kat ligero_kat circuit_kat writer_kat prover_kat fft_kat mdoc_kat"
    local logs status=0 h code
    logs="$(mktemp -d)"
    header "test: $harnesses, concurrently"
@@ -180,7 +180,10 @@ do_test() {
 #  with the default 8 MB stack of ADR 0056): the proofs state what the
 #  prover computes, not that the verifier accepts it, so completeness
 #  on the circuits the project is about is tested here (the trusted
-#  base register, V6).
+#  base register, V6); then the mDoc proof of age on both archives
+#  (measure-mdoc.sh mdoc, ADR 0058): made from the upstream witnesses,
+#  accepted by longfellow_verify_mdoc, the upstream example proofs
+#  accepted, the altered copies refused.
 #  In the build "proved" the run-time checks are suppressed (-gnatp) in
 #  the library units of src/ only (ADR 0068). The switches each unit was
 #  compiled with are read from its ALI file (lines "A"), so the check
@@ -298,6 +301,9 @@ do_cli() {
    header "cli: the round trip on the four mDoc circuits, default stack (measure-mdoc.sh)"
    MEASURE_STACK_KB=8192 scripts/measure-mdoc.sh
    echo "cli: the four mDoc proofs made from the upstream witnesses and accepted"
+   header "cli: the mDoc proof of age on both archives, default stack (measure-mdoc.sh mdoc)"
+   MEASURE_STACK_KB=8192 scripts/measure-mdoc.sh mdoc
+   echo "cli: both mDoc proofs made and accepted, the upstream example proofs accepted, the altered copies refused"
 }
 
 do_vectors() {
@@ -320,6 +326,7 @@ do_vectors() {
    python3 -I tests/vectors/gen_mdoc_vectors.py "$scratch"
    python3 -I tests/vectors/gen_fft_vectors.py "$scratch"
    python3 -I tests/vectors/gen_rs_p256_vectors.py "$scratch"
+   python3 -I tests/vectors/gen_mdoc_layer_vectors.py "$scratch"
    local name status=0
    for name in "$scratch"/*.txt; do
       name="$(basename "$name")"

@@ -16,6 +16,7 @@ The [verification approach](verification-approach.md) explains why the line fall
 - The arithmetic of both fields is proved equal to a simple reference written for clarity. That the reference is the one the specification means is tested.
 - The building blocks of the verifier and the prover are proved against transcriptions of the specification's formulas. That those formulas fit together into a sound protocol is a theorem of the protocol, not something SPARK can prove.
 - The verifier accepts the proofs the upstream prover makes. The prover reproduces upstream's proofs byte for byte. Both facts are tested.
+- The mDoc layer makes, from upstream's witness files, an mDoc proof of age in upstream's format that upstream's verifier accepts, and accepts upstream's example proofs. Both facts are tested; the layer's layouts are specified by upstream's code, not by the pinned draft, and are trusted as such.
 - The toolchain, the specification, the operating system's random generator and the circuit files are trusted.
 - No check is justified away and no `pragma Assume` is used. Full functional correctness of the whole system (Platinum) is not a goal.
 
@@ -79,6 +80,15 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 - `Lqc_Triples` equals the core's layout. The pad layout gives `Witness_Count` as the private inputs plus `Pad_Total`.
 - Every prover unit is Silver for any circuit, inputs, configuration and random byte stream. The subfield projection and `In_Subfield` are Silver.
 - `Additive_Fft` and `Rfft_P256` are Silver for every row of up to 2^16 values, and each `Extend` keeps the row as the first part of its output. In `Encode_Row`, the parity part is proved equal to the Lagrange evaluation only with the Lagrange encoder; both fields now encode by an FFT, and the parity part is tested (Phase D, ADR 0057).
+- `Zk_Prover.Commit` and `Prove_Committed`, `Zk_Verifier.Receive` and `Verify_Received` are the two phases of each unit on a transcript the caller opens; `Prove` and `Verify` are their composition and keep their contracts (ADR 0085). The statuses of the phases are proved as stated, with the heap state of the record between them (`Is_Null`, `Fits`).
+
+**The mDoc layer** (chapter 9).
+
+- `Mdoc_Mac.Legacy_Tags` returns the six products (av + ap) m of the legacy tags, stated with the field's `Mul` and `Add` on the halves of each message.
+- `Cbor_Encode.Head` returns the bytes of the CBOR head of a string of any length, by the cases of the standard.
+- `Mdoc_Inputs.Hash_Inputs` fills exactly `Hash_Count` elements, the constant one first, the six tags and av last; `Sig_Inputs` fills 900 with the constant one, the key and e2 first. `Witness_Parts` returns the last six elements of the witness as the pads when it accepts.
+- `Mdoc_Proof.Write_Tags` and `Read_Tags` place each tag at its offset at the front of the proof.
+- `Mdoc_Prover.Prove` and `Mdoc_Verifier.Verify` are Silver with the ownership checks on the two commitments, the two proofs received and the proof buffers; their statuses are proved as stated.
 
 ## What is tested
 
@@ -136,6 +146,14 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 - Both FFTs give the Lagrange codeword. Python transcriptions of the upstream transforms are checked against Lagrange interpolation (`gen_fft_vectors.py` for GF(2^128), `gen_rs_p256_vectors.py` for the real FFT over F_p^2), `fft_kat` checks the Ada units on those vectors and against `Lagrange.Evaluate` on random rows, and the prover's commitments and the two upstream proofs stay those of the Lagrange encoder (Phase D).
 - A proof file made by this project was verified by the upstream `ZkVerifier`, by hand, through `tests/vectors/upstream/verify_proof_file.rs`.
 
+**The mDoc layer.**
+
+- The public parts of upstream's three witness files (the hash circuit's at versions 7 and 6, the signature circuit's) are rebuilt byte for byte from the parameters of the test case they come from, by the Python transcription of upstream's builders in `gen_mdoc_layer_vectors.py` and by `Mdoc_Inputs` in `mdoc_kat`; the six tags of each hash witness are recomputed from its ends and equal the file's and the example proof's. This is how the test case was identified (chapter 9 Section 2.2).
+- The CBOR heads, the tags, e2 and the table of specifications match the Python transcription on synthetic cases: the boundaries of the heads, random tags, an empty transcript, a long document type, two attributes, a short date.
+- Fresh pads placed in both witnesses by `Mdoc_Inputs.Place_Pads` are read back by `Witness_Parts` and `Sig_Pads_Match`, and the file's pads are found where the layout says, in `mdoc_kat` on both archives.
+- `longfellow_prove_mdoc` makes an mDoc proof from the witness files on each archive, `longfellow_verify_mdoc` accepts it and accepts upstream's example proof of the archive, and refuses a wrong date, a wrong value, a wrong document type, a tag altered and a proof cut short: the `cli` step of `make check` (`scripts/measure-mdoc.sh mdoc`).
+- The proofs this project makes are accepted by upstream's `run_mdoc_verifier`, by hand, through `tests/vectors/upstream/verify_mdoc.rs` (chapter 9 Section 5.1).
+
 **Where the vectors are.**
 
 | Area | Vector files | Generator | Harness |
@@ -148,6 +166,7 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 | Circuits | `circuit_summary.txt`, `circuit_lfc2.txt` | `gen_circuit_vectors.py` | `circuit_kat` |
 | FFTs (Phase D) | `fft.txt`, `rs_p256.txt` | `gen_fft_vectors.py`, `gen_rs_p256_vectors.py` | `fft_kat` |
 | mDoc circuits (Phase D) | `mdoc_summary.txt`, from the archives in `upstream/mdoc/` | `gen_mdoc_vectors.py` | `circuit_kat` |
+| mDoc layer (Phase D) | `mdoc_layer.txt`, with the witness files in `upstream/mdoc/` | `gen_mdoc_layer_vectors.py` | `mdoc_kat`; `make cli` for the round trip and the example proofs |
 | Interop | `interop.txt` | `gen_circuit_vectors.py` | `interop_kat` (release build) |
 | Prover | `writer.txt`, `sumcheck_prover.txt`, `ligero_commit.txt`, `zk_prove.txt` | `gen_prover_vectors.py` | `writer_kat`, `prover_kat`; `make cli` for the byte identity |
 
@@ -179,6 +198,9 @@ Each item below has a row in the [trusted base register](trusted-base.md).
 - The list of `Pinned_Circuits` in the command line: the digest of each circuit file and its identifier, checked once by a full `Read` in `interop_kat`. A file in the list is loaded without recomputing its identifier (ADR 0074).
 - The upstream production reader at d5e6be7, as the definition of the LFC2 format.
 - That the recordings of the upstream Ligero verifier are faithful to d5e6be7 (ADR 0040).
+- The construction of the mDoc layer as upstream's code specifies it, since no document of the pinned draft covers it: the legacy tags, the layouts of the public inputs of both circuits, the fixed CBOR headers of the device authentication digest, the table of specifications (ADR 0058; register rows R8, R9). Tested against upstream's witness files and example proofs.
+- The parameters of the test case the witness files and the example proofs were made from (`FAMILYNAME_MUSTERMANN_MDOC_3` of upstream's test cases), recovered by matching the files, not recorded by upstream (register row R10).
+- The bound of 65,000 bytes on the session transcript, taken from upstream's pull request 223 before its merge (ADR 0058; issue #122).
 
 **Properties tested but not proved.**
 
@@ -197,5 +219,6 @@ Each item below has a row in the [trusted base register](trusted-base.md).
 ## Outside the proofs, and what covers it
 
 - **Soundness and zero knowledge of the protocol.** These are probabilistic properties, not contracts of a subprogram. The implementation follows the pinned specification step by step and cites each section, so that it is an instance of the analysed protocol and not a variant.
-- **Completeness of the Fiat-Shamir transcript.** The order in which `Replay_Challenges` absorbs values was compared with the reference by reading, and is tested on the Appendix B.3 proofs. On the prover side, the byte identity with the upstream proofs tests every draw and every absorption.
+- **Completeness of the Fiat-Shamir transcript.** The order in which `Replay_Challenges` absorbs values was compared with the reference by reading, and is tested on the Appendix B.3 proofs. On the prover side, the byte identity with the upstream proofs tests every draw and every absorption. For the mDoc layer, the order of the two roots, the draw of av and the two statements on one transcript was compared with upstream's prover and verifier by reading, and is tested by the acceptance of upstream's example proofs and by upstream's acceptance of this project's proofs (chapter 9).
+- **What the relying party checks outside the proof.** The trust in the issuer's key, the freshness of the nonce in the session transcript and the choice of the date are the relying party's; the layer binds what it is given (chapter 9 Section 6).
 - **Constant time.** It is a coding discipline, documented in each package header. The guarantee holds only for builds with assertions disabled, because enabled contracts and ghost code branch on secret values (ADR 0006). It does not apply to `Transcript`, `Sha256`, `Aes256` or the units of chapter 5, which handle only the public content of a proof (ADR 0029, 0037). Since M2, the multiplication in GF(2^128) uses integer multiplications on masked words: it assumes, as upstream does, that the processor's multiplier takes a time independent of its operands (ADR 0065). The prover is constant time by construction, unit by unit. The run-length structure of Section 7.4 depends only on position, the subfield projection is a fixed linear map, and the re-injection selects the basis elements with masks. Two branches on values derived from the witness are declared (ADR 0051).

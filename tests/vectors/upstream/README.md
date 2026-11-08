@@ -135,6 +135,35 @@ inputs (952 public) and subfield boundary 85 112; that of version 6 has 15
 layers, 6 823 073 terms, 75 098 inputs (944 public), boundary 75 092; the
 signature circuit has 21 layers, 481 833 terms, 3739 inputs (900 public).
 
+The witness files and the example proof of each archive are one run of
+upstream's prover on the test case `FAMILYNAME_MUSTERMANN_MDOC_3` of
+`rust/applications/mdoc_zk/testcases/src/vectors.rs` (chapter 9, Section
+2.2): the attribute `family_name` with the CBOR text value `"Mustermann"`
+(`6a4d75737465726d616e6e`), the date `2024-10-01T09:00:00Z`, the document
+type `org.iso.18013.5.1.mDL`, the issuer key
+`0xdc1c1f55cff4cd5c76cf4169278f7217667f86ee81d8669b63f2e19bc12a0c9f`,
+`0x12355dd0385fed3bc33bedc9781b9aad47b33e4c24704b8d14288b1b3cb45c28`, and
+the 143-byte session transcript that `scripts/measure-mdoc.sh` and
+`gen_mdoc_layer_vectors.py` hold. Upstream does not record the case; it
+was recovered by matching the public parts of the files, which the
+generator rebuilds byte for byte at every `make check`.
+
+To cross-verify an mDoc proof of this project with upstream's mDoc
+verifier (ADR 0058, block 5), `verify_mdoc.rs` is built as an example of
+upstream's runtime crate, like `scripts/measure/heap_v7.rs`, and run on the
+proof file with the circuit version of its archive:
+
+    git clone https://github.com/longfellow-zk/longfellow-zk upstream
+    git -C upstream checkout d5e6be77336933d50bf7f25a954f8ec273eb51ce
+    mkdir -p upstream/rust/applications/mdoc_zk/runtime/examples
+    cp tests/vectors/upstream/verify_mdoc.rs upstream/rust/applications/mdoc_zk/runtime/examples/
+    cd upstream/rust
+    cargo run --release -p mdoc-zk-runtime --example verify_mdoc -- 7 <longfellow-spark>/cli/out/mdoc_v7_proof.bin
+    cargo run --release -p mdoc-zk-runtime --example verify_mdoc -- 6 <longfellow-spark>/cli/out/mdoc_v6_proof.bin
+
+It exits with status 0 and prints `accepted` only when upstream's
+`run_mdoc_verifier` accepts.
+
 To cross-verify a bare Longfellow proof of one of these circuits with the
 upstream `ZkVerifier` (Phase D, block 1), `verify_proof_file.rs` is used as
 it is, on the extracted LFC2 file and on the witness converted to the JSON
