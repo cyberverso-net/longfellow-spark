@@ -29,6 +29,7 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 **The two fields** (chapters 1 and 2).
 
 - `GF2_128.Add`, `Xtime`, `Mul` and `Square` are proved. `Mul` and `Square` are proved equal to the ghost reference `Mul_Ref`.
+- `Q256_Field`, the scalar field of P-256 (the integers modulo the order q of the group, block 6 of Phase D, ADR 0086), carries the same contracts as `P256_Field` with the constants of q, proved the same way; the one difference of its Montgomery round, the multiplication of the low word by q' = -q^-1 mod 2^64, is proved to clear that word (`Lemma_Low_Word_Clears`). `P256_Curve.Select_Element`, `Select_Point` and `Select_8` return the point the mask or the index names (Gold); `Ecdsa_Witness.Push_Legacy` changes nothing outside the 1,034 positions it is given (Gold on the frame; what it writes inside them is tested).
 - `P256_Field.Add`, `Sub`, `Neg`, `Mul`, `Square`, `Is_Canonical`, `From_Bytes`, `To_Bytes`, `From_Canonical`, `To_Canonical` and `Of_Natural` are proved against a ghost integer model, `To_Int`, and a ghost prime `P`. Elements are stored in Montgomery form, x 2^256 mod p, and `Mul` is proved to be the Montgomery product A B 2^-256 mod p (ADR 0069).
 - `P` is defined from the limbs of p. The proof shows that it equals 2^256 - 2^224 + 2^192 + 2^96 - 1, as a polynomial identity in 2^32.
 
@@ -101,6 +102,8 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 - `GF2_128.Inv` computes the inverse. `gf2_128_inv.txt` checks `Inv (beta_i) = g^(65535 - i)`, `E * Inv (E) = 1` on random elements and `Inv (Zero) = Zero`. Two Python references, Fermat exponentiation and the extended Euclid algorithm, must agree. The harness checks `E * Inv (E) = One` again at run time.
 - The limbs of `P_Limbs` are the prime of Table 1, and the byte encoding is that of Section 7.2.1. The files `p256_add.txt`, `p256_mul.txt` and `p256_bytes.txt` are anchored on b, Gx and Gy of RFC 5903, through the curve equation.
 - `P256_Field.Inv` is the inverse, by `p256_inv.txt`, with the same two references and the same run-time check.
+- `Q256_Field` is the scalar field of P-256, by `q256_field.txt` (`gen_q256_vectors.py`): the order q of RFC 5903 checked by q G = O on the curve, its Montgomery constants re-derived, the window chain of `Inv` checked to read q - 2, the inverse by the same two references and the same run-time check; `q256_kat`.
+- `P256_Curve` and `Ecdsa_Witness` are upstream's curve formulas and ECDSA witness, by `ecdsa_witness.txt` (`gen_ecdsa_witness_vectors.py`): the complete addition and doubling on the base point, the RFC 5903 Section 8.1 points and random non-normalised projective points, against an independent transcription; `Scalar_Mul` on the RFC 5903 key pairs and shared secret; the witness of random valid signatures as a digest; and the two signatures of upstream's test document, whose witnesses equal the signature witness files of both archives element by element (`ecdsa_kat`, the `witness_file` cases). The group law itself is not proved (register row V7).
 - The generator `gen_p256_vectors.py` also re-derives the inversion chain, and the Solinas reduction table, a cross-check kept from before the Montgomery form of ADR 0069.
 
 **The sumcheck algebra.**
@@ -160,6 +163,8 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 |------|--------------|-----------|---------|
 | GF(2^128) | `gf2_128_*.txt` | `gen_gf2_128_vectors.py` | `gf2_128_kat` |
 | P-256 field | `p256_*.txt` | `gen_p256_vectors.py` | `p256_kat` |
+| P-256 scalar field | `q256_field.txt` | `gen_q256_vectors.py` | `q256_kat` |
+| P-256 curve and ECDSA witness | `ecdsa_witness.txt` | `gen_ecdsa_witness_vectors.py` | `ecdsa_kat` |
 | Sumcheck | `sumcheck_*.txt`, `upstream/sumcheck_core_*.txt` | `gen_sumcheck_vectors.py` | `sumcheck_kat` |
 | Transcript | `sha256.txt`, `aes256.txt`, `transcript_fs.txt`, `zk_proof_*.txt` | `gen_transcript_vectors.py` | `transcript_kat`, `sumcheck_kat` |
 | Ligero | `merkle.txt`, `ligero_geometry.txt`, `lagrange_*.txt`, `ligero_proof.txt`, `upstream/ligero_*.txt` | `gen_ligero_vectors.py` | `ligero_kat`, `sumcheck_kat` |
