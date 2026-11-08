@@ -42,3 +42,18 @@ Upstream's one process proves, or verifies, both circuits; ours is one process p
 ## How the series were run
 
 One session of the proving machine (`c4-standard-24`, ADR 0060), the toolchain of `alire.toml`, rustc 1.99.1 for upstream; three runs per commit, the peaks identical from run to run, the times the median of the three (ADR 0067). The proofs are compared byte for byte before and after each change.
+
+## `heap_v7_single_crate.rs`: upstream's side at a commit newer than the pin
+
+Upstream's commit 759b94a (October 2026) refactored its Rust implementation into one crate, `longfellow-zk`, and split the mDoc runtime into `v1`, the Longfellow this project implements, and `v2`. The driver above no longer compiles there. This file is the same forty lines for the single crate: the same test data, the same archive, the same seed, the same LFA2 format, so that a proof it makes compares byte for byte with the pinned driver's. It is built as an example of the crate, with its `testonly` feature for the test data and the deterministic randomness, and the generic arithmetic:
+
+```
+git -C upstream checkout <commit>
+mkdir -p upstream/rust/examples
+cp scripts/measure/heap_v7_single_crate.rs upstream/rust/examples/heap_v7.rs
+cd upstream/rust
+MEASURE_UPSTREAM=<commit> RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --example heap_v7 \
+   --features testonly,force-generic-arch
+```
+
+The runs are as above. The first use is the series of #128 on the performance page, "Upstream at a newer commit".

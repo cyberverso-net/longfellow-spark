@@ -12,7 +12,7 @@ This page records how fast the project proves and verifies the production mDoc c
   - three runs of each commit, the median reported;
   - a 64 MB stack for all;
   - upstream's bench in the same session, generic for the baseline processor;
-  - two labels on every series: this project's commit or tag, and the upstream commit measured in the same session. Every series on this page measured upstream at d5e6be7, the pin. Upstream's main has moved since (one crate, the algebra rewritten, a carry fix in the generic multiply-accumulate), so its time and memory can change without this project changing anything; a figure against upstream is read with the upstream commit beside it. Measuring a newer upstream, when it comes, does not move the pin of the code and the interoperability (ADR 0002, ADR 0079).
+  - two labels on every series: this project's commit or tag, and the upstream commit measured in the same session. Every series on this page measured upstream at d5e6be7, the pin, except the one of "Upstream at a newer commit" below, which measured the pin and a later state of upstream's main side by side. Upstream's main has moved since the pin (one crate, the algebra rewritten, a carry fix in the generic multiply-accumulate), so its time and memory can change without this project changing anything; a figure against upstream is read with the upstream commit beside it. Measuring a newer upstream does not move the pin of the code and the interoperability (ADR 0002, ADR 0079).
 - **Sessions differ.** The same commit can be up to 8 % slower in one session than in another. Only figures from the same session are compared.
 - **The scripts:** `scripts/measure-mdoc.sh` times the four runs, prints the two labels first (`MEASURE_COMMIT` and `MEASURE_UPSTREAM` where git or the default d5e6be7 do not apply), and with `MEASURE_PROFILE=1` profiles them with `perf`; `scripts/measure/heap_v7.rs`, upstream's driver under the heap counter, prints the upstream commit it was built for. The `cli` step of `make check` runs it once, untimed, with the default stack, as the test that every proof of the four production circuits is accepted.
 
@@ -208,6 +208,21 @@ The maximum resident set agrees: 133 MB against 115 MB for the proof, 70 MB agai
 In the same session, the single-circuit programs on the same pair, for the scale: the hash proof 4.58 s and 125 MB, the signature proof 0.45 s and 20 MB, the verifications 2.28 s and 62 MB, 0.27 s and 9.5 MB; the peaks within a few hundred bytes of the release's. The two-circuit prover's peak is 6.6 MB above the hash proof's alone: the signature circuit's packed form, its witness and its commitment are held while the hash proof is made, since upstream's order commits both circuits before it proves either. The two-circuit verifier's peak is 1.6 MB above the hash verification's. The two-circuit proof is 0.11 s faster than the hash proof alone, within the spread of a session and not attributed. This project's verification of upstream's example proof takes the same time as the verification of its own, 2.55 s, and the same peak.
 
 The version 6 pair, one run in the same session: the proof 3.88 s and 111 MB (111,180,360 B), the verification 2.34 s and 59 MB (58,587,032 B). Upstream's driver covers the version 7 flow only, so the version 6 figures stand without a reference.
+
+## Upstream at a newer commit
+
+The first series against upstream at a commit newer than the pin (#128, reduced to time and peak heap; the per-stage column of #119 follows). The commit is 1c06629, the head of upstream's main on 3 November 2026, 70 commits after d5e6be7: among them the refactor of the Rust implementation into one crate (759b94a), the Longfellow v2 and the experimental ML-DSA circuits (f9d4318), the fix of the carries in the generic multiply-accumulate (7ec62ec), and the proofs in Lean. The mDoc runtime this project follows is its `v1` module there; the driver `scripts/measure/heap_v7_single_crate.rs` runs the same flow as `heap_v7.rs` on the new paths.
+
+**The version 7 proof of 1c06629 is identical byte for byte to the pin's** (360,276 bytes, the same deterministic seed, the same test data), each commit's verifier accepts the other's proof, and the archives, the example proofs and the witness files of the two commits are the same files, so the new column measures upstream's code and nothing else. One session (8 November, main 210065c), three runs of each program, upstream's drivers generic for the baseline processor, the same heap counter on every side:
+
+| mDoc v7, both circuits in one process | this project (210065c) | upstream d5e6be7 | upstream 1c06629 |
+|---|---|---|---|
+| proof, time | 4.57 s | 4.13 s | 4.15 s |
+| proof, peak heap | 132 MB (131,513,608 B) | 107 MB (107,020,208 B) | 107 MB (107,043,752 B) |
+| verification, time | 2.61 s | 1.65 s | 1.65 s |
+| verification, peak heap | 64 MB (63,996,664 B) | 48 MB (48,161,640 B) | 48 MB (48,138,192 B) |
+
+Upstream's figures did not move: the proof within 0.02 s, the verification the same, the peaks within 24 kB either way. This project's ratios are the same against both upstream commits: 1.10 and 1.23 for the proof, 1.58 and 1.33 for the verification. The session is about 2 % slower than the one of "The mDoc proof of age" above for every program, ours and upstream's alike, the usual spread between sessions. The pin of the code and the interoperability stays d5e6be7.
 
 ## After M2
 
