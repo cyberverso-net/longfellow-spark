@@ -27,7 +27,8 @@
 #     the commit's. Then posts `prove` as passed, naming that commit,
 #     without starting the VM. Without such an ancestor it refuses, and
 #     the full gate is due. Anything under src/, tests/ or scripts/, and
-#     alire.toml, is code for this purpose and needs the proof.
+#     alire.toml, is code for this purpose and needs the proof, except
+#     scripts/measure/, whose files nothing in the gate compiles or runs.
 #
 #  scripts/remote-check.sh --tree [make target...]
 #     Copies the working tree as it is, committed or not, and runs the
@@ -210,8 +211,13 @@ if [ "$MODE" != text ]; then
 fi
 
 #  Text and configuration that cannot change the proof. The workflows
-#  are not in the list: they are code.
-TEXT_ONLY='(\.md$|^LICENSE$|^\.github/(ISSUE_TEMPLATE/[^/]+|CODEOWNERS|dependabot\.yml|pull_request_template\.md)$)'
+#  are not in the list: they are code. scripts/measure/ is in the list:
+#  nothing in make check, in the verify workflow or on the proving
+#  machine compiles or runs its files (the heap shim and the drivers of
+#  the measurement series are built by hand on a copy of upstream), so
+#  a change there cannot change what the proof checks. The rest of
+#  scripts/ is code.
+TEXT_ONLY='(\.md$|^LICENSE$|^scripts/measure/|^\.github/(ISSUE_TEMPLATE/[^/]+|CODEOWNERS|dependabot\.yml|pull_request_template\.md)$)'
 
 #  The files of $1 and $2 that differ and are not text or .github
 #  configuration; empty when the two trees hold the same code.

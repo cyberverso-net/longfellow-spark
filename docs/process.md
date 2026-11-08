@@ -71,12 +71,17 @@ posted by `scripts/remote-check.sh`), both green. The ruleset on `main` requires
 
 Two cases get `prove` without a proof run, because they cannot change what the proof checks:
 
-- A change without code: nothing under `src/`, `tests/` or `scripts/`, and not `alire.toml`.
-  `scripts/remote-check.sh --text-only` checks that only Markdown files, LICENSE and the
-  configuration files under `.github/` (the issue forms, `CODEOWNERS`, `dependabot.yml`, the
-  pull request template; never the workflows) changed since a proved commit, an ancestor
-  along any parent whose status `prove` is success and whose code is the commit's, and posts
-  the status naming that commit. Without such an ancestor it refuses, and the full gate is due.
+- A change without code: nothing under `src/`, `tests/` or `scripts/`, and not `alire.toml`,
+  with one exception, `scripts/measure/`. `scripts/remote-check.sh --text-only` checks that
+  only Markdown files, LICENSE, the files under `scripts/measure/` and the configuration
+  files under `.github/` (the issue forms, `CODEOWNERS`, `dependabot.yml`, the pull request
+  template; never the workflows) changed since a proved commit, an ancestor along any parent
+  whose status `prove` is success and whose code is the commit's, and posts the status naming
+  that commit. Without such an ancestor it refuses, and the full gate is due. The exception
+  holds because nothing in `make check`, in the `verify` workflow or on the proving machine
+  compiles or runs the files under `scripts/measure/`: the heap shim and the drivers of the
+  measurement series are built by hand, on a copy of upstream, for the performance page
+  (`scripts/measure/README.md`), so a change to them cannot change what the proof checks.
 - A merge of `main` into the branch of an open pull request that brings no such change: the
   complete diff between the merge commit and the proved commit touches only the files
   `--text-only` accepts, so the project files, the workflows and every other input of the
