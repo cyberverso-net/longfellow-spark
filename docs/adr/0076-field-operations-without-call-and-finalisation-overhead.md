@@ -4,6 +4,8 @@
 
 Accepted (2026-10-28, at the merge of pull request #47; proposed 2026-10-27, milestone M2 of Phase D).
 
+Note (2026-11-08, #134): `P256_Field` precedes this record and keeps `Big_Integer` actuals of ghost calls in four compiled bodies (`Round`, `Mont_Mul`, `From_Canonical`, `From_Bytes`); its release disassembly on arm64 and x86-64 shows no call and no finalisation, so the guarantee holds there by inspection rather than by the rule. `Q256_Field` follows the rule with three lemmas on words. Task #140 transposes them to `P256_Field` and closes this note.
+
 ## Date
 
 2026-10-27

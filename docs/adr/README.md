@@ -89,3 +89,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0083](0083-claims-corrected-at-the-milestone-review.md) | Claims corrected at the milestone review of the memory milestone | Accepted | 2026-11-06 |
 | [0084](0084-memory-milestone-closed.md) | The memory milestone closed: the peak heap at 1.17 and 1.30 times upstream's | Accepted | 2026-11-07 |
 | [0085](0085-prover-and-verifier-in-two-phases.md) | The prover and the verifier in two phases: commit, then prove, on a transcript the caller opens | Accepted | 2026-11-07 |
+| [0086](0086-mdoc-witness-bounds-and-constant-time.md) | The witness from the mDoc: the bounds, the constant-time perimeter and the inversion of secrets | Proposed | 2026-11-08 |
