@@ -90,6 +90,7 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 - `Mdoc_Inputs.Hash_Inputs` fills exactly `Hash_Count` elements, the constant one first, the six tags and av last; `Sig_Inputs` fills 900 with the constant one, the key and e2 first. `Witness_Parts` returns the last six elements of the witness as the pads when it accepts.
 - `Mdoc_Proof.Write_Tags` and `Read_Tags` place each tag at its offset at the front of the proof.
 - `Mdoc_Prover.Prove` and `Mdoc_Verifier.Verify` are Silver with the ownership checks on the two commitments, the two proofs received and the proof buffers; their statuses are proved as stated.
+- `Cbor_Parse.Parse_Exact` is Silver on any bytes within the bound, and Gold on the invariants of its table (`Valid`): every element's range inside the parsed bytes, the head before the content, every child inside its parent, the links forward within the table, the root and only the root without a parent. `Mdoc_Parse.Parse` is Silver on any document and Gold on its ranges and offsets lying inside the document and the MSO (`In_Bounds`); `Sha256.Trace.Pad_Message` is Gold on the layout of the padded buffer.
 
 ## What is tested
 
@@ -155,6 +156,7 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 - The CBOR heads, the tags, e2 and the table of specifications match the Python transcription on synthetic cases: the boundaries of the heads, random tags, an empty transcript, a long document type, two attributes, a short date.
 - Fresh pads placed in both witnesses by `Mdoc_Inputs.Place_Pads` are read back by `Witness_Parts` and `Sig_Pads_Match`, and the file's pads are found where the layout says, in `mdoc_kat` on both archives.
 - `longfellow_prove_mdoc` makes an mDoc proof from the witness files on each archive, `longfellow_verify_mdoc` accepts it and accepts upstream's example proof of the archive, and refuses a wrong date, a wrong value, a wrong document type, a tag altered and a proof cut short: the `cli` step of `make check` (`scripts/measure-mdoc.sh mdoc`).
+- `Cbor_Parse`, `Mdoc_Parse` and `Sha256.Trace` are upstream's parser, `parse_mdoc` and SHA-256 trace, by `mdoc_parse.txt` (`gen_mdoc_parse_vectors.py`, an independent Python transcription that checks itself against the front of the hash witness files of both archives before it writes): the table of 23 CBOR items and the status of 18 refused ones, 8 traces over fixed numbers of blocks, upstream's 38 test documents parsed field by field, the items of the Mustermann document in clear, 39 synthetic documents accepted or refused with upstream's status; and `mdoc_parse_kat` compares the front of each archive's hash witness file (the 768 bits of the bound values, the block count, the four offsets) with the Ada parse. The trace's state after the last block equals `Sha256.Digest` of the message on every trace vector (the two compressions share their round functions and constants).
 - The proofs this project makes are accepted by upstream's `run_mdoc_verifier`, and a copy with one tag altered is refused by it, through `tests/vectors/upstream/verify_mdoc.rs` built on a working copy of upstream at the pin: the last part of the `cli` step of `make check` on the proving machine, which holds cargo and a clone of upstream (`scripts/cross-check-upstream.sh`, ADR 0087); where a machine has no clone of upstream, as the hosted `verify` workflow, the step says so and is skipped (chapter 9 Section 5.1).
 
 **Where the vectors are.**
@@ -165,6 +167,7 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 | P-256 field | `p256_*.txt` | `gen_p256_vectors.py` | `p256_kat` |
 | P-256 scalar field | `q256_field.txt` | `gen_q256_vectors.py` | `q256_kat` |
 | P-256 curve and ECDSA witness | `ecdsa_witness.txt` | `gen_ecdsa_witness_vectors.py` | `ecdsa_kat` |
+| The parse of the mDoc and the SHA-256 trace | `mdoc_parse.txt` | `gen_mdoc_parse_vectors.py` | `mdoc_parse_kat` |
 | Sumcheck | `sumcheck_*.txt`, `upstream/sumcheck_core_*.txt` | `gen_sumcheck_vectors.py` | `sumcheck_kat` |
 | Transcript | `sha256.txt`, `aes256.txt`, `transcript_fs.txt`, `zk_proof_*.txt` | `gen_transcript_vectors.py` | `transcript_kat`, `sumcheck_kat` |
 | Ligero | `merkle.txt`, `ligero_geometry.txt`, `lagrange_*.txt`, `ligero_proof.txt`, `upstream/ligero_*.txt` | `gen_ligero_vectors.py` | `ligero_kat`, `sumcheck_kat` |

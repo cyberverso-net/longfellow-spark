@@ -1,0 +1,4 @@
+pkx 0x5070e8199f3c5e1ecf6249662994997605b7205b039ff77fad4f9aceb3cadbcd
+pky 0xc2f6fa056f2423ca57f828ded12656bdae863f23654561d494ae5efa9feb883f
+now 2025-01-29T18:00:00Z
+doc_type com.google.wallet.idcard.1
