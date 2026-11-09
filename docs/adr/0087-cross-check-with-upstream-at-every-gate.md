@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-11-09, with #142; to be accepted at its merge). Amended 2026-11-09 by [ADR 0088](0088-proof-inputs-and-the-reuse-of-a-proof.md): `verify_mdoc.rs` is not a proof input, and the cross-check runs at every gate whether the proof is proved again or reused.
+Accepted (2026-11-09, at the merge of pull request #143; proposed 2026-11-09 with #142). Amended 2026-11-09 by [ADR 0088](0088-proof-inputs-and-the-reuse-of-a-proof.md): `verify_mdoc.rs` is not a proof input, and the cross-check runs at every gate whether the proof is proved again or reused.
 
 ## Date
 
