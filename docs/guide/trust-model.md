@@ -155,7 +155,7 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 - The CBOR heads, the tags, e2 and the table of specifications match the Python transcription on synthetic cases: the boundaries of the heads, random tags, an empty transcript, a long document type, two attributes, a short date.
 - Fresh pads placed in both witnesses by `Mdoc_Inputs.Place_Pads` are read back by `Witness_Parts` and `Sig_Pads_Match`, and the file's pads are found where the layout says, in `mdoc_kat` on both archives.
 - `longfellow_prove_mdoc` makes an mDoc proof from the witness files on each archive, `longfellow_verify_mdoc` accepts it and accepts upstream's example proof of the archive, and refuses a wrong date, a wrong value, a wrong document type, a tag altered and a proof cut short: the `cli` step of `make check` (`scripts/measure-mdoc.sh mdoc`).
-- The proofs this project makes are accepted by upstream's `run_mdoc_verifier`, by hand, through `tests/vectors/upstream/verify_mdoc.rs` (chapter 9 Section 5.1).
+- The proofs this project makes are accepted by upstream's `run_mdoc_verifier`, and a copy with one tag altered is refused by it, through `tests/vectors/upstream/verify_mdoc.rs` built on a working copy of upstream at the pin: the last part of the `cli` step of `make check` on the proving machine, which holds cargo and a clone of upstream (`scripts/cross-check-upstream.sh`, ADR 0087); where a machine has no clone of upstream, as the hosted `verify` workflow, the step says so and is skipped (chapter 9 Section 5.1).
 
 **Where the vectors are.**
 

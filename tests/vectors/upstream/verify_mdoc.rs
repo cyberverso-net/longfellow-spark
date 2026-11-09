@@ -19,8 +19,9 @@
 // The first argument is the circuit version of the archive the proof was
 // made for (7 or 6, one attribute); the second the proof file. The
 // program exits with status 0 and prints "accepted" only if upstream's
-// verifier accepts; a refusal is a panic with upstream's error code. The
-// library is not modified.
+// verifier accepts; a refusal prints upstream's error and exits with
+// status 3; any other status (a missing file, a panic) is a failure of
+// the program, not a verdict. The library is not modified.
 use mdoc_zk_runtime::{req_attr, run_mdoc_verifier_inner, RequestedAttribute, ZK_SPECS};
 
 fn hex(s: &str) -> Vec<u8> {
@@ -46,7 +47,7 @@ fn main() {
         "family_name",
         hex("6a4d75737465726d616e6e"),
     )];
-    run_mdoc_verifier_inner(
+    if let Err(e) = run_mdoc_verifier_inner(
         spec,
         &circuits,
         case.pkx,
@@ -56,8 +57,13 @@ fn main() {
         case.now,
         case.doc_type,
         &proof,
-    )
-    .expect("upstream's mDoc verifier refuses the proof");
+    ) {
+        eprintln!(
+            "verify_mdoc: {} refused by upstream's run_mdoc_verifier: {:?}",
+            args[2], e
+        );
+        std::process::exit(3);
+    }
     println!(
         "verify_mdoc: {} ({} bytes) accepted by upstream's run_mdoc_verifier, version {}",
         args[2],

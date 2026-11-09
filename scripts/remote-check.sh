@@ -49,6 +49,10 @@
 #  Needs gcloud authenticated on the developer's account (OS Login), the
 #  key that gcloud compute ssh created (~/.ssh/google_compute_engine),
 #  rsync, and gh authenticated with the right to post commit statuses.
+#  The machine keeps a clone of upstream at ~/upstream and cargo under
+#  ~/.cargo, for the measurement series and for the cross-check of the
+#  mDoc proofs with upstream's verifier, which every run gets through
+#  LONGFELLOW_UPSTREAM (scripts/cross-check-upstream.sh, ADR 0087).
 #  The status is posted from this machine, with the developer's gh
 #  account; the VM holds no GitHub credential beyond its read-only
 #  deploy key.
@@ -288,7 +292,7 @@ if [ "$MODE" = commit ]; then
       echo $SHA > ~/runs/current
       rm -f ~/runs/$SHA.done ~/runs/$SHA.log
       cd ~/longfellow-spark && git fetch -q origin && git checkout -q --detach $SHA && git clean -q -fd || { rm -f ~/runs/current; echo fetch-failed; exit 0; }
-      nohup setsid bash -c 'start=\$(date +%s); (time make \"chec\"k) > ~/runs/$SHA.log 2>&1; code=\$?; echo \"\$code \$(( (\$(date +%s) - start + 59) / 60 ))\" > ~/runs/$SHA.done; rm -f ~/runs/current; $OFF' > /dev/null 2>&1 < /dev/null &
+      nohup setsid bash -c 'start=\$(date +%s); (time env LONGFELLOW_UPSTREAM=\$HOME/upstream make \"chec\"k) > ~/runs/$SHA.log 2>&1; code=\$?; echo \"\$code \$(( (\$(date +%s) - start + 59) / 60 ))\" > ~/runs/$SHA.done; rm -f ~/runs/current; $OFF' > /dev/null 2>&1 < /dev/null &
       echo started" 2> /dev/null || echo unreachable)"
    case "$launched" in
       started)
@@ -441,7 +445,7 @@ launched="$(remote "{ [ -n \"\$(find ~/runs/tree.reserved -maxdepth 1 -name $RUN
    echo $RUN > ~/runs/current
    echo $RUN > ~/runs/tree.last
    cd ~/remote-check
-   nohup setsid bash -c 'echo \$\$ \$(cat /proc/sys/kernel/random/boot_id) > ~/runs/tree.pid; rm -rf ~/runs/tree.reserved; start=\$(date +%s); (time eval \"make \$(cat ~/runs/$RUN.targets)\") > ~/runs/$RUN.log 2>&1; code=\$?; echo \"exit \$code\" >> ~/runs/$RUN.log; echo \"\$code \$(( (\$(date +%s) - start + 59) / 60 ))\" > ~/runs/$RUN.done; rm -f ~/runs/current ~/runs/tree.pid; $OFF' > /dev/null 2>&1 < /dev/null &
+   nohup setsid bash -c 'echo \$\$ \$(cat /proc/sys/kernel/random/boot_id) > ~/runs/tree.pid; rm -rf ~/runs/tree.reserved; start=\$(date +%s); (time eval \"env LONGFELLOW_UPSTREAM=\$HOME/upstream make \$(cat ~/runs/$RUN.targets)\") > ~/runs/$RUN.log 2>&1; code=\$?; echo \"exit \$code\" >> ~/runs/$RUN.log; echo \"\$code \$(( (\$(date +%s) - start + 59) / 60 ))\" > ~/runs/$RUN.done; rm -f ~/runs/current ~/runs/tree.pid; $OFF' > /dev/null 2>&1 < /dev/null &
    echo started" 2> /dev/null || echo unreachable)"
 case "$launched" in
    started)
