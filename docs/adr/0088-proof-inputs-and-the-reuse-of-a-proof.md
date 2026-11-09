@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-11-09, with #144; to be accepted at its merge). Amends [ADR 0062](0062-proof-on-demand.md): the text-only mode and its list of harmless files are replaced by the rule below. Amends [ADR 0087](0087-cross-check-with-upstream-at-every-gate.md) on one point: the cross-check runs at every gate, proof proved again or reused.
+Accepted (2026-11-09, at the merge of pull request #145; proposed 2026-11-09 with #144). Amends [ADR 0062](0062-proof-on-demand.md): the text-only mode and its list of harmless files are replaced by the rule below. Amends [ADR 0087](0087-cross-check-with-upstream-at-every-gate.md) on one point: the cross-check runs at every gate, proof proved again or reused.
 
 ## Date
 
