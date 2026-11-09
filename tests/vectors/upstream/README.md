@@ -162,7 +162,15 @@ proof file with the circuit version of its archive:
     cargo run --release -p mdoc-zk-runtime --example verify_mdoc -- 6 <longfellow-spark>/cli/out/mdoc_v6_proof.bin
 
 It exits with status 0 and prints `accepted` only when upstream's
-`run_mdoc_verifier` accepts.
+`run_mdoc_verifier` accepts, and with status 3 and upstream's error when it
+refuses; any other status is a failure of the program.
+
+The `cli` step of `make check` runs the same check through
+`scripts/cross-check-upstream.sh` when `LONGFELLOW_UPSTREAM` names a clone
+of upstream that contains d5e6be7, as on the proving machine: the working
+copy and its build stay under `~/.cache/longfellow-spark/cross-check` (or
+`LONGFELLOW_CROSS_CHECK_DIR`), and the altered copy of the version 6 proof
+must be refused. Without the variable the step prints that it was skipped.
 
 To cross-verify a bare Longfellow proof of one of these circuits with the
 upstream `ZkVerifier` (Phase D, block 1), `verify_proof_file.rs` is used as

@@ -304,6 +304,8 @@ do_cli() {
    header "cli: the mDoc proof of age on both archives, default stack (measure-mdoc.sh mdoc)"
    MEASURE_STACK_KB=8192 scripts/measure-mdoc.sh mdoc
    echo "cli: both mDoc proofs made and accepted, the upstream example proofs accepted, the altered copies refused"
+   header "cli: the cross-check with upstream's verifier (cross-check-upstream.sh; skipped without LONGFELLOW_UPSTREAM)"
+   scripts/cross-check-upstream.sh
 }
 
 do_vectors() {
