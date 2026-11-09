@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Amended 2026-11-09 by [ADR 0088](0088-proof-inputs-and-the-reuse-of-a-proof.md): the text-only mode of `scripts/remote-check.sh` and its list of harmless files are replaced by the reuse of the proof for a commit whose proof inputs equal a proved ancestor's; the machine then runs every check but the proof.
 
 ## Date
 

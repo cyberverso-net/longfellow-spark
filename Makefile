@@ -3,10 +3,16 @@
 #  definition of done for every commit and every pull request (ADR
 #  0041, ADR 0044).
 
-.PHONY: check build prove prove-partition partitions-check test cli vectors lint
+.PHONY: check check-reuse build prove prove-partition partitions-check test cli vectors lint
 
 check:
 	scripts/check.sh all
+
+#  Every check but the proof, for a commit whose proof inputs equal those
+#  of a commit already proved (ADR 0088); scripts/remote-check.sh chooses
+#  it, never a developer by hand.
+check-reuse:
+	scripts/check.sh reuse
 
 build:
 	scripts/check.sh build

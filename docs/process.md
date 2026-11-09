@@ -72,27 +72,26 @@ proving machine's `make check` also runs the cross-check of the mDoc proofs with
 verifier, which needs cargo and a clone of upstream and is skipped, with a line saying so,
 where they are absent (`scripts/cross-check-upstream.sh`, ADR 0087).
 
-Two cases get `prove` without a proof run, because they cannot change what the proof checks:
+The proof is proved again only when its inputs changed (ADR 0088). `scripts/remote-check.sh`
+lists the proof inputs of the commit, every file gnatprove reads: the project file and the
+source directories it names, `alire.toml` (the toolchain pins), the partition list, every
+configuration pragma file, and the gnatprove command lines of `scripts/check.sh` and the
+Makefile, each by its git object hash; the digest of the list identifies the proof's inputs.
+If an ancestor along any parent has the same digest and its status `prove` is success, the
+machine runs every check but the proof (`make check-reuse`: build, partitions, tests, the
+command line with the cross-check of the mDoc proofs, vectors, lint, about fifteen minutes)
+and `prove` is posted naming the proved commit and the digest. Otherwise the machine runs
+`make check` and proves from scratch; so it does when the project file names a source
+directory, a file or an attribute the list does not cover, declares its source directories
+conditionally or more than once, or when a project file the list does not know appears. A merge of `main` into a branch that brings no change of the inputs
+reuses the proof like any other commit. `scripts/remote-check.sh --digest [commit]` shows the
+list, the digest and the proved ancestor without starting anything.
 
-- A change without code: nothing under `src/`, `tests/` or `scripts/`, and not `alire.toml`,
-  with one exception, `scripts/measure/`. `scripts/remote-check.sh --text-only` checks that
-  only Markdown files, LICENSE, the files under `scripts/measure/` and the configuration
-  files under `.github/` (the issue forms, `CODEOWNERS`, `dependabot.yml`, the pull request
-  template; never the workflows) changed since a proved commit, an ancestor along any parent
-  whose status `prove` is success and whose code is the commit's, and posts the status naming
-  that commit. Without such an ancestor it refuses, and the full gate is due. The exception
-  holds because nothing in `make check`, in the `verify` workflow or on the proving machine
-  compiles or runs the files under `scripts/measure/`: the heap shim and the drivers of the
-  measurement series are built by hand, on a copy of upstream, for the performance page
-  (`scripts/measure/README.md`), so a change to them cannot change what the proof checks.
-- A merge of `main` into the branch of an open pull request that brings no such change: the
-  complete diff between the merge commit and the proved commit touches only the files
-  `--text-only` accepts, so the project files, the workflows and every other input of the
-  proof are the same as in that commit. The maintainer may then post `prove` by hand; the
-  description of the status says so and names the commit that was proved; the review of the
-  pull request checks the diff.
-
-Every other change runs the proof.
+The proof from scratch stays the rule at three points, with `scripts/remote-check.sh --full`:
+every release tag, every milestone close, and once a week on `main`, started on Monday at
+03:00 by a scheduled job on the maintainer's machine (`scripts/weekly-proof.plist`, a
+launchd agent that runs `--full origin/main`); the run is detached on the machine and its
+status is posted on the head of `main` when it ends.
 
 ## Proof rules
 

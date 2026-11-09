@@ -65,7 +65,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0059](0059-mdoc-vectors-and-measurement.md) | mDoc vectors, witness inputs and measurement | Proposed | 2026-10-19 |
 | [0060](0060-proving-machine-on-google-cloud.md) | A proving machine on Google Cloud: prove as one job, make check remote | Accepted, amended by 0062 | 2026-10-19 |
 | [0061](0061-readme-as-front-page.md) | The README as a front page, the trust model in the guide | Accepted | 2026-10-19 |
-| [0062](0062-proof-on-demand.md) | The proof on demand, posted as a commit status | Accepted | 2026-10-19 |
+| [0062](0062-proof-on-demand.md) | The proof on demand, posted as a commit status | Accepted, amended by 0088 | 2026-10-19 |
 | [0063](0063-milestone-m1-algorithmic-parity.md) | Milestone M1: algorithmic parity with the production verifier and prover | Accepted, amended by 0066, M1 closed | 2026-10-21 |
 | [0064](0064-lean-circuit-premises.md) | The circuit premises of upstream's Lean proofs, checked and proved | Accepted, amended by 0079 | 2026-10-21 |
 | [0065](0065-carry-less-multiplication-in-gf2-128.md) | The carry-less multiplication of upstream in GF(2^128), proved Gold | Accepted | 2026-10-21 |
@@ -90,4 +90,5 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0084](0084-memory-milestone-closed.md) | The memory milestone closed: the peak heap at 1.17 and 1.30 times upstream's | Accepted | 2026-11-07 |
 | [0085](0085-prover-and-verifier-in-two-phases.md) | The prover and the verifier in two phases: commit, then prove, on a transcript the caller opens | Accepted | 2026-11-07 |
 | [0086](0086-mdoc-witness-bounds-and-constant-time.md) | The witness from the mDoc: the bounds, the constant-time perimeter and the inversion of secrets | Proposed | 2026-11-08 |
-| [0087](0087-cross-check-with-upstream-at-every-gate.md) | The cross-check of the mDoc proofs with upstream's verifier at every gate | Proposed | 2026-11-09 |
+| [0087](0087-cross-check-with-upstream-at-every-gate.md) | The cross-check of the mDoc proofs with upstream's verifier at every gate | Proposed, amended by 0088 | 2026-11-09 |
+| [0088](0088-proof-inputs-and-the-reuse-of-a-proof.md) | The proof inputs and the reuse of a proof: the gate proves again only what changed the proof's inputs | Proposed | 2026-11-09 |
