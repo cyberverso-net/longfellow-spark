@@ -68,7 +68,8 @@ The project's proving machine, a virtual machine on Google Cloud (c4-standard-24
 ```bash
 scripts/remote-check.sh               # make check on the pushed commit, posts the status prove
 scripts/remote-check.sh --collect     # picks up that run later, if the terminal was closed
-scripts/remote-check.sh --text-only   # only text since the last proved commit: posts prove without the proof
+scripts/remote-check.sh --digest      # the proof inputs of HEAD, their digest, the proved ancestor with the same
+scripts/remote-check.sh --full        # the proof from scratch even when the inputs are unchanged
 scripts/remote-check.sh --tree prove  # the working tree as it is, any target, posts nothing
 scripts/remote-check.sh --tree-collect  # picks up a tree run later, if the terminal was closed
 ```
@@ -166,7 +167,7 @@ To reproduce the environment on another machine:
 3. Check the versions with `alr exec -- gnat --version` and `alr exec -- gnatprove --version`.
 
 - **`verify`** is a workflow. It runs on every push and pull request, on a hosted Ubuntu runner, and covers everything in `make check` except the proof.
-- **`prove`** is a commit status. `scripts/remote-check.sh` posts it after running `make check` on the proving machine for that exact commit. Branches that change only text, or the configuration files under `.github/` other than the workflows, get it with `--text-only`, without running the proof; [the development process](docs/process.md) says when the maintainer may post it by hand.
+- **`prove`** is a commit status. `scripts/remote-check.sh` posts it after running `make check` on the proving machine for that exact commit. A commit whose proof inputs (the sources, the project file, the toolchain pins, the prover's switches) equal those of a proved ancestor does not prove again: the machine runs every other check and the status names the proved commit (ADR 0088); the proof from scratch returns at every release, milestone close and once a week on `main`. [The development process](docs/process.md) has the rule.
 
 Work happens on a branch per stage or block, and reaches `main` through a pull request once both checks are green (ADR 0062). A red check is fixed with a new commit on the branch. Before a release, or after a toolchain change, the check is run on `main` as well.
 

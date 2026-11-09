@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The weekly proof from scratch of main on the proving machine (ADR 0088):
+  a launchd agent on the maintainer's machine that runs
+  scripts/remote-check.sh with the option full on origin/main every Monday
+  at 03:00. The run is detached on the machine; this job waits for it and
+  posts the status prove on the head of main. Install, with the path of
+  the checkout and the home directory in place of the two placeholders:
+
+     sed "s|CHECKOUT|$PWD|g; s|HOMEDIR|$HOME|g" scripts/weekly-proof.plist \
+        > ~/Library/LaunchAgents/net.cyberverso.longfellow-spark.weekly-proof.plist
+     launchctl load ~/Library/LaunchAgents/net.cyberverso.longfellow-spark.weekly-proof.plist
+
+  The log is ~/Library/Logs/longfellow-spark-weekly-proof.log. The job
+  needs gcloud, gh and the ssh key of scripts/remote-check.sh, as the
+  maintainer's shell has them; launchd runs it with a login shell.
+-->
+<plist version="1.0">
+<dict>
+   <key>Label</key>
+   <string>net.cyberverso.longfellow-spark.weekly-proof</string>
+   <key>ProgramArguments</key>
+   <array>
+      <string>/bin/bash</string>
+      <string>-lc</string>
+      <string>cd CHECKOUT &amp;&amp; git fetch -q origin &amp;&amp; scripts/remote-check.sh --full origin/main</string>
+   </array>
+   <key>StartCalendarInterval</key>
+   <dict>
+      <key>Weekday</key>
+      <integer>1</integer>
+      <key>Hour</key>
+      <integer>3</integer>
+      <key>Minute</key>
+      <integer>0</integer>
+   </dict>
+   <key>StandardOutPath</key>
+   <string>HOMEDIR/Library/Logs/longfellow-spark-weekly-proof.log</string>
+   <key>StandardErrorPath</key>
+   <string>HOMEDIR/Library/Logs/longfellow-spark-weekly-proof.log</string>
+</dict>
+</plist>

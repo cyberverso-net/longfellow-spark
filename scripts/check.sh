@@ -14,7 +14,7 @@ set -euo pipefail
 
 usage() {
    echo "usage: scripts/check.sh {build|prove|prove-partition <name>|" \
-        "partitions-check|test|cli|vectors|lint|all}" >&2
+        "partitions-check|test|cli|vectors|lint|all|reuse}" >&2
    exit 2
 }
 
@@ -399,6 +399,18 @@ case "${1:-}" in
       do_vectors
       do_lint
       header "all checks passed"
+      ;;
+   reuse)
+      #  Every check but the proof, for a commit whose proof inputs are
+      #  those of a commit already proved (ADR 0088); scripts/remote-check.sh
+      #  chooses it and names the proved commit in the status.
+      do_build
+      do_partitions_check
+      do_test
+      do_cli
+      do_vectors
+      do_lint
+      header "all checks but the proof passed; the proof is reused (ADR 0088)"
       ;;
    *) usage ;;
 esac

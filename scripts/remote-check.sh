@@ -18,17 +18,27 @@
 #     end (the terminal was closed), and posts its status. The commit
 #     defaults to HEAD.
 #
-#  scripts/remote-check.sh --text-only
-#     Checks that the commit changes only text (Markdown files and
-#     LICENSE) and the configuration files under .github/ (the issue
-#     forms, CODEOWNERS, dependabot.yml, the pull request template; not
-#     the workflows) since a commit already proved: an ancestor, along
-#     every parent, whose status `prove` is success and whose code is
-#     the commit's. Then posts `prove` as passed, naming that commit,
-#     without starting the VM. Without such an ancestor it refuses, and
-#     the full gate is due. Anything under src/, tests/ or scripts/, and
-#     alire.toml, is code for this purpose and needs the proof, except
-#     scripts/measure/, whose files nothing in the gate compiles or runs.
+#  scripts/remote-check.sh [--full] [commit]
+#     Before starting, the commit mode lists the proof inputs of the
+#     commit (ADR 0088): the project file and the source directories it
+#     names, the toolchain pins alire.toml and alire.lock, the partition
+#     list, every configuration pragma file, and the gnatprove command
+#     lines of scripts/check.sh and the Makefile, each by its git object
+#     hash, and digests the list. If an ancestor, along every parent,
+#     has the same digest and its status `prove` is success, the proof
+#     is reused: the VM runs make check-reuse (build, partitions, test,
+#     cli with the cross-check, vectors, lint; about fifteen minutes)
+#     and the status names the proved commit and the digest. Otherwise,
+#     or with --full, the VM runs make check and proves from scratch.
+#     The reuse is refused, and the proof runs, when the project file
+#     names a source, a file or an attribute the list does not cover.
+#     The commit defaults to HEAD, which must be clean and pushed; with
+#     a commit given (origin/main for the weekly proof), only pushed.
+#
+#  scripts/remote-check.sh --digest [commit]
+#     Prints the proof inputs and the digest of the commit (HEAD by
+#     default) and the proved ancestor with the same digest, if any.
+#     Starts nothing; needs no gcloud.
 #
 #  scripts/remote-check.sh --tree [make target...]
 #     Copies the working tree as it is, committed or not, and runs the
@@ -153,11 +163,25 @@ fetch_log() {
    echo "remote-check: could not read the log from $VM" >&2
 }
 
+#  The kind of the run of $SHA (~/runs/$SHA.targets), "none" when the VM
+#  has no such file; false after five failures to reach the VM.
+fetch_targets() {
+   local i t
+   for i in 1 2 3 4 5; do
+      if t="$(remote "if [ -e ~/runs/$SHA.targets ]; then cat ~/runs/$SHA.targets; else echo none; fi" 2> /dev/null)"; then
+         printf '%s\n' "$t"
+         return 0
+      fi
+      sleep 20
+   done
+   return 1
+}
+
 #  Wait for the detached run of $SHA and post its result. Every failure
 #  to reach the VM (the laptop asleep, the network gone) is retried.
 collect() {
    echo "remote-check: waiting for the run of ${SHA:0:12} (checked every $POLL s)"
-   local state result
+   local state result targets
    while true; do
       state="$(vm_status)"
       if [ "$state" = "TERMINATED" ]; then
@@ -179,18 +203,33 @@ collect() {
                exit 1 ;;
             [0-9]*\ [0-9]*)
                fetch_log
+               #  What the run was: "check", or "check-reuse <base> <digest>"
+               #  (ADR 0088); a run of an older script has no file, which
+               #  the VM reports as "none": check. A VM that cannot be
+               #  reached is not a missing file: nothing is posted.
+               if ! targets="$(fetch_targets)"; then
+                  echo "remote-check: the run of ${SHA:0:12} ended with status ${result%% *} but its kind could not be read from $VM; run --collect again" >&2
+                  exit 1
+               fi
                vm_stop
-               local code minutes step
+               local code minutes step target base digest
                code="${result%% *}"
                minutes="${result##* }"
+               if [ "$targets" = none ]; then targets=check; fi
+               target="${targets%% *}"
                if [ "$code" = 0 ]; then
-                  post_status success "make check passed on $VM in $minutes min"
-                  echo "remote-check: make check passed (remote-check.log)"
+                  if [ "$target" = check-reuse ]; then
+                     read -r _ base digest <<< "$targets"
+                     post_status success "proof inputs ${digest:0:12} as ${base:0:7}, proved; build, test, cli, vectors, lint passed on $VM in $minutes min"
+                  else
+                     post_status success "make check passed on $VM in $minutes min"
+                  fi
+                  echo "remote-check: make $target passed (remote-check.log)"
                   exit 0
                fi
                step="$(grep '^=== ' remote-check.log | tail -1 | sed 's/^=== \([a-z-]*\).*/\1/')"
-               post_status failure "make check failed in step ${step:-unknown} on $VM after $minutes min"
-               echo "remote-check: make check FAILED (remote-check.log)" >&2
+               post_status failure "make $target failed in step ${step:-unknown} on $VM after $minutes min"
+               echo "remote-check: make $target FAILED (remote-check.log)" >&2
                exit 1 ;;
             *) ;;   # an answer cut short: ask again
          esac
@@ -200,70 +239,175 @@ collect() {
 }
 
 MODE=commit
+FULL=""
 case "${1:-}" in
-   --text-only) MODE=text ;;
+   --full)      FULL=yes; shift ;;
+   --digest)    MODE=digest; shift ;;
    --collect)   MODE=collect; shift ;;
    --tree)      MODE=tree; shift ;;
    --tree-collect) MODE=tree-collect; shift ;;
    "")          ;;
-   *)           echo "usage: scripts/remote-check.sh [--text-only | --collect [commit] | --tree [target...] | --tree-collect [run]]" >&2
+   -*)          echo "usage: scripts/remote-check.sh [--full] [commit] | --digest [commit] | --collect [commit] | --tree [target...] | --tree-collect [run]" >&2
                 exit 2 ;;
+   *)           ;;
 esac
 
-if [ "$MODE" != text ]; then
+if [ "$MODE" != digest ]; then
    need_user
 fi
 
-#  Text and configuration that cannot change the proof. The workflows
-#  are not in the list: they are code. scripts/measure/ is in the list:
-#  nothing in make check, in the verify workflow or on the proving
-#  machine compiles or runs its files (the heap shim and the drivers of
-#  the measurement series are built by hand on a copy of upstream), so
-#  a change there cannot change what the proof checks. The rest of
-#  scripts/ is code.
-TEXT_ONLY='(\.md$|^LICENSE$|^scripts/measure/|^\.github/(ISSUE_TEMPLATE/[^/]+|CODEOWNERS|dependabot\.yml|pull_request_template\.md)$)'
+#  The proof inputs of a commit (ADR 0088): every file gnatprove reads,
+#  each with its git object hash, one per line. The source directories
+#  are read from the project file, so that a new one cannot be missed;
+#  config/ is generated by Alire from alire.toml and alire.lock and is
+#  not in the repository, which the line "generated" records. The other
+#  project files of the repository are the known ones below, which the
+#  proof does not read; any other makes the listing fail. Fails, with
+#  the reason on stderr, when the project file uses an attribute or a
+#  form the list does not cover: then the proof runs.
+KNOWN_OTHER_GPR="cli/longfellow_verify.gpr tests/longfellow_spark_tests.gpr"
 
-#  The files of $1 and $2 that differ and are not text or .github
-#  configuration; empty when the two trees hold the same code.
-code_diff() {
-   git diff --name-only "$1" "$2" | grep -v -E "$TEXT_ONLY" || true
+#  The Source_Dirs of the project file on stdin, one per line without
+#  the trailing slash. Every entry must be a string literal without a
+#  wildcard: a variable, a concatenation or a pattern is a form the
+#  list cannot follow, and the function fails with the reason.
+gpr_source_dirs() {
+   local raw entry n=0
+   local text
+   text="$(grep -v '^ *--')"
+   n="$(printf '%s\n' "$text" | grep -c 'for Source_Dirs use')"
+   if [ "$n" -ne 1 ]; then
+      echo "longfellow_spark.gpr has $n Source_Dirs declarations; the list follows exactly one" >&2
+      return 1
+   fi
+   if printf '%s\n' "$text" | grep -q -E '^[[:space:]]*case[[:space:]]'; then
+      echo "longfellow_spark.gpr has a case statement; the list cannot follow a conditional project" >&2
+      return 1
+   fi
+   raw="$(printf '%s\n' "$text" | tr '\n' ' ' \
+      | sed -n 's/.*for Source_Dirs use (\([^)]*\)).*/\1/p')"
+   if [ -z "$raw" ]; then
+      echo "no Source_Dirs in longfellow_spark.gpr" >&2; return 1
+   fi
+   printf '%s\n' "$raw" | tr ',' '\n' | while read -r entry; do
+      case "$entry" in
+         '"'*'"') entry="${entry#\"}"; entry="${entry%\"}" ;;
+         *) echo "a Source_Dirs entry that is not a string literal: $entry" >&2; exit 1 ;;
+      esac
+      case "$entry" in
+         *'*'*|'') echo "a Source_Dirs entry the list cannot follow: \"$entry\"" >&2; exit 1 ;;
+      esac
+      echo "${entry%/}"
+   done
 }
 
-#  An ancestor of $SHA whose status `prove` is success and whose tree
-#  holds the same code as $SHA's (code_diff empty); empty if none within
-#  200 commits. The walk is topological (children before parents) over
-#  every parent of a merge, not the first parents only: the proved head
-#  of a branch is the second parent of its merge into main, and a walk
-#  along the first parents would miss every one of them. The walk
-#  starts from every parent of $SHA ($SHA^@), since $SHA may itself be
-#  a merge whose proved head is its second parent. A status posted on a
-#  merge of main without code (docs/process.md) counts.
+proof_inputs() {  # commit
+   local c="$1" gpr dirs d f
+   gpr="$(git show "$c:longfellow_spark.gpr" 2> /dev/null)" || {
+      echo "no longfellow_spark.gpr in $c" >&2; return 1; }
+   echo "longfellow_spark.gpr $(git rev-parse "$c:longfellow_spark.gpr")"
+   if printf '%s\n' "$gpr" | grep -v '^ *--' \
+         | grep -q -E 'Source_Files|Excluded_Source|Source_List_File|Configuration_Pragmas'; then
+      echo "longfellow_spark.gpr uses an attribute the proof inputs do not cover" >&2
+      return 1
+   fi
+   #  The projects it withs: Alire crates by name (pinned by alire.lock),
+   #  or the project Alire generates under config/ (from alire.toml and
+   #  alire.lock); any other path is a project the list does not follow.
+   for f in $(printf '%s\n' "$gpr" | grep -v '^ *--' | sed -n 's/^ *with *"\([^"]*\)".*/\1/p'); do
+      case "$f" in
+         config/*) ;;
+         */*|*.gpr) echo "longfellow_spark.gpr withs a project the proof inputs do not follow: $f" >&2; return 1 ;;
+         *) ;;
+      esac
+   done
+   dirs="$(printf '%s\n' "$gpr" | gpr_source_dirs)" || return 1
+   for d in $dirs; do
+      if [ "$d" = config ]; then
+         echo "config/ generated"
+      elif git cat-file -e "$c:$d" 2> /dev/null; then
+         echo "$d/ $(git rev-parse "$c:$d")"
+      else
+         echo "a source directory not in the repository: $d" >&2; return 1
+      fi
+   done
+   for f in alire.toml scripts/prove-partitions.txt; do
+      git cat-file -e "$c:$f" 2> /dev/null || { echo "no $f in $c" >&2; return 1; }
+      echo "$f $(git rev-parse "$c:$f")"
+   done
+   #  The lockfile is not in the repository today (the pins are exact in
+   #  alire.toml); it counts if it ever is, at either place Alire has
+   #  kept it (alire/alire.lock since Alire 2, alire.lock before).
+   for f in alire/alire.lock alire.lock; do
+      if git cat-file -e "$c:$f" 2> /dev/null; then
+         echo "$f $(git rev-parse "$c:$f")"
+      fi
+   done
+   for f in $(git ls-tree -r --name-only "$c" | grep -E '\.(adc|gpr)$'); do
+      case "$f" in
+         longfellow_spark.gpr) ;;
+         *.adc) echo "$f $(git rev-parse "$c:$f")" ;;
+         *) case " $KNOWN_OTHER_GPR " in
+               *" $f "*) ;;
+               *) echo "a project file the proof inputs do not know: $f" >&2; return 1 ;;
+            esac ;;
+      esac
+   done
+   echo "gnatprove-lines $( { git show "$c:scripts/check.sh"; git show "$c:Makefile"; } \
+      | gnatprove_lines | shasum -a 256 | cut -d' ' -f1)"
+}
+
+#  The gnatprove command lines of the text on stdin: continuation lines
+#  (a backslash at the end) joined first, so that an option on a line of
+#  its own counts, comment lines dropped.
+gnatprove_lines() {
+   sed -e ':a' -e '/\\$/N; s/\\\n//; ta' | grep -v -E '^[[:space:]]*#' | grep -F gnatprove
+}
+
+#  The digest of the proof inputs of a commit; fails as proof_inputs.
+proof_digest() {  # commit
+   local l
+   l="$(proof_inputs "$1")" || return 1
+   printf '%s\n' "$l" | shasum -a 256 | cut -d' ' -f1
+}
+
+#  An ancestor of $SHA whose proof inputs have the digest $DIGEST and
+#  whose status `prove` is success; empty if none within 200 commits.
+#  The walk is topological (children before parents) over every parent
+#  of a merge, not the first parents only: the proved head of a branch
+#  is the second parent of its merge into main, and a walk along the
+#  first parents would miss every one of them. The walk starts from
+#  every parent of $SHA ($SHA^@), since $SHA may itself be a merge whose
+#  proved head is its second parent. A reused status counts: it names
+#  the commit it rests on, and the chain ends at a proof from scratch.
 proved_base() {
-   local c
+   local c d
    for c in $(git rev-list --topo-order --max-count=200 "$SHA^@" 2> /dev/null); do
+      d="$(proof_digest "$c" 2> /dev/null)" || continue
+      [ "$d" = "$DIGEST" ] || continue
       if [ "$(gh api "repos/$(repo)/commits/$c/statuses" \
-                --jq "[.[] | select(.context == \"$CONTEXT\")][0].state" 2> /dev/null)" = success ] \
-         && [ -z "$(code_diff "$c" "$SHA")" ]; then
+                --jq "[.[] | select(.context == \"$CONTEXT\")][0].state" 2> /dev/null)" = success ]; then
          echo "$c"
          return 0
       fi
    done
 }
 
-if [ "$MODE" = text ]; then
-   commit_preconditions
-   git fetch -q origin main
-   BASE="$(proved_base)"
-   if [ -z "$BASE" ]; then
-      echo "remote-check: no ancestor of $SHA within 200 commits is proved with the same code (the status prove is not success, or files that are not text or .github configuration differ): run the full gate" >&2
-      others="$(code_diff "origin/main" "$SHA")"
-      if [ -n "$others" ]; then
-         echo "remote-check: files that are not text or .github configuration changed since main:" >&2
-         echo "$others" >&2
-      fi
+if [ "$MODE" = digest ]; then
+   SHA="$(git rev-parse "${1:-HEAD}")"
+   if ! inputs="$(proof_inputs "$SHA")"; then
+      echo "remote-check: the proof inputs of ${SHA:0:12} cannot be listed; the proof would run" >&2
       exit 1
    fi
-   post_status success "Text only since ${BASE:0:7}, proved: Markdown, LICENSE and .github configuration, proof not run"
+   DIGEST="$(printf '%s\n' "$inputs" | shasum -a 256 | cut -d' ' -f1)"
+   printf '%s\n' "$inputs"
+   echo "digest $DIGEST"
+   BASE="$(proved_base)"
+   if [ -n "$BASE" ]; then
+      echo "proved with the same inputs: $BASE"
+   else
+      echo "no proved ancestor with the same inputs within 200 commits: the proof would run"
+   fi
    exit 0
 fi
 
@@ -273,7 +417,40 @@ if [ "$MODE" = collect ]; then
 fi
 
 if [ "$MODE" = commit ]; then
-   commit_preconditions
+   if [ -n "${1:-}" ]; then
+      SHA="$(git rev-parse "$1")"
+      if ! gh api --silent "repos/$(repo)/commits/$SHA" 2> /dev/null; then
+         echo "remote-check: ${SHA:0:12} is not on GitHub; push it first" >&2
+         exit 2
+      fi
+   else
+      commit_preconditions
+   fi
+   #  What the VM runs: make check, or make check-reuse when an ancestor
+   #  proved the same proof inputs (ADR 0088). The choice travels to the
+   #  VM in ~/runs/<commit>.targets, so that --collect reads it back.
+   TARGET=check
+   REUSE=""
+   if [ -n "$FULL" ]; then
+      echo "remote-check: --full: the proof runs from scratch"
+   elif inputs="$(proof_inputs "$SHA" 2> /tmp/remote-check-inputs.$$)"; then
+      DIGEST="$(printf '%s\n' "$inputs" | shasum -a 256 | cut -d' ' -f1)"
+      git fetch -q origin main 2> /dev/null || true
+      BASE="$(proved_base)"
+      if [ -n "$BASE" ]; then
+         TARGET=check-reuse
+         REUSE="${BASE} ${DIGEST}"
+         echo "remote-check: proof inputs ${DIGEST:0:12} identical to ${BASE:0:12}, proved: the proof is reused, make check-reuse runs"
+      else
+         echo "remote-check: no proved ancestor with the proof inputs ${DIGEST:0:12}: the proof runs"
+      fi
+   else
+      echo "remote-check: the proof inputs cannot be listed ($(cat /tmp/remote-check-inputs.$$)): the proof runs"
+   fi
+   rm -f /tmp/remote-check-inputs.$$
+   #  Both targets are spelt make "chec"k... so that no command line but
+   #  the one of make itself matches the pattern [m]ake check of BUSY.
+   if [ "$TARGET" = check ]; then MAKE_CMD='make "chec"k'; else MAKE_CMD='make "chec"k-reuse'; fi
    vm_start
    #  The run, detached from this connection: the VM's own clone at
    #  exactly this commit (untracked files go, ignored ones such as the
@@ -291,12 +468,17 @@ if [ "$MODE" = commit ]; then
       if [ -e ~/runs/off.pid ]; then kill \$(cat ~/runs/off.pid) 2> /dev/null; rm -f ~/runs/off.pid; fi
       echo $SHA > ~/runs/current
       rm -f ~/runs/$SHA.done ~/runs/$SHA.log
+      echo '$TARGET $REUSE' > ~/runs/$SHA.targets
       cd ~/longfellow-spark && git fetch -q origin && git checkout -q --detach $SHA && git clean -q -fd || { rm -f ~/runs/current; echo fetch-failed; exit 0; }
-      nohup setsid bash -c 'start=\$(date +%s); (time env LONGFELLOW_UPSTREAM=\$HOME/upstream make \"chec\"k) > ~/runs/$SHA.log 2>&1; code=\$?; echo \"\$code \$(( (\$(date +%s) - start + 59) / 60 ))\" > ~/runs/$SHA.done; rm -f ~/runs/current; $OFF' > /dev/null 2>&1 < /dev/null &
+      nohup setsid bash -c 'start=\$(date +%s); (time env LONGFELLOW_UPSTREAM=\$HOME/upstream $MAKE_CMD) > ~/runs/$SHA.log 2>&1; code=\$?; echo \"\$code \$(( (\$(date +%s) - start + 59) / 60 ))\" > ~/runs/$SHA.done; rm -f ~/runs/current; $OFF' > /dev/null 2>&1 < /dev/null &
       echo started" 2> /dev/null || echo unreachable)"
    case "$launched" in
       started)
-         post_status pending "make check running on $VM" ;;
+         if [ "$TARGET" = check ]; then
+            post_status pending "make check running on $VM"
+         else
+            post_status pending "make check-reuse running on $VM, the proof reused from ${BASE:0:7}"
+         fi ;;
       busy*)
          echo "remote-check: $VM is already checking ${launched#busy }; wait for it, or --collect it" >&2
          exit 2 ;;
