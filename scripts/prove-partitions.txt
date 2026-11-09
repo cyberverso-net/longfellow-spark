@@ -14,6 +14,7 @@
 #  the set of non-generic units under src/, with no unit listed twice.
 p256       p256_field field_p256 field_p256-laws
 ecdsa      q256_field p256_curve ecdsa_witness
+mdoc-parse cbor_parse mdoc_parse sha256-trace
 primitives clmul64 gf2_128 field_gf2_128 field_gf2_128-laws bytes sha256 aes256 transcript fisher_yates merkle proof_levels
 sumcheck   sumcheck_algebra_gf2_128 sumcheck_algebra_p256 sumcheck_expression_gf2_128 sumcheck_expression_p256
 protocol   sumcheck_verifier_gf2_128 sumcheck_verifier_p256 sumcheck_transcript_gf2_128 sumcheck_transcript_p256
