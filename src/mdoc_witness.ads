@@ -42,8 +42,18 @@
 --  pad into two blocks (above Max_Item_Bytes: upstream refuses 256 and
 --  above with AttributeTooLong and stops on 120 to 255), a signature
 --  value s at or above the group order (upstream stops; the ECDSA
---  witness requires it below). On a refusal the witness array is zero
---  (postcondition): nothing of the credential stays in it.
+--  witness requires it below); and, at version 6 only, an item whose
+--  elementValue entry does not follow its elementIdentifier entry
+--  (Item_Order_Unsupported, #150): the version 6 circuit shifts the
+--  item by the identifier's offset and compares one span, the
+--  identifier's text, the key elementValue and the value, with the
+--  request (upstream's lib/circuits/mdoc/mdoc_hash.h before 0d92f80,
+--  assert_attribute over the shifted bytes; mdoc_witness.h,
+--  fill_attribute), so that any other order fails in the circuit after
+--  the commitment; the version 7 circuit reads the order of the four
+--  entries from the witness. Upstream's builder has no such status (a
+--  deliberate divergence, noted on ADR 0086). On a refusal the witness
+--  array is zero (postcondition): nothing of the credential stays in it.
 --
 --  Documentation: docs/guide/09-mdoc.md, Section 3.7.
 --
@@ -135,6 +145,7 @@ package Mdoc_Witness is
      (Ok,
       Attribute_Not_Found,
       Attribute_Too_Long,
+      Item_Order_Unsupported,
       Signature_Not_Canonical);
 
    --  The three bound values as the tags take them (Mdoc_Mac.Messages):

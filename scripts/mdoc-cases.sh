@@ -16,21 +16,22 @@
 #  not_satisfied (the circuit is not satisfied by a value the document
 #  contradicts). At version 6 the two documents whose MSO exceeds the
 #  capacity of the version 6 circuit must be refused at the parse, and
-#  the eight documents whose issuer-signed item does not hold the value
-#  entry right after the identifier entry must be refused by the
-#  circuit: the version 6 circuit frames the two entries as one span
-#  (ei_len = identifier + value + 13, push_witness_attrs), where the
-#  version 7 circuit reads the order of the four entries from the
-#  witness. Upstream's test skips every order but the standard one for
-#  the prior versions (is_supported_by_prior_version of
-#  runtime/tests/all/prior_zk.rs); the circuit itself accepts the two
-#  EUAV documents whose identifier comes first and value second.
+#  the eight documents whose issuer-signed item does not hold the
+#  elementValue entry right after the elementIdentifier entry must be
+#  refused by the builder (item_order_unsupported, #150): the version 6
+#  circuit checks the identifier's text, the key elementValue and the
+#  value as one span, where the version 7 circuit reads the order of
+#  the four entries from the witness. Upstream's test skips every order
+#  but the standard one for the prior versions
+#  (is_supported_by_prior_version of runtime/tests/all/prior_zk.rs);
+#  the circuit itself accepts the two EUAV documents whose identifier
+#  comes first and value second, and so does the builder.
 #
 #  Usage: scripts/mdoc-cases.sh [v7|v6]     (default: both)
-#  Needs the release build (make cli). Not part of make check: about
-#  five minutes on the proving machine; `make mdoc-cases` runs it, and
-#  the record of a block that touches the witness or the parse cites a
-#  run.
+#  Needs the release build (make cli). The cli step of make check runs
+#  it after the round trips of measure-mdoc.sh, about seven minutes on
+#  the proving machine, and skips it on GitHub Actions, whose job would
+#  exceed its 30 minutes; `make mdoc-cases` runs it alone.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -93,7 +94,7 @@ V6_TOO_BIG="MT_PROD_AGE_OVER_18_MDOC_12 MT_PROD_AGE_OVER_18_MDOC_14"
 #  At version 6 the item of these eight documents does not hold the
 #  value right after the identifier (the permutations 177, 198, 27, 39,
 #  54, 201, 45, 57 of mdoc_parse.txt; EUAV 20 and 21, with 75 and 78,
-#  identifier first and value second, prove).
+#  identifier first and value second, prove): the builder refuses them.
 V6_UNFRAMED="AZ_PROD_AGE_OVER_18_MDOC_13 EUAV_AGE_OVER_18_MDOC_16 EUAV_AGE_OVER_18_MDOC_17 EUAV_AGE_OVER_18_MDOC_18 EUAV_AGE_OVER_18_MDOC_19 EUAV_AGE_OVER_18_MDOC_22 EUAV_AGE_OVER_18_MDOC_23 EUAV_AGE_OVER_18_MDOC_24"
 mkdir -p cli/out
 for v in $VERSIONS; do
@@ -108,7 +109,7 @@ for v in $VERSIONS; do
       if [ "$v" = v6 ] && echo "$V6_TOO_BIG" | grep -qw "$name"; then
          want=parse_failed_too_big
       elif [ "$v" = v6 ] && echo "$V6_UNFRAMED" | grep -qw "$name"; then
-         want=hash_failed_not_satisfied
+         want=item_order_unsupported
       fi
       proof=cli/out/mdoc_case_${v}_$name.bin
       status=0

@@ -70,7 +70,9 @@ command line, vectors, lint) and the status `prove` (`make check` on the proving
 posted by `scripts/remote-check.sh`), both green. The ruleset on `main` requires both. The
 proving machine's `make check` also runs the cross-check of the mDoc proofs with upstream's
 verifier, which needs cargo and a clone of upstream and is skipped, with a line saying so,
-where they are absent (`scripts/cross-check-upstream.sh`, ADR 0087).
+where they are absent (`scripts/cross-check-upstream.sh`, ADR 0087), and the proof of age
+from every one of upstream's 38 test documents (`scripts/mdoc-cases.sh`), which is skipped,
+with a line saying so, on GitHub Actions, whose job would exceed its 30 minutes.
 
 The proof is proved again only when its inputs changed (ADR 0088). `scripts/remote-check.sh`
 lists the proof inputs of the commit, every file gnatprove reads: the project file and the
@@ -79,7 +81,7 @@ configuration pragma file, and the gnatprove command lines of `scripts/check.sh`
 Makefile, each by its git object hash; the digest of the list identifies the proof's inputs.
 If an ancestor along any parent has the same digest and its status `prove` is success, the
 machine runs every check but the proof (`make check-reuse`: build, partitions, tests, the
-command line with the cross-check of the mDoc proofs, vectors, lint, about fifteen minutes)
+command line with the 38 test documents and the cross-check of the mDoc proofs, vectors, lint, about twenty minutes)
 and `prove` is posted naming the proved commit and the digest. Otherwise the machine runs
 `make check` and proves from scratch; so it does when the project file names a source
 directory, a file or an attribute the list does not cover, declares its source directories

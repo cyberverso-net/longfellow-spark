@@ -39,7 +39,12 @@ one case per line, fields separated by blanks; an attribute is
                                         type "x", under the key of the
                                         archives' test case
   reject_hex <name> <hex> <version> <n> <attr>... <status>
-                                        a synthetic document refused
+                                        a synthetic document refused; the
+                                        order_* cases are the 24 orders of
+                                        the four entries of an item, at
+                                        version 6 refused unless
+                                        elementValue follows
+                                        elementIdentifier (#150)
 
 The fixed pads: pad H of message I (I = 0 .. 2, H = 0 .. 1) is the element
 whose 16 little-endian bytes are ((16 (2 I + H) + K) 7 + 1) mod 256 for
@@ -168,6 +173,11 @@ def hash_witness(version, mdoc, p, attrs, pads):
         it = p["items"][i]
         if it["item_len"] > MAX_ITEM_BYTES:
             return "attribute_too_long"
+        perm = it["permutation"]
+        if version < 7 and (perm >> 6) & 3 != ((perm >> 4) & 3) + 1:
+            # The version 6 circuit checks the identifier's text, the key
+            # elementValue and the value as one span (#150).
+            return "item_order_unsupported"
         item = mdoc[it["item_start"]:it["item_start"] + it["item_len"]]
         nb2, pad2 = mp.pad_message(item, 2)
         w += raw_bytes(pad2)
@@ -314,10 +324,13 @@ def main():
     w("#")
     w("# The 38 test documents at both versions, under the fixed pads: one or two")
     w("#   attributes each, the full four on the archives' case, three on another;")
-    w("#   a document whose MSO exceeds the version's capacity has no row there.")
+    w("#   a document whose MSO exceeds the version's capacity has no row there,")
+    w("#   and one whose item does not hold elementValue right after")
+    w("#   elementIdentifier is refused at version 6 (item_order_unsupported).")
     pads = fixed_pads()
     counts = {CASE: 4, "BIRTHDATE_1971_09_01_MDOC_3": 3}
     rows = 0
+    order_rejects = 0
     for name in mp.case_names():
         mdoc, transcript, doc_type = mp.load_case(name)
         pk, _ = request_of(name)
@@ -330,6 +343,10 @@ def main():
             if not attrs:
                 fail(f"{name}: no attribute fits")
             wh = hash_witness(version, mdoc, p, attrs, pads)
+            if wh == "item_order_unsupported":
+                w(f"witness_reject {name} {version} {len(attrs)} {' '.join(attr(*a) for a in attrs)} {wh}")
+                order_rejects += 1
+                continue
             ws = sig_witness(p, pk, pads)
             if isinstance(wh, str) or isinstance(ws, str):
                 fail(f"{name} v{version}: {wh if isinstance(wh, str) else ws}")
@@ -375,10 +392,45 @@ def main():
     small_attr = attr(b"family_name", small)
     w(f"reject_hex issuer_s_is_q {synthetic_text(big_s, one_two).hex()} 7 1 {small_attr} signature_not_canonical")
     w(f"reject_hex device_s_is_q {synthetic_text(one_two, big_s).hex()} 7 1 {small_attr} signature_not_canonical")
+    w("#")
+    w("# The 24 orders of the four entries of an item, synthetic: at version 7 every")
+    w("#   order is accepted; at version 6 the six orders where elementValue follows")
+    w("#   elementIdentifier are accepted and the eighteen others refused.")
+    import itertools
+    names = ["digestID", "random", "elementIdentifier", "elementValue"]
+    accepted6 = 0
+    for order in itertools.permutations(names):
+        doc = synthetic_order(list(order), one_two)
+        label = "".join(n[0] if n != "elementValue" else "v" for n in order)
+        for version in (7, 6):
+            p = mp.parse_mdoc(doc, b"", b"x", version)
+            wh = hash_witness(version, doc, p, [(b"family_name", small)], pads)
+            if isinstance(wh, str):
+                if version != 6 or wh != "item_order_unsupported":
+                    fail(f"order {label} v{version}: {wh}")
+                w(f"reject_hex order_{label} {doc.hex()} {version} 1 {small_attr} {wh}")
+            else:
+                if version == 6:
+                    accepted6 += 1
+                w(f"witness_hex order_{label} {doc.hex()} {version} 1 {small_attr} "
+                  f"{hash_digest(wh)} {sig_digest(sig_witness(p, case_pk, pads))}")
+    if accepted6 != 6:
+        fail(f"{accepted6} orders accepted at version 6, expected 6")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "mdoc_witness.txt").write_text("\n".join(lines) + "\n")
-    print(f"gen_mdoc_witness_vectors: {rows} witness rows, written to {out_dir / 'mdoc_witness.txt'}")
+    print(f"gen_mdoc_witness_vectors: {rows} witness rows, {order_rejects} documents refused at version 6"
+          f" for the order of the item's entries, written to {out_dir / 'mdoc_witness.txt'}")
+
+
+def synthetic_order(key_names, sig):
+    """A synthetic document whose item has its four entries in the given
+    order, both signatures set to sig."""
+    zero_sig = bytes([0x58, 0x40]) + bytes(64)
+    doc = mp.make_doc(items=[mp.make_item(key_names=key_names)])
+    if doc.count(zero_sig) != 2:
+        fail("synthetic: the two signatures are not where expected")
+    return doc.replace(zero_sig, sig, 1).replace(zero_sig, sig, 1)
 
 
 def synthetic_text(issuer_sig, device_sig):
