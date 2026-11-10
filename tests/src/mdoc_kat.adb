@@ -713,7 +713,10 @@ procedure Mdoc_KAT is
    --  one element short, and the proof buffer not starting at zero;
    --  each refusal is Profile_Mismatch with Len zero, the details Ok and
    --  every buffer zero. The circuits are read pinned to the row's
-   --  identifiers, as the command line reads them.
+   --  identifiers, as the command line reads them. Then a refusal after
+   --  the witnesses are built: a value of 65 bytes, above the version 7
+   --  layout, refused by Prove with Attribute_Invalid before any
+   --  commitment; the two witnesses and the proof buffer are zero.
    procedure Profile_Buffers is
       use type Mdoc_Status.Status;
       use type Prover_Status.Status;
@@ -791,6 +794,32 @@ procedure Mdoc_KAT is
          Try ("signature witness one short", NH, NS - 1, 0, Max);
          Try ("proof buffer one short", NH, NS, 0, Max - 1);
          Try ("proof buffer from 1", NH, NS, 1, Max);
+         A (1).Value_Len := 65;
+         declare
+            type HA is access MP.Hash_Elements;
+            type SA is access MP.Sig_Elements;
+            type BA is access Byte_Array;
+            WH  : constant HA := new MP.Hash_Elements (0 .. NH - 1);
+            WS  : constant SA := new MP.Sig_Elements (0 .. NS - 1);
+            B   : constant BA := new Byte_Array (0 .. Max - 1);
+            Len : Natural;
+            St  : Mdoc_Status.Status;
+            D   : Prover_Status.Status;
+            PS  : Mdoc_Parse.Status;
+            CS  : Cbor_Parse.Status;
+         begin
+            MP.Prove_Profile (S.Combined, HC.all, HH.Id, HH.Subfield_Boundary,
+                              SC.all, SH.Id, SH.Subfield_Boundary, Doc.all, Ap,
+                              P256_Field.Zero, P256_Field.Zero, Tr, A, Now, DT,
+                              WH.all, WS.all, B.all, Len, St, D, PS, CS);
+            Check (St = Mdoc_Status.Attribute_Invalid and then Len = 0
+                   and then D = Prover_Status.Ok and then PS = Mdoc_Parse.Ok
+                   and then (for all E of WH.all => E = GF2_128.Zero)
+                   and then (for all E of WS.all =>
+                               P256_Field.To_Bytes (E) = Bytes_32'[others => 0])
+                   and then (for all X of B.all => X = 0),
+                   "profile buffers, a value of 65 bytes: " & St'Image);
+         end;
       end;
       Circuit_Reader_GF2_128.Free_Packed (HC);
       Circuit_Reader_P256.Free_Packed (SC);

@@ -268,6 +268,7 @@ package body Mdoc_Prover is
                               Hash_W (J) = GF2_128.Zero)
                   and then (for all J in Sig_W'Range =>
                               Sig_W (J) = P256_Field.Zero)
+                  and then (for all J in B'Range => B (J) = 0)
       is
       begin
          Hash_W   := [others => GF2_128.Zero];
@@ -311,6 +312,14 @@ package body Mdoc_Prover is
          Prove_Mdoc (S.Version, Hash_P, HI, Sig_P, SI, Mdoc, Ap, Pk_X, Pk_Y,
                      Session, Attrs, Now, Doc_Type, Hash_W, Sig_W, B, Len,
                      St, Detail, Parse_St, Cbor_St);
+         --  Any other refusal, of the request, of the witness or of the
+         --  proof: the witnesses built from the credential and the proof
+         --  buffer are wiped, so that a refusal leaves only a status.
+         if St /= Mdoc_Status.Ok then
+            Hash_W := [others => GF2_128.Zero];
+            Sig_W  := [others => P256_Field.Zero];
+            B      := [others => 0];
+         end if;
       end;
    end Prove_Profile;
 

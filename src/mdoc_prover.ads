@@ -59,6 +59,7 @@
 
 pragma SPARK_Mode (On);
 
+with Interfaces;       use type Interfaces.Unsigned_8;
 with Bytes;            use Bytes;
 with Ligero_Geometry;  use Ligero_Geometry;
 with Prover_Status;
@@ -313,8 +314,10 @@ package Mdoc_Prover is
    --  Attribute_Count); then that the circuits fit the row's Ligero
    --  configurations and that the three buffers have the row's lengths
    --  (Profile_Mismatch otherwise); then Prove_Mdoc runs with the row's
-   --  version and configurations. On a refusal of the profile the
-   --  buffers are zero. The claims of chapter 9 Section 6 are scoped
+   --  version and configurations. On every refusal, of the profile, of
+   --  the request, of the witness or of the proof, the three buffers
+   --  are zero. On success the two witnesses hold the credential's
+   --  secrets: the caller wipes them once the proof is written. The claims of chapter 9 Section 6 are scoped
    --  to this entry point; Prove and Prove_Mdoc stay for reference work.
    procedure Prove_Profile
      (Profile    : Bytes_32;
@@ -353,17 +356,11 @@ package Mdoc_Prover is
        and then (St in Mdoc_Status.Hash_Failed | Mdoc_Status.Sig_Failed)
                 = (Detail /= Prover_Status.Ok)
        and then (St = Mdoc_Status.Parse_Failed) = (Parse_St /= Mdoc_Parse.Ok)
-       and then (if St in Mdoc_Status.Profile_Unknown
-                        | Mdoc_Status.Profile_Mismatch
-                        | Mdoc_Status.Attribute_Count
-                        | Mdoc_Status.Parse_Failed
-                        | Mdoc_Status.Attribute_Not_Found
-                        | Mdoc_Status.Attribute_Too_Long
-                        | Mdoc_Status.Item_Order_Unsupported
-                        | Mdoc_Status.Signature_Not_Canonical
+       and then (if St /= Mdoc_Status.Ok
                  then (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero)
                       and then
                       (for all I in Sig_W'Range =>
-                         Sig_W (I) = P256_Field.Zero));
+                         Sig_W (I) = P256_Field.Zero)
+                      and then (for all I in B'Range => B (I) = 0));
 
 end Mdoc_Prover;
