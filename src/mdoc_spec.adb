@@ -72,6 +72,28 @@ package body Mdoc_Spec is
       end loop;
    end Lookup;
 
+   procedure Select_Profile
+     (Combined         : Bytes_32;
+      Hash_Id, Sig_Id  : Bytes_32;
+      Nattrs           : Natural;
+      I                : out Spec_Index;
+      St               : out Mdoc_Status.Status)
+   is
+      Found : Boolean;
+   begin
+      Lookup (Combined, Found, I);
+      if not Found then
+         St := Mdoc_Status.Profile_Unknown;
+      elsif Table (I).Hash_Id /= Hash_Id or else Table (I).Sig_Id /= Sig_Id
+      then
+         St := Mdoc_Status.Profile_Mismatch;
+      elsif Table (I).Num_Attributes /= Nattrs then
+         St := Mdoc_Status.Attribute_Count;
+      else
+         St := Mdoc_Status.Ok;
+      end if;
+   end Select_Profile;
+
    function Combined_Of (Sig_Id, Hash_Id : Bytes_32) return Bytes_32 is
       Ctx : Sha256.Context := Sha256.Initial;
    begin

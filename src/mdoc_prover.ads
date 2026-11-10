@@ -38,6 +38,11 @@
 --  the transcript's bound, the attributes against the version's
 --  layout, the counts of the public inputs against the circuits'.
 --
+--  Prove_Profile is the entry point of the supported profile (ADR
+--  0089): the profile checked first, then Prove_Mdoc with the row's
+--  values; the claims of chapter 9 Section 6 are scoped to it, and
+--  Prove and Prove_Mdoc stay for reference work.
+--
 --  Documentation: docs/guide/09-mdoc.md.
 --
 --  Proof status (per instance). Silver with the ownership checks on
@@ -64,6 +69,7 @@ with Mdoc_Inputs;      use Mdoc_Inputs;
 with Cbor_Parse;
 with Mdoc_Parse;
 with Mdoc_Witness;
+with Mdoc_Spec;
 with Mdoc_Proof;
 with Device_Auth;
 with P256_Field;
@@ -217,7 +223,10 @@ package Mdoc_Prover is
                         | Mdoc_Status.Attribute_Not_Found
                         | Mdoc_Status.Attribute_Too_Long
                         | Mdoc_Status.Item_Order_Unsupported
-                        | Mdoc_Status.Signature_Not_Canonical;
+                        | Mdoc_Status.Signature_Not_Canonical
+                        | Mdoc_Status.Profile_Unknown
+                        | Mdoc_Status.Profile_Mismatch
+                        | Mdoc_Status.Attribute_Count;
 
    --  The proof from the credential (block 6, ADR 0086): Mdoc is the
    --  document as the holder presents it; it is parsed (Mdoc_Parse),
@@ -287,6 +296,71 @@ package Mdoc_Prover is
                                 | Mdoc_Status.Attribute_Too_Long
                                 | Mdoc_Status.Item_Order_Unsupported
                                 | Mdoc_Status.Signature_Not_Canonical
+                 then (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero)
+                      and then
+                      (for all I in Sig_W'Range =>
+                         Sig_W (I) = P256_Field.Zero))
+       and then St not in Mdoc_Status.Profile_Unknown
+                        | Mdoc_Status.Profile_Mismatch
+                        | Mdoc_Status.Attribute_Count;
+
+   --  The prover's entry point of the supported profile (ADR 0089,
+   --  #79): Profile is the profile's name, the combined identifier of a
+   --  row of Mdoc_Spec; Hash_Id, Hash_Sfb, Sig_Id and Sig_Sfb the
+   --  identifiers and subfield boundaries of the two circuits given
+   --  (from their files' headers). The profile is checked first
+   --  (Mdoc_Spec.Select_Profile: Profile_Unknown, Profile_Mismatch,
+   --  Attribute_Count); then that the circuits fit the row's Ligero
+   --  configurations and that the three buffers have the row's lengths
+   --  (Profile_Mismatch otherwise); then Prove_Mdoc runs with the row's
+   --  version and configurations. On a refusal of the profile the
+   --  buffers are zero. The claims of chapter 9 Section 6 are scoped
+   --  to this entry point; Prove and Prove_Mdoc stay for reference work.
+   procedure Prove_Profile
+     (Profile    : Bytes_32;
+      Hash_P     : Hash_Circuit;
+      Hash_Id    : Bytes_32;
+      Hash_Sfb   : Natural;
+      Sig_P      : Sig_Circuit;
+      Sig_Id     : Bytes_32;
+      Sig_Sfb    : Natural;
+      Mdoc       : Byte_Array;
+      Ap         : Mdoc_Mac.Pads;
+      Pk_X, Pk_Y : P256_Field.Element;
+      Session    : Byte_Array;
+      Attrs      : Attribute_List;
+      Now        : Byte_Array;
+      Doc_Type   : Byte_Array;
+      Hash_W     : out Hash_Elements;
+      Sig_W      : out Sig_Elements;
+      B          : out Byte_Array;
+      Len        : out Natural;
+      St         : out Mdoc_Status.Status;
+      Detail     : out Prover_Status.Status;
+      Parse_St   : out Mdoc_Parse.Status;
+      Cbor_St    : out Cbor_Parse.Status)
+   with
+     Always_Terminates => False,
+     Pre               =>
+       (Runtime    =>
+          Attrs'Length <= Max_Attributes
+          and then Now'Length <= Now_Len
+          and then Doc_Type'Length <= Device_Auth.Max_Doc_Type,
+        Proof_Only => Hash_Valid (Hash_P) and then Sig_Valid (Sig_P)),
+     Post              =>
+       (if St = Mdoc_Status.Ok then Len in Mdoc_Proof.Tags_Len + 2 .. B'Length
+        else Len = 0)
+       and then (St in Mdoc_Status.Hash_Failed | Mdoc_Status.Sig_Failed)
+                = (Detail /= Prover_Status.Ok)
+       and then (St = Mdoc_Status.Parse_Failed) = (Parse_St /= Mdoc_Parse.Ok)
+       and then (if St in Mdoc_Status.Profile_Unknown
+                        | Mdoc_Status.Profile_Mismatch
+                        | Mdoc_Status.Attribute_Count
+                        | Mdoc_Status.Parse_Failed
+                        | Mdoc_Status.Attribute_Not_Found
+                        | Mdoc_Status.Attribute_Too_Long
+                        | Mdoc_Status.Item_Order_Unsupported
+                        | Mdoc_Status.Signature_Not_Canonical
                  then (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero)
                       and then
                       (for all I in Sig_W'Range =>

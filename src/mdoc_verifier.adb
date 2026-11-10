@@ -124,4 +124,36 @@ package body Mdoc_Verifier is
       end;
    end Verify;
 
+   procedure Verify_Profile
+     (Profile    : Bytes_32;
+      Hash_P     : Hash_Circuit;
+      Hash_Id    : Bytes_32;
+      Sig_P      : Sig_Circuit;
+      Sig_Id     : Bytes_32;
+      Pk_X, Pk_Y : P256_Field.Element;
+      Session    : Byte_Array;
+      Attrs      : Attribute_List;
+      Now        : Byte_Array;
+      Doc_Type   : Byte_Array;
+      B          : Byte_Array;
+      St         : out Mdoc_Status.Status;
+      Detail     : out Verifier_Status.Status)
+   is
+      I : Mdoc_Spec.Spec_Index;
+   begin
+      Detail := Verifier_Status.Ok;
+      Mdoc_Spec.Select_Profile
+        (Profile, Hash_Id, Sig_Id, Attrs'Length, I, St);
+      if St /= Mdoc_Status.Ok then
+         return;
+      end if;
+      declare
+         S : constant Mdoc_Spec.Specification := Mdoc_Spec.Spec (I);
+      begin
+         Verify (S.Version, Hash_P, (Id => Hash_Id, Cfg => S.Hash_Cfg),
+                 Sig_P, (Id => Sig_Id, Cfg => S.Sig_Cfg), Pk_X, Pk_Y,
+                 Session, Attrs, Now, Doc_Type, B, St, Detail);
+      end;
+   end Verify_Profile;
+
 end Mdoc_Verifier;

@@ -18,6 +18,10 @@
 --  checked both circuits on the same tags and the same av, hence on
 --  the same credential.
 --
+--  Verify_Profile is the entry point of the supported profile (ADR
+--  0089): the profile checked first, then Verify with the row's values;
+--  the claims of chapter 9 Section 6 are scoped to it.
+--
 --  What the verifier does not check, and the relying party does: that
 --  the issuer's key is a trusted issuer's; the freshness of the nonce
 --  inside the session transcript; the date it gives as now; what the
@@ -41,6 +45,7 @@ with Ligero_Geometry;  use Ligero_Geometry;
 with Transcript;
 with Verifier_Status;
 with Mdoc_Status;
+with Mdoc_Spec;
 with Mdoc_Inputs;      use Mdoc_Inputs;
 with Device_Auth;
 with P256_Field;
@@ -109,6 +114,43 @@ package Mdoc_Verifier is
        (Runtime    =>
           Valid (HI.Cfg) and then Valid (SI.Cfg)
           and then Attrs'Length <= Max_Attributes
+          and then Now'Length <= Now_Len
+          and then Doc_Type'Length <= Device_Auth.Max_Doc_Type
+          and then B'First = 0,
+        Proof_Only => Hash_Valid (Hash_P) and then Sig_Valid (Sig_P)),
+     Post              =>
+       (St in Mdoc_Status.Hash_Failed | Mdoc_Status.Sig_Failed)
+       = (Detail /= Verifier_Status.Ok);
+
+   --  The verifier's entry point of the supported profile (ADR 0089,
+   --  #79): Profile is the profile's name, the combined identifier of a
+   --  row of Mdoc_Spec; Hash_Id and Sig_Id the identifiers of the two
+   --  circuits given (from their files' headers). The profile is
+   --  checked first (Mdoc_Spec.Select_Profile: Profile_Unknown,
+   --  Profile_Mismatch, Attribute_Count), then Verify runs with the
+   --  row's version and configurations. The claims of chapter 9
+   --  Section 6 are scoped to this entry point; Verify stays for
+   --  reference work.
+   procedure Verify_Profile
+     (Profile    : Bytes_32;
+      Hash_P     : Hash_Circuit;
+      Hash_Id    : Bytes_32;
+      Sig_P      : Sig_Circuit;
+      Sig_Id     : Bytes_32;
+      Pk_X, Pk_Y : P256_Field.Element;
+      Session    : Byte_Array;
+      Attrs      : Attribute_List;
+      Now        : Byte_Array;
+      Doc_Type   : Byte_Array;
+      B          : Byte_Array;
+      St         : out Mdoc_Status.Status;
+      Detail     : out Verifier_Status.Status)
+   with
+     Global            => (In_Out => (Transcript.State, Transcript.Absorbed)),
+     Always_Terminates => False,
+     Pre               =>
+       (Runtime    =>
+          Attrs'Length <= Max_Attributes
           and then Now'Length <= Now_Len
           and then Doc_Type'Length <= Device_Auth.Max_Doc_Type
           and then B'First = 0,
