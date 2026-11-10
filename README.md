@@ -152,7 +152,7 @@ At Phase C each took about six seconds on the author's laptop; Phase D has made 
 scripts/measure-mdoc.sh mdoc
 ```
 
-On the proving machine the proof of age takes 4.47 s and a peak heap of 132 MB, its verification 2.55 s and 64 MB, against 4.06 s and 107 MB, 1.61 s and 48 MB for upstream's generic code in the same session (1.10 and 1.23 times for the proof, 1.58 and 1.33 for the verification; [the performance page](docs/guide/performance.md), "The mDoc proof of age"); about six and three seconds on the author's laptop. The verifier accepts upstream's own example proofs too. To check a proof with upstream's mDoc verifier, see `tests/vectors/upstream/verify_mdoc.rs`. `make mdoc-cases` proves and verifies every one of upstream's 38 test documents (`tests/vectors/upstream/mdoc/testcases/`) with upstream's own requests.
+On the proving machine the proof of age from the credential takes 4.60 s and a peak heap of 132 MB, its verification 2.63 s and 64 MB, against 4.16 s and 107 MB, 1.65 s and 48 MB for upstream's generic code on the same document in the same session (1.11 and 1.23 times for the proof, 1.59 and 1.33 for the verification; [the performance page](docs/guide/performance.md), "The proof of age from the credential"); the parse and the witnesses cost nothing measurable beside the proof from the witness files; about six and three seconds on the author's laptop. The verifier accepts upstream's own example proofs too. To check a proof with upstream's mDoc verifier, see `tests/vectors/upstream/verify_mdoc.rs`. `make mdoc-cases` proves and verifies every one of upstream's 38 test documents (`tests/vectors/upstream/mdoc/testcases/`) with upstream's own requests.
 
 ## Continuous integration
 
