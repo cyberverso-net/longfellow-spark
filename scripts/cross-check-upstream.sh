@@ -4,9 +4,11 @@
 #
 #  Builds tests/vectors/upstream/verify_mdoc.rs as an example of upstream's
 #  runtime crate at the pin d5e6be7, on a working copy made from the clone
-#  of upstream that LONGFELLOW_UPSTREAM names, and runs it on the two mDoc
-#  proofs the cli step writes under cli/out/ (both must be accepted) and
-#  on the altered copy of the version 6 proof (it must be refused).
+#  of upstream that LONGFELLOW_UPSTREAM names, and runs it on the mDoc
+#  proofs the cli step writes under cli/out/: the two from the witness
+#  files, the two from the same document (block 6) and the one from
+#  upstream's TEST_DATA document, all of which must be accepted, and on
+#  the altered copy of the version 6 proof, which must be refused.
 #
 #  Environment:
 #     LONGFELLOW_UPSTREAM         a clone of longfellow-zk/longfellow-zk that
@@ -19,7 +21,7 @@
 #                                 ~/.cache/longfellow-spark/cross-check).
 #  cargo must be on PATH, or installed by rustup (~/.cargo/env is sourced).
 #
-#  Exit status: 0 when both proofs are accepted and the altered copy is
+#  Exit status: 0 when every proof is accepted and the altered copy is
 #  refused, or when the step is skipped; 1 otherwise.
 
 set -euo pipefail
@@ -27,6 +29,9 @@ set -euo pipefail
 PIN=d5e6be77336933d50bf7f25a954f8ec273eb51ce
 V7=cli/out/mdoc_v7_proof.bin
 V6=cli/out/mdoc_v6_proof.bin
+DOC7=cli/out/mdoc_doc_v7_proof.bin
+DOC6=cli/out/mdoc_doc_v6_proof.bin
+TEST_DATA=cli/out/mdoc_doc_test_data_proof.bin
 ALTERED=cli/out/mdoc_v6_altered.bin
 
 if [ -z "${LONGFELLOW_UPSTREAM:-}" ]; then
@@ -35,7 +40,7 @@ if [ -z "${LONGFELLOW_UPSTREAM:-}" ]; then
    exit 0
 fi
 
-for f in "$V7" "$V6" "$ALTERED"; do
+for f in "$V7" "$V6" "$DOC7" "$DOC6" "$TEST_DATA" "$ALTERED"; do
    if [ ! -f "$f" ]; then
       echo "cross-check: $f is missing;" \
          "scripts/measure-mdoc.sh mdoc writes it" >&2
@@ -104,6 +109,9 @@ fi
 
 "$BIN" 7 "$V7"
 "$BIN" 6 "$V6"
+"$BIN" 7 "$DOC7"
+"$BIN" 6 "$DOC6"
+"$BIN" 7 "$TEST_DATA" "age_over_18-website-mdoc[5].json" age_over_18:f5
 #  A refusal is exactly exit status 3 of the example; anything else, a
 #  verdict of acceptance or a failure of the program (a panic, a signal),
 #  fails the step. The subshell of two commands keeps the shell's own
@@ -118,5 +126,5 @@ if [ "$status" -ne 3 ]; then
    cat "$DIR/altered.log" >&2
    exit 1
 fi
-echo "cross-check: both mDoc proofs accepted by upstream's run_mdoc_verifier" \
+echo "cross-check: the five mDoc proofs accepted by upstream's run_mdoc_verifier" \
    "at ${PIN:0:7}, the altered copy refused ($(tail -c 60 "$DIR/altered.log" | tr -d '\n' | sed 's/.*: //'))"

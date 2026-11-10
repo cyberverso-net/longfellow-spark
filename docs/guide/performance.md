@@ -209,6 +209,19 @@ In the same session, the single-circuit programs on the same pair, for the scale
 
 The version 6 pair, one run in the same session: the proof 3.88 s and 111 MB (111,180,360 B), the verification 2.34 s and 59 MB (58,587,032 B). Upstream's driver covers the version 7 flow only, so the version 6 figures stand without a reference.
 
+## The proof of age from the credential
+
+Block 6 (chapter 9 Sections 3.5 to 3.7, [ADR 0086](../adr/0086-mdoc-witness-bounds-and-constant-time.md)) builds the two witnesses from the credential, so that `longfellow_prove_mdoc --mdoc` and upstream's `heap_v7 prove` do the same work on the same input: the parse of upstream's `TEST_DATA` document, the two witnesses, the two commitments, the tags and the two proofs, in one process. One session of the proving machine (10 November 2026, commit 9a3f20e, upstream d5e6be7), three runs of each program plain and three under the counter, upstream's driver three times plain and once under the counter; the peaks identical from run to run, the times within 0.03 s. The scripts are those of "The mDoc proof of age" above; the round trip is `scripts/measure-mdoc.sh mdoc v7`, which since this block also proves from the Mustermann document and from `TEST_DATA`.
+
+| mDoc v7, both circuits in one process | from the witness files (9a3f20e) | from the document, `TEST_DATA` (9a3f20e) | upstream, `TEST_DATA` (d5e6be7) | ratio | share of the ADR 0080 criterion |
+|---|---|---|---|---|---|
+| prove, wall time, median of 3 | 4.60 s | 4.60 s | 4.16 s | 1.11 | |
+| prove, peak heap | 131,513,608 B (132 MB) | 131,514,792 B (132 MB) | 107,021,240 B (107 MB) | 1.23 | 61 % of 214 MB |
+| verify, wall time, median of 3 | 2.61 s | 2.63 s | 1.65 s | 1.59 | |
+| verify, peak heap | 63,996,664 B (64 MB) | 63,996,152 B (64 MB) | 48,162,672 B (48 MB) | 1.33 | 67 % of 96 MB |
+
+The proof from the Mustermann document takes 4.60 s and 131,516,648 B of peak heap, 3 kB above the proof from its witness files, and under the same seed is byte for byte the same file: the witnesses built from the document are the files' to the element, so everything after them is the same. The version 6 pair, one run: 3.99 s to prove from the files and from the document (111 MB either way), 2.41 s to verify. The session is about 3 % slower than the one of 8 November for every program, ours and upstream's alike (4.47 s and 4.06 s then; the ratios are unchanged). All 38 test documents at both versions, 54 proofs and verifications and 20 refusals, take 6 min 36 s (`make mdoc-cases`). The raw figures are in the session's folder of the measurement series.
+
 ## Upstream at a newer commit
 
 The first series against upstream at a commit newer than the pin (#128, reduced to time and peak heap; the per-stage column of #119 follows). The commit is 1c06629, the head of upstream's main on 3 November 2026, 70 commits after d5e6be7: among them the refactor of the Rust implementation into one crate (759b94a), the Longfellow v2 and the experimental ML-DSA circuits (f9d4318), the fix of the carries in the generic multiply-accumulate (7ec62ec), and the proofs in Lean. The mDoc runtime this project follows is its `v1` module there; the driver `scripts/measure/heap_v7_single_crate.rs` runs the same flow as `heap_v7.rs` on the new paths.

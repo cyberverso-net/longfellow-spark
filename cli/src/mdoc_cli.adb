@@ -25,8 +25,9 @@ package body Mdoc_Cli is
    Default_Dir : constant String := "tests/vectors/upstream/mdoc";
 
    Prove_Usage : constant String :=
-     "usage: longfellow_prove_mdoc --spec HEX --hash-witness FILE"
-     & " --sig-witness FILE --pkx HEX --pky HEX"
+     "usage: longfellow_prove_mdoc --spec HEX"
+     & " (--mdoc FILE | --hash-witness FILE --sig-witness FILE)"
+     & " --pkx HEX --pky HEX"
      & " (--transcript HEX | --transcript-file FILE) --now STRING"
      & " --doc-type STRING --attr ID:CBORHEX [--attr ...] --out FILE"
      & " [--circuits DIR] [--seed N] [--check-circuit-id]";
@@ -292,6 +293,8 @@ package body Mdoc_Cli is
             elsif Opt = "--check-circuit-id" then
                R.Full_Id := True;
                I := I + 1;
+            elsif Prover and then Opt = "--mdoc" then
+               R.Mdoc_Path := new String'(Value);
             elsif Prover and then Opt = "--hash-witness" then
                R.Hash_Witness := new String'(Value);
             elsif Prover and then Opt = "--sig-witness" then
@@ -322,12 +325,17 @@ package body Mdoc_Cli is
       if Spec_Arg = null or else Pkx_Arg = null or else Pky_Arg = null
         or else R.Session = null or else R.Now = null or else R.Doc_Type = null
         or else R.Nattrs = 0
-        or else (Prover and then (R.Hash_Witness = null
-                                  or else R.Sig_Witness = null
-                                  or else R.Out_Path = null))
+        or else (Prover and then R.Out_Path = null)
+        or else (Prover and then R.Mdoc_Path = null
+                 and then (R.Hash_Witness = null or else R.Sig_Witness = null))
         or else (not Prover and then R.Proof_Path = null)
       then
          raise Usage_Error with "missing argument";
+      end if;
+      if Prover and then R.Mdoc_Path /= null
+        and then (R.Hash_Witness /= null or else R.Sig_Witness /= null)
+      then
+         raise Usage_Error with "--mdoc excludes the witness files";
       end if;
       declare
          Combined : constant Byte_Array := Hex_Bytes (Spec_Arg.all);

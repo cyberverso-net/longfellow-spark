@@ -16,6 +16,11 @@
 --  identifier (Mdoc_Spec.Combined_Of): the status combined_hash
 --  otherwise.
 --
+--  The prover's input: --mdoc FILE the credential as the holder
+--  presents it (the library parses it and builds both witnesses,
+--  Mdoc_Prover.Prove_Mdoc), or --hash-witness and --sig-witness
+--  upstream's two witness files; one form or the other.
+--
 --  The request: --pkx and --pky the issuer's key as hex integers (an
 --  optional 0x, up to 64 digits), --transcript the session transcript
 --  as hex or --transcript-file its bytes, --now the date, --doc-type
@@ -80,7 +85,8 @@ package Mdoc_Cli is
       Attrs        : Mdoc_Inputs.Attribute_List
                        (1 .. Mdoc_Inputs.Max_Attributes);
       Nattrs       : Natural := 0;
-      --  The prover's.
+      --  The prover's: the credential, or the two witness files.
+      Mdoc_Path    : String_Access;
       Hash_Witness : String_Access;
       Sig_Witness  : String_Access;
       Out_Path     : String_Access;

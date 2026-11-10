@@ -149,9 +149,11 @@ was recovered by matching the public parts of the files, which the
 generator rebuilds byte for byte at every `make check`.
 
 To cross-verify an mDoc proof of this project with upstream's mDoc
-verifier (ADR 0058, block 5), `verify_mdoc.rs` is built as an example of
-upstream's runtime crate, like `scripts/measure/heap_v7.rs`, and run on the
-proof file with the circuit version of its archive:
+verifier (ADR 0058, block 5; ADR 0086, block 6), `verify_mdoc.rs` is built
+as an example of upstream's runtime crate, like `scripts/measure/heap_v7.rs`,
+and run on the proof file with the circuit version of its archive and,
+for a proof made from another test document than the Mustermann one, the
+name of upstream's case and the requested attributes:
 
     git clone https://github.com/longfellow-zk/longfellow-zk upstream
     git -C upstream checkout d5e6be77336933d50bf7f25a954f8ec273eb51ce
@@ -160,6 +162,7 @@ proof file with the circuit version of its archive:
     cd upstream/rust
     cargo run --release -p mdoc-zk-runtime --example verify_mdoc -- 7 <longfellow-spark>/cli/out/mdoc_v7_proof.bin
     cargo run --release -p mdoc-zk-runtime --example verify_mdoc -- 6 <longfellow-spark>/cli/out/mdoc_v6_proof.bin
+    cargo run --release -p mdoc-zk-runtime --example verify_mdoc -- 7 <longfellow-spark>/cli/out/mdoc_doc_test_data_proof.bin "age_over_18-website-mdoc[5].json" age_over_18:f5
 
 It exits with status 0 and prints `accepted` only when upstream's
 `run_mdoc_verifier` accepts, and with status 3 and upstream's error when it
