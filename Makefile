@@ -39,7 +39,8 @@ vectors:
 	scripts/check.sh vectors
 
 #  The proof of age from every test document of upstream, alone (the
-#  cli step of make check runs it too; about seven minutes; ADR 0086).
+#  cli step of make check runs it too on the proving machine, not on
+#  GitHub Actions; about seven minutes; ADR 0086).
 #  Needs the release build.
 mdoc-cases:
 	scripts/mdoc-cases.sh
