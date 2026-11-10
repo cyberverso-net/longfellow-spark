@@ -215,6 +215,10 @@ package body Mdoc_Prover is
             St := Mdoc_Status.Attribute_Too_Long;
             pragma Assert
               (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero);
+         when Mdoc_Witness.Item_Order_Unsupported =>
+            St := Mdoc_Status.Item_Order_Unsupported;
+            pragma Assert
+              (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero);
          when Mdoc_Witness.Signature_Not_Canonical =>
             --  The hash witness was built: cleared, as the contract says.
             Hash_W := [others => GF2_128.Zero];

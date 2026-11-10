@@ -11,7 +11,11 @@
 --  the heap (1.3 MB for the hash circuit) and clears afterwards: the
 --  witnesses are secret. The parse and the witness builders are the
 --  library's; what this program checks is what their preconditions
---  ask: the specification's version is 6 or 7.
+--  ask: the specification's version is 6 or 7. At version 6 an item
+--  whose elementValue entry does not follow its elementIdentifier entry
+--  is refused by the builder (item_order_unsupported) before any
+--  commitment, where upstream's builder would let the circuit refuse
+--  the proof.
 --
 --  With --hash-witness and --sig-witness the two files are read (the
 --  circuit's inputs as little-endian field elements, 16 bytes each

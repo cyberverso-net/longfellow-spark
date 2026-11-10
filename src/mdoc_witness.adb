@@ -278,9 +278,18 @@ package body Mdoc_Witness is
                   Put_Block (W, Pos, T2, H2);
                end loop;
                Put_Bits (W, Pos, Unsigned_64 (It.Digest_Offset), 12);
-               --  The locator of the identifier and of the value.
+               --  The locator of the identifier and of the value. At
+               --  version 6 the value's entry must be the one after the
+               --  identifier's: the circuit checks the two as one span.
                Slot_Ei := Mdoc_Parse.Slot_Index ((It.Permutation / 16) mod 4);
                Slot_Ev := Mdoc_Parse.Slot_Index ((It.Permutation / 64) mod 4);
+               if Version < 7
+                 and then Natural (Slot_Ev) /= Natural (Slot_Ei) + 1
+               then
+                  W := [others => GF2_128.Zero];
+                  Result := Item_Order_Unsupported;
+                  return;
+               end if;
                if Version < 7 then
                   Hdr := Value_Header_Len (Req.Value (0 .. Req.Value_Len - 1));
                   Val_Len := (if Req.Value_Len >= Hdr

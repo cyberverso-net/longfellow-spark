@@ -38,6 +38,12 @@
 --    Attribute_Too_Long   the item does not pad into two SHA-256
 --                         blocks (above 119 bytes; upstream's
 --                         AttributeTooLong refuses 256 and above).
+--    Item_Order_Unsupported
+--                         at version 6, the item's elementValue entry
+--                         does not follow its elementIdentifier entry,
+--                         the one order the version 6 circuit frames
+--                         (#150; upstream's builder has no such status
+--                         and its circuit refuses the proof).
 --    Signature_Not_Canonical
 --                         a signature value s of the document is not
 --                         below the group order, which the ECDSA
@@ -61,6 +67,7 @@ package Mdoc_Status is
       Parse_Failed,
       Attribute_Not_Found,
       Attribute_Too_Long,
+      Item_Order_Unsupported,
       Signature_Not_Canonical);
 
 end Mdoc_Status;

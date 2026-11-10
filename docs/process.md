@@ -79,7 +79,7 @@ configuration pragma file, and the gnatprove command lines of `scripts/check.sh`
 Makefile, each by its git object hash; the digest of the list identifies the proof's inputs.
 If an ancestor along any parent has the same digest and its status `prove` is success, the
 machine runs every check but the proof (`make check-reuse`: build, partitions, tests, the
-command line with the cross-check of the mDoc proofs, vectors, lint, about fifteen minutes)
+command line with the 38 test documents and the cross-check of the mDoc proofs, vectors, lint, about twenty minutes)
 and `prove` is posted naming the proved commit and the digest. Otherwise the machine runs
 `make check` and proves from scratch; so it does when the project file names a source
 directory, a file or an attribute the list does not cover, declares its source directories
