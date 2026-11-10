@@ -30,7 +30,8 @@
 #  Usage: scripts/mdoc-cases.sh [v7|v6]     (default: both)
 #  Needs the release build (make cli). The cli step of make check runs
 #  it after the round trips of measure-mdoc.sh, about seven minutes on
-#  the proving machine; `make mdoc-cases` runs it alone.
+#  the proving machine, and skips it on GitHub Actions, whose job would
+#  exceed its 30 minutes; `make mdoc-cases` runs it alone.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
