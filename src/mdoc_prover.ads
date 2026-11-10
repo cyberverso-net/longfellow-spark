@@ -33,7 +33,8 @@
 --  could bind two unrelated witnesses. In this block the private
 --  inputs, mac_ap and the three messages come from upstream's witness
 --  files (Mdoc_Inputs.Witness_Parts); block 6 builds them from the
---  credential. The checks that do not need the transcript come first:
+--  credential (Prove_Mdoc: the parse, the two witnesses, then Prove;
+--  ADR 0086). The checks that do not need the transcript come first:
 --  the transcript's bound, the attributes against the version's
 --  layout, the counts of the public inputs against the circuits'.
 --
@@ -41,10 +42,10 @@
 --
 --  Proof status (per instance). Silver with the ownership checks on
 --  the two commitments and the two proof buffers; the statuses as
---  stated in the postcondition. Completeness (upstream's verifier and
+--  stated in the postconditions. Completeness (upstream's verifier and
 --  Mdoc_Verifier accept the proof) is tested: the round trip of the
---  cli step on both archives, the cross-check with run_mdoc_verifier
---  run by hand (chapter 9).
+--  cli step on both archives, from the witness files and from the
+--  documents, and the cross-check with upstream's verifier (chapter 9).
 --
 --  Constant-time discipline (ADR 0051): the witness, mac_ap and the
 --  messages are secret and go to units that keep the discipline
@@ -57,8 +58,12 @@ with Bytes;            use Bytes;
 with Ligero_Geometry;  use Ligero_Geometry;
 with Prover_Status;
 with Mdoc_Status;
+with GF2_128;
 with Mdoc_Mac;
 with Mdoc_Inputs;      use Mdoc_Inputs;
+with Cbor_Parse;
+with Mdoc_Parse;
+with Mdoc_Witness;
 with Mdoc_Proof;
 with Device_Auth;
 with P256_Field;
@@ -87,6 +92,9 @@ package Mdoc_Prover is
 
    use type Mdoc_Status.Status;
    use type Prover_Status.Status;
+   use type Mdoc_Parse.Status;
+   use type GF2_128.Element;
+   use type P256_Field.Element;
 
    package PCH renames Packed_Circuits_GF2_128;
    package PCS renames Packed_Circuits_P256;
@@ -204,6 +212,82 @@ package Mdoc_Prover is
        (if St = Mdoc_Status.Ok then Len in Mdoc_Proof.Tags_Len + 2 .. B'Length
         else Len = 0)
        and then (St in Mdoc_Status.Hash_Failed | Mdoc_Status.Sig_Failed)
-                = (Detail /= Prover_Status.Ok);
+                = (Detail /= Prover_Status.Ok)
+       and then St not in Mdoc_Status.Parse_Failed
+                        | Mdoc_Status.Attribute_Not_Found
+                        | Mdoc_Status.Attribute_Too_Long
+                        | Mdoc_Status.Signature_Not_Canonical;
+
+   --  The proof from the credential (block 6, ADR 0086): Mdoc is the
+   --  document as the holder presents it; it is parsed (Mdoc_Parse),
+   --  the two witnesses are built from the parse and the pads Ap
+   --  (Mdoc_Witness) into Hash_W and Sig_W, the caller's buffers of the
+   --  layout's counts, and Prove runs on them with the same request.
+   --  St is Parse_Failed when the parse refuses the document, with the
+   --  parser's status in Parse_St and the CBOR reader's in Cbor_St;
+   --  Attribute_Not_Found, Attribute_Too_Long and
+   --  Signature_Not_Canonical are the builders' refusals; otherwise St,
+   --  Len, B and Detail are Prove's. On a refusal before the proof (a
+   --  session transcript above the bound, the parse, the builders) the
+   --  three buffers are zero (postcondition): nothing of the credential
+   --  stays in them. On a proof, or a refusal of the proof itself, the
+   --  witnesses are in the caller's buffers, secret: the caller clears
+   --  them.
+   procedure Prove_Mdoc
+     (Version    : Version_Number;
+      Hash_P     : Hash_Circuit;
+      HI         : Circuit_Info;
+      Sig_P      : Sig_Circuit;
+      SI         : Circuit_Info;
+      Mdoc       : Byte_Array;
+      Ap         : Mdoc_Mac.Pads;
+      Pk_X, Pk_Y : P256_Field.Element;
+      Session    : Byte_Array;
+      Attrs      : Attribute_List;
+      Now        : Byte_Array;
+      Doc_Type   : Byte_Array;
+      Hash_W     : out Hash_Elements;
+      Sig_W      : out Sig_Elements;
+      B          : out Byte_Array;
+      Len        : out Natural;
+      St         : out Mdoc_Status.Status;
+      Detail     : out Prover_Status.Status;
+      Parse_St   : out Mdoc_Parse.Status;
+      Cbor_St    : out Cbor_Parse.Status)
+   with
+     Always_Terminates => False,
+     Pre               =>
+       (Runtime    =>
+          Version in 6 .. 7
+          and then Hash_Ok (Hash_P, HI.Cfg) and then Sig_Ok (Sig_P, SI.Cfg)
+          and then Parts_Fit (Hash_P, HI, Sig_P, SI)
+          and then Attrs'Length <= Max_Attributes
+          and then Now'Length <= Now_Len
+          and then Doc_Type'Length <= Device_Auth.Max_Doc_Type
+          and then Hash_W'First = 0
+          and then Hash_W'Length
+                   = Mdoc_Witness.Hash_Count (Version, Attrs'Length)
+          and then Sig_W'First = 0
+          and then Sig_W'Length = Mdoc_Witness.Sig_Count
+          and then B'First = 0
+          and then B'Length = Max_Len (Hash_P, HI, Sig_P, SI),
+        Proof_Only => Hash_Valid (Hash_P) and then Sig_Valid (Sig_P)),
+     Post              =>
+       (if St = Mdoc_Status.Ok then Len in Mdoc_Proof.Tags_Len + 2 .. B'Length
+        else Len = 0)
+       and then (St in Mdoc_Status.Hash_Failed | Mdoc_Status.Sig_Failed)
+                = (Detail /= Prover_Status.Ok)
+       and then (St = Mdoc_Status.Parse_Failed) = (Parse_St /= Mdoc_Parse.Ok)
+       and then (if Session'Length > Device_Auth.Max_Session_Transcript
+                 then St = Mdoc_Status.Transcript_Too_Long)
+       and then (if Session'Length > Device_Auth.Max_Session_Transcript
+                    or else St in Mdoc_Status.Parse_Failed
+                                | Mdoc_Status.Attribute_Not_Found
+                                | Mdoc_Status.Attribute_Too_Long
+                                | Mdoc_Status.Signature_Not_Canonical
+                 then (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero)
+                      and then
+                      (for all I in Sig_W'Range =>
+                         Sig_W (I) = P256_Field.Zero));
 
 end Mdoc_Prover;

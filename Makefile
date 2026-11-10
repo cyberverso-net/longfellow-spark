@@ -3,7 +3,7 @@
 #  definition of done for every commit and every pull request (ADR
 #  0041, ADR 0044).
 
-.PHONY: check check-reuse build prove prove-partition partitions-check test cli vectors lint
+.PHONY: check check-reuse build prove prove-partition partitions-check test cli vectors lint mdoc-cases
 
 check:
 	scripts/check.sh all
@@ -37,6 +37,11 @@ cli:
 
 vectors:
 	scripts/check.sh vectors
+
+#  The proof of age from every test document of upstream, outside make
+#  check (about five minutes; ADR 0086). Needs the release build.
+mdoc-cases:
+	scripts/mdoc-cases.sh
 
 lint:
 	scripts/check.sh lint

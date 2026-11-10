@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-11-08, with the first pull request of block 6, #134; to be accepted at the merge of the block's last pull request, #136). This record completes the constant-time account that [ADR 0058](0058-mdoc-layer.md) promised at block 6, and takes the decision that [ADR 0051](0051-constant-time-in-the-prover.md) reserved on the inversion of secrets; both records point to it from their Status lines.
+Accepted (2026-11-09, with the third and last pull request of block 6, #136; Proposed since 2026-11-08 with the first, #134). This record completes the constant-time account that [ADR 0058](0058-mdoc-layer.md) promised at block 6, and takes the decision that [ADR 0051](0051-constant-time-in-the-prover.md) reserved on the inversion of secrets; both records point to it from their Status lines.
 
 ## Date
 
@@ -23,7 +23,7 @@ Third, the inversion of secrets. ADR 0051 noted that the prover of Phase C compu
 **The bounds.** Six, each a constant of the units, each excess refused with a status and never silently truncated:
 
 - the signed part of the document, the wrapped MSO (tag 24 and its two-byte length head included): at most 2,531 bytes for the version 7 circuits and 2,211 for version 6, the SHA-256 capacity of the hash circuit (40 or 35 blocks) less the 18-byte COSE prefix, the 2-byte length and the 9 bytes of padding; and a map of at least 256 bytes with a two-byte length head, the only encoding the circuits accept (`validate_mso_layout`);
-- an issuer-signed item, tag 24 included: at most 255 bytes (two SHA-256 blocks, `push_witness_attrs`);
+- an issuer-signed item, tag 24 included: at most 119 bytes, the two SHA-256 blocks of `push_witness_attrs` less the nine bytes of padding (`Mdoc_Witness.Max_Item_Bytes`); upstream refuses an item of 256 bytes or more with `AttributeTooLong` and stops on one of 120 to 255, which does not pad into its two blocks either, so the bound here is the one its circuit enforces, as a status; the 38 test documents hold items of 79 to 103 bytes;
 - the session transcript and the document type: 65,000 and 65,535 bytes, as ADR 0058 records;
 - **the whole document: at most 262,144 bytes** (`Max_Mdoc_Bytes`). Upstream does not bound it. The bound covers a document with a portrait and an issuer's certificate chain; upstream's 38 test documents are between 1,264 and 3,549 bytes. The file bound of the command line stays 16 MB;
 - **the CBOR nesting depth, 16, and the number of CBOR elements, 4,096**, the two bounds of a parser that walks the document once with an explicit stack and a table of elements, without recursion and without the heap. The path to an issuer-signed item is eight levels deep.
@@ -56,7 +56,7 @@ Third, the inversion of secrets. ADR 0051 noted that the prover of Phase C compu
 ## Verification impact
 
 - Provable: absence of run-time errors in the parser on any bytes and in the witness computation; Gold on the invariants of the parser's table, on the frame of the ECDSA witness (nothing outside its interval changes), on the counts and positions of the pieces of the complete witnesses where a contract can state them, on the bit encodings, on the selections of the curve unit.
-- Tested: the curve against RFC 5903 and an independent transcription; the ECDSA witness against the signature witness files of both archives, element by element; the complete witnesses against the hash witness files; the 38 test documents through the round trip.
+- Tested: the curve against RFC 5903 and an independent transcription; the ECDSA witness against the signature witness files of both archives, element by element; the complete witnesses of both circuits against the four witness files, element by element, and against an independent transcription on the 38 test documents; the 38 test documents through the round trip from the document (`make mdoc-cases`), the eight negative cases refused by the circuit.
 - Trusted: the curve formulas as upstream's code specifies them (register row R11), the parse's non-constant-time behaviour as declared here.
 
 ## References

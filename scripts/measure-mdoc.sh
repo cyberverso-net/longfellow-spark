@@ -12,16 +12,24 @@
 #
 #  Usage: scripts/measure-mdoc.sh [v7|v6] [hash|sig]
 #         scripts/measure-mdoc.sh mdoc [v7|v6]
-#  The second form is the mDoc proof of age (Phase D, block 5, ADR
-#  0058) on each archive: longfellow_prove_mdoc from the two upstream
-#  witness files under the parameters of the test case they come from
-#  (FAMILYNAME_MUSTERMANN_MDOC_3 of upstream's testcases/src/vectors.rs:
-#  the attribute family_name with the text value "Mustermann"), then
-#  longfellow_verify_mdoc on that proof and on upstream's example proof
-#  of the archive, both timed; then, untimed, the refusals: a wrong
-#  date, a wrong value, a wrong document type, a tag altered, the proof
-#  cut short. The cli step of make check runs it once with the default
-#  stack as the test of the layer (the register, V6 and the mDoc rows).
+#  The second form is the mDoc proof of age (Phase D, blocks 5 and 6,
+#  ADR 0058, ADR 0086) on each archive: longfellow_prove_mdoc from the
+#  two upstream witness files under the parameters of the test case they
+#  come from (FAMILYNAME_MUSTERMANN_MDOC_3 of upstream's
+#  testcases/src/vectors.rs: the attribute family_name with the text
+#  value "Mustermann"), then longfellow_verify_mdoc on that proof and on
+#  upstream's example proof of the archive, both timed; then, untimed,
+#  the refusals: a wrong date, a wrong value, a wrong document type, a
+#  tag altered, the proof cut short. Then the proof from the document
+#  itself (--mdoc, block 6): the same case's document at each version,
+#  and upstream's TEST_DATA document with age_over_18 at version 7, each
+#  proved (timed) and verified; then, untimed, the refusals of the
+#  document path: an attribute the document does not hold, a document
+#  that is not CBOR, one above the parser's bound, an attribute value
+#  the document contradicts (upstream's fail-not_over_18 case), both
+#  input forms at once. The
+#  cli step of make check runs it once with the default stack as the
+#  test of the layer (the register, V6 and the mDoc rows).
 #  Needs the release build (make cli) and python3 for the witness
 #  conversion. MEASURE_STACK_KB sets the stack limit (default 65520, the
 #  64 MB that the hash circuit needed before ADR 0056; 8192 checks that
@@ -126,6 +134,14 @@ CASE_TRANSCRIPT=83f6f6847142726f7773657248616e646f76657276315820f93ebac4ce4d9901
 CASE_NOW=2024-10-01T09:00:00Z
 CASE_DOC_TYPE=org.iso.18013.5.1.mDL
 CASE_ATTR=family_name:6a4d75737465726d616e6e
+CASE_DIR=$M/testcases/FAMILYNAME_MUSTERMANN_MDOC_3
+#  Upstream's TEST_DATA document (the same bytes as its case
+#  age_over_18-website-mdoc[5].json), with its request.
+TD_DIR=$M/testcases/TEST_DATA
+TD_PKX=0xb4682ec20e06e8df840b5dd32959798ab20c544d4da50109ff4684d06fd261fc
+TD_PKY=0xf6f8e9a811911329a5f653fcec5990092c91a65bc1695d291cd51de9c94e7db7
+TD_NOW=2025-04-30T00:00:00Z
+TD_ATTR=age_over_18:f5
 #  expect_refused <name> <status pattern> <command...>: the command must
 #  exit with 1 and print a typed status that matches the pattern (an
 #  unhandled exception exits with 1 too, and prints a traceback instead).
@@ -240,9 +256,71 @@ PY
       --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$CASE_ATTR"
    rm -f cli/out/mdoc_large.bin
 }
+#  The proof from the document (block 6): the Mustermann document at
+#  each version, under the same request as the witness files, and the
+#  TEST_DATA document at version 7; each verified. The proofs stay under
+#  cli/out/ for the cross-check with upstream's verifier.
+mdoc_from_documents() {
+   local v h proof
+   for v in $VERSIONS; do
+      h=$(hash_of "$v")
+      proof=cli/out/mdoc_doc_${v}_proof.bin
+      echo "=== $v mdoc: prove from the document ==="
+      run mdoc_doc_${v}_prove "$BIN/longfellow_prove_mdoc" --spec "$h" --mdoc "$CASE_DIR/mdoc.bin" \
+         --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript-file "$CASE_DIR/transcript.bin" \
+         --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$CASE_ATTR" \
+         --seed 1 --out "$proof"
+      echo "=== $v mdoc: verify the proof from the document ==="
+      run mdoc_doc_${v}_verify "$BIN/longfellow_verify_mdoc" --spec "$h" --proof "$proof" \
+         --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
+         --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$CASE_ATTR"
+   done
+   local h7
+   h7=$(hash_of v7)
+   if echo "$VERSIONS" | grep -q v7; then
+      echo "=== v7 mdoc: prove from the TEST_DATA document (age_over_18) ==="
+      run mdoc_doc_test_data_prove "$BIN/longfellow_prove_mdoc" --spec "$h7" --mdoc "$TD_DIR/mdoc.bin" \
+         --pkx "$TD_PKX" --pky "$TD_PKY" --transcript-file "$TD_DIR/transcript.bin" \
+         --now "$TD_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$TD_ATTR" \
+         --seed 1 --out cli/out/mdoc_doc_test_data_proof.bin
+      echo "=== v7 mdoc: verify the TEST_DATA proof ==="
+      run mdoc_doc_test_data_verify "$BIN/longfellow_verify_mdoc" --spec "$h7" --proof cli/out/mdoc_doc_test_data_proof.bin \
+         --pkx "$TD_PKX" --pky "$TD_PKY" --transcript-file "$TD_DIR/transcript.bin" \
+         --now "$TD_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$TD_ATTR"
+   fi
+   echo "=== mdoc: the refusals of the document path ==="
+   expect_refused "attribute not in the document" "attribute_not_found" "$BIN/longfellow_prove_mdoc" --spec "$h7" \
+      --mdoc "$CASE_DIR/mdoc.bin" --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
+      --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr age_over_99:f5 --seed 1 --out cli/out/never.bin
+   expect_refused "document that is not CBOR" "parse_failed cbor_root [a-z_]+" "$BIN/longfellow_prove_mdoc" --spec "$h7" \
+      --mdoc "$CASE_DIR/request.txt" --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
+      --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$CASE_ATTR" --seed 1 --out cli/out/never.bin
+   expect_refused "document above the parser's bound" "parse_failed document_too_long" "$BIN/longfellow_prove_mdoc" --spec "$h7" \
+      --mdoc "$M/$h7.bin" --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
+      --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$CASE_ATTR" --seed 1 --out cli/out/never.bin
+   #  Upstream's negative case fail-not_over_18-mdoc[0]: the document of
+   #  +18-mdoc[0] (age_over_18 true) against a request for false.
+   local f0=$M/testcases/FAIL_NOT_OVER_18_MDOC_0
+   expect_refused "value the document contradicts" "hash_failed not_satisfied" "$BIN/longfellow_prove_mdoc" --spec "$h7" \
+      --mdoc "$f0/mdoc.bin" --pkx 0x$(sed -n 's/^pkx 0x//p' "$f0/request.txt") --pky 0x$(sed -n 's/^pky 0x//p' "$f0/request.txt") \
+      --transcript-file "$f0/transcript.bin" --now "$(sed -n 's/^now //p' "$f0/request.txt")" \
+      --doc-type "$CASE_DOC_TYPE" --attr age_over_18:f4 --seed 1 --out cli/out/never.bin
+   local status=0 out
+   out="$("$BIN/longfellow_prove_mdoc" --spec "$h7" --mdoc "$CASE_DIR/mdoc.bin" \
+      --hash-witness "$M/${h7}_hash_witness.bin" --sig-witness "$M/${h7}_sig_witness.bin" \
+      --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
+      --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$CASE_ATTR" --seed 1 --out cli/out/never.bin 2>&1)" || status=$?
+   if [ "$status" -ne 2 ] || ! echo "$out" | grep -q "excludes"; then
+      echo "measure-mdoc: both input forms: expected exit status 2 and the message, got $status" >&2
+      echo "$out" | head -3 >&2
+      return 1
+   fi
+   echo "refused: both input forms at once (usage error)"
+}
 if [ "$MODE" = mdoc ]; then
    mkdir -p cli/out
    mdoc_round_trip
+   mdoc_from_documents
    exit 0
 fi
 for v in $VERSIONS; do

@@ -150,4 +150,78 @@ package body Mdoc_Prover is
       end;
    end Prove;
 
+   procedure Prove_Mdoc
+     (Version    : Version_Number;
+      Hash_P     : Hash_Circuit;
+      HI         : Circuit_Info;
+      Sig_P      : Sig_Circuit;
+      SI         : Circuit_Info;
+      Mdoc       : Byte_Array;
+      Ap         : Mdoc_Mac.Pads;
+      Pk_X, Pk_Y : P256_Field.Element;
+      Session    : Byte_Array;
+      Attrs      : Attribute_List;
+      Now        : Byte_Array;
+      Doc_Type   : Byte_Array;
+      Hash_W     : out Hash_Elements;
+      Sig_W      : out Sig_Elements;
+      B          : out Byte_Array;
+      Len        : out Natural;
+      St         : out Mdoc_Status.Status;
+      Detail     : out Prover_Status.Status;
+      Parse_St   : out Mdoc_Parse.Status;
+      Cbor_St    : out Cbor_Parse.Status)
+   is
+      use type Mdoc_Witness.Status;
+      P  : Mdoc_Parse.Parsed_Mdoc;
+      WS : Mdoc_Witness.Status;
+   begin
+      Hash_W   := [others => GF2_128.Zero];
+      Sig_W    := [others => P256_Field.Zero];
+      B        := [others => 0];
+      Len      := 0;
+      Detail   := Prover_Status.Ok;
+      Parse_St := Mdoc_Parse.Ok;
+      Cbor_St  := Cbor_Parse.Ok;
+      --  The zero of the buffers on each path before the proof is
+      --  asserted where it holds, one path at a time, for the provers.
+      if Session'Length > Device_Auth.Max_Session_Transcript then
+         St := Mdoc_Status.Transcript_Too_Long;
+         pragma Assert
+           (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero);
+         return;
+      end if;
+      Mdoc_Parse.Parse (Mdoc, Session, Doc_Type, Version, P, Parse_St, Cbor_St);
+      if Parse_St /= Mdoc_Parse.Ok then
+         St := Mdoc_Status.Parse_Failed;
+         pragma Assert
+           (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero);
+         return;
+      end if;
+      Mdoc_Witness.Hash_Witness (Version, Mdoc, P, Attrs, Ap, Hash_W, WS);
+      if WS = Mdoc_Witness.Ok then
+         Mdoc_Witness.Sig_Witness (Mdoc, P, Pk_X, Pk_Y, Ap, Sig_W, WS);
+      end if;
+      case WS is
+         when Mdoc_Witness.Ok =>
+            Prove (Version, Hash_P, HI, Sig_P, SI, Hash_W, Sig_W, Ap,
+                   Mdoc_Witness.Messages (P), Pk_X, Pk_Y, Session, Attrs,
+                   Now, Doc_Type, B, Len, St, Detail);
+         when Mdoc_Witness.Attribute_Not_Found =>
+            St := Mdoc_Status.Attribute_Not_Found;
+            pragma Assert
+              (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero);
+         when Mdoc_Witness.Attribute_Too_Long =>
+            St := Mdoc_Status.Attribute_Too_Long;
+            pragma Assert
+              (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero);
+         when Mdoc_Witness.Signature_Not_Canonical =>
+            --  The hash witness was built: cleared, as the contract says.
+            Hash_W := [others => GF2_128.Zero];
+            St := Mdoc_Status.Signature_Not_Canonical;
+            pragma Assert
+              (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero);
+      end case;
+   end Prove_Mdoc;
+
 end Mdoc_Prover;
