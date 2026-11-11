@@ -355,6 +355,8 @@ do_vectors() {
 }
 
 do_lint() {
+   header "lint: the clean checkout of the gate (clean-checkout-test.sh)"
+   scripts/clean-checkout-test.sh
    header "lint: forbidden content over tracked files"
    #  git grep searches tracked files only, in one process, and exits 0
    #  exactly when something matched. This script is excluded from the

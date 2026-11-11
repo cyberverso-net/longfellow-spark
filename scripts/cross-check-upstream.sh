@@ -72,9 +72,16 @@ UP="$DIR/upstream"
 if [ ! -d "$UP/.git" ]; then
    git clone -q --shared --no-checkout "$LONGFELLOW_UPSTREAM" "$UP"
 fi
-if ! git -C "$UP" -c advice.detachedHead=false checkout -q --detach "$PIN" 2> /dev/null; then
+#  The copy is the pin and nothing else (scripts/clean-checkout.sh):
+#  every tracked file restored, the untracked ones removed (the build
+#  directory and Cargo.lock, which upstream's .gitignore names, stay),
+#  and both checked before anything is built.
+if ! git -C "$UP" cat-file -e "$PIN^{commit}" 2> /dev/null; then
    git -C "$UP" fetch -q "$LONGFELLOW_UPSTREAM" "$PIN"
-   git -C "$UP" -c advice.detachedHead=false checkout -q --detach "$PIN"
+fi
+if ! scripts/clean-checkout.sh "$UP" "$PIN"; then
+   echo "cross-check: $UP is not a clean checkout of $PIN" >&2
+   exit 1
 fi
 EXAMPLES="$UP/rust/applications/mdoc_zk/runtime/examples"
 mkdir -p "$EXAMPLES"
