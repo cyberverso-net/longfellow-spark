@@ -91,5 +91,5 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0085](0085-prover-and-verifier-in-two-phases.md) | The prover and the verifier in two phases: commit, then prove, on a transcript the caller opens | Accepted | 2026-11-07 |
 | [0086](0086-mdoc-witness-bounds-and-constant-time.md) | The witness from the mDoc: the bounds, the constant-time perimeter and the inversion of secrets | Accepted | 2026-11-08 |
 | [0087](0087-cross-check-with-upstream-at-every-gate.md) | The cross-check of the mDoc proofs with upstream's verifier at every gate | Accepted, amended by 0088 | 2026-11-09 |
-| [0089](0089-the-supported-mdoc-profile.md) | The supported mDoc profile: its invariants, its two rows, the claim of each row and one entry point per role | Proposed | 2026-11-10 |
+| [0089](0089-the-supported-mdoc-profile.md) | The supported mDoc profile: its invariants, its two rows, the claim of each row and one entry point per role | Accepted | 2026-11-10 |
 | [0088](0088-proof-inputs-and-the-reuse-of-a-proof.md) | The proof inputs and the reuse of a proof: the gate proves again only what changed the proof's inputs | Accepted | 2026-11-09 |
