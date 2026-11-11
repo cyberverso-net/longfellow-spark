@@ -219,6 +219,18 @@ package body Mdoc_Prover is
             St := Mdoc_Status.Item_Order_Unsupported;
             pragma Assert
               (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero);
+         when Mdoc_Witness.Validity_Form_Unsupported =>
+            St := Mdoc_Status.Validity_Form_Unsupported;
+            pragma Assert
+              (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero);
+         when Mdoc_Witness.Device_Key_Form_Unsupported =>
+            St := Mdoc_Status.Device_Key_Form_Unsupported;
+            pragma Assert
+              (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero);
+         when Mdoc_Witness.Random_Form_Unsupported =>
+            St := Mdoc_Status.Random_Form_Unsupported;
+            pragma Assert
+              (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero);
          when Mdoc_Witness.Signature_Not_Canonical =>
             --  The hash witness was built: cleared, as the contract says.
             Hash_W := [others => GF2_128.Zero];

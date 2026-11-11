@@ -186,6 +186,123 @@ package body Mdoc_Witness is
       end case;
    end Value_Header_Len;
 
+   --  The validity date whose key starts at Off in the MSO map: after
+   --  the key's Key_Len bytes, tag 0 (16#C0#) over a text of 20 bytes
+   --  (16#74#), YYYY-MM-DDThh:mm:ssZ, digits where the form has digits
+   --  (#165). Every byte is read, without an early exit.
+   function Date_Conforms
+     (Mdoc    : Byte_Array;
+      P       : Parsed_Mdoc;
+      Off     : Mdoc_Parse.Position;
+      Key_Len : Positive) return Boolean
+   with
+     Global => null,
+     Pre    => Mdoc'Length <= Cbor_Parse.Max_Bytes
+               and then Mdoc_Parse.In_Bounds (P, Mdoc'Length)
+               and then Key_Len <= 16
+   is
+      Map_Len : constant Natural := P.Mso_Len - Mdoc_Parse.Mso_Head_Len;
+      Base    : Natural;
+      Bad     : Unsigned_8;  --  1 once a byte is out of the form
+      B       : Unsigned_8;
+      function Flag (C : Boolean) return Unsigned_8 is (Boolean'Pos (C))
+      with Global => null;
+   begin
+      if Off >= Map_Len or else Map_Len - Off < Key_Len + 22 then
+         return False;
+      end if;
+      Base := P.Mso_Start + Mdoc_Parse.Mso_Head_Len + Off + Key_Len;
+      Bad := Flag (Mdoc (Mdoc'First + Base) /= 16#C0#)
+             or Flag (Mdoc (Mdoc'First + Base + 1) /= 16#74#);
+      for I in 0 .. 19 loop
+         B := Mdoc (Mdoc'First + Base + 2 + I);
+         case I is
+            when 4 | 7   => Bad := Bad or Flag (B /= Character'Pos ('-'));
+            when 10      => Bad := Bad or Flag (B /= Character'Pos ('T'));
+            when 13 | 16 => Bad := Bad or Flag (B /= Character'Pos (':'));
+            when 19      => Bad := Bad or Flag (B /= Character'Pos ('Z'));
+            when others  => Bad := Bad or Flag (B not in 16#30# .. 16#39#);
+         end case;
+      end loop;
+      return Bad = 0;
+   end Date_Conforms;
+
+   --  The device key whose key "deviceKeyInfo" starts at Off in the MSO
+   --  map, in the one form the circuits compare (#165): the 33 bytes
+   --  6D "deviceKeyInfo" A1 69 "deviceKey" A4 01 02 20 01 21 58 20,
+   --  32 bytes of x, 22 58 20, 32 bytes of y. Every byte is read,
+   --  without an early exit.
+   Key_Head : constant Byte_Array (0 .. 32) :=
+     [16#6D#, 16#64#, 16#65#, 16#76#, 16#69#, 16#63#, 16#65#, 16#4B#,
+      16#65#, 16#79#, 16#49#, 16#6E#, 16#66#, 16#6F#, 16#A1#, 16#69#,
+      16#64#, 16#65#, 16#76#, 16#69#, 16#63#, 16#65#, 16#4B#, 16#65#,
+      16#79#, 16#A4#, 16#01#, 16#02#, 16#20#, 16#01#, 16#21#, 16#58#,
+      16#20#];
+   Y_Head : constant Byte_Array (0 .. 2) := [16#22#, 16#58#, 16#20#];
+
+   function Device_Key_Conforms
+     (Mdoc : Byte_Array;
+      P    : Parsed_Mdoc) return Boolean
+   with
+     Global => null,
+     Pre    => Mdoc'Length <= Cbor_Parse.Max_Bytes
+               and then Mdoc_Parse.In_Bounds (P, Mdoc'Length)
+   is
+      Map_Len : constant Natural := P.Mso_Len - Mdoc_Parse.Mso_Head_Len;
+      Off     : constant Natural := P.Device_Key_Info_Offset;
+      Base    : Natural;
+      Bad     : Unsigned_8 := 0;
+   begin
+      if Off >= Map_Len or else Map_Len - Off < 100 then
+         return False;
+      end if;
+      Base := P.Mso_Start + Mdoc_Parse.Mso_Head_Len + Off;
+      for I in Key_Head'Range loop
+         Bad := Bad or (Mdoc (Mdoc'First + Base + I) xor Key_Head (I));
+      end loop;
+      for I in Y_Head'Range loop
+         Bad := Bad or (Mdoc (Mdoc'First + Base + 65 + I) xor Y_Head (I));
+      end loop;
+      return Bad = 0;
+   end Device_Key_Conforms;
+
+   --  The random of an item, a byte string of at least 16 bytes
+   --  (ISO/IEC 18013-5, 9.1.2.5; #165): its head after the 7 bytes of
+   --  the key 66 "random", at the slot the permutation gives it. A head
+   --  of 16#50# to 16#57# holds 16 to 23 bytes; 16#58# and 16#59# give
+   --  the length in the next one or two bytes. A branch on the head
+   --  byte, as the parse's on every head.
+   function Random_Conforms
+     (Mdoc : Byte_Array;
+      It   : Mdoc_Parse.Item) return Boolean
+   with
+     Global => null,
+     Pre    => Mdoc'Length <= Cbor_Parse.Max_Bytes
+               and then It.Item_Start + It.Item_Len <= Mdoc'Length
+   is
+      Sr  : constant Mdoc_Parse.Slot_Index :=
+        Mdoc_Parse.Slot_Index ((It.Permutation / 4) mod 4);
+      Off : constant Natural := It.Slot (Sr);
+      Hd  : Natural;
+      H   : Unsigned_8;
+   begin
+      if Off >= It.Item_Len or else It.Item_Len - Off < 10 then
+         return False;
+      end if;
+      Hd := Mdoc'First + It.Item_Start + Off + 7;
+      H := Mdoc (Hd);
+      case H is
+         when 16#50# .. 16#57# =>
+            return True;
+         when 16#58# =>
+            return Mdoc (Hd + 1) >= 16;
+         when 16#59# =>
+            return Mdoc (Hd + 1) > 0 or else Mdoc (Hd + 2) >= 16;
+         when others =>
+            return False;
+      end case;
+   end Random_Conforms;
+
    -------------------------------------------------------------------
    --  The hash witness
    -------------------------------------------------------------------
@@ -211,6 +328,19 @@ package body Mdoc_Witness is
    begin
       W := [others => GF2_128.Zero];
       Result := Ok;
+      --  0. The validity dates in the one form the circuits compare
+      --  (#165): the keys "validFrom" and "validUntil" with their text
+      --  heads, 10 and 11 bytes.
+      if not (Date_Conforms (Mdoc, P, P.Valid_From_Offset, 10)
+              and then Date_Conforms (Mdoc, P, P.Valid_Until_Offset, 11))
+      then
+         Result := Validity_Form_Unsupported;
+         return;
+      end if;
+      if not Device_Key_Conforms (Mdoc, P) then
+         Result := Device_Key_Form_Unsupported;
+         return;
+      end if;
       --  1. The three bound values, 768 bits.
       for I in Mdoc_Mac.Message_Index loop
          pragma Loop_Invariant (Pos = 256 * I);
@@ -263,6 +393,11 @@ package body Mdoc_Witness is
                if It.Item_Len > Max_Item_Bytes then
                   W := [others => GF2_128.Zero];
                   Result := Attribute_Too_Long;
+                  return;
+               end if;
+               if not Random_Conforms (Mdoc, It) then
+                  W := [others => GF2_128.Zero];
+                  Result := Random_Form_Unsupported;
                   return;
                end if;
                --  The item into two blocks, as bits, then its two traces.

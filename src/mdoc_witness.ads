@@ -52,8 +52,27 @@
 --  fill_attribute), so that any other order fails in the circuit after
 --  the commitment; the version 7 circuit reads the order of the four
 --  entries from the witness. Upstream's builder has no such status (a
---  deliberate divergence, noted on ADR 0086). On a refusal the witness
---  array is zero (postcondition): nothing of the credential stays in it.
+--  deliberate divergence, noted on ADR 0086); and, at both versions, a
+--  validFrom or validUntil that is not tag 0 over the 20 bytes
+--  YYYY-MM-DDThh:mm:ssZ (Validity_Form_Unsupported, #165): both circuits
+--  compare the dates with the verifier's time byte for byte, so a
+--  lower-case t or z, fractional seconds or an offset would make the
+--  comparison wrong (a lower-case t admits a time up to one day after
+--  validUntil) or fail; ISO/IEC 18013-5 fixes the Z (9.1.2.4) but not
+--  the T, which RFC 3339 allows in lower case. Upstream's builder has
+--  no such status (a second deliberate divergence, noted on ADR 0086);
+--  and, at both versions, a deviceKeyInfo that is not a map of one
+--  entry, deviceKey, a COSE_Key of exactly four entries in the order
+--  kty 2, crv 1, x and y as byte strings of 32 bytes
+--  (Device_Key_Form_Unsupported, #165), the one form both circuits
+--  compare byte for byte (mdoc_hash.h at 0d92f80c, 218 to 227): a kid,
+--  an alg or another order would fail in the circuit after the
+--  commitment; and, at both versions, a requested item whose random is
+--  not a byte string of at least 16 bytes (Random_Form_Unsupported,
+--  #165; ISO/IEC 18013-5, 9.1.2.5): the circuits do not check the type
+--  of random, so a text string of the same length would pass them.
+--  On a refusal the witness array is zero (postcondition): nothing of
+--  the credential stays in it.
 --
 --  Documentation: docs/guide/09-mdoc.md, Section 3.7.
 --
@@ -146,6 +165,9 @@ package Mdoc_Witness is
       Attribute_Not_Found,
       Attribute_Too_Long,
       Item_Order_Unsupported,
+      Validity_Form_Unsupported,
+      Device_Key_Form_Unsupported,
+      Random_Form_Unsupported,
       Signature_Not_Canonical);
 
    --  The three bound values as the tags take them (Mdoc_Mac.Messages):

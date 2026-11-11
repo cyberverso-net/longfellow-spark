@@ -52,6 +52,7 @@ K = 0 .. 15. The digests are the SHA-256 of the elements as little-endian
 bytes, 16 each for the hash witness and 32 for the signature witness.
 """
 import hashlib
+import re
 import sys
 from pathlib import Path
 
@@ -149,8 +150,65 @@ def find_item(p, mdoc, ident):
     return None
 
 
+DATE_FORM = re.compile(rb"\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z")
+
+
+def date_conforms(mdoc, p, offset, key_len):
+    """The validity date after the key at offset in the MSO map: tag 0 over
+    a text of 20 bytes, YYYY-MM-DDThh:mm:ssZ (#165)."""
+    map_start = p["mso_start"] + 5
+    map_len = p["mso_len"] - 5
+    if offset >= map_len or map_len - offset < key_len + 22:
+        return False
+    at = map_start + offset + key_len
+    return mdoc[at:at + 2] == b"\xc0\x74" and DATE_FORM.match(mdoc[at + 2:at + 22]) is not None
+
+
+KEY_HEAD = (bytes([0x6D]) + b"deviceKeyInfo" + bytes([0xA1, 0x69]) + b"deviceKey"
+            + bytes([0xA4, 0x01, 0x02, 0x20, 0x01, 0x21, 0x58, 0x20]))
+
+
+def device_key_conforms(mdoc, p):
+    """deviceKeyInfo at its offset in the MSO map: a map of one entry,
+    deviceKey, a COSE_Key of exactly kty 2, crv 1, x, y, the coordinates
+    byte strings of 32 bytes (#165)."""
+    map_start = p["mso_start"] + 5
+    map_len = p["mso_len"] - 5
+    off = p["device_key_info_offset"]
+    if off >= map_len or map_len - off < 100:
+        return False
+    at = map_start + off
+    return mdoc[at:at + 33] == KEY_HEAD and mdoc[at + 65:at + 68] == bytes([0x22, 0x58, 0x20])
+
+
+def random_conforms(mdoc, it):
+    """The item's random: a byte string of at least 16 bytes (ISO/IEC
+    18013-5, 9.1.2.5; #165), its head after the 7 bytes of the key."""
+    off = it["slot"][(it["permutation"] >> 2) & 3]
+    if off >= it["item_len"] or it["item_len"] - off < 10:
+        return False
+    at = it["item_start"] + off + 7
+    h = mdoc[at]
+    if 0x50 <= h <= 0x57:
+        return True
+    if h == 0x58:
+        return mdoc[at + 1] >= 16
+    if h == 0x59:
+        return int.from_bytes(mdoc[at + 1:at + 3], "big") >= 16
+    return False
+
+
 def hash_witness(version, mdoc, p, attrs, pads):
     """The private inputs of the hash circuit, or a status string."""
+    # Both circuits compare the dates byte for byte with the verifier's
+    # time: any other form than YYYY-MM-DDThh:mm:ssZ under tag 0 is
+    # refused before anything is built (#165).
+    if not (date_conforms(mdoc, p, p["valid_from_offset"], 10)
+            and date_conforms(mdoc, p, p["valid_until_offset"], 11)):
+        return "validity_form_unsupported"
+    # The COSE_Key in the one form the circuits compare (#165).
+    if not device_key_conforms(mdoc, p):
+        return "device_key_form_unsupported"
     mb = mp.max_blocks(version)
     w = []
     for v in (p["issuer_sig_digest"], p["device_pk_x"], p["device_pk_y"]):
@@ -173,6 +231,8 @@ def hash_witness(version, mdoc, p, attrs, pads):
         it = p["items"][i]
         if it["item_len"] > MAX_ITEM_BYTES:
             return "attribute_too_long"
+        if not random_conforms(mdoc, it):
+            return "random_form_unsupported"
         perm = it["permutation"]
         if version < 7 and (perm >> 6) & 3 != ((perm >> 4) & 3) + 1:
             # The version 6 circuit checks the identifier's text, the key
@@ -368,7 +428,8 @@ def main():
     big_s = bytes([0x58, 0x40]) + (1).to_bytes(32, "big") + Q.to_bytes(32, "big")
 
     def synthetic(value_len, issuer_sig=one_two, device_sig=one_two):
-        doc = mp.make_doc(items=[mp.make_item(value=mp.enc_bytes(bytes(range(value_len))))])
+        doc = mp.make_doc(mso_map=tagged_mso(),
+                          items=[mp.make_item(value=mp.enc_bytes(bytes(range(value_len))))])
         if doc.count(zero_sig) != 2:
             fail("synthetic: the two signatures are not where expected")
         doc = doc.replace(zero_sig, issuer_sig, 1).replace(zero_sig, device_sig, 1)
@@ -416,6 +477,95 @@ def main():
                   f"{hash_digest(wh)} {sig_digest(sig_witness(p, case_pk, pads))}")
     if accepted6 != 6:
         fail(f"{accepted6} orders accepted at version 6, expected 6")
+    w("#")
+    w("# The validity dates (#165): the one form both circuits compare byte for byte,")
+    w("#   tag 0 over YYYY-MM-DDThh:mm:ssZ, accepted; every other form refused at both")
+    w("#   versions (validity_form_unsupported), in validFrom or in validUntil.")
+    good = "2024-01-01T00:00:00Z"
+    validity_cases = [
+        ("lower_t", "2024-01-01t00:00:00Z"),
+        ("lower_z", "2024-01-01T00:00:00z"),
+        ("fraction", "2024-01-01T00:00:00.5Z"),
+        ("offset", "2024-01-01T00:00:00+01:00"),
+        ("letter", "2O24-01-01T00:00:00Z"),
+        ("space", "2024-01-01 00:00:00Z"),
+        ("untagged", mp.enc_text(good)),
+        ("tag1", mp.enc_tag(1, mp.enc_text(good))),
+    ]
+    for version in (7, 6):
+        doc = synthetic_text(one_two, one_two)
+        p = mp.parse_mdoc(doc, b"", b"x", version)
+        wh = hash_witness(version, doc, p, [(b"family_name", small)], pads)
+        if isinstance(wh, str):
+            fail(f"validity good v{version}: {wh}")
+        w(f"witness_hex validity_good {doc.hex()} {version} 1 {small_attr} "
+          f"{hash_digest(wh)} {sig_digest(sig_witness(p, case_pk, pads))}")
+        for label, bad in validity_cases:
+            for which in ("from", "until"):
+                mso = tagged_mso(valid_from=bad) if which == "from" else tagged_mso(valid_until=bad)
+                doc = synthetic_text(one_two, one_two, mso)
+                p = mp.parse_mdoc(doc, b"", b"x", version)
+                wh = hash_witness(version, doc, p, [(b"family_name", small)], pads)
+                if wh != "validity_form_unsupported":
+                    fail(f"validity {label} {which} v{version}: {wh if isinstance(wh, str) else 'accepted'}")
+                w(f"reject_hex validity_{which}_{label} {doc.hex()} {version} 1 {small_attr} {wh}")
+    w("#")
+    w("# The device key (#165): deviceKeyInfo of one entry, deviceKey, a COSE_Key of")
+    w("#   exactly kty 2, crv 1, x, y, accepted (validity_good above); refused at both")
+    w("#   versions (device_key_form_unsupported): a kid after y, an alg before kty,")
+    w("#   crv before kty, y before x, x of 31 bytes, and deviceKeyInfo with a second")
+    w("#   entry (keyInfo).")
+    x, y = mp.enc_bytes(bytes([1] * 32)), mp.enc_bytes(bytes([2] * 32))
+    kty, crv = (mp.enc_uint(1), mp.enc_uint(2)), (mp.enc_nint(-1), mp.enc_uint(1))
+    px, py = (mp.enc_nint(-2), x), (mp.enc_nint(-3), y)
+    key_cases = [
+        ("kid", cose_key([kty, crv, px, py, (mp.enc_uint(2), mp.enc_bytes(b"k"))])),
+        ("alg", cose_key([(mp.enc_uint(3), mp.enc_nint(-7)), kty, crv, px, py])),
+        ("crv_first", cose_key([crv, kty, px, py])),
+        ("y_first", cose_key([kty, crv, py, px])),
+        ("x_31", cose_key([kty, crv, (mp.enc_nint(-2), mp.enc_bytes(bytes([1] * 31))), py])),
+        ("key_info", mp.enc_map([(mp.enc_text("deviceKey"), mp.enc_map([kty, crv, px, py])),
+                                 (mp.enc_text("keyInfo"), mp.enc_map([]))])),
+    ]
+    for version in (7, 6):
+        for label, dki in key_cases:
+            doc = synthetic_text(one_two, one_two, tagged_mso(device_key_info=dki))
+            p = mp.parse_mdoc(doc, b"", b"x", version)
+            wh = hash_witness(version, doc, p, [(b"family_name", small)], pads)
+            if wh != "device_key_form_unsupported":
+                fail(f"device key {label} v{version}: {wh if isinstance(wh, str) else 'accepted'}")
+            w(f"reject_hex device_key_{label} {doc.hex()} {version} 1 {small_attr} {wh}")
+    w("#")
+    w("# The random of the item (#165): a byte string of at least 16 bytes (ISO/IEC")
+    w("#   18013-5, 9.1.2.5) accepted, of 16 bytes under 16#50# and of 24 under 16#58#;")
+    w("#   refused at both versions (random_form_unsupported): a text of 16 bytes,")
+    w("#   which keeps the layout the circuits check, a byte string of 15 bytes, an")
+    w("#   integer.")
+
+    def random_doc(value):
+        it = mp.make_item(entries=[("digestID", mp.enc_uint(7)), ("random", value),
+                                   ("elementIdentifier", mp.enc_text("family_name")), ("elementValue", small)])
+        zero_sig = bytes([0x58, 0x40]) + bytes(64)
+        doc = mp.make_doc(mso_map=tagged_mso(), items=[it])
+        return doc.replace(zero_sig, one_two, 1).replace(zero_sig, one_two, 1)
+
+    for version in (7, 6):
+        for label, value in (("bytes_16", mp.enc_bytes(bytes(range(16)))), ("bytes_24", mp.enc_bytes(bytes(range(24))))):
+            doc = random_doc(value)
+            p = mp.parse_mdoc(doc, b"", b"x", version)
+            wh = hash_witness(version, doc, p, [(b"family_name", small)], pads)
+            if isinstance(wh, str):
+                fail(f"random {label} v{version}: {wh}")
+            w(f"witness_hex random_{label} {doc.hex()} {version} 1 {small_attr} "
+              f"{hash_digest(wh)} {sig_digest(sig_witness(p, case_pk, pads))}")
+        for label, value in (("text_16", mp.enc_text("0123456789abcdef")), ("bytes_15", mp.enc_bytes(bytes(range(15)))),
+                             ("uint", mp.enc_uint(5))):
+            doc = random_doc(value)
+            p = mp.parse_mdoc(doc, b"", b"x", version)
+            wh = hash_witness(version, doc, p, [(b"family_name", small)], pads)
+            if wh != "random_form_unsupported":
+                fail(f"random {label} v{version}: {wh if isinstance(wh, str) else 'accepted'}")
+            w(f"reject_hex random_{label} {doc.hex()} {version} 1 {small_attr} {wh}")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "mdoc_witness.txt").write_text("\n".join(lines) + "\n")
@@ -423,19 +573,45 @@ def main():
           f" for the order of the item's entries, written to {out_dir / 'mdoc_witness.txt'}")
 
 
+def tdate(text):
+    """A tdate as an MSO carries it: tag 0 over a text."""
+    return mp.enc_tag(0, mp.enc_text(text))
+
+
+def cose_key(entries=None):
+    """deviceKeyInfo with its deviceKey: by default the one form the
+    circuits compare, kty 2, crv 1, x, y; entries: (key, value) pairs of
+    encoded CBOR in the order given."""
+    x, y = mp.enc_bytes(bytes([1] * 32)), mp.enc_bytes(bytes([2] * 32))
+    if entries is None:
+        entries = [(mp.enc_uint(1), mp.enc_uint(2)), (mp.enc_nint(-1), mp.enc_uint(1)),
+                   (mp.enc_nint(-2), x), (mp.enc_nint(-3), y)]
+    return mp.enc_map([(mp.enc_text("deviceKey"), mp.enc_map(entries))])
+
+
+def tagged_mso(valid_from="2024-01-01T00:00:00Z", valid_until="2034-01-01T00:00:00Z", device_key_info=None):
+    """The synthetic MSO with its dates under tag 0 and its COSE_Key in
+    the circuits' form, as real documents have them (#165); a date given
+    as bytes is used as the encoded CBOR."""
+    vf = valid_from if isinstance(valid_from, bytes) else tdate(valid_from)
+    vu = valid_until if isinstance(valid_until, bytes) else tdate(valid_until)
+    return mp.make_mso_map(valid_from=vf, valid_until=vu,
+                           device_key_info=device_key_info if device_key_info is not None else cose_key())
+
+
 def synthetic_order(key_names, sig):
     """A synthetic document whose item has its four entries in the given
     order, both signatures set to sig."""
     zero_sig = bytes([0x58, 0x40]) + bytes(64)
-    doc = mp.make_doc(items=[mp.make_item(key_names=key_names)])
+    doc = mp.make_doc(mso_map=tagged_mso(), items=[mp.make_item(key_names=key_names)])
     if doc.count(zero_sig) != 2:
         fail("synthetic: the two signatures are not where expected")
     return doc.replace(zero_sig, sig, 1).replace(zero_sig, sig, 1)
 
 
-def synthetic_text(issuer_sig, device_sig):
+def synthetic_text(issuer_sig, device_sig, mso_map=None):
     zero_sig = bytes([0x58, 0x40]) + bytes(64)
-    doc = mp.make_doc()
+    doc = mp.make_doc(mso_map=mso_map if mso_map is not None else tagged_mso())
     if doc.count(zero_sig) != 2:
         fail("synthetic: the two signatures are not where expected")
     return doc.replace(zero_sig, issuer_sig, 1).replace(zero_sig, device_sig, 1)
