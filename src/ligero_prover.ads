@@ -28,7 +28,10 @@
 --  Proof status (per instance). Silver with the ownership checks on
 --  the heap commitment. Gold, structural (ADR 0052), on the row
 --  procedures of the body: the systematic part of every encoded row is
---  the row and the parity part is Lagrange.Evaluate (Encode_Row); row R
+--  the row (Encode_Row); the parity part is Lagrange.Evaluate when the
+--  instance encodes with Lagrange, and with the FFT, as both production
+--  instances do, the FFT's parity equal to Lagrange is tested with
+--  vectors (register row V2), not proved; row R
 --  of the tableau receives the encoding and the other rows are
 --  untouched (Commit_Row); the witness slots of a row before encoding
 --  hold the witnesses i WR .. i WR + WR - 1 and zero beyond NW, or the

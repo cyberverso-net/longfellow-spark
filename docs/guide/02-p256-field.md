@@ -13,7 +13,7 @@ The ECDSA signatures on mDoc credentials are over the NIST curve P-256, whose po
 
 (draft-03 Table 1 prints it in decimal; RFC 5903 Section 3.1 in hex). The circuits that verify an ECDSA signature inside the zero-knowledge proof compute in this field, so the verifier and prover need its arithmetic. It is the *base* field, in which the curve equation y^2 = x^3 - 3x + b lives; it is not the *scalar* field of order n in which signature scalars live. The draft is inconsistent on this point in two places (Section 3.4.3 and Appendix B.3.2 say "scalar field"), but the prime it prints is p.
 
-The shape of p is a Solinas prime: a sum of a few signed powers of two, all multiples of 2^32. This is what makes reduction cheap (Section 1.5): it needs shifts and additions, not multiplications. Unlike GF(2^128), where addition was xor and there were no carries, F_p is the integers modulo p: addition carries, multiplication produces a 512-bit integer, and every result has to be brought back below p.
+The shape of p is a Solinas prime: a sum of a few signed powers of two, all multiples of 2^32. Until ADR 0077 the reduction used that shape, with shifts and additions only; it is now upstream's generic Montgomery round (Section 1.5), which uses one property of p, p = -1 modulo 2^64. Unlike GF(2^128), where addition was xor and there were no carries, F_p is the integers modulo p: addition carries, multiplication produces a 512-bit integer, and every result has to be brought back below p.
 
 ### 1.2 Representation and canonical form
 
@@ -21,7 +21,7 @@ An element is an integer in 0 .. p - 1, stored as four 64-bit limbs in little-en
 
     To_Int (L) = L(0) + L(1) * 2^64 + L(2) * 2^128 + L(3) * 2^192.
 
-Every integer below 2^256 has exactly one such representation, and p < 2^256, so elements have exactly one representation each: this is *canonical form*. Keeping every element canonical makes equality a limb comparison and serialisation a byte copy. The package enforces it with a type predicate ([ADR 0015](../adr/0015-p256-canonical-form-and-conditional-subtraction.md)): no `Element` can exist whose value is p or more.
+Every integer below 2^256 has exactly one such representation, and p < 2^256, so elements have exactly one representation each: this is *canonical form*. Keeping every element canonical makes equality a limb comparison. Serialisation is not a copy of the stored limbs: since the Montgomery form below, the limbs store x R mod p, and `To_Bytes` first converts out of that form, then writes the canonical integer x (Section 2.3). The package enforces it with a type predicate ([ADR 0015](../adr/0015-p256-canonical-form-and-conditional-subtraction.md)): no `Element` can exist whose value is p or more.
 
 **The Montgomery form** ([ADR 0069](../adr/0069-p256-montgomery-multiplication.md)). The element of value x does not store x. It stores x R mod p, with R = 2^256. The stored integer is still canonical, so the two paragraphs above hold for it: one representation per element, equality as a limb comparison. What changes is the meaning of the limbs. Zero stores 0; One stores R mod p = 2^256 - p; the sum of two stored integers is the stored integer of the sum, since (x R + y R) mod p = (x + y) R mod p. Only the product and the boundaries need care: the bytes, the constants and the parsers convert in and out (Sections 2.3 and 3.8).
 

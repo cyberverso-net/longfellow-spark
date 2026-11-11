@@ -62,7 +62,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0056](0056-linear-input-constraint.md) | The input constraint in linear time | Accepted | 2026-10-19 |
 | [0057](0057-additive-fft.md) | The additive FFT for the Reed-Solomon code | Accepted | 2026-10-19 |
 | [0058](0058-mdoc-layer.md) | The mDoc layer: MACs, public inputs, transcript, proof format and witness | Accepted for block 5 | 2026-10-19 |
-| [0059](0059-mdoc-vectors-and-measurement.md) | mDoc vectors, witness inputs and measurement | Proposed | 2026-10-19 |
+| [0059](0059-mdoc-vectors-and-measurement.md) | mDoc vectors, witness inputs and measurement | Accepted | 2026-10-19 |
 | [0060](0060-proving-machine-on-google-cloud.md) | A proving machine on Google Cloud: prove as one job, make check remote | Accepted, amended by 0062 | 2026-10-19 |
 | [0061](0061-readme-as-front-page.md) | The README as a front page, the trust model in the guide | Accepted | 2026-10-19 |
 | [0062](0062-proof-on-demand.md) | The proof on demand, posted as a commit status | Accepted, amended by 0088 | 2026-10-19 |

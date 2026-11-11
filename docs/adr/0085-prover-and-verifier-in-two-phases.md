@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-08, at the merge of #125, pull request #130; proposed 2026-11-07). The gate of the pull request held 33,709 checks, all proved, 449 of them added by the split, in 165 minutes; the mDoc layer of #126 drives the four phases as the Consequences foresee.
+Accepted (2026-11-08, at the merge of #125, pull request #130; proposed 2026-11-07). The gate of the pull request held 33,709 checks, all proved, 449 of them added by the split, in 165 minutes; the mDoc layer of #126 drives the four phases as the Consequences foresee. Note of 2026-11-11 (#159): the link to ADR 0049 in the References names a file that does not exist; the record is [ADR 0049](0049-phase-c-scope-the-prover.md).
 
 ## Date
 
