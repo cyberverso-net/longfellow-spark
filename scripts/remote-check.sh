@@ -6,7 +6,11 @@
 #     checked out here, and posts the result on that commit as the
 #     status `prove`, which branch protection requires. The working tree
 #     must be clean and the commit pushed: the VM fetches it from GitHub
-#     into its own clone, so what is checked is exactly that commit.
+#     into its own clone and starts only once scripts/clean-checkout.sh
+#     has put the clone at that commit with every tracked file restored
+#     and the untracked ones removed (for a commit older than that
+#     script, the same check written inline), so what is checked is
+#     exactly that commit.
 #     The run is detached on the VM: the laptop may sleep or lose the
 #     network. The VM keeps the log and the result on its disk and shuts
 #     itself down when done. This script checks once a minute, starting
@@ -469,7 +473,8 @@ if [ "$MODE" = commit ]; then
       echo $SHA > ~/runs/current
       rm -f ~/runs/$SHA.done ~/runs/$SHA.log
       echo '$TARGET $REUSE' > ~/runs/$SHA.targets
-      cd ~/longfellow-spark && git fetch -q origin && git checkout -q --detach $SHA && git clean -q -fd || { rm -f ~/runs/current; echo fetch-failed; exit 0; }
+      cd ~/longfellow-spark && git fetch -q origin && git checkout -q -f --detach $SHA || { rm -f ~/runs/current; echo fetch-failed; exit 0; }
+      if [ -x scripts/clean-checkout.sh ]; then scripts/clean-checkout.sh . $SHA > /dev/null 2>&1; else git clean -q -fd && [ \"\$(git rev-parse HEAD)\" = $SHA ] && git diff --quiet HEAD && [ -z \"\$(git ls-files --others --exclude-standard)\" ]; fi || { rm -f ~/runs/current; echo not-clean; exit 0; }
       nohup setsid bash -c 'start=\$(date +%s); (time env LONGFELLOW_UPSTREAM=\$HOME/upstream $MAKE_CMD) > ~/runs/$SHA.log 2>&1; code=\$?; echo \"\$code \$(( (\$(date +%s) - start + 59) / 60 ))\" > ~/runs/$SHA.done; rm -f ~/runs/current; $OFF' > /dev/null 2>&1 < /dev/null &
       echo started" 2> /dev/null || echo unreachable)"
    case "$launched" in

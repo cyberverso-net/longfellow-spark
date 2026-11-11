@@ -24,6 +24,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - Every measurement series carries two labels, this project's commit or tag and the upstream commit measured in the same session (#127): the performance page states the convention and names d5e6be7, the pin, for every comparison it shows; `scripts/measure-mdoc.sh` prints both labels first; `scripts/measure/heap_v7.rs` prints the upstream commit it was built for. The pin does not move when a newer upstream is measured.
 - The trusted base register notes upstream's commit 7ec62ec (24 October 2026), the fix of the carries in the multiply-accumulate of the delayed reduction of `fp_generic.rs`, and why the fault has no counterpart here: every product is reduced (ADR 0070) and the P-256 multiplication is proved against the integer model. No row changes; the pin stays at d5e6be7 (#123).
 
+### Fixed
+
+- The gate's scripts could report a commit they had not run exactly: `scripts/remote-check.sh` checked out the commit on the proving machine and ran `git clean -fd`, which keeps modified tracked files, and `scripts/cross-check-upstream.sh` reused its copy of upstream the same way. Both now restore every tracked file (`git checkout -f`), remove the untracked ones, and start only if the copy is at the commit or the pin with no tracked file modified, otherwise the run is refused with a line saying so (`scripts/clean-checkout.sh`, tested in the lint step by `scripts/clean-checkout-test.sh`). Found by the milestone review of the mDoc layer (#67, #160).
+
 ## [0.4.0] - 2026-11-07
 
 Phase D, performance and memory: the production mDoc circuits of upstream at full scale, proved and verified with every contract proved. Milestone M2 closed the round trip at 8.13 s (ADR 0078); the memory milestone closes with the peak heap at 1.17 times upstream's for the prover and 1.30 times for the verifier on the hash circuit (ADR 0084), after a review of the whole repository (ADR 0083). The mDoc layer and the proof of age follow in 0.5.0 (ADR 0082).

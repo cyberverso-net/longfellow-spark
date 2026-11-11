@@ -68,6 +68,8 @@ or `task/58-prover-memory-profile`. Pull requests reference their issue with `Cl
 The gate of a pull request is the check `verify` (GitHub Actions: build, partitions, tests,
 command line, vectors, lint) and the status `prove` (`make check` on the proving machine,
 posted by `scripts/remote-check.sh`), both green. The ruleset on `main` requires both. The
+machine runs on its own clone, restored to the commit and checked clean at it before the
+run starts; the copy of upstream for the cross-check is checked the same way at the pin. The
 proving machine's `make check` also runs the cross-check of the mDoc proofs with upstream's
 verifier, which needs cargo and a clone of upstream and is skipped, with a line saying so,
 where they are absent (`scripts/cross-check-upstream.sh`, ADR 0087), and the proof of age
