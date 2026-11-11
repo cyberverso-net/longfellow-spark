@@ -158,8 +158,28 @@ def main() -> None:
         fail("g = x^e is 1; x would not generate the multiplicative group")
     if power(g, 2**16 - 1) != 1:
         fail("g^(2^16 - 1) /= 1; g does not lie in GF(2^16)")
+    # The order of g is exactly 2^16 - 1 = 3 * 5 * 17 * 257: no proper
+    # divisor of it is the order, so g^((2^16 - 1) / r) /= 1 for each
+    # prime r. Cyclicity alone does not give it; it depends on x.
+    for r in (3, 5, 17, 257):
+        if power(g, (2**16 - 1) // r) == 1:
+            fail(f"g^((2^16 - 1) / {r}) = 1; g has a smaller order")
 
     beta = [power(g, i) for i in range(16)]
+    # The sixteen powers are linearly independent over GF(2): Gaussian
+    # elimination on their 128-bit patterns leaves sixteen pivots.
+    rows, pivots = list(beta), 0
+    for bit in range(128):
+        k = next((i for i in range(pivots, 16) if rows[i] >> bit & 1), None)
+        if k is None:
+            continue
+        rows[pivots], rows[k] = rows[k], rows[pivots]
+        for i in range(16):
+            if i != pivots and rows[i] >> bit & 1:
+                rows[i] ^= rows[pivots]
+        pivots += 1
+    if pivots != 16:
+        fail("beta_0 .. beta_15 are not linearly independent over GF(2)")
     for i in range(16):
         if beta[i] != UPSTREAM_SUBFIELD_BASIS[i]:
             fail(f"beta_{i} = {hx(beta[i])} but upstream Rust has "

@@ -52,10 +52,23 @@
 --  cli step on both archives, from the witness files and from the
 --  documents, and the cross-check with upstream's verifier (chapter 9).
 --
---  Constant-time discipline (ADR 0051): the witness, mac_ap and the
---  messages are secret and go to units that keep the discipline
+--  Constant-time discipline (ADR 0051, ADR 0086): the witness, mac_ap
+--  and the messages are secret and go to units that keep the discipline
 --  (Zk_Prover, Mdoc_Mac); the public inputs, av, the tags and the proof
---  are public. This unit adds no branch on a secret.
+--  are public. This unit adds no branch on a secret. Prove_Mdoc calls
+--  the parse of the credential (Mdoc_Parse), which ADR 0086 declares
+--  outside the discipline: its time depends on the credential's
+--  structure and on the bytes of its text strings, not on its
+--  signatures, digests or coordinates; the discipline applies to the
+--  values once extracted, in the witness builders.
+--
+--  The pads. Prove_Profile, Prove_Mdoc and Prove take the one-time pads
+--  of the MAC (Ap, mac_ap) from their caller, who draws them fresh,
+--  secret and uniform for each proof: the tags hide the bound values
+--  only under such pads, and pads used under two challenges reveal
+--  them (chapter 9 Section 1.3; ADR 0089, the caller's obligations).
+--  longfellow_prove_mdoc draws them for each proof; drawing them here
+--  is deferred to Phase E (#156).
 
 pragma SPARK_Mode (On);
 

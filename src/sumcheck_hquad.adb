@@ -1,17 +1,6 @@
 pragma SPARK_Mode (On);
 
-with Ada.Unchecked_Deallocation;
-
 package body Sumcheck_HQuad is
-
-   --  Heap buffers (ADR 0047), for the kernels that allocate.
-   type Elems_Access is access Element_Array;
-   type Terms_Access is access Term_Array;
-
-   procedure Free_Elems is
-     new Ada.Unchecked_Deallocation (Element_Array, Elems_Access);
-   procedure Free_Terms is
-     new Ada.Unchecked_Deallocation (Term_Array, Terms_Access);
 
    procedure Bind_G_T (T : in out Term_Array; E : Element_Array;
                        Beta : Element)

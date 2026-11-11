@@ -202,6 +202,8 @@ requests `area: ci` (`.github/dependabot.yml`); they need no issue.
 ## Releases
 
 A release is tagged `vX.Y.Z` from `main` when its milestone's criterion is met, and published
-as a GitHub release whose notes are the changelog section of that version. Until the interface
+as a GitHub release whose notes are the changelog section of that version. Before the tag,
+the version in `alire.toml`, which the library is built with, is set to the release's
+number in the same pull request as the changelog section. Until the interface
 of the project is more than the pinned specification, the version numbers mark milestones, not
 API compatibility, as [CHANGELOG.md](../CHANGELOG.md) says.

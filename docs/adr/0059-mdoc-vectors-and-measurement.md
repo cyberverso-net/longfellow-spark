@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-19, block 1 of Phase D)
+Accepted (2026-11-11, at the review of the mDoc layer, #159; proposed 2026-10-19 with block 1 of Phase D, which realised it: the archives, witnesses and circuits under `tests/vectors/upstream/mdoc/`, `gen_mdoc_vectors.py`, `scripts/measure-mdoc.sh`). Note of 2026-11-11: the Decision's "outside `make check`" holds for the measurement series; the round trip of `measure-mdoc.sh` on the four circuits joined the `cli` step of `make check` with ADR 0083, the proof of age on both archives with block 5, and the 38 test documents with #150.
 
 ## Date
 
