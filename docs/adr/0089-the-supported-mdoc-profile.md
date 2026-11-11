@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-11-10, with the pull request of #79; accepted at its merge). Completes [ADR 0058](0058-mdoc-layer.md), whose specification table becomes the rows of the profile, and [ADR 0086](0086-mdoc-witness-bounds-and-constant-time.md), whose bounds become part of its invariants.
+Accepted (2026-11-11, at the merge of pull request #153; proposed 2026-11-10 with #79). Completes [ADR 0058](0058-mdoc-layer.md), whose specification table becomes the rows of the profile, and [ADR 0086](0086-mdoc-witness-bounds-and-constant-time.md), whose bounds become part of its invariants.
 
 ## Date
 
