@@ -6,7 +6,7 @@ Stage 3 of Phase A. Three generic packages over a field, each instantiated for G
 
 ### 1.1 Layered circuits and the quad representation
 
-A circuit has NL layers (Section 6.3.1). Layer j computes the wires V[j] from the wires V[j + 1]; V[0] are the outputs and V[NL] the inputs. The statement "the circuit accepts" means every output wire is 0. Each layer is a *quad* Q[j], a sparse three-dimensional array (Section 6.3.2):
+A circuit has NL layers (Section 6.3.1). Layer j computes the wires V[j] from the wires V[j + 1]; V[0] are the outputs and V[NL] the inputs. The statement "the circuit accepts" means every output wire is 0 and every Z assertion of the circuit holds (below): an assertion states that a product of two wires is zero and adds nothing to any output, so a violated one can leave every output at 0. Both conditions make the circuit accept; `Eval_Circuit`'s postcondition states the status as both (Section 2.2). Each layer is a *quad* Q[j], a sparse three-dimensional array (Section 6.3.2):
 
     V[j][g] = SUM_{l, r} Q[j][g, l, r] V[j + 1][l] V[j + 1][r]
 
