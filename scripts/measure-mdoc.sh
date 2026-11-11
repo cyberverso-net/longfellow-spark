@@ -206,7 +206,8 @@ PY
    #  The refusals of the request itself, through both programs: the
    #  session transcript above 65,000 bytes, an identifier that does not
    #  fit the version 7 layout (31 bytes with a two-byte head), two
-   #  attributes against a one-attribute specification. On upstream's
+   #  attributes against a one-attribute profile (ADR 0089: two to four
+   #  are refused by the entry points). On upstream's
    #  checked-in example proof of the version 7 archive, so that the
    #  check does not depend on the proofs this run made.
    local h7 long_tr
@@ -219,7 +220,7 @@ PY
    expect_refused "verifier, attribute invalid" "attribute_invalid" "$BIN/longfellow_verify_mdoc" --spec "$h7" \
       --proof "$M/$h7.bin" --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
       --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$long_id:f5"
-   expect_refused "verifier, input count" "input_count" "$BIN/longfellow_verify_mdoc" --spec "$h7" \
+   expect_refused "verifier, two attributes" "attribute_count" "$BIN/longfellow_verify_mdoc" --spec "$h7" \
       --proof "$M/$h7.bin" --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
       --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$CASE_ATTR" --attr age_over_18:f5
    expect_refused "prover, transcript too long" "transcript_too_long" "$BIN/longfellow_prove_mdoc" --spec "$h7" \
@@ -230,7 +231,7 @@ PY
       --hash-witness "$M/${h7}_hash_witness.bin" --sig-witness "$M/${h7}_sig_witness.bin" \
       --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
       --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$long_id:f5" --seed 1 --out cli/out/never.bin
-   expect_refused "prover, input count" "input_count" "$BIN/longfellow_prove_mdoc" --spec "$h7" \
+   expect_refused "prover, two attributes" "attribute_count" "$BIN/longfellow_prove_mdoc" --spec "$h7" \
       --hash-witness "$M/${h7}_hash_witness.bin" --sig-witness "$M/${h7}_sig_witness.bin" \
       --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
       --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$CASE_ATTR" --attr age_over_18:f5 --seed 1 --out cli/out/never.bin
@@ -289,6 +290,9 @@ mdoc_from_documents() {
          --now "$TD_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$TD_ATTR"
    fi
    echo "=== mdoc: the refusals of the document path ==="
+   expect_refused "two attributes from the document" "attribute_count" "$BIN/longfellow_prove_mdoc" --spec "$h7" \
+      --mdoc "$CASE_DIR/mdoc.bin" --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
+      --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$CASE_ATTR" --attr age_over_18:f5 --seed 1 --out cli/out/never.bin
    expect_refused "attribute not in the document" "attribute_not_found" "$BIN/longfellow_prove_mdoc" --spec "$h7" \
       --mdoc "$CASE_DIR/mdoc.bin" --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
       --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr age_over_99:f5 --seed 1 --out cli/out/never.bin

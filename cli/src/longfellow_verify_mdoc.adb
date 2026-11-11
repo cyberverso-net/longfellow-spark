@@ -59,10 +59,13 @@ begin
       then
          raise Refused with "config_invalid";
       end if;
-      Mdoc_Verifier.Verify (S.Version, Hash_C.all, HI, Sig_C.all, SI,
-                            R.Pk_X, R.Pk_Y, R.Session.all,
-                            R.Attrs (1 .. R.Nattrs), R.Now.all,
-                            R.Doc_Type.all, P.all, St, Detail);
+      --  The entry point of the supported profile (ADR 0089): it checks
+      --  the profile again and refuses anything that is not one of its
+      --  rows, two to four attributes included.
+      Mdoc_Verifier.Verify_Profile
+        (S.Combined, Hash_C.all, HI.Id, Sig_C.all, SI.Id,
+         R.Pk_X, R.Pk_Y, R.Session.all, R.Attrs (1 .. R.Nattrs),
+         R.Now.all, R.Doc_Type.all, P.all, St, Detail);
       Free (P);
       Circuit_Reader_GF2_128.Free_Packed (Hash_C);
       Circuit_Reader_P256.Free_Packed (Sig_C);

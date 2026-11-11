@@ -204,22 +204,36 @@ begin
                Priv_H := new MP.Hash_Elements
                  (0 .. Mdoc_Witness.Hash_Count (S.Version, R.Nattrs) - 1);
                Priv_S := new MP.Sig_Elements (0 .. Mdoc_Witness.Sig_Count - 1);
-               MP.Prove_Mdoc (S.Version, Hash_C.all, HI, Sig_C.all, SI,
-                              Mdoc.all, Ap, R.Pk_X, R.Pk_Y,
-                              R.Session.all, R.Attrs (1 .. R.Nattrs),
-                              R.Now.all, R.Doc_Type.all,
-                              Priv_H.all, Priv_S.all, Out_B.all, Len,
-                              St, Detail, Parse_St, Cbor_St);
+               --  The entry point of the supported profile (ADR 0089).
+               MP.Prove_Profile (S.Combined, Hash_C.all, HI.Id, HI.Sfb,
+                                 Sig_C.all, SI.Id, SI.Sfb,
+                                 Mdoc.all, Ap, R.Pk_X, R.Pk_Y,
+                                 R.Session.all, R.Attrs (1 .. R.Nattrs),
+                                 R.Now.all, R.Doc_Type.all,
+                                 Priv_H.all, Priv_S.all, Out_B.all, Len,
+                                 St, Detail, Parse_St, Cbor_St);
                Free (Mdoc);
             end;
          else
-            --  From the files: the fresh pads in place of the file's,
-            --  in both witnesses.
-            Mdoc_Inputs.Place_Pads (Priv_H.all, Priv_S.all, Ap);
-            MP.Prove (S.Version, Hash_C.all, HI, Sig_C.all, SI,
-                      Priv_H.all, Priv_S.all, Ap, M, R.Pk_X, R.Pk_Y,
-                      R.Session.all, R.Attrs (1 .. R.Nattrs), R.Now.all,
-                      R.Doc_Type.all, Out_B.all, Len, St, Detail);
+            --  From the files, the reference path of block 5: the
+            --  profile is checked as the entry point would (ADR 0089),
+            --  then the fresh pads in place of the file's, in both
+            --  witnesses.
+            declare
+               Row : Mdoc_Spec.Spec_Index;
+            begin
+               Mdoc_Spec.Select_Profile (S.Combined, HI.Id, SI.Id,
+                                         R.Nattrs, Row, St);
+            end;
+            Detail := Prover_Status.Ok;
+            Len    := 0;
+            if St = Mdoc_Status.Ok then
+               Mdoc_Inputs.Place_Pads (Priv_H.all, Priv_S.all, Ap);
+               MP.Prove (S.Version, Hash_C.all, HI, Sig_C.all, SI,
+                         Priv_H.all, Priv_S.all, Ap, M, R.Pk_X, R.Pk_Y,
+                         R.Session.all, R.Attrs (1 .. R.Nattrs), R.Now.all,
+                         R.Doc_Type.all, Out_B.all, Len, St, Detail);
+            end if;
          end if;
          --  The witnesses are secret: cleared before they are freed.
          Priv_H.all := [others => GF2_128.Zero];

@@ -31,6 +31,7 @@ with Ada.Text_IO;
 with Ada.Unchecked_Deallocation;
 with Interfaces; use Interfaces;
 with Bytes;      use Bytes;
+with Mdoc_Status;
 with GF2_128;
 with P256_Field;
 with Sha256;
@@ -41,6 +42,13 @@ with Mdoc_Proof;
 with Device_Auth;
 with Mdoc_Inputs;
 with Mdoc_Spec;
+with Mdoc_Parse;
+with Cbor_Parse;
+with Prover_Status;
+with Circuit_Status;
+with Circuit_Reader_GF2_128;
+with Circuit_Reader_P256;
+with Mdoc_Prover_Lib;
 
 procedure Mdoc_KAT is
 
@@ -657,7 +665,166 @@ procedure Mdoc_KAT is
          Mdoc_Spec.Lookup ([others => 16#AB#], Found, I);
          Check (not Found, "built-in: an unknown combined identifier");
       end;
+      --  The supported profile (ADR 0089): each row accepted with its
+      --  own circuits and one attribute; refused under an unknown name,
+      --  with the other row's hash circuit, with the signature
+      --  circuit's identifier altered, and with zero and two to four
+      --  attributes.
+      declare
+         use type Mdoc_Status.Status;
+         I   : Mdoc_Spec.Spec_Index;
+         St  : Mdoc_Status.Status;
+         Bad : Bytes_32;
+      begin
+         for R in Mdoc_Spec.Spec_Index loop
+            declare
+               S     : constant Mdoc_Spec.Specification := Mdoc_Spec.Spec (R);
+               Other : constant Mdoc_Spec.Specification :=
+                 Mdoc_Spec.Spec (if R = 1 then 2 else 1);
+            begin
+               Mdoc_Spec.Select_Profile (S.Combined, S.Hash_Id, S.Sig_Id, 1, I, St);
+               Check (St = Mdoc_Status.Ok and then I = R,
+                      "profile: row" & R'Image & " refused: " & St'Image);
+               Mdoc_Spec.Select_Profile ([others => 16#AB#], S.Hash_Id, S.Sig_Id, 1, I, St);
+               Check (St = Mdoc_Status.Profile_Unknown,
+                      "profile: an unknown name gives " & St'Image);
+               Mdoc_Spec.Select_Profile (S.Combined, Other.Hash_Id, S.Sig_Id, 1, I, St);
+               Check (St = Mdoc_Status.Profile_Mismatch,
+                      "profile: the other row's hash circuit gives " & St'Image);
+               Bad := S.Sig_Id;
+               Bad (0) := Bad (0) xor 1;
+               Mdoc_Spec.Select_Profile (S.Combined, S.Hash_Id, Bad, 1, I, St);
+               Check (St = Mdoc_Status.Profile_Mismatch,
+                      "profile: an altered signature circuit gives " & St'Image);
+               for N in 0 .. 4 loop
+                  if N /= 1 then
+                     Mdoc_Spec.Select_Profile (S.Combined, S.Hash_Id, S.Sig_Id, N, I, St);
+                     Check (St = Mdoc_Status.Attribute_Count,
+                            "profile:" & N'Image & " attributes give " & St'Image);
+                  end if;
+               end loop;
+            end;
+         end loop;
+      end;
    end Built_In;
+
+   --  The prover's entry point refuses buffers that are not the row's
+   --  (ADR 0089): on the version 7 circuits, each of the three buffers
+   --  one element short, and the proof buffer not starting at zero;
+   --  each refusal is Profile_Mismatch with Len zero, the details Ok and
+   --  every buffer zero. The circuits are read pinned to the row's
+   --  identifiers, as the command line reads them. Then a refusal after
+   --  the witnesses are built: a value of 65 bytes, above the version 7
+   --  layout, refused by Prove with Attribute_Invalid before any
+   --  commitment; the two witnesses and the proof buffer are zero.
+   procedure Profile_Buffers is
+      use type Mdoc_Status.Status;
+      use type Prover_Status.Status;
+      use type Mdoc_Parse.Status;
+      use type GF2_128.Element;
+      use type Circuit_Status.Status;
+      package MP renames Mdoc_Prover_Lib;
+      S   : constant Mdoc_Spec.Specification := Mdoc_Spec.Spec (1);
+      Dir : constant String := "tests/vectors/upstream/mdoc/";
+      Hex : constant String := "8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121";
+      HB  : Byte_Array_Access := Read_File (Dir & Hex & "_hash.lfc2");
+      SB  : Byte_Array_Access := Read_File (Dir & Hex & "_sig.lfc2");
+      Doc : Byte_Array_Access :=
+        Read_File (Dir & "testcases/FAMILYNAME_MUSTERMANN_MDOC_3/mdoc.bin");
+      HC  : Circuit_Reader_GF2_128.Packed_Access;
+      HH  : Circuit_Reader_GF2_128.Header;
+      HS  : Circuit_Status.Status;
+      SC  : Circuit_Reader_P256.Packed_Access;
+      SH  : Circuit_Reader_P256.Header;
+      SS  : Circuit_Status.Status;
+      A   : Mdoc_Inputs.Attribute_List (1 .. 1);
+      Ap  : constant Mdoc_Mac.Pads := [others => [others => GF2_128.Zero]];
+      Now : constant Byte_Array := [for C of String'("2024-10-01T09:00:00Z") => Character'Pos (C)];
+      DT  : constant Byte_Array := [for C of String'("org.iso.18013.5.1.mDL") => Character'Pos (C)];
+      Fn  : constant Byte_Array := [for C of String'("family_name") => Character'Pos (C)];
+      Val : constant Byte_Array := [16#6a#, 16#4d#, 16#75#, 16#73#, 16#74#, 16#65#, 16#72#, 16#6d#, 16#61#, 16#6e#, 16#6e#];
+      Tr  : constant Byte_Array (0 .. -1) := [];
+   begin
+      Circuit_Reader_GF2_128.Read_Packed (HB.all, True, S.Hash_Id, HC, HH, HS);
+      Circuit_Reader_P256.Read_Packed (SB.all, True, S.Sig_Id, SC, SH, SS);
+      if HS /= Circuit_Status.Ok or else SS /= Circuit_Status.Ok then
+         Report_Failure ("profile buffers: the version 7 circuits did not load");
+         return;
+      end if;
+      A (1).Id (0 .. Fn'Length - 1) := Fn;
+      A (1).Id_Len := Fn'Length;
+      A (1).Value (0 .. Val'Length - 1) := Val;
+      A (1).Value_Len := Val'Length;
+      declare
+         HI  : constant MP.Circuit_Info :=
+           (Id => HH.Id, Sfb => HH.Subfield_Boundary, Cfg => S.Hash_Cfg);
+         SI  : constant MP.Circuit_Info :=
+           (Id => SH.Id, Sfb => SH.Subfield_Boundary, Cfg => S.Sig_Cfg);
+         Max : constant Positive := MP.Max_Len (HC.all, HI, SC.all, SI);
+         NH  : constant Positive := 84_166;
+         NS  : constant Positive := 2_839;
+
+         procedure Try (Name : String; Lh, Ls, Fb, Lb : Natural) is
+            type HA is access MP.Hash_Elements;
+            type SA is access MP.Sig_Elements;
+            type BA is access Byte_Array;
+            WH  : constant HA := new MP.Hash_Elements (0 .. Lh - 1);
+            WS  : constant SA := new MP.Sig_Elements (0 .. Ls - 1);
+            B   : constant BA := new Byte_Array (Fb .. Fb + Lb - 1);
+            Len : Natural;
+            St  : Mdoc_Status.Status;
+            D   : Prover_Status.Status;
+            PS  : Mdoc_Parse.Status;
+            CS  : Cbor_Parse.Status;
+         begin
+            MP.Prove_Profile (S.Combined, HC.all, HH.Id, HH.Subfield_Boundary,
+                              SC.all, SH.Id, SH.Subfield_Boundary, Doc.all, Ap,
+                              P256_Field.Zero, P256_Field.Zero, Tr, A, Now, DT,
+                              WH.all, WS.all, B.all, Len, St, D, PS, CS);
+            Check (St = Mdoc_Status.Profile_Mismatch and then Len = 0
+                   and then D = Prover_Status.Ok and then PS = Mdoc_Parse.Ok
+                   and then (for all E of WH.all => E = GF2_128.Zero)
+                   and then (for all E of WS.all =>
+                               P256_Field.To_Bytes (E) = Bytes_32'[others => 0])
+                   and then (for all X of B.all => X = 0),
+                   "profile buffers, " & Name & ": " & St'Image);
+         end Try;
+      begin
+         Try ("hash witness one short", NH - 1, NS, 0, Max);
+         Try ("signature witness one short", NH, NS - 1, 0, Max);
+         Try ("proof buffer one short", NH, NS, 0, Max - 1);
+         Try ("proof buffer from 1", NH, NS, 1, Max);
+         A (1).Value_Len := 65;
+         declare
+            type HA is access MP.Hash_Elements;
+            type SA is access MP.Sig_Elements;
+            type BA is access Byte_Array;
+            WH  : constant HA := new MP.Hash_Elements (0 .. NH - 1);
+            WS  : constant SA := new MP.Sig_Elements (0 .. NS - 1);
+            B   : constant BA := new Byte_Array (0 .. Max - 1);
+            Len : Natural;
+            St  : Mdoc_Status.Status;
+            D   : Prover_Status.Status;
+            PS  : Mdoc_Parse.Status;
+            CS  : Cbor_Parse.Status;
+         begin
+            MP.Prove_Profile (S.Combined, HC.all, HH.Id, HH.Subfield_Boundary,
+                              SC.all, SH.Id, SH.Subfield_Boundary, Doc.all, Ap,
+                              P256_Field.Zero, P256_Field.Zero, Tr, A, Now, DT,
+                              WH.all, WS.all, B.all, Len, St, D, PS, CS);
+            Check (St = Mdoc_Status.Attribute_Invalid and then Len = 0
+                   and then D = Prover_Status.Ok and then PS = Mdoc_Parse.Ok
+                   and then (for all E of WH.all => E = GF2_128.Zero)
+                   and then (for all E of WS.all =>
+                               P256_Field.To_Bytes (E) = Bytes_32'[others => 0])
+                   and then (for all X of B.all => X = 0),
+                   "profile buffers, a value of 65 bytes: " & St'Image);
+         end;
+      end;
+      Circuit_Reader_GF2_128.Free_Packed (HC);
+      Circuit_Reader_P256.Free_Packed (SC);
+      Free (HB); Free (SB); Free (Doc);
+   end Profile_Buffers;
 
 begin
    if Ada.Command_Line.Argument_Count = 0 then
@@ -668,6 +835,7 @@ begin
       end loop;
    end if;
    Built_In;
+   Profile_Buffers;
    TIO.Put_Line ("mdoc_kat:" & Passed'Image & " passed," & Failed'Image
                  & " failed");
    if Failed > 0 or else Passed = 0 then

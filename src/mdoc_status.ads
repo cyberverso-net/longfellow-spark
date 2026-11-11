@@ -49,6 +49,20 @@
 --                         below the group order, which the ECDSA
 --                         witness requires (upstream stops there).
 --
+--  From the profile (#79, ADR 0089, Mdoc_Spec.Select_Profile, the
+--  entry points Mdoc_Prover.Prove_Profile and
+--  Mdoc_Verifier.Verify_Profile):
+--
+--    Profile_Unknown      the name is not the combined identifier of a
+--                         row of the supported profile.
+--    Profile_Mismatch     the circuits given are not the row's (their
+--                         identifiers), or do not fit its Ligero
+--                         configurations, or a buffer is not of the
+--                         row's length.
+--    Attribute_Count      the request does not hold the row's number of
+--                         attributes (one, for both rows: two to four
+--                         are refused until an archive is pinned).
+--
 --  Documentation: docs/guide/09-mdoc.md. Proof status: an
 --  enumeration, nothing to prove.
 
@@ -68,6 +82,9 @@ package Mdoc_Status is
       Attribute_Not_Found,
       Attribute_Too_Long,
       Item_Order_Unsupported,
-      Signature_Not_Canonical);
+      Signature_Not_Canonical,
+      Profile_Unknown,
+      Profile_Mismatch,
+      Attribute_Count);
 
 end Mdoc_Status;

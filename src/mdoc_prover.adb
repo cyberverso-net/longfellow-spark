@@ -228,4 +228,99 @@ package body Mdoc_Prover is
       end case;
    end Prove_Mdoc;
 
+   procedure Prove_Profile
+     (Profile    : Bytes_32;
+      Hash_P     : Hash_Circuit;
+      Hash_Id    : Bytes_32;
+      Hash_Sfb   : Natural;
+      Sig_P      : Sig_Circuit;
+      Sig_Id     : Bytes_32;
+      Sig_Sfb    : Natural;
+      Mdoc       : Byte_Array;
+      Ap         : Mdoc_Mac.Pads;
+      Pk_X, Pk_Y : P256_Field.Element;
+      Session    : Byte_Array;
+      Attrs      : Attribute_List;
+      Now        : Byte_Array;
+      Doc_Type   : Byte_Array;
+      Hash_W     : out Hash_Elements;
+      Sig_W      : out Sig_Elements;
+      B          : out Byte_Array;
+      Len        : out Natural;
+      St         : out Mdoc_Status.Status;
+      Detail     : out Prover_Status.Status;
+      Parse_St   : out Mdoc_Parse.Status;
+      Cbor_St    : out Cbor_Parse.Status)
+   is
+      I : Mdoc_Spec.Spec_Index;
+
+      --  A refusal of the profile: everything zero, nothing proved.
+      procedure Refuse (S : Mdoc_Status.Status) with
+        Global => (Output => (Hash_W, Sig_W, B, Len, St, Detail,
+                              Parse_St, Cbor_St)),
+        Pre    => S in Mdoc_Status.Profile_Unknown
+                     | Mdoc_Status.Profile_Mismatch
+                     | Mdoc_Status.Attribute_Count,
+        Post   => St = S and then Len = 0
+                  and then Detail = Prover_Status.Ok
+                  and then Parse_St = Mdoc_Parse.Ok
+                  and then (for all J in Hash_W'Range =>
+                              Hash_W (J) = GF2_128.Zero)
+                  and then (for all J in Sig_W'Range =>
+                              Sig_W (J) = P256_Field.Zero)
+                  and then (for all J in B'Range => B (J) = 0)
+      is
+      begin
+         Hash_W   := [others => GF2_128.Zero];
+         Sig_W    := [others => P256_Field.Zero];
+         B        := [others => 0];
+         Len      := 0;
+         St       := S;
+         Detail   := Prover_Status.Ok;
+         Parse_St := Mdoc_Parse.Ok;
+         Cbor_St  := Cbor_Parse.Ok;
+      end Refuse;
+
+      Sel : Mdoc_Status.Status;
+   begin
+      Mdoc_Spec.Select_Profile
+        (Profile, Hash_Id, Sig_Id, Attrs'Length, I, Sel);
+      if Sel /= Mdoc_Status.Ok then
+         Refuse (Sel);
+         return;
+      end if;
+      declare
+         S  : constant Mdoc_Spec.Specification := Mdoc_Spec.Spec (I);
+         HI : constant Circuit_Info :=
+           (Id => Hash_Id, Sfb => Hash_Sfb, Cfg => S.Hash_Cfg);
+         SI : constant Circuit_Info :=
+           (Id => Sig_Id, Sfb => Sig_Sfb, Cfg => S.Sig_Cfg);
+      begin
+         if not (Hash_Ok (Hash_P, HI.Cfg) and then Sig_Ok (Sig_P, SI.Cfg)
+                 and then Parts_Fit (Hash_P, HI, Sig_P, SI)
+                 and then Hash_W'First = 0
+                 and then Hash_W'Length
+                          = Mdoc_Witness.Hash_Count (S.Version, Attrs'Length)
+                 and then Sig_W'First = 0
+                 and then Sig_W'Length = Mdoc_Witness.Sig_Count
+                 and then B'First = 0
+                 and then B'Length = Max_Len (Hash_P, HI, Sig_P, SI))
+         then
+            Refuse (Mdoc_Status.Profile_Mismatch);
+            return;
+         end if;
+         Prove_Mdoc (S.Version, Hash_P, HI, Sig_P, SI, Mdoc, Ap, Pk_X, Pk_Y,
+                     Session, Attrs, Now, Doc_Type, Hash_W, Sig_W, B, Len,
+                     St, Detail, Parse_St, Cbor_St);
+         --  Any other refusal, of the request, of the witness or of the
+         --  proof: the witnesses built from the credential and the proof
+         --  buffer are wiped, so that a refusal leaves only a status.
+         if St /= Mdoc_Status.Ok then
+            Hash_W := [others => GF2_128.Zero];
+            Sig_W  := [others => P256_Field.Zero];
+            B      := [others => 0];
+         end if;
+      end;
+   end Prove_Profile;
+
 end Mdoc_Prover;

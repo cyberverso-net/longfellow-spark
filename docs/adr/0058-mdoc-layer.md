@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for block 5 (2026-11-08, issue #126, pull request of the layer; proposed 2026-10-19 at block 1 of Phase D and edited until then). Block 6, the witness in Ada, is realised in three pull requests from 2026-11-08 (#134, #135, #136); its constant-time account and its bounds are [ADR 0086](0086-mdoc-witness-bounds-and-constant-time.md), which completes this record. The split of `Zk_Prover` and `Zk_Verifier` that the one transcript needs is [ADR 0085](0085-prover-and-verifier-in-two-phases.md).
+Accepted for block 5 (2026-11-08, issue #126, pull request of the layer; proposed 2026-10-19 at block 1 of Phase D and edited until then). Block 6, the witness in Ada, is realised in three pull requests from 2026-11-08 (#134, #135, #136); its constant-time account and its bounds are [ADR 0086](0086-mdoc-witness-bounds-and-constant-time.md), which completes this record. The split of `Zk_Prover` and `Zk_Verifier` that the one transcript needs is [ADR 0085](0085-prover-and-verifier-in-two-phases.md). The table of specifications becomes the rows of the supported profile, with one entry point per role, in [ADR 0089](0089-the-supported-mdoc-profile.md) (2026-11-10, #79).
 
 ## Date
 
