@@ -1,6 +1,6 @@
 # Performance
 
-This page records how fast the project proves and verifies the production mDoc circuits, how it got there, and how it compares with upstream. The milestones are set by [ADR 0055](../adr/0055-phase-d-scope-mdoc-scale.md) and [ADR 0067](../adr/0067-performance-milestones-by-trust.md); M2 closes with [ADR 0078](../adr/0078-milestone-m2-closed.md), the memory milestone with [ADR 0084](../adr/0084-memory-milestone-closed.md).
+This page records how fast the project proves and verifies the production mDoc circuits, how it got there, and how it compares with upstream. The milestones are set by [ADR 0055](../adr/0055-phase-d-scope-mdoc-scale.md) and [ADR 0067](../adr/0067-performance-milestones-by-trust.md); M2 closes with [ADR 0078](../adr/0078-milestone-m2-closed.md), the memory milestone with [ADR 0084](../adr/0084-memory-milestone-closed.md), the mDoc milestone and Phase D with [ADR 0090](../adr/0090-mdoc-milestone-closed-phase-d-complete.md).
 
 ## What is measured
 
@@ -23,6 +23,7 @@ This page records how fast the project proves and verifies the production mDoc c
 | M1 | Algorithmic parity: the eq tables, the verifier's Lagrange tables, the sumcheck prover realigned | at most 100 s | closed at about 126 s |
 | M2 | The Gold limit: as fast as the code goes while every contract stays proved | upstream generic | closed at 8.13 s (ADR 0078) |
 | Memory | The peak heap within twice upstream's, by the same measure, in Gold | upstream's peak heap | closed at 1.17 and 1.30 times upstream's (ADR 0084) |
+| mDoc | The proof of age from the credential, in upstream's format, accepted by upstream's verifier | upstream's `heap_v7`, the same flow | closed at 1.10 times upstream's time to prove, 1.58 to verify, peaks within the memory criterion (ADR 0090) |
 | M3 | A tested variant chosen at build time: hardware carry-less product, the verifier's encoding by FFT | upstream hardware, 0.69 s | next |
 | M4 | Parallelism | to be set | optional |
 
@@ -236,6 +237,25 @@ The first series against upstream at a commit newer than the pin (#128, reduced 
 | verification, peak heap | 64 MB (63,996,664 B) | 48 MB (48,161,640 B) | 48 MB (48,138,192 B) |
 
 Upstream's figures did not move: the proof within 0.02 s, the verification the same, the peaks within 24 kB either way. This project's ratios are the same against both upstream commits: 1.10 and 1.23 for the proof, 1.58 and 1.33 for the verification. The session is about 2 % slower than the one of "The mDoc proof of age" above for every program, ours and upstream's alike, the usual spread between sessions. The pin of the code and the interoperability stays d5e6be7.
+
+## At the close of Phase D
+
+The mDoc milestone, and with it Phase D, closes with [ADR 0090](../adr/0090-mdoc-milestone-closed-phase-d-complete.md). The final measurement, one session of 11 November on the release commit (9f790cf), right after its full gate, upstream at d5e6be7 in the same session: three runs of each program plain and three under the counter, upstream's `heap_v7` three times plain and once under the counter, the same flow on both sides from upstream's `TEST_DATA` document, both circuits of the version 7 pair in one process. The peaks are identical from run to run, the times within 0.02 s.
+
+| mDoc v7, both circuits in one process | from the witness files (9f790cf) | from the document, `TEST_DATA` (9f790cf) | upstream, `TEST_DATA` (d5e6be7) | ratio | share of the ADR 0080 criterion |
+|---|---|---|---|---|---|
+| prove, wall time, median of 3 | 4.53 s | 4.55 s | 4.12 s | 1.10 | |
+| prove, peak heap | 131,513,608 B (132 MB) | 131,514,792 B (132 MB) | 107,021,240 B (107 MB) | 1.23 | 61 % of 214 MB |
+| verify, wall time, median of 3 | 2.60 s | 2.60 s | 1.65 s | 1.58 | |
+| verify, peak heap | 63,996,664 B (64 MB) | 63,996,152 B (64 MB) | 48,162,672 B (48 MB) | 1.33 | 67 % of 96 MB |
+
+The round trip from the document is 7.15 s against upstream's 5.77 s, 1.24 times, the same ratio as in the sessions of 8 and 10 November. The peaks are those of 10 November to the byte, and upstream's too. The proofs are byte for byte those of the earlier sessions: from the Mustermann document and from its witness files under the same seed (SHA-256 `eb1fb46c…`), from `TEST_DATA` (`1d6cbca3…`).
+
+In the same session:
+
+- the version 6 pair, one run: 3.95 s to prove from the files and 3.96 s from the document (111 MB either way), 2.39 s and 59 MB to verify;
+- the single-circuit programs on the version 7 pair, as at the close of the memory milestone: the hash proof 4.64 s and 124,919,880 B, its verification 2.31 s and 62,389,072 B, the signature proof 0.45 s and 19,673,208 B, its verification 0.27 s and 9,538,152 B. These are within 400 bytes of the peaks of release 0.4.0, and the two proofs are the release's byte for byte;
+- the 38 test documents at both versions, `make mdoc-cases`: 6 min 25 s, every case as expected.
 
 ## After M2
 
