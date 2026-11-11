@@ -58,7 +58,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0052](0052-gold-perimeter-for-the-prover.md) | Gold perimeter for the prover | Accepted, amended by 0083 | 2026-10-17 |
 | [0053](0053-prover-vectors-and-cross-verification.md) | Prover vectors and cross-verification | Accepted | 2026-10-17 |
 | [0054](0054-prove-job-limit-sixty-minutes.md) | Prove job limit raised to sixty minutes and the prover partition split | Accepted, amended by 0060 | 2026-10-19 |
-| [0055](0055-phase-d-scope-mdoc-scale.md) | Phase D scope: the mDoc scale and the proof of age | Proposed, amended by 0067 and 0082, M2 closed by 0078 | 2026-10-19 |
+| [0055](0055-phase-d-scope-mdoc-scale.md) | Phase D scope: the mDoc scale and the proof of age | Accepted, amended by 0067 and 0082, M2 closed by 0078, closed by 0090 | 2026-10-19 |
 | [0056](0056-linear-input-constraint.md) | The input constraint in linear time | Accepted | 2026-10-19 |
 | [0057](0057-additive-fft.md) | The additive FFT for the Reed-Solomon code | Accepted | 2026-10-19 |
 | [0058](0058-mdoc-layer.md) | The mDoc layer: MACs, public inputs, transcript, proof format and witness | Accepted for block 5 | 2026-10-19 |
@@ -92,4 +92,5 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0086](0086-mdoc-witness-bounds-and-constant-time.md) | The witness from the mDoc: the bounds, the constant-time perimeter and the inversion of secrets | Accepted | 2026-11-08 |
 | [0087](0087-cross-check-with-upstream-at-every-gate.md) | The cross-check of the mDoc proofs with upstream's verifier at every gate | Accepted, amended by 0088 | 2026-11-09 |
 | [0089](0089-the-supported-mdoc-profile.md) | The supported mDoc profile: its invariants, its two rows, the claim of each row and one entry point per role | Accepted | 2026-11-10 |
+| [0090](0090-mdoc-milestone-closed-phase-d-complete.md) | The mDoc milestone closed: Phase D complete | Accepted | 2026-11-11 |
 | [0088](0088-proof-inputs-and-the-reuse-of-a-proof.md) | The proof inputs and the reuse of a proof: the gate proves again only what changed the proof's inputs | Accepted | 2026-11-09 |
