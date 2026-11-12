@@ -323,11 +323,11 @@ Two builds matter to an evaluator.
 
 | Part of the code | Proved by GNATprove | Runs in the test build | Runs in the release build |
 |---|---|---|---|
-| a contract with no level | yes | yes | no |
+| a contract with no level | yes | yes, unless it belongs to ghost code at `Proof_Only` or `SPARKlib_Full` | no |
 | a contract at `Proof_Only` or `SPARKlib_Full` | yes | no | no |
 | a contract at `Runtime` | yes | yes | yes |
 | the run-time checks of `src/` (indices, overflow) | yes (Silver) | yes | no: suppressed, the proof stands in |
-| the run-time checks of `cli/src/` | no: outside SPARK | yes | yes |
+| the run-time checks of `cli/src/` | no: outside SPARK | not applicable: the test build does not include `cli/src/` | yes |
 | ghost code | used by the proofs | yes, except at `Proof_Only` or `SPARKlib_Full` | no |
 
 Two consequences for an evaluator.
