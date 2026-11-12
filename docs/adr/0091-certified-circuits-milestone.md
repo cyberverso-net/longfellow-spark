@@ -54,6 +54,15 @@ The boundaries of the gadgets do not survive in the terms. A check that reads ra
 - No `native_decide` counts as evidence.
 - Lean and Mathlib join the trusted base. They are there already through upstream's proofs.
 
+**Lean in the repository and in the gate.** It is decided here because it fixes the trusted base and what a green gate means:
+
+- A folder `lean/` in the repository holds a Lake project.
+- The toolchain 4.31.0 and Mathlib v4.31.0 are pinned in `lean-toolchain` and `lake-manifest.json`, the versions of upstream's `formal/`.
+- Mathlib's compiled cache is fetched with `lake exe cache get` and never compiled in the gate. On the proving machine it lives in the home directory, where it is already installed.
+- A step `lean` of `make check` builds the lemmas, and fails if a theorem does not close. It checks `#print axioms` on every lemma a SPARK contract cites: the standard axioms only (`propext`, `Classical.choice`, `Quot.sound`), so no `native_decide` and no `sorry`, as upstream's audit does for its own proofs.
+- The digest of the Lean inputs (the Lake project, the pinned versions and the sources under `lean/`) joins the fingerprint of the proof inputs of [ADR 0088](0088-proof-inputs-and-the-reuse-of-a-proof.md), so that a changed lemma forces the run.
+- Whether the `verify` workflow on GitHub Actions runs the step from the cache, or leaves it to the proving machine, is measured in block 2 and recorded there.
+
 **The certificate's format.** For every wire:
 
 - its class: gadget node, shared, copy or rewritten;
@@ -131,12 +140,13 @@ G3 rests on the order of α in the circuit's field. The milestone proves it in L
 
 - The milestone "Certified circuits" opens after the guide for the evaluator. Its seven blocks become issues of the form Block, written from this record.
 - `Local_Check`, the lemma of the feasibility study, enters a pull request of block 3 with its review. Until then it stays on the task branch of #88.
-- The Lean development becomes part of the evidence an evaluator re-runs. Block 2, which brings its first lemmas, fixes where it lives and how the gate builds it.
+- The Lean development becomes part of the evidence an evaluator re-runs, in `lean/`, with its step in `make check`. Block 2 brings its first lemmas and the step, and records the measurement for `verify`.
+- The guide gains chapter 10, the certified circuits, with one section per block. It opens with the table "Conditions for certifying the circuit": what must be true for the circuit to be certifiable comes first, then how it is proved.
 - At the milestone's close, the trust model, the register and the Lean correspondence page change their rows on the circuits' semantics. The conditions table of chapter 9 Section 6 becomes the hypotheses of a theorem rather than a reading.
 
 ## Verification impact
 
-None from this record: no code and no contract change. The milestone adds partitions and the Lean build to the gate; each block records its own.
+None from this record: no code and no contract change. The milestone adds partitions, the step `lean` and the digest of the Lean inputs to the gate; each block records its own.
 
 ## References
 
