@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-30, at the merge of pull request #54; proposed 2026-10-30, during the memory milestone of Phase D).
+Accepted (2026-10-30, at the merge of pull request #54; proposed 2026-10-30, during the memory milestone of Phase D). Amended by [ADR 0091](0091-certified-circuits-milestone.md) (2026-11-12, Proposed): the milestone Certified circuits comes after the guide for the evaluator and before the certification block.
 
 ## Date
 

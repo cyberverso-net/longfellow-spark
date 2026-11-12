@@ -85,7 +85,7 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0079](0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md) | The specification migrated to draft-irtf-cfrg-longfellow-00, and upstream's new home | Accepted | 2026-10-29 |
 | [0080](0080-milestone-memory.md) | A memory milestone, before the certification block and M3 | Accepted, amended by 0082, closed by 0084 | 2026-10-29 |
 | [0081](0081-audience-certification-evaluators.md) | The audience: evaluators in a certification laboratory | Accepted | 2026-10-30 |
-| [0082](0082-order-after-the-memory-milestone.md) | The order after the memory milestone | Accepted | 2026-10-30 |
+| [0082](0082-order-after-the-memory-milestone.md) | The order after the memory milestone | Accepted, amended by 0091 | 2026-10-30 |
 | [0083](0083-claims-corrected-at-the-milestone-review.md) | Claims corrected at the milestone review of the memory milestone | Accepted | 2026-11-06 |
 | [0084](0084-memory-milestone-closed.md) | The memory milestone closed: the peak heap at 1.17 and 1.30 times upstream's | Accepted | 2026-11-07 |
 | [0085](0085-prover-and-verifier-in-two-phases.md) | The prover and the verifier in two phases: commit, then prove, on a transcript the caller opens | Accepted | 2026-11-07 |
@@ -94,3 +94,4 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0089](0089-the-supported-mdoc-profile.md) | The supported mDoc profile: its invariants, its two rows, the claim of each row and one entry point per role | Accepted | 2026-11-10 |
 | [0090](0090-mdoc-milestone-closed-phase-d-complete.md) | The mDoc milestone closed: Phase D complete | Accepted | 2026-11-11 |
 | [0088](0088-proof-inputs-and-the-reuse-of-a-proof.md) | The proof inputs and the reuse of a proof: the gate proves again only what changed the proof's inputs | Accepted | 2026-11-09 |
+| [0091](0091-certified-circuits-milestone.md) | Certified circuits: a proved checker for the registered circuits, with two proof backends | Proposed | 2026-11-12 |

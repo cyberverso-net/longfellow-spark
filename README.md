@@ -12,6 +12,7 @@ The project is built in phases, each released when complete:
 | B | A loader for the circuits the upstream compiler produces, and the upstream proofs accepted from their files | 0.2.0 | 11967 |
 | C | The prover, which reproduces the two upstream example proofs byte for byte | 0.3.0 | 16671 |
 | D | The production mDoc circuits at full scale: performance and memory (0.4.0), then the mDoc layer and the proof of age (0.5.0) | 0.4.0, then 0.5.0 | 33276 at 0.4.0, 39177 at 0.5.0 |
+| Certified circuits, a milestone after the guide for the evaluator | A proved checker that takes the registered circuit files as they are, with an untrusted certificate, and establishes what each circuit accepts. Criterion: both circuits of the version 7 one-attribute pair accepted by the checker, the theorems Gold (ADR 0091, Proposed) | to come | |
 
 In Phase D, milestone M2 closed at a round trip of 8.13 s for the two mDoc proofs and their verifications, and the memory milestone at a peak heap of 1.17 times upstream's for the prover and 1.30 times for the verifier on the hash circuit, with every contract proved; [the performance page](docs/guide/performance.md) gives the steps and the comparison with upstream. Release 0.4.0 closes the memory milestone. Release 0.5.0 closes Phase D: the proof of age made from the credential itself, in upstream's format and accepted by upstream's verifier, at 1.10 times upstream's time to prove and 1.58 times to verify, with every contract proved.
 
