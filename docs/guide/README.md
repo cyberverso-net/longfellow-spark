@@ -6,6 +6,8 @@ Each stage of the implementation has a chapter with the same shape: the mathemat
 
 ## Reading order
 
+Before the chapters, the primer for the evaluator explains the cryptography and SPARK from first principles: [part 1, the cryptography](00-primer-cryptography.md), and [part 2, SPARK and the evidence](00-primer-spark.md). Each part marks an essential route for a first reading.
+
 1. [Verification approach](verification-approach.md): what a SPARK proof can and cannot say about a zero-knowledge proof system, the assurance levels used here, and how to read a package header.
 2. [Trust model](trust-model.md): every claim of the project, proved, tested or trusted, part by part.
 3. [Trusted base register](trusted-base.md): every trusted item, one row each, with what depends on it, where it is stated and what would discharge it; a living document, extended by each block.
