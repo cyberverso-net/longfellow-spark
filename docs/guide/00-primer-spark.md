@@ -328,7 +328,7 @@ Two builds matter to an evaluator.
 | a contract at `Runtime` | yes | yes | yes |
 | the run-time checks of `src/` (indices, overflow) | yes (Silver) | yes | no: suppressed, the proof stands in |
 | the run-time checks of `cli/src/` | no: outside SPARK | yes | yes |
-| ghost code | used by the proofs | yes, except at `Proof_Only` | no |
+| ghost code | used by the proofs | yes, except at `Proof_Only` or `SPARKlib_Full` | no |
 
 Two consequences for an evaluator.
 
