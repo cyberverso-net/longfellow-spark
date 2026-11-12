@@ -44,6 +44,21 @@
 --                         the one order the version 6 circuit frames
 --                         (#150; upstream's builder has no such status
 --                         and its circuit refuses the proof).
+--    Validity_Form_Unsupported
+--                         the document's validFrom or validUntil is not
+--                         tag 0 over YYYY-MM-DDThh:mm:ssZ, the one form
+--                         the circuits compare byte for byte (#165;
+--                         upstream's builder has no such status).
+--    Device_Key_Form_Unsupported
+--                         the device key is not a COSE_Key of exactly
+--                         kty, crv, x, y in that order (no kid, no alg)
+--                         alone in deviceKeyInfo, the one form the
+--                         circuits compare byte for byte (#165).
+--    Random_Form_Unsupported
+--                         a requested item's random is not a byte string
+--                         of at least 16 bytes (ISO/IEC 18013-5,
+--                         9.1.2.5), which the circuits do not check
+--                         (#165).
 --    Signature_Not_Canonical
 --                         a signature value s of the document is not
 --                         below the group order, which the ECDSA
@@ -82,6 +97,9 @@ package Mdoc_Status is
       Attribute_Not_Found,
       Attribute_Too_Long,
       Item_Order_Unsupported,
+      Validity_Form_Unsupported,
+      Device_Key_Form_Unsupported,
+      Random_Form_Unsupported,
       Signature_Not_Canonical,
       Profile_Unknown,
       Profile_Mismatch,

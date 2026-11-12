@@ -237,6 +237,9 @@ package Mdoc_Prover is
                         | Mdoc_Status.Attribute_Not_Found
                         | Mdoc_Status.Attribute_Too_Long
                         | Mdoc_Status.Item_Order_Unsupported
+                        | Mdoc_Status.Validity_Form_Unsupported
+                        | Mdoc_Status.Device_Key_Form_Unsupported
+                        | Mdoc_Status.Random_Form_Unsupported
                         | Mdoc_Status.Signature_Not_Canonical
                         | Mdoc_Status.Profile_Unknown
                         | Mdoc_Status.Profile_Mismatch
@@ -249,8 +252,10 @@ package Mdoc_Prover is
    --  layout's counts, and Prove runs on them with the same request.
    --  St is Parse_Failed when the parse refuses the document, with the
    --  parser's status in Parse_St and the CBOR reader's in Cbor_St;
-   --  Attribute_Not_Found, Attribute_Too_Long, Item_Order_Unsupported
-   --  and Signature_Not_Canonical are the builders' refusals; otherwise St,
+   --  Attribute_Not_Found, Attribute_Too_Long, Item_Order_Unsupported,
+   --  Validity_Form_Unsupported, Device_Key_Form_Unsupported,
+   --  Random_Form_Unsupported and Signature_Not_Canonical are the
+   --  builders' refusals; otherwise St,
    --  Len, B and Detail are Prove's. On a refusal before the proof (a
    --  session transcript above the bound, the parse, the builders) the
    --  three buffers are zero (postcondition): nothing of the credential
@@ -309,6 +314,9 @@ package Mdoc_Prover is
                                 | Mdoc_Status.Attribute_Not_Found
                                 | Mdoc_Status.Attribute_Too_Long
                                 | Mdoc_Status.Item_Order_Unsupported
+                                | Mdoc_Status.Validity_Form_Unsupported
+                                | Mdoc_Status.Device_Key_Form_Unsupported
+                                | Mdoc_Status.Random_Form_Unsupported
                                 | Mdoc_Status.Signature_Not_Canonical
                  then (for all I in Hash_W'Range => Hash_W (I) = GF2_128.Zero)
                       and then

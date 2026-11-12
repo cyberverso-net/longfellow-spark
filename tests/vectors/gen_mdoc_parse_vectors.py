@@ -715,14 +715,20 @@ def make_item(entries=None, digest_id=7, key_names=None, value=None):
     return enc_map([(enc_text(k), v) for k, v in entries])
 
 
-def make_mso_map(map_len=300, ns="org.iso.18013.5.1", digest_id=7, pad_key="pad", doc_type="org.iso.18013.5.1.mDL"):
+def make_mso_map(map_len=300, ns="org.iso.18013.5.1", digest_id=7, pad_key="pad", doc_type="org.iso.18013.5.1.mDL",
+                 valid_from=None, valid_until=None, device_key_info=None):
+    """valid_from, valid_until: the encoded CBOR values (default a text
+    without tag 0, as this generator's vectors were made)."""
+    valid_from = valid_from if valid_from is not None else enc_text("2024-01-01T00:00:00Z")
+    valid_until = valid_until if valid_until is not None else enc_text("2034-01-01T00:00:00Z")
     base = [
         (enc_text("docType"), enc_text(doc_type)),
-        (enc_text("validityInfo"), enc_map([(enc_text("validFrom"), enc_text("2024-01-01T00:00:00Z")),
-                                             (enc_text("validUntil"), enc_text("2034-01-01T00:00:00Z"))])),
-        (enc_text("deviceKeyInfo"), enc_map([(enc_text("deviceKey"),
-                                               enc_map([(enc_nint(-2), enc_bytes(bytes([1] * 32))),
-                                                        (enc_nint(-3), enc_bytes(bytes([2] * 32)))]))])),
+        (enc_text("validityInfo"), enc_map([(enc_text("validFrom"), valid_from),
+                                             (enc_text("validUntil"), valid_until)])),
+        (enc_text("deviceKeyInfo"), device_key_info if device_key_info is not None else
+         enc_map([(enc_text("deviceKey"),
+                   enc_map([(enc_nint(-2), enc_bytes(bytes([1] * 32))),
+                            (enc_nint(-3), enc_bytes(bytes([2] * 32)))]))])),
         (enc_text("valueDigests"), enc_map([(enc_text(ns), enc_map([(enc_uint(digest_id), enc_bytes(bytes(32)))]))])),
     ]
     # pad to the wanted length with a byte string under pad_key (its head

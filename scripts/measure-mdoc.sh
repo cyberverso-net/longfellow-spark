@@ -309,6 +309,38 @@ mdoc_from_documents() {
       --mdoc "$f0/mdoc.bin" --pkx 0x$(sed -n 's/^pkx 0x//p' "$f0/request.txt") --pky 0x$(sed -n 's/^pky 0x//p' "$f0/request.txt") \
       --transcript-file "$f0/transcript.bin" --now "$(sed -n 's/^now //p' "$f0/request.txt")" \
       --doc-type "$CASE_DOC_TYPE" --attr age_over_18:f4 --seed 1 --out cli/out/never.bin
+   #  The case's document with the T of its validUntil in lower case
+   #  (#165): refused by the builder before any commitment, since both
+   #  circuits compare the dates byte for byte.
+   python3 -I - "$CASE_DIR/mdoc.bin" cli/out/mdoc_lower_t.bin <<'PY'
+import sys
+d = bytearray(open(sys.argv[1], "rb").read())
+key = b"\x6avalidUntil\xc0\x74"
+i = d.find(key)
+if i < 0 or d.find(key, i + 1) >= 0 or d[i + len(key) + 10] != ord("T"):
+    sys.exit("measure-mdoc: the case's validUntil is not where expected")
+d[i + len(key) + 10] = ord("t")
+open(sys.argv[2], "wb").write(bytes(d))
+PY
+   expect_refused "validity date not in the circuit's form" "validity_form_unsupported" "$BIN/longfellow_prove_mdoc" --spec "$h7" \
+      --mdoc cli/out/mdoc_lower_t.bin --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
+      --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$CASE_ATTR" --seed 1 --out cli/out/never.bin
+   #  The case's document with the device key's crv 1 (P-256) changed to
+   #  2 (P-384) (#165): refused by the builder, since both circuits
+   #  compare the COSE_Key's bytes with the one form kty, crv, x, y.
+   python3 -I - "$CASE_DIR/mdoc.bin" cli/out/mdoc_crv2.bin <<'PY'
+import sys
+d = bytearray(open(sys.argv[1], "rb").read())
+key = b"\x69deviceKey\xa4\x01\x02\x20\x01"
+i = d.find(key)
+if i < 0 or d.find(key, i + 1) >= 0:
+    sys.exit("measure-mdoc: the case's device key is not where expected")
+d[i + len(key) - 1] = 0x02
+open(sys.argv[2], "wb").write(bytes(d))
+PY
+   expect_refused "device key not in the circuit's form" "device_key_form_unsupported" "$BIN/longfellow_prove_mdoc" --spec "$h7" \
+      --mdoc cli/out/mdoc_crv2.bin --pkx "$CASE_PKX" --pky "$CASE_PKY" --transcript "$CASE_TRANSCRIPT" \
+      --now "$CASE_NOW" --doc-type "$CASE_DOC_TYPE" --attr "$CASE_ATTR" --seed 1 --out cli/out/never.bin
    local status=0 out
    out="$("$BIN/longfellow_prove_mdoc" --spec "$h7" --mdoc "$CASE_DIR/mdoc.bin" \
       --hash-witness "$M/${h7}_hash_witness.bin" --sig-witness "$M/${h7}_sig_witness.bin" \

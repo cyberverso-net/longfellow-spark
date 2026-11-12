@@ -207,7 +207,7 @@ Each item below has a row in the [trusted base register](trusted-base.md).
 **Inputs and references.**
 
 - The pinned specification itself.
-- The upstream circuit files, as to what they compute, until this project compiles its own. Their shape is proved `Well_Formed` on load and their identifier is recomputed (ADR 0046), except for the pinned list below.
+- The upstream circuit files, as to what they compute, until this project compiles its own. Their shape is proved `Well_Formed` on load and their identifier is recomputed (ADR 0046), except for the pinned list below. The version 7 pair's guarantee holds under explicit conditions on the issuer, the relying party and the circuit itself (matching by content, the SHA-256 padding, the wrapper lengths, the types in an item, the namespace, the separators of the dates, the docType, the issuer's key, e2 not zero), and the circuits support ES256 on P-256 only, with one COSE_Key form: chapter 9 Section 6, "Conditions for certifying the circuit".
 - The list of `Pinned_Circuits` in the command line: the digest of each circuit file and its identifier, checked once by a full `Read` in `interop_kat`. A file in the list is loaded without recomputing its identifier (ADR 0074).
 - The upstream production reader at d5e6be7, as the definition of the LFC2 format.
 - That the recordings of the upstream Ligero verifier are faithful to d5e6be7 (ADR 0040).

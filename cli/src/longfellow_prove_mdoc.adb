@@ -15,7 +15,12 @@
 --  whose elementValue entry does not follow its elementIdentifier entry
 --  is refused by the builder (item_order_unsupported) before any
 --  commitment, where upstream's builder would let the circuit refuse
---  the proof.
+--  the proof. At both versions a validFrom or validUntil not of the
+--  form YYYY-MM-DDThh:mm:ssZ under tag 0 is refused by the builder
+--  (validity_form_unsupported, #165), and a device key not a COSE_Key
+--  of exactly kty, crv, x, y (device_key_form_unsupported, #165), and
+--  an item whose random is not a byte string of at least 16 bytes
+--  (random_form_unsupported, #165).
 --
 --  With --hash-witness and --sig-witness the two files are read (the
 --  circuit's inputs as little-endian field elements, 16 bytes each
