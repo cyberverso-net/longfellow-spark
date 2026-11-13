@@ -14,7 +14,7 @@ The route goes from the claim down the chain of evidence: first what is certifie
 
 Reading time: about four hours, estimated from its length (about 23,000 words); the author's measured time will replace this estimate at the close of the milestone.
 
-1. The repository's [README](../../README.md), its first screen; then [A11.1](00-primer-cryptography.md#a111-the-idea-in-plain-words), the idea in plain words; [A1](00-primer-cryptography.md#a1-the-object-certified-and-what-certifying-it-means), the object certified and what certifying it means; then [A11](00-primer-cryptography.md#a11-longfellow-all-together) in full, where [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee) states how strong the guarantee is and the four things that limit it.
+1. The repository's [README](../../README.md), its first screen; then [A11.1](00-primer-cryptography.md#a111-the-idea-in-plain-words), the idea in plain words; optionally the [system map](system-map.md), the same flow with the units; [A1](00-primer-cryptography.md#a1-the-object-certified-and-what-certifying-it-means), the object certified and what certifying it means; then [A11](00-primer-cryptography.md#a11-longfellow-all-together) in full, where [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee) states how strong the guarantee is and the four things that limit it.
 2. [A12](00-primer-cryptography.md#a12-who-attacks-what), who attacks what.
 3. The [trust model](trust-model.md), "In short".
 4. [B3](00-primer-spark.md#b3-contracts), [B4](00-primer-spark.md#b4-ghost-code-assertion-levels-and-builds), [B6](00-primer-spark.md#b6-what-a-verification-condition-says) and [B7](00-primer-spark.md#b7-proved-tested-trusted): enough SPARK to read a contract, a table of verification conditions and a row of the trusted base register; then [B10](00-primer-spark.md#b10-a-worked-evaluation), a worked evaluation.
@@ -53,6 +53,7 @@ The other sections of the primer, [B1](00-primer-spark.md#b1-ada-in-two-pages), 
 | [Primer, part 1](00-primer-cryptography.md) | what is certified; the cryptography from first principles; the adversaries |
 | [Primer, part 2](00-primer-spark.md) | SPARK, contracts and the evidence; a worked evaluation |
 | [Glossary](glossary.md) | one name per thing, with its aliases in the chapters |
+| [System map](system-map.md) | the proof of age step by step, PS1 to PS11 and VS1 to VS8, with the units of each step |
 | [Chapter 1, GF(2^128)](01-gf2_128.md) | the binary field of the hash circuit |
 | [Chapter 2, the base field of P-256](02-p256-field.md) | the prime field of the signature circuit |
 | [Chapter 3, the sumcheck](03-sumcheck.md) | circuits as data, the sumcheck and the verifier's equations |

@@ -6,6 +6,31 @@ Stage 5 of Phase A, the last. The Merkle commitment (`Merkle`), the geometry and
 
 ### 1.1 Commitments to a matrix: Reed-Solomon rows, hashed columns
 
+```mermaid
+flowchart TB
+  D4_1["D4.1 the combined witness in rows, each row prefixed by blinding values; rows of pure randomness<br/>Ligero_Prover.Commit, Ligero_Geometry"]
+  D4_2["D4.2 each row extended into a codeword: the tableau<br/>Ligero_Prover.Encode_Row, Additive_Fft, Rfft_P256"]
+  D4_3["D4.3 the committed columns, each hashed with a leaf nonce, in a Merkle tree; the root is the commitment<br/>Merkle.Build"]
+  D4_4["D4.4 the challenges, from the transcript after the sumcheck<br/>Ligero_Verifier.Draw_Challenges"]
+  D4_5["D4.5 the prover's answers: the low-degree row, the linear row, the quadratic row<br/>Ligero_Prover.Prove"]
+  D4_6["D4.6 the opened columns, drawn after the answers, with a batch proof<br/>Ligero_Verifier.Choose_Columns, Merkle.Open, Ligero_Verifier.Verify_Merkle"]
+  D4_7["D4.7 the three tests at the opened columns: low-degree, linear, quadratic<br/>Ligero_Verifier.Verify_LDT, Ligero_Verifier.Build_A_Full, Ligero_Verifier.Verify_Dot, Ligero_Verifier.Verify_Quad"]
+  SC["the linear and quadratic constraints, from the sumcheck: D3"]
+  D4_1 --> D4_2 --> D4_3 --> D4_4 --> D4_5 --> D4_6 --> D4_7
+  SC --> D4_4
+```
+
+*D4. Ligero: the commitment and the three tests. The verifier never sees a row; it sees the prover's three answers in full and the opened columns, and checks each answer against the same combination of the opened columns ([A8.3](00-primer-cryptography.md#a83-the-three-tests)). The order is what makes it sound: the root is written before any challenge, the answers before the columns are drawn. What it simplifies: the rows are of three kinds, the witness rows, the copied rows of the quadratic test and the random rows that hide each answer, drawn here as one; the verifier extends each answer by Lagrange interpolation at the opened columns, where the prover encodes by an FFT. Draft-irtf-cfrg-longfellow-00, Sections 4.1 to 4.5.*
+
+Where it is in the code:
+
+| Box | Units | Key subprograms | Assurance | Harnesses and vectors | Draft and records | Upstream |
+|---|---|---|---|---|---|---|
+| D4.1, D4.2 | [`Ligero_Prover`](../../src/ligero_prover.ads), [`Ligero_Geometry`](../../src/ligero_geometry.ads), [`Additive_Fft`](../../src/additive_fft.ads), [`Rfft_P256`](../../src/rfft_p256.ads) | `Commit`, `Encode_Row`, `Make` | the geometry Gold; each row placed without touching the others; the systematic part proved, the parity by the FFT tested (register row V2); partitions `ligero`, `ligero-prover` | `prover_kat`, `fft_kat` | Sections 2.2, 4.2, 4.3; ADR 0057 | `runtime_ligero::prover::LigeroProver::commit` |
+| D4.3, D4.6 | [`Merkle`](../../src/merkle.ads), [`Fisher_Yates`](../../src/fisher_yates.ads) | `Build`, `Open`, `Verify` | `Build` against the heap of the tree; `Verify` accepts only distinct indices and a proof consumed exactly; `Choose` distinct values; partition `primitives` | `ligero_kat` | Sections 4.1, 4.4.3; ADR 0052 | `runtime_merkle::commitment` |
+| D4.4, D4.7 | [`Ligero_Verifier`](../../src/ligero_verifier.ads), [`Lagrange`](../../src/lagrange.ads), [`Ligero_Proof`](../../src/ligero_proof.ads) | `Draw_Challenges`, `Verify_LDT`, `Build_A_Full`, `Verify_Dot`, `Verify_Quad` | the three tests against the combinations of Sections 4.4 and 4.5; `Lagrange` against the matrix at the opened columns; partitions `verifier`, `ligero` | `ligero_kat` | Sections 4.4, 4.5; ADR 0036 | `runtime_ligero::verifier::verify` |
+| D4.5 | [`Ligero_Prover`](../../src/ligero_prover.ads) | `Prove` | Silver; partition `ligero-prover` | `prover_kat` | Section 4.4.4 | `runtime_ligero::prover::LigeroProver::prove` |
+
 The sumcheck of chapter 3 ends with linear constraints A W + b = 0 and quadratic constraints W[x] W[y] = W[z] on a witness vector W the verifier never sees: the private inputs and the pad variables of every layer. Ligero is the commitment that lets the prover prove those constraints about W without revealing it. The witness is laid out in rows of WR entries, each row prefixed by NREQ random blinding values, and every row of BLOCK = NREQ + WR entries is read as the values of a polynomial of degree below BLOCK at the first BLOCK points of a Reed-Solomon code and extended to NCOL points. The matrix of extended rows is the tableau; its columns from DBLOCK on, where DBLOCK = 2 BLOCK - 1 (Section 4.2), are each hashed with a random nonce and committed in a Merkle tree, and the verifier asks to see NREQ of those columns, chosen after everything else is fixed. The rate 1/RATE_INV and the number of opened columns are the two parameters that buy soundness (Section 5.1 gives NREQ 132 and rate 7 for 128 bits); the blinding prefix is what buys zero knowledge: an opened column reveals one value of each row's polynomial, and NREQ such values of a polynomial with NREQ random coefficients reveal nothing about the other WR.
 
 ### 1.2 Merkle trees without padding: the heap layout and batch proofs

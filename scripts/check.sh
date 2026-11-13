@@ -362,6 +362,11 @@ do_lint() {
    header "lint: relative links of docs/ and the README (check-links.py)"
    python3 -I scripts/check-links-test.py
    python3 -I scripts/check-links.py
+   #  Every unit a diagram or a code map of the guide names exists, and
+   #  every unit is placed in a map.
+   header "lint: the code maps of the guide (check-map.py)"
+   python3 -I scripts/check-map-test.py
+   python3 -I scripts/check-map.py
    header "lint: forbidden content over tracked files"
    #  git grep searches tracked files only, in one process, and exits 0
    #  exactly when something matched. This script is excluded from the

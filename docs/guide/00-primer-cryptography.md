@@ -289,7 +289,7 @@ Two different tables have different extensions, so a claim about a whole layer c
 |---|---|
 | Polynomials of degree 2 by three values; the Lagrange basis | chapter 3 Section 1.4 |
 | Multilinear extensions and bind | chapter 3 Section 1.2; `Sumcheck_Algebra` |
-| Interpolation for the Reed-Solomon code | chapter 5 Section 2.3; `Lagrange` |
+| The verifier's interpolation at the opened columns | chapter 5 Section 2.3; `Lagrange` |
 | The security bound | the Lean correspondence page |
 
 ## A4. Hashes and Merkle trees
@@ -573,7 +573,9 @@ The equations of [A7.5](#a75-the-running-example), linear in w and the eleven pa
 
 | What | Where |
 |---|---|
-| The code and the interpolation | chapter 5 Sections 1.1 and 2.3; `Lagrange` |
+| The code | chapter 5 Section 1.1 |
+| The prover's encoding, by an FFT | chapter 8; `Additive_Fft`, `Rfft_P256` |
+| The verifier's interpolation | chapter 5 Section 2.3; `Lagrange` |
 | The tableau, the tests, the opened columns | chapter 5 Sections 1.3 to 1.6; `Ligero_Verifier`, `Ligero_Prover` |
 | The geometry: rows, columns, the 132 openings | chapter 5 Section 2.2; `Ligero_Geometry` |
 | The version 7 parameters | chapter 9 Section 1.2 |
@@ -726,18 +728,21 @@ flowchart TB
   subgraph prover [Prover]
     W1["hash witness"] --> C1["commit (Ligero, Merkle root)"]
     W2["signature witness"] --> C2["commit (Ligero, Merkle root)"]
-    C1 --> AV["draw av from the transcript"]
-    C2 --> AV
+    C1 --> C2
+    C2 --> AV["draw av from the transcript"]
     AV --> S1["hash circuit: sumcheck, then Ligero proof"]
     S1 --> S2["signature circuit: sumcheck, then Ligero proof"]
     S2 --> P["proof bytes: six tags, hash proof, signature proof"]
   end
   subgraph verifier [Verifier]
-    P --> B["rebuild the public inputs and e2 from its own data"]
-    B --> R["replay the transcript: roots, av, both proofs"]
-    R --> D{"both accepted?"}
+    P --> R["read both proofs; both roots into the transcript; draw av"]
+    R --> B["rebuild the public inputs and e2 from its own data"]
+    B --> V["verify the hash proof, then the signature proof"]
+    V --> D{"both accepted?"}
   end
 ```
+
+The same flow step by step, with the units that implement each step, is the [system map](system-map.md).
 
 ### A11.3 A running example
 

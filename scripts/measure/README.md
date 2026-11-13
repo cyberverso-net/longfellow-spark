@@ -57,3 +57,41 @@ MEASURE_UPSTREAM=<commit> RUSTFLAGS="-C target-cpu=x86-64" cargo build --release
 ```
 
 The runs are as above. The first use is the series of #128 on the performance page, "Upstream at a newer commit".
+
+## The steps: where the time and the peak heap go
+
+The matrices of the performance page, "By step", divide the totals of the page among the steps of the guide's system map (PS1 to PS11, VS1 to VS8). Three tools make them.
+
+### `heapprof.c`: the blocks alive at the peak
+
+A second `LD_PRELOAD` object, counting what `heapshim.c` counts, that also records the call stack of every allocation. The peak is known only at exit, so it takes two runs of the same deterministic command: the first under `heapshim.so` gives the peak P, the second under `heapprof.so` with `HEAPPROF_AT=P` writes, the first time the bytes alive reach P, every block alive with its stack, and the process's memory map.
+
+```
+gcc -O2 -shared -fPIC -o heapprof.so scripts/measure/heapprof.c
+HEAPSHIM_OUT=peak.txt LD_PRELOAD=$PWD/heapshim.so COMMAND
+HEAPPROF_AT=<the peak of peak.txt> HEAPPROF_OUT=prove.dump LD_PRELOAD=$PWD/heapprof.so COMMAND
+```
+
+The stacks are walked by glibc's `backtrace()`, which needs unwind tables: GNAT emits them; upstream's release profile (`panic = "abort"`) does not, and its binary is built with `-C force-unwind-tables=yes` for this profile.
+
+### `attribute-steps.py`: a profile by step
+
+Reads a time profile (the text of `perf script` with call chains) or a dump of `heapprof.c`, and gives each sample or block to the step whose root subprogram is the nearest one on its stack. The roots of each step are listed in the script, for this project and for upstream at the pin; the units every step uses (the fields, the hashes) are leaves and take the step above them. It prints the share of each step and circuit, the share of the program's own code and the share not attributed, and, for a heap profile, the bytes at the peak by allocating subprogram.
+
+```
+LONGFELLOW_CLI_BUILD=proved alr -n exec -- gprbuild -P cli/longfellow_verify.gpr -p -f -cargs -g
+perf record -e cpu-clock -F 999 --call-graph dwarf,65528 -o prove.data -- cli/bin/longfellow_prove_mdoc ...
+perf script -i prove.data -F comm,tid,time,event,ip,sym,dso --inline > prove.txt
+python3 -I scripts/measure/attribute-steps.py ours prove time prove.txt
+python3 -I scripts/measure/attribute-steps.py ours prove heap prove.dump
+```
+
+Ours is the release build with `-g` only: GCC's code does not change, and the session of 13 November found the `.text` of both programs identical byte for byte to the release build's. Upstream's time profiles take a build with `-C force-frame-pointers=yes -C symbol-mangling-version=v0` and debug information, recorded with `--call-graph fp`, its names demangled by `c++filt` (`perf script --no-demangle ... | c++filt`); perf's own DWARF unwinder stops inside upstream's field multiplication.
+
+### `step-matrix.py`: the matrix
+
+Takes three time attributions of one program, its heap attribution and the page's totals, and prints the Markdown matrix: per step, its class, the median share of the samples and that share of the total time per circuit, the bytes alive at the peak and their share.
+
+```
+python3 -I scripts/measure/step-matrix.py 4.55 131514792 prove-heap.tsv prove-time-1.tsv prove-time-2.tsv prove-time-3.tsv
+```
