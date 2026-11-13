@@ -1,41 +1,84 @@
 # Guide
 
-This guide is meant for evaluators in a certification laboratory, and for anyone who wants to understand how the system works, with no expertise in cryptography or SPARK assumed (ADR 0081). The chapters are not there yet: they were written for a reader who knows some cryptography, and a milestone of their own will revise them, with a primer and a glossary.
+This guide is written for evaluators in a certification laboratory, and for anyone who wants to understand how the system works, with no expertise in cryptography or SPARK assumed (ADR 0081). It starts with a primer and a glossary; the chapters then apply what the primer explains, stage by stage.
 
-Each stage of the implementation has a chapter with the same shape: the mathematics, then the algorithm, then the Ada/SPARK implementation (types, contracts, ghost code, loop invariants, explained for a reader new to SPARK), then an honest account of what the proofs guarantee for all inputs, what is only tested, what remains trusted, with the verification condition table and the commands to reproduce it.
+- **The primer:** [part 1, the cryptography](00-primer-cryptography.md), and [part 2, SPARK and the evidence](00-primer-spark.md).
+- **The glossary:** [one name per thing](glossary.md), with the place where each term is defined.
+- **The chapters**, one per stage of the implementation, each with the same shape: the mathematics, the algorithm, the Ada/SPARK implementation, then what the proofs guarantee for all inputs, what is only tested, what remains trusted, with the table of verification conditions and the commands to reproduce it.
 
-## Reading order
+## How to read it
 
-Before the chapters, the primer for the evaluator explains the cryptography and SPARK from first principles: [part 1, the cryptography](00-primer-cryptography.md), and [part 2, SPARK and the evidence](00-primer-spark.md). Each part marks an essential route for a first reading.
+The route goes from the claim down the chain of evidence: first what is certified and what it means to certify it, then the protocol from the top, each idea in the primer followed by the chapters' sections that apply it, then the evidence item by item.
 
-1. [Verification approach](verification-approach.md): what a SPARK proof can and cannot say about a zero-knowledge proof system, the assurance levels used here, and how to read a package header.
-2. [Trust model](trust-model.md): every claim of the project, proved, tested or trusted, part by part.
-3. [Trusted base register](trusted-base.md): every trusted item, one row each, with what depends on it, where it is stated and what would discharge it; a living document, extended by each block.
-4. [Correspondence with upstream's Lean proofs](lean-correspondence.md): how the protocol theorems upstream proves in Lean relate to the code proved here, row by row.
-5. [Chapter 1, GF(2^128)](01-gf2_128.md): the binary field under the sumcheck and Ligero layers; the first complete stage.
-6. [Chapter 2, the P-256 base field](02-p256-field.md): prime-field arithmetic with carries, a ghost big-integer model, and Montgomery multiplication as upstream's CIOS step, proved against the model.
-7. [Chapter 3, the sumcheck algebra and the symbolic verifier core](03-sumcheck.md): generics over a field, circuits as data, structural Gold through logical equality, sparse expressions and the constraint-emitting verifier core with challenges as input.
-8. [Chapter 4, the Fiat-Shamir transcript and the challenge replay](04-transcript.md): the transcript of draft Section 3 over SHA-256 and AES-256, field serialisation and sampling, and the replay of the challenges of a proof into the record of chapter 3; the fourth complete stage.
-9. [Chapter 5, Ligero and the complete verifier](05-ligero.md): the Merkle commitment, the geometry and the Reed-Solomon code by Lagrange interpolation, the Ligero proof reader and verifier, and the complete verifier from the proof string to a verdict; the fifth and last stage of Phase A.
-10. [Chapter 6, the circuit loader, the heap and the interop proofs](06-circuits.md): the LFC2 format of the upstream compiler as a representation of the quad circuits of Section 6.3, the loader that proves the shape of what it returns, access types under SPARK's ownership rules, the working sets on the heap, the command-line verifier, and the two upstream proofs accepted from their files; Phase B.
-11. [Chapter 7, the prover](07-prover.md): the sumcheck from the prover's side with its one-time pads, the Ligero commitment and proof, randomness as a generic formal so that a program is proved for any source, the writers as inverses of the readers, the subfield projection as a fixed linear map, the command-line prover, and the two upstream proofs reproduced byte for byte from their inputs and seeds; Phase C.
-12. [Chapter 8, the additive FFT](08-additive-fft.md): the Reed-Solomon code on GF(2^128) by the FFT of Lin, Chung and Han, its subspace polynomials and novel basis, a small example by hand, the encoder of the prover switched to it, and what is proved and what is tested; Phase D.
-13. [Chapter 9, the mDoc layer](09-mdoc.md): how two Longfellow proofs become one mDoc proof of age in upstream's format, the tags that bind the two circuits and why the challenge comes after both commitments, the public inputs and the one transcript, the proof format, the test case recovered from upstream's witness files, the two programs, the witness built from the credential itself (its parse, its SHA-256 trace, the two witnesses), the four conditions of the EU Age Verification profile against what the layer covers, and the supported profile with its entry points.
-14. [Performance](performance.md): how fast the mDoc circuits are proved and verified, the milestones, every optimisation step with its measurement, and the comparison with upstream.
-15. The [architecture decision records](../adr/README.md), referenced from the chapters where a choice is explained.
+### The short path, for a first assessment
 
-Later chapters follow the roadmap: the circuit compiler is Phase E (ADR 0055).
+Reading time: about four hours, estimated from its length (about 23,000 words); the author's measured time will replace this estimate at the close of the milestone.
+
+1. The repository's [README](../../README.md), its first screen; then [A11.1](00-primer-cryptography.md#a111-the-idea-in-plain-words), the idea in plain words; [A1](00-primer-cryptography.md#a1-the-object-certified-and-what-certifying-it-means), the object certified and what certifying it means; then [A11](00-primer-cryptography.md#a11-longfellow-all-together) in full, where [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee) states how strong the guarantee is and the four things that limit it.
+2. [A12](00-primer-cryptography.md#a12-who-attacks-what), who attacks what.
+3. The [trust model](trust-model.md), "In short".
+4. [B3](00-primer-spark.md#b3-contracts), [B4](00-primer-spark.md#b4-ghost-code-assertion-levels-and-builds), [B6](00-primer-spark.md#b6-what-a-verification-condition-says) and [B7](00-primer-spark.md#b7-proved-tested-trusted): enough SPARK to read a contract, a table of verification conditions and a row of the trusted base register; then [B10](00-primer-spark.md#b10-a-worked-evaluation), a worked evaluation.
+5. [Chapter 9 Section 1](09-mdoc.md#1-the-construction), the construction of the proof of age, and [chapter 9 Section 6](09-mdoc.md#6-what-stays-trusted-and-the-limits), the supported profile and the conditions for certifying the circuit.
+6. The [trusted base register](trusted-base.md), and one proof summary: chapter 9's, at the end of [chapter 9 Section 4](09-mdoc.md#4-what-the-proofs-guarantee), the checks of the mDoc partitions. The other chapters give theirs as a table of verification conditions in the same terms ([B6.4](00-primer-spark.md#b64-reading-the-summary-table)).
+
+### The full path, for a certification
+
+| Step | Read | Why at this point |
+|---|---|---|
+| 1 | The short path, steps 1 to 4 | what is claimed, and the vocabulary of the evidence |
+| 2 | [A2](00-primer-cryptography.md#a2-finite-fields), [A3](00-primer-cryptography.md#a3-polynomials-and-random-points), [A4](00-primer-cryptography.md#a4-hashes-and-merkle-trees) and [A5](00-primer-cryptography.md#a5-commitments-and-the-four-kinds-of-randomness): fields, random points, hashes and Merkle trees, commitments | the prerequisites of the protocol |
+| 3 | [A6](00-primer-cryptography.md#a6-circuits), then [chapter 3 Section 1.1](03-sumcheck.md#11-layered-circuits-and-the-quad-representation) and [chapter 6 Section 1](06-circuits.md#1-the-format) | circuits: what "the circuit accepts" means, and how a circuit is read from its file |
+| 4 | [A7](00-primer-cryptography.md#a7-the-sumcheck), then [chapter 3 Section 1](03-sumcheck.md#1-the-mathematics) | the sumcheck, and the verifier that ends in equations |
+| 5 | [A8](00-primer-cryptography.md#a8-reed-solomon-codes-and-ligero), then [chapter 5 Section 1](05-ligero.md#1-the-mathematics) | Reed-Solomon codes and Ligero |
+| 6 | [A9](00-primer-cryptography.md#a9-fiat-shamir), then [chapter 4 Section 1](04-transcript.md#1-the-mathematics) | Fiat-Shamir and the transcript |
+| 7 | [Chapter 1](01-gf2_128.md) and [chapter 2](02-p256-field.md) | the two fields under the protocol |
+| 8 | [B8](00-primer-spark.md#b8-lean-and-spark-two-kinds-of-proof), then the [Lean correspondence page](lean-correspondence.md) | what upstream proves about the protocol, and where its proofs stop |
+| 9 | [Chapter 7](07-prover.md) and [chapter 8](08-additive-fft.md) | the side that makes proofs: needed for zero knowledge and interoperability, not for soundness |
+| 10 | [A10](00-primer-cryptography.md#a10-signatures-cbor-and-the-mdoc), then [chapter 9](09-mdoc.md), Sections 2 to 6 | the mDoc layer in full, the supported profile and the conditions for certifying the circuit |
+| 11 | The [trusted base register](trusted-base.md), then the [trust model](trust-model.md) in full | every trusted item, now with the vocabulary to judge it |
+| 12 | [B9](00-primer-spark.md#b9-reproducing-the-evidence) and the [verification approach](verification-approach.md) | reproducing the evidence |
+
+The other sections of the primer, [B1](00-primer-spark.md#b1-ada-in-two-pages), [B2](00-primer-spark.md#b2-spark-and-what-it-rules-out) and [B5](00-primer-spark.md#b5-loops-recursion-and-termination), are reference: read them when a chapter needs them. The [performance page](performance.md) is optional for a certification.
+
+### What comes next
+
+- **Chapter 10, the certified circuits**, in the milestone Certified circuits ([ADR 0091](../adr/0091-certified-circuits-milestone.md)): a checker that will prove what the registered circuits compute, today trusted ([A1.5](00-primer-cryptography.md#a15-what-stays-outside)). It opens with the conditions for certifying the circuit.
+- **A reading on Longfellow v2** and its version 8 circuits, in a milestone of its own: what changes for a certification.
+- **The circuit compiler**, Phase E ([ADR 0055](../adr/0055-phase-d-scope-mdoc-scale.md)), after the certification block and M3 ([ADR 0082](../adr/0082-order-after-the-memory-milestone.md), confirmed at the close of Phase D by [ADR 0090](../adr/0090-mdoc-milestone-closed-phase-d-complete.md)).
+
+## Every page
+
+| Page | What it holds |
+|---|---|
+| [Primer, part 1](00-primer-cryptography.md) | what is certified; the cryptography from first principles; the adversaries |
+| [Primer, part 2](00-primer-spark.md) | SPARK, contracts and the evidence; a worked evaluation |
+| [Glossary](glossary.md) | one name per thing, with its aliases in the chapters |
+| [Chapter 1, GF(2^128)](01-gf2_128.md) | the binary field of the hash circuit |
+| [Chapter 2, the base field of P-256](02-p256-field.md) | the prime field of the signature circuit |
+| [Chapter 3, the sumcheck](03-sumcheck.md) | circuits as data, the sumcheck and the verifier's equations |
+| [Chapter 4, the transcript](04-transcript.md) | Fiat-Shamir, the transcript and the replay of a proof's challenges |
+| [Chapter 5, Ligero](05-ligero.md) | the commitment, the three tests and the complete verifier |
+| [Chapter 6, the circuits](06-circuits.md) | the circuit file, its reader, its packed form and the command-line verifier |
+| [Chapter 7, the prover](07-prover.md) | the prover, its randomness and the byte identity with upstream's proofs |
+| [Chapter 8, the additive FFT](08-additive-fft.md) | the encoding of the prover's rows |
+| [Chapter 9, the mDoc layer](09-mdoc.md) | the proof of age: two circuits, the tags, the witness from the credential, the supported profile, the conditions for certifying the circuit |
+| [Trust model](trust-model.md) | every claim, sorted into proved, tested, trusted and outside the proofs |
+| [Trusted base register](trusted-base.md) | every trusted item, one row each |
+| [Lean correspondence page](lean-correspondence.md) | upstream's Lean model against this project's units |
+| [Verification approach](verification-approach.md) | what a SPARK proof can and cannot say here |
+| [Performance](performance.md) | time and memory against upstream |
+| The [ADRs](../adr/README.md) | the decision records, cited from the chapters |
 
 ## Building, proving and testing
 
-Requirements: [Alire](https://alire.ada.dev) with a GNAT toolchain selected (`alr toolchain --select`); GNATprove is a crate dependency and is run through `alr exec`. Python 3 is needed only to regenerate test vectors.
+Requirements: [Alire](https://alire.ada.dev) with a GNAT toolchain selected (`alr toolchain --select`); GNATprove is a crate dependency and is run through `alr exec`. Python 3 is needed to regenerate the test vectors and by some steps of `make cli`.
 
 ```bash
 alr build                                                     # the library
 alr exec -- gnatprove -P longfellow_spark.gpr
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p   # the test harness, assertions on
 make test                                                     # the fourteen harnesses, concurrently
-make cli                                                      # the release build: interop harness, command-line verifier and prover
+make cli                                                      # the release build: interoperability harness, command-line verifier and prover
 python3 -I tests/vectors/gen_gf2_128_vectors.py               # regenerate vectors (optional)
 python3 -I tests/vectors/gen_p256_vectors.py
 python3 -I tests/vectors/gen_sumcheck_vectors.py
@@ -50,10 +93,8 @@ python3 -I tests/vectors/gen_mdoc_vectors.py                  # the mDoc product
 
 The proof summary is written to `obj/development/gnatprove/gnatprove.out`. The expected outcome at every commit is "all checks proved" and a harness run with zero failures; the chapters quote the counts of the commit they describe.
 
-A rule for the harnesses, learnt in the memory milestone: in the assertion build, compare on small inputs; measure in the release build. The harnesses of `tests/` run every executable contract and ghost function, and some cost far more than the code they check: a postcondition that names a recursive reference, such as `Eval_Bound_Quad`'s `EBQ_Ref`, runs a recursion over the terms of the layer at every call, and the loop invariants of a table builder cost the size of the table at every iteration. `circuit_kat` therefore compares the packed first step with the expanded one on the small layers only (at most 128 terms without the eq tables, Logv and Logw at most 10 with them), and `first_step_bench` in the release build (`cli/`, assertions off) compares and times the two on every layer of the mDoc circuits (chapter 3, Section 3.5). A comparison on a large input belongs in the release build, as a test (`first_step_bench --check` in the `cli` step of `make check`) or as a measurement.
-
 ## Conventions used in the guide
 
 - Specification sections are cited by number (draft-irtf-cfrg-longfellow-00, see [ADR 0002](../adr/0002-pin-the-specification.md) and [ADR 0079](../adr/0079-specification-migrated-to-draft-irtf-cfrg-longfellow-00.md)); the text is not reproduced.
 - Upstream files are cited as path and commit of longfellow-zk/longfellow-zk (formerly google/longfellow-zk).
-- "Proved" means discharged by GNATprove for all inputs; "tested" means checked on the committed vectors; "trusted" means assumed and listed as such in the [trust model](trust-model.md).
+- The four kinds of claim, [proved](glossary.md#proved), [tested](glossary.md#tested), [trusted](glossary.md#trusted) and [outside the proofs](glossary.md#outside-the-proofs), are used as the glossary defines them.
