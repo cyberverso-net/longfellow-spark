@@ -353,7 +353,7 @@ On long chains of algebra, `a·(b + c) = a·b + a·c = …`, this makes the proo
 |---|---|
 | A ghost reference | `GF2_128.Mul_Ref` and the postcondition of `Mul`, `src/gf2_128.ads`; chapter 1 Section 2 |
 | The level `Proof_Only` | `src/proof_levels.ads`; ADR 0044 |
-| `Runtime` and its two exceptions | chapter 4 Section 3.2; the trusted base register, row S4 |
+| `Runtime` and its exceptions | chapter 4 Section 3.2; the trusted base register, row S4 |
 | The two builds | `tests/longfellow_spark_tests.gpr`, `cli/longfellow_verify.gpr`; ADR 0068 |
 | `Same` | `src/field_gf2_128.ads`; chapter 3 Section 4.1 |
 | The trusted items | the trusted base register, rows T6, T7, T8 and C2 |

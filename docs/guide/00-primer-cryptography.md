@@ -74,7 +74,7 @@ Each begins by checking that the request names a row of the profile and that the
 
 The proof is in fact two proofs, one per circuit, and a cheating prover could take the signature from one credential and the attribute from another. Six short values the proof also carries, the tags ([A11.2](#a112-the-two-circuits-of-the-proof-of-age)), bind the two circuits to the same digest and the same device key without revealing them.
 
-**The secret inputs**, called the **witness**: the signed part of the credential (the mobile security object, MSO, [A10](#a10-signatures-cbor-and-the-mdoc)), the item that holds the attribute, the two signatures, intermediate values such as the steps of each SHA-256, and random pads drawn for this proof ([A5](#a5-commitments-and-the-four-kinds-of-randomness)).
+**The private inputs**, called the **witness**: the signed part of the credential (the mobile security object, MSO, [A10](#a10-signatures-cbor-and-the-mdoc)), the item that holds the attribute, the two signatures, intermediate values such as the steps of each SHA-256, and random pads drawn for this proof ([A5](#a5-commitments-and-the-four-kinds-of-randomness)).
 
 The prover builds the witness from the credential: `longfellow_prove_mdoc --mdoc` (chapter 9 Section 3.7).
 
@@ -372,7 +372,7 @@ A proof uses fresh random values in four places. Each hides something different,
 | **Sumcheck pads** | in the combined witness, one per value the sumcheck would send, plus one per layer for a product ([A7.4](#a74-padding-the-messages-reveal-nothing)) | the sumcheck's messages: each is sent minus a pad, so it looks random ([A7](#a7-the-sumcheck)) |
 | **Ligero blinding** | the first entries of each row, and the random rows | the opened columns and the combinations of rows Ligero sends ([A8](#a8-reed-solomon-codes-and-ligero)) |
 | **Leaf nonces** | one per committed column, hashed with it | the digests of the columns that are not opened |
-| **MAC pads** (`mac_ap`), also called one-time pads | in both witnesses of the proof of age | the three secret values in the six public tags ([A11.2](#a112-the-two-circuits-of-the-proof-of-age)) |
+| **MAC pads** (`mac_ap`) | in both witnesses of the proof of age | the three secret values in the six public tags ([A11.2](#a112-the-two-circuits-of-the-proof-of-age)) |
 
 The first three are part of every Longfellow proof. The fourth belongs to the proof of age, which binds two proofs together.
 
@@ -540,7 +540,7 @@ Two properties make codes useful here:
 
 ### A8.2 The tableau and the opened columns
 
-The commitment of [A5.2](#a52-how-longfellow-commits) is a table of rows. Each row holds blinding values, then a piece of the witness, and is extended into a codeword. The first 2k − 1 columns (921 in the hash circuit) are never committed. A product of two rows is a polynomial fixed by 2k − 1 values, and the prover's answers to the linear and quadratic tests are given on those positions (Section 4.2 of the specification; chapter 5 Sections 1.4 and 1.5); the opened columns are drawn after them. The others, 3,230 in the hash circuit and 3,187 in the signature circuit, are hashed into a Merkle tree whose root is the commitment. The configuration's nominal rate, 1/7, is the row's length over this committed part.
+The tableau of [A5.2](#a52-how-longfellow-commits) is a table of rows. Each row holds blinding values, then a piece of the witness, and is extended into a codeword. The first 2k − 1 columns (921 in the hash circuit) are never committed. A product of two rows is a polynomial fixed by 2k − 1 values, and the prover's answers to the linear and quadratic tests are given on those positions (Section 4.2 of the specification; chapter 5 Sections 1.4 and 1.5); the opened columns are drawn after them. The others, 3,230 in the hash circuit and 3,187 in the signature circuit, are hashed into a Merkle tree whose root is the commitment. The configuration's nominal rate, 1/7, is the row's length over this committed part.
 
 At the end of the proof the verifier draws 132 of the committed columns at random. The prover reveals them with a Merkle batch proof ([A4.2](#a42-a-merkle-tree-a-commitment-to-a-long-vector)), and the verifier checks them against the root. Each test below checks agreement at those columns, in the same pattern, and the linear and quadratic tests add their own algebraic condition ([A8.3](#a83-the-three-tests)):
 
@@ -715,7 +715,7 @@ What makes them one statement is the binding of chapter 9 Section 1.3, with the 
 
 1. Both commitments are written first.
 2. Then a challenge, called `av`, is drawn from the Fiat-Shamir transcript ([A9](#a9-fiat-shamir)).
-3. Each circuit checks six tags, computed from `av`, from one-time pads, and from the three secret values the circuits share: the digest `e` and the two coordinates of the device key ([A1.3](#a13-the-three-digests)). Each value has 256 bits and a field element of GF(2^128) holds 128, so each value is split in two halves, with one tag each: three values, six tags. A message authentication code (MAC) computes each tag as tag = (av + pad) · half, in GF(2^128) (chapter 9 Section 1.3).
+3. Each circuit checks six tags, computed from `av`, the MAC pads, each used for one proof only, and the three secret values the circuits share: the digest `e` and the two coordinates of the device key ([A1.3](#a13-the-three-digests)). Each value has 256 bits and a field element of GF(2^128) holds 128, so each is split in two halves, with one tag each: three values, six tags. A message authentication code (MAC) computes each tag as tag = (av + pad) · half, in GF(2^128) (chapter 9 Section 1.3).
 
 The tags are public. A prover that gave the two circuits different values would need the tags to agree by chance. Since `av` is drawn after both commitments, for one pair of different values that chance is at most one in 2^128. The composed bound of [A11.4](#a114-how-strong-is-the-guarantee) accounts for every attempt and for the several witnesses a commitment may be close to.
 
