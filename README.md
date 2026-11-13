@@ -60,7 +60,7 @@ The prover settings are in `longfellow_spark.gpr` (ADR 0020): CVC5, Z3 and Alt-E
 3. the fourteen test harnesses;
 4. the release build: the interop harness, the command-line verifier on the upstream proofs, the command-line prover reproducing them, the mDoc round trips and the proof of age from every one of upstream's 38 test documents;
 5. the vector generators, compared with the committed files;
-6. a lint of the tracked files.
+6. a lint of the tracked files and of the relative links of the documentation.
 
 `scripts/check.sh` defines these steps. `make build`, `make prove`, `make test`, `make cli`, `make vectors` and `make lint` run them one at a time. The full proof takes about an hour on a laptop.
 

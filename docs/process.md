@@ -76,6 +76,18 @@ where they are absent (`scripts/cross-check-upstream.sh`, ADR 0087), and the pro
 from every one of upstream's 38 test documents (`scripts/mdoc-cases.sh`), which is skipped,
 with a line saying so, on GitHub Actions, whose job would exceed its 30 minutes.
 
+The step lint (`make lint`), in both checks, holds these rules:
+
+- the tests of the clean checkout the proving machine makes pass (`scripts/clean-checkout-test.sh`);
+- every relative link of the Markdown under `docs/` and of the README resolves: the file
+  exists, with the case as written, and an anchor names a heading of the target, as GitHub
+  computes it (`scripts/check-links.py`). A wrong link in the body of an Accepted record stays,
+  corrected in its Status line (ADR 0042); the script lists each such link with where it is
+  corrected, and fails if the link is no longer there. Its tests run first
+  (`scripts/check-links-test.py`): broken links it must report, valid ones it must accept;
+- no em-dash in any tracked file;
+- none of the attribution and tooling words that `scripts/check.sh` lists, in any tracked file.
+
 The proof is proved again only when its inputs changed (ADR 0088). `scripts/remote-check.sh`
 lists the proof inputs of the commit, every file gnatprove reads: the project file and the
 source directories it names, `alire.toml` (the toolchain pins), the partition list, every

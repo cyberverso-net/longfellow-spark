@@ -357,6 +357,11 @@ do_vectors() {
 do_lint() {
    header "lint: the clean checkout of the gate (clean-checkout-test.sh)"
    scripts/clean-checkout-test.sh
+   #  Every relative link of docs/ and the README resolves, anchors
+   #  included; this step reads files only, so it runs everywhere.
+   header "lint: relative links of docs/ and the README (check-links.py)"
+   python3 -I scripts/check-links-test.py
+   python3 -I scripts/check-links.py
    header "lint: forbidden content over tracked files"
    #  git grep searches tracked files only, in one process, and exits 0
    #  exactly when something matched. This script is excluded from the
