@@ -85,6 +85,9 @@ The step lint (`make lint`), in both checks, holds these rules:
   corrected in its Status line (ADR 0042); the script lists each such link with where it is
   corrected, and fails if the link is no longer there. Its tests run first
   (`scripts/check-links-test.py`): broken links it must report, valid ones it must accept;
+- every unit named in a diagram of the guide or in a code map exists, every subprogram named
+  is declared in its unit, and every unit of the proof partitions and of `cli/src` is in at
+  least one map (`scripts/check-map.py`);
 - no em-dash in any tracked file;
 - none of the attribution and tooling words that `scripts/check.sh` lists, in any tracked file.
 

@@ -24,6 +24,34 @@ and binding to a vector of challenges X applies bind once per coordinate. The ar
 
 ### 1.3 The sumcheck protocol in one layer
 
+```mermaid
+flowchart TB
+  D3_1["D3.1 a claim on layer j at a point<br/>Sumcheck_Prover.Prove, Sumcheck_Verifier.Verifier_Core"]
+  D3_2["D3.2 the layer's terms bound at that point: each coefficient times eq2<br/>Sumcheck_Algebra.Eq2_Table, Packed_Hquad.Bind_Merge"]
+  D3_3["D3.3 a round: the prover sends its polynomial of degree 2 by two values, at 0 and at the third point, each minus its pad; the verifier defines the value at 1 from the claim<br/>Sumcheck_Prover.Prove, Sumcheck_Verifier.Symbolic_Round"]
+  D3_4["D3.4 the challenge, from the transcript; the new claim is the polynomial at the challenge; one bit of one hand is bound<br/>Sumcheck_Transcript, Sumcheck_Algebra.Bind_In_Place"]
+  D3_5["D3.5 after 2 logw rounds: the claim is the bound quad times the two hands' values<br/>Zk_Verifier.Bound_Quads"]
+  D3_6["D3.6 the two claims on layer j + 1, combined into one for the next layer"]
+  D3_7["D3.7 at the last layer: the claims on the inputs, a linear equation on the committed values<br/>Sumcheck_Verifier.Verifier_Core"]
+  LIG["Ligero, D4"]
+  D3_1 --> D3_2 --> D3_3 --> D3_4
+  D3_4 -- "next round" --> D3_3
+  D3_4 -- "last round" --> D3_5 --> D3_6
+  D3_6 -- "next layer" --> D3_1
+  D3_6 -- "after the last layer" --> D3_7 --> LIG
+```
+
+*D3. One layer of the sumcheck. In a round nothing is checked: the prover sends two values of its polynomial, each minus a sumcheck pad, and the verifier defines the third from the claim, so the equation holds by construction ([A7.2](00-primer-cryptography.md#a72-the-rounds)); the verifier's core writes, round by round, equations about the committed pads and values, and Ligero checks them at the end (D4). The prover and the verifier draw the same challenges from the transcript; the prover also runs the verifier's core on its own proof, to get the linear constraints it must prove (PS9). What it simplifies: the protocol holds two points per layer, G0 and G1, combined with the challenge alpha; that is why `Eq2_Table` builds one table of weights for the two points. A second challenge, beta, weighs the assertions. The figure draws one point for readability. Draft-irtf-cfrg-longfellow-00, Sections 6.6 and 6.7.*
+
+Where it is in the code:
+
+| Box | Units | Key subprograms | Assurance | Harnesses and vectors | Draft and records | Upstream |
+|---|---|---|---|---|---|---|
+| D3.1, D3.3 | [`Sumcheck_Prover`](../../src/sumcheck_prover.ads), [`Sumcheck_Verifier`](../../src/sumcheck_verifier.ads), [`Sumcheck_Expression`](../../src/sumcheck_expression.ads) | `Prove`, `Verifier_Core`, `Symbolic_Round` | Silver; `Symbolic_Round` the draft's formula by definition; `Round_Evals` against a ghost transcription; partitions `prover`, `protocol`, `sumcheck` | `prover_kat`, `sumcheck_kat` | Sections 6.4, 6.6, 6.7; ADR 0022, ADR 0026 | `runtime_sumcheck::prover::prove_core`, `symbolic_sumcheck_verifier_core` |
+| D3.2, D3.4 | [`Sumcheck_Algebra`](../../src/sumcheck_algebra.ads), [`Packed_Hquad`](../../src/packed_hquad.ads), [`Sumcheck_Transcript`](../../src/sumcheck_transcript.ads) | `Eq2_Table`, `Bind_Merge`, `Bind_In_Place` | Gold against the ghost references, except that `Bind_Merge` without the eq2 table (Logv above 24) proves the run count only, its coefficients tested; partitions `sumcheck`, `packed_hquad`, `protocol` | `sumcheck_kat`, `circuit_kat` | Sections 6.1, 6.2; ADR 0063 | `runtime_sumcheck::eq`, `bind_quad` |
+| D3.5 | [`Zk_Verifier`](../../src/zk_verifier.ads) | `Bound_Quads` | Gold against `BQ_Ref` on the expansion; partition `verifier` | `sumcheck_kat` | Section 6.7; ADR 0073 | inside `symbolic_sumcheck_verifier_core` |
+| D3.7 | [`Sumcheck_Verifier`](../../src/sumcheck_verifier.ads) | `Input_Constraint` | Gold against the formula of Section 6.7; partition `protocol` | `sumcheck_kat` | Section 6.7; ADR 0056 | `symbolic_sumcheck_verifier_core` |
+
 At layer j both parties hold two claims, bind (V[j], G0) and bind (V[j], G1), combined with a challenge alpha into one (Section 6.6). The quad of the layer with its outputs bound (`bind_g`, the coefficient of each term becomes k eq2 (g), or beta eq2 (g) for a Z term) turns the claim into a sum over the 2 logw bits of the two input wire indices l and r. Each round binds one bit of one hand with a fresh challenge: the prover sends a degree-two polynomial, the verifier evaluates it at the challenge and that becomes the new claim. After 2 logw rounds the sum has collapsed to a single term: the fully bound quad (`eval_bound_quad`, a field element the verifier computes alone) times the two new claims bind (V[j + 1], G'0) and bind (V[j + 1], G'1), which the prover sends and the next layer inherits.
 
 ### 1.4 Degree-two polynomials by three evaluations; the Lagrange basis

@@ -8,6 +8,38 @@ Phase A ended with a verifier from the proof string to a verdict on circuits hel
 
 ### 1.1 What the verifier needs of a circuit
 
+```mermaid
+flowchart BT
+  subgraph D2_1["D2.1 the last layer: the inputs<br/>Packed_Circuits"]
+    PUB["public inputs, the constant one first"]
+    PRIV["private inputs"]
+  end
+  subgraph LJ1["layer j + 1"]
+    L["wire l, one hand"]
+    R["wire r, the other hand"]
+  end
+  subgraph LJ["layer j"]
+    D2_2["D2.2 a term of wire g: k · V(l) · V(r), wire g the sum of its terms<br/>Packed_Eval.Eval_Circuit"]
+    D2_3["D2.3 an assertion: a term with k = 0, V(l) · V(r) must be zero<br/>Packed_Eval.Eval_Circuit"]
+  end
+  D2_4["D2.4 layer 0: the outputs, each must be zero<br/>Packed_Eval.Eval_Circuit"]
+  D2_1 -. "the layers between" .-> LJ1
+  L --> D2_2
+  R --> D2_2
+  L --> D2_3
+  R --> D2_3
+  LJ -. "the layers between" .-> D2_4
+```
+
+*D2. A circuit as data: each wire of layer j is a sum of terms, each a coefficient times the product of two wires of layer j + 1, its hands; a term with coefficient zero is an assertion, that the product is zero. "The circuit accepts" means that every output is zero and every assertion holds: the status `Eval_Circuit` returns, and states in its postcondition. No wire is free: every wire of a layer is computed from the layer below, and the only values the prover chooses are the private inputs. What it simplifies: one term and one assertion are drawn, where a layer of the hash circuit has hundreds of thousands; the file holds the terms in packed form, runs of terms that repeat, which the programs never expand ([Section 3.7](#37-the-packed-form-the-memory-milestone)). Draft-irtf-cfrg-longfellow-00, Sections 6.3.1 to 6.3.3.*
+
+Where it is in the code:
+
+| Box | Units | Key subprograms | Assurance | Harnesses and vectors | Draft and records | Upstream |
+|---|---|---|---|---|---|---|
+| D2.1 | [`Packed_Circuits`](../../src/packed_circuits.ads), [`Circuit_Reader`](../../src/circuit_reader.ads) | `Read_Packed`, `Expand` (ghost) | proved on the expansion: well formed, every assertion on wires of its own (`Isolated`, `Dead_End`), the identifier; partition `circuits` | `circuit_kat` | Section 6.3; ADR 0080 | `core_proto` LFC2 reader |
+| D2.2, D2.3, D2.4 | [`Packed_Eval`](../../src/packed_eval.ads), [`Sumcheck_Algebra`](../../src/sumcheck_algebra.ads) | `Eval_Circuit` | Gold on the expansion against the references `Layer_Holds` and `Layer_Z`; partitions `packed_hquad`, `sumcheck` | `prover_kat`, `sumcheck_kat` | Sections 6.3.2, 6.3.3; ADR 0072 | `runtime_sumcheck::eval_circuit` |
+
 Chapter 3 defined a circuit as data: layers, each a list of terms (g, h0, h1, k) with k an element, meaning Q[g, h0, h1] = k in the quad representation of draft Section 6.3.2 (k = 0 marks a Z assertion, Section 6.3.3), and the counts `noutput`, `ninput`, `npublic`. The verifier needs nothing else of a circuit's meaning, but it needs its shape to be right: `Well_Formed` of `Sumcheck_Algebra` (every term names an output wire below its layer's output width and input wires below its input width, `nw <= 2^logw`, the last layer reads exactly `ninput` wires, `npublic <= ninput`, the layers partition the term list in order) is a precondition of `Verifier_Core`, and the stage 3 proofs assume it. The loader's job is to establish it on arbitrary bytes.
 
 ### 1.2 LFC2

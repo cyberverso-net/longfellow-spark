@@ -41,6 +41,36 @@ This project holds the first row and the fifth ([ADR 0055](../adr/0055-phase-d-s
 
 ### 1.3 The tags that bind the two proofs
 
+```mermaid
+flowchart TB
+  subgraph H["the hash circuit, over GF(2^128)"]
+    D5_1["D5.1 private inputs: e, the device key, their MAC pads<br/>Mdoc_Witness.Hash_Witness"]
+    D5_3__H["D5.3 commitment, root 1<br/>Zk_Prover.Commit"]
+  end
+  subgraph S["the signature circuit, over the base field of P-256"]
+    D5_2["D5.2 private inputs: e, the device key, their MAC pads<br/>Mdoc_Witness.Sig_Witness"]
+    D5_3__S["D5.3 commitment, root 2<br/>Zk_Prover.Commit"]
+  end
+  D5_4["D5.4 av, from the transcript after both roots<br/>Transcript.Get_Random_Bytes"]
+  D5_5["D5.5 six tags, (av + pad) · half, for the halves of e and of the two coordinates<br/>Mdoc_Mac.Legacy_Tags"]
+  D5_6["D5.6 the tags and av, public inputs of both circuits; each circuit checks the six equations<br/>Mdoc_Inputs.Hash_Inputs, Mdoc_Inputs.Sig_Inputs"]
+  D5_1 --> D5_3__H
+  D5_2 --> D5_3__S
+  D5_3__H --> D5_4
+  D5_3__S --> D5_4
+  D5_4 --> D5_5 --> D5_6
+```
+
+*D5. The binding of the two proofs. Each circuit holds its own copy of e, of the device key and of the pads, fixed when its commitment is written; `av` is drawn only after both roots are in the transcript; the six tags are public inputs of both. A prover that gave the two circuits different values would need the tags to agree, a chance of at most one in 2^128 for one pair of values (Section 1.3). What it simplifies: the transcript also holds, before the roots, the session transcript, and after the tags the two proofs, in that order; the hash circuit is committed before the signature circuit. The binding is upstream's `applications/mdoc_zk`, not a section of the draft.*
+
+Where it is in the code:
+
+| Box | Units | Key subprograms | Assurance | Harnesses and vectors | Draft and records | Upstream |
+|---|---|---|---|---|---|---|
+| D5.1, D5.2 | [`Mdoc_Witness`](../../src/mdoc_witness.ads) | `Hash_Witness`, `Sig_Witness` | Gold on the pads at the end of the hash witness; partition `mdoc-parse` | `mdoc_witness_kat` | ADR 0086 | `push_witness_hash`, `push_witness_sig` |
+| D5.3 | [`Zk_Prover`](../../src/zk_prover.ads) | `Commit` | Silver, statuses proved; partition `ligero-prover` | `prover_kat` | ADR 0085 | `runtime_zk::prover::ZkProver::commit` |
+| D5.4, D5.5, D5.6 | [`Mdoc_Mac`](../../src/mdoc_mac.ads), [`Mdoc_Inputs`](../../src/mdoc_inputs.ads), [`Transcript`](../../src/transcript.ads) | `Legacy_Tags`, `Hash_Inputs`, `Sig_Inputs` | the six products proved; `Hash_Inputs` proved to fill exactly its elements, the tags and av last; `Sig_Inputs` proved for its first four elements, the rest tested; partition `mdoc` | `mdoc_kat` | ADR 0058 | `generate_mac_ap`, `push_macs`, `push_input_hash`, `push_input_sig` |
+
 Three values appear in both circuits: the digest of the MSO that the issuer signed, and the two coordinates of the device key. The hash circuit computes or reads them from the document; the signature circuit verifies signatures under them. They are secret, parts of the credential, so they cannot be public inputs. Without a link, a dishonest holder could prove the hash circuit on one credential and the signature circuit on another.
 
 The link is a message authentication code, a MAC, of a particular simple kind. For each 256-bit value m, split in two halves m0 and m1 of 128 bits, each read as an element of GF(2^128), the prover computes

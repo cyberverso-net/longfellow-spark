@@ -49,3 +49,11 @@ Every package header states, subprogram by subprogram, its level (Silver or Gold
 ## Circuits as data
 
 The circuit compiler (SHA-256, ECDSA, CBOR parsing into circuits) is the largest part of the upstream code. The project consumes upstream-generated circuits as validated data and reimplements the compiler last, so a verified verifier is reachable early ([ADR 0011](../adr/0011-circuits-as-data.md)). Two questions are kept apart. That a circuit is executed safely and as its terms say is proved here. What the circuit computes, the credential property it enforces, is not: a circuit that expresses the wrong property is executed just as faithfully. The circuit files are therefore a declared trusted input, as to their meaning.
+
+## What "could run in parallel" means for a proved step
+
+The steps of the [system map](system-map.md) carry a class: sequential by the transcript, sequential by data, or could run in parallel. The third says that the work inside a step splits into parts that read and write disjoint data: the rows of the encoding, the nodes of one level of the Merkle tree (each level needs the one below it), the terms of a round's polynomial, the opened columns and their paths. It is a property of the algorithm. Neither this project nor upstream uses threads on these paths: both run on one core.
+
+For a proved step, running in parallel would not weaken what is proved, if it were done the way SPARK allows. SPARK supports tasks under the Ravenscar and Jorvik profiles, and proves the absence of data races through ownership: each task would own its slice, and the step would keep its contract, with the same postcondition over the whole. The proof of each slice would be the proof of today's loop body. That is work for the milestone M3, decided with the hardware kernels; nothing in the current code depends on it.
+
+The first class cannot change: each challenge is a hash of everything before it, so the steps it marks cannot start early or overlap, in any implementation.

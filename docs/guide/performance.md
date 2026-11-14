@@ -257,6 +257,153 @@ In the same session:
 - the single-circuit programs on the version 7 pair, as at the close of the memory milestone: the hash proof 4.64 s and 124,919,880 B, its verification 2.31 s and 62,389,072 B, the signature proof 0.45 s and 19,673,208 B, its verification 0.27 s and 9,538,152 B. These are within 400 bytes of the peaks of release 0.4.0, and the two proofs are the release's byte for byte;
 - the 38 test documents at both versions, `make mdoc-cases`: 6 min 25 s, every case as expected.
 
+## By step
+
+Where the time and the peak heap of the proof of age go, step by step. The steps are those of the [system map](system-map.md): PS1 to PS11 for the prover, VS1 to VS8 for the verifier. They are not rows of the [trusted base register](trusted-base.md).
+
+```mermaid
+flowchart LR
+  PS1["PS1 read the circuits [D]<br/>Pinned_Circuits.Read_Packed"]:::d
+  PS2["PS2 parse the mDoc [D]<br/>Mdoc_Parse.Parse"]:::d
+  PS3["PS3 private inputs, MAC pads [P]<br/>Mdoc_Witness.Hash_Witness, Mdoc_Witness.Sig_Witness"]:::p
+  PS4["PS4 sumcheck pads [D]<br/>Sumcheck_Prover.Sample_Pads"]:::d
+  PS5["PS5 commitment, root [P]<br/>Ligero_Prover.Commit"]:::p
+  PS6["PS6 av, tags, public inputs [T]<br/>Mdoc_Mac.Legacy_Tags"]:::t
+  PS7["PS7 evaluate [D]<br/>Packed_Eval.Eval_Circuit"]:::d
+  PS8["PS8 sumcheck [T]<br/>Sumcheck_Prover.Prove"]:::t
+  PS9["PS9 linear constraints [D]<br/>Sumcheck_Verifier.Verifier_Core"]:::d
+  PS10["PS10 Ligero proof [P]<br/>Ligero_Prover.Prove"]:::p
+  PS11["PS11 write [D]<br/>Proof_Writer.Write_Proof"]:::d
+  PS1 --> PS2 --> PS3 --> PS4 --> PS5 --> PS6 --> PS7 --> PS8 --> PS9 --> PS10 --> PS11
+  PS5 -- "then the signature circuit" --> PS4
+  PS11 -- "then the signature circuit" --> PS7
+  classDef t stroke:#d9480f,stroke-width:4px
+  classDef d stroke:#1c7ed6,stroke-width:2px
+  classDef p stroke:#2f9e44,stroke-width:2px,stroke-dasharray:6 3
+```
+
+```mermaid
+flowchart LR
+  VS1["VS1 read the circuits [D]<br/>Pinned_Circuits.Read_Packed"]:::d
+  VS2["VS2 read the proofs, the roots [T]<br/>Zk_Verifier.Receive"]:::t
+  VS3["VS3 av, e2, public inputs [T]<br/>Device_Auth.Digest, Mdoc_Inputs.Hash_Inputs"]:::t
+  VS4["VS4 replay the challenges [T]<br/>Sumcheck_Transcript.Replay_From_Statement"]:::t
+  VS5["VS5 bound quads [P]<br/>Zk_Verifier.Bound_Quads"]:::p
+  VS6["VS6 the sumcheck's equations [D]<br/>Sumcheck_Verifier.Verifier_Core"]:::d
+  VS7["VS7 Ligero checks [P]<br/>Ligero_Verifier.Verify"]:::p
+  VS8["VS8 decision [D]<br/>Mdoc_Verifier.Verify_Profile"]:::d
+  VS1 --> VS2 --> VS3 --> VS4 --> VS5 --> VS6 --> VS7 --> VS8
+  VS7 -- "then the signature circuit" --> VS4
+  classDef t stroke:#d9480f,stroke-width:4px
+  classDef d stroke:#1c7ed6,stroke-width:2px
+  classDef p stroke:#2f9e44,stroke-width:2px,stroke-dasharray:6 3
+```
+
+*D6 and D7. The prover's eleven steps and the verifier's eight, in the order they run; PS4 and PS5 run for the hash circuit then the signature circuit, and so do PS7 to PS11, VS2 and VS4 to VS7. PS4 is sequential by data because the pads are drawn from one stream of fresh bytes, in order: the same seed gives the same proof, byte for byte. Legend: **[T]**, thick orange border, sequential by the transcript: each challenge is a hash of everything before it, so the step cannot start before the one it follows, nor overlap it; a property of the protocol, not of the code. **[D]**, blue border, sequential by data: the step needs the whole result of the one before. **[P]**, dashed green border, could run in parallel: the work inside the step splits into independent parts. A step whose rounds are in order and whose inside could split takes the outer class; the matrix says what is parallel inside. Neither implementation uses threads on these paths today: both are single-threaded, measured on one core. The step identifiers are not rows of the trusted base register.*
+
+### How the matrices are made
+
+One session of the proving machine on 13 November 2026, main at df4467b, upstream at d5e6be7. The flow is the one of "At the close of Phase D": upstream's `TEST_DATA` document, both circuits of the version 7 pair in one process, on both sides.
+
+- **The totals** are the page's: 4.55 s and 131,514,792 B to prove, 2.60 s and 63,996,152 B to verify; upstream 4.12 s, 107,021,240 B, 1.65 s and 48,162,672 B. The session's own release builds gave 4.57 s and 2.59 s, within the noise of the page's figures, and the same peaks within 50 bytes. The matrices divide the totals by the shares below; they do not replace them.
+- **The time shares** are the median of three profiles of each program: `perf` sampling the processor clock at 999 samples a second, with the call stack of each sample. A sample belongs to the step whose root subprogram is the nearest one on its stack; the fields, the hashes and the other units under every step take the step of the root above them. `scripts/measure/attribute-steps.py` lists the roots of each step, for both sides.
+- **The heap shares** are those of the blocks alive at the exact peak, each with the stack of its allocation (`scripts/measure/heapprof.c`), attributed the same way. A step's share is what it allocated and still holds at the peak.
+- **The binaries profiled.** Ours is the release build with `-g` added, for the names of inlined frames; its machine code is identical to the release build's, byte for byte. Upstream's release profile has no unwind tables (`panic = "abort"`), so its time profiles use a build with frame pointers, debug information and v0 symbol names, 0.5 % slower than its release build in the same session, and its heap profile a build with unwind tables, as fast as its release build. `scripts/measure/README.md` has the commands.
+- **Threads.** Every profile has one thread, on both sides. Upstream's benchmark, `mdoc_zk_bench_v7`, runs the same Rust runtime with one C dependency, zstd, which decompresses the circuits; none of the crates on its path uses a thread pool, and its version 7 rows run on one thread.
+
+### This project
+
+To prove:
+
+| Step | Class | Parallel inside | Time, hash | Time, signature | Time, not per circuit | Share of the samples | Heap alive at the peak | Share of the peak |
+|---|---|---|---|---|---|---|---|---|
+| PS1 | [D] |  | 0.23 s | 0.02 s | 0.01 s | 5.7 % | 6,302,696 B | 4.8 % |
+| PS2 | [D] |  |  |  |  | 0.0 % |  |  |
+| PS3 | [P] | the two witnesses |  |  | 0.00 s | 0.1 % |  |  |
+| PS4 | [D] |  |  |  |  | 0.0 % |  |  |
+| PS5 | [P] | the rows of the encoding, the nodes of one level of the tree | 0.29 s | 0.10 s |  | 8.7 % | 25,965,312 B | 19.7 % |
+| PS6 | [T] |  |  |  |  | 0.0 % | 351,800 B | 0.3 % |
+| PS7 | [D] | the wires of one layer | 0.70 s | 0.04 s |  | 16.3 % | 28,584,160 B | 21.7 % |
+| PS8 | [T] | the terms of a round, the binding of a round | 2.82 s | 0.19 s |  | 66.3 % | 68,132,472 B | 51.8 % |
+| PS9 | [D] |  | 0.02 s | 0.01 s |  | 0.5 % |  |  |
+| PS10 | [P] | the combined rows, the opened columns | 0.07 s | 0.02 s |  | 1.8 % |  |  |
+| PS11 | [D] |  | 0.01 s | 0.02 s | 0.00 s | 0.6 % |  |  |
+| program |  |  |  |  | 0.00 s | 0.1 % | 2,178,400 B | 1.7 % |
+| not attributed |  |  |  |  | 0.00 s | 0.1 % |  |  |
+
+To verify:
+
+| Step | Class | Parallel inside | Time, hash | Time, signature | Time, not per circuit | Share of the samples | Heap alive at the peak | Share of the peak |
+|---|---|---|---|---|---|---|---|---|
+| VS1 | [D] |  | 0.23 s | 0.02 s | 0.00 s | 9.8 % | 6,302,696 B | 9.8 % |
+| VS2 | [T] |  | 0.00 s |  |  | 0.0 % | 3,641,888 B | 5.7 % |
+| VS3 | [T] |  |  |  |  | 0.0 % |  |  |
+| VS4 | [T] |  | 0.04 s | 0.00 s |  | 1.8 % |  |  |
+| VS5 | [P] | the terms of a layer | 1.38 s | 0.08 s |  | 56.2 % | 53,690,336 B | 83.9 % |
+| VS6 | [D] |  | 0.02 s | 0.00 s |  | 0.8 % |  |  |
+| VS7 | [P] | the opened columns and their paths | 0.65 s | 0.16 s |  | 31.3 % |  |  |
+| VS8 | [D] |  |  |  |  | 0.0 % |  |  |
+| program |  |  |  |  | 0.00 s | 0.1 % | 361,248 B | 0.6 % |
+| not attributed |  |  |  |  | 0.00 s | 0.1 % |  |  |
+
+### Upstream at d5e6be7
+
+To prove:
+
+| Step | Class | Parallel inside | Time, hash | Time, signature | Time, not per circuit | Share of the samples | Heap alive at the peak | Share of the peak |
+|---|---|---|---|---|---|---|---|---|
+| PS1 | [D] |  | 0.00 s | 0.00 s | 0.01 s | 0.3 % | 8,048,080 B | 7.5 % |
+| PS2 | [D] |  |  |  |  | 0.0 % | 3,000 B | 0.0 % |
+| PS3 | [P] | the two witnesses |  |  | 0.00 s | 0.1 % | 131,080 B | 0.1 % |
+| PS4 | [D] |  |  |  |  | 0.0 % | 59,568 B | 0.1 % |
+| PS5 | [P] | the rows of the encoding, the nodes of one level of the tree | 0.22 s | 0.03 s |  | 6.1 % | 20,777,800 B | 19.4 % |
+| PS6 | [T] |  |  |  |  | 0.0 % | 32,776 B | 0.0 % |
+| PS7 | [D] | the wires of one layer | 0.65 s | 0.01 s |  | 15.9 % | 28,584,272 B | 26.7 % |
+| PS8 | [T] | the terms of a round, the binding of a round | 2.95 s | 0.09 s |  | 73.8 % | 49,365,976 B | 46.1 % |
+| PS9 | [D] |  | 0.01 s | 0.00 s |  | 0.2 % |  |  |
+| PS10 | [P] | the combined rows, the opened columns | 0.06 s | 0.00 s |  | 1.7 % |  |  |
+| PS11 | [D] |  | 0.01 s | 0.00 s | 0.01 s | 0.4 % |  |  |
+| program |  |  |  |  | 0.05 s | 1.2 % | 18,688 B | 0.0 % |
+| not attributed |  |  |  |  |  | 0.0 % |  |  |
+
+To verify:
+
+| Step | Class | Parallel inside | Time, hash | Time, signature | Time, not per circuit | Share of the samples | Heap alive at the peak | Share of the peak |
+|---|---|---|---|---|---|---|---|---|
+| VS1 | [D] |  | 0.00 s | 0.00 s | 0.01 s | 0.7 % | 8,048,080 B | 16.7 % |
+| VS2 | [T] |  |  |  | 0.01 s | 0.4 % | 833,888 B | 1.7 % |
+| VS3 | [T] |  |  |  | 0.00 s | 0.1 % | 16,760 B | 0.0 % |
+| VS4 | [T] |  | 0.02 s | 0.00 s |  | 1.4 % |  |  |
+| VS5 | [P] | the terms of a layer |  |  |  | 0.0 % |  |  |
+| VS6 | [D] |  |  |  |  | 0.0 % |  |  |
+| VS7 | [P] | the opened columns and their paths | 0.22 s | 0.02 s |  | 14.8 % |  |  |
+| VS8 | [D] |  |  |  |  | 0.0 % |  |  |
+| VS5-VS6 |  |  | 1.32 s | 0.04 s |  | 82.8 % | 38,899,784 B | 80.8 % |
+| program |  |  |  |  | 0.00 s | 0.1 % | 364,160 B | 0.8 % |
+| not attributed |  |  |  |  |  | 0.0 % |  |  |
+
+### Reading the matrices
+
+- **A blank time** means no sample: the step takes less than a millisecond (PS2, PS4, PS6, VS3, VS8 here). **A blank heap** means that nothing the step allocated is alive at the peak; it is not "the step uses no memory". VS7, the Ligero checks, has a working set of its own, which is not alive at the verifier's peak.
+- **The program** is the entry point's own code, outside the steps. Upstream's 1.2 % to prove is zstd decompressing the circuits, frames the frame pointers do not cross: it belongs to PS1, which is about 0.06 s, not 0.01 s.
+- **Not attributed** is what has no root on its stack: at most 0.1 % of the samples, and no byte of the heap at the peak.
+- **VS5 and VS6** are one function upstream: its verifier's core computes the bound quads as it writes the equations, where this verifier computes them first and passes them to its core. Its matrix has one row for the two, VS5-VS6. No other boundary differs, and none is hidden by inlining.
+- **The class** of each step and what could run in parallel inside it are as in D6 and D7. Upstream's steps have the same classes.
+
+**What the steps hold at the peak.** Both peaks fall inside the hash circuit's sumcheck.
+
+| Object | Here | Upstream | Lives from, freed at |
+|---|---|---|---|
+| The sumcheck's working set for one layer: the layer's terms bound to the claim, the hand vectors | 68.1 MB, `Prove_Layer` (PS8) | 49.4 MB, `bind_g` and the bound vectors (PS8) | Both: allocated at the start of each layer, freed at its end |
+| The wires of the circuit | 28.6 MB, `Eval_Circuit` (PS7) | 28.6 MB (PS7) | Both: every layer from PS7; during PS8 each layer's wires are freed once the layer is proved (`Free_Seg` here, upstream's sumcheck takes and drops each layer's vector) |
+| The tableau | 18.0 MB for the hash circuit, 2.8 MB for the signature circuit, `Allocate` (PS5) | 17.7 MB and 2.8 MB (PS5) | Here: from PS5 to the end of PS11 of its circuit (`Release` at the end of `Prove_Committed`). Upstream: from PS5 to the end of the proof of age, after both proofs are written |
+| The circuits | 6.3 MB, the packed form (PS1) | 8.0 MB, the archive and the two decoded circuits (PS1) | Both: to the end of the program |
+| The verifier's bound quads | 53.7 MB, `Bind_Quad_Packed` (VS5) | 38.9 MB, `bind_g` (VS5-VS6) | Both: allocated for each layer, freed at its end |
+
+### Where the difference with upstream comes from
+
+To prove, this project takes 0.43 s more than upstream (4.55 s against 4.12 s). About 0.20 s is reading and checking the two circuit files in each process (PS1, 0.26 s against about 0.06 s with upstream's decompression); 0.14 s the commitment (PS5, 0.40 s against 0.25 s); 0.08 s the evaluation of the circuit (PS7, 0.74 s against 0.66 s); 0.04 s the linear constraints, the Ligero proof and the writing together (PS9 to PS11). The sumcheck, two thirds of the time here and three quarters upstream, is equal: 3.02 s against 3.04 s. To verify, it takes 0.95 s more (2.60 s against 1.65 s): 0.57 s the Ligero checks (VS7, 0.81 s against 0.24 s), where this verifier interpolates by Lagrange's formula and upstream's by an FFT ([Where the gap goes](#where-the-gap-goes)); 0.24 s reading and checking the circuits (VS1); 0.12 s the sumcheck's equations and bound quads (VS5 and VS6 together, 1.48 s against 1.37 s); 0.03 s the replay of the challenges (VS4). The parts are rounded and their sums are within 0.02 s of the differences.
+
 ## After M2
 
 Recorded here and handled after M2, each with its own record:

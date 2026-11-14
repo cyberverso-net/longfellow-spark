@@ -768,6 +768,8 @@ The assertion level of SPARK's own library, which no build compiles; the twin of
 
 The machine-independent measure of a solver's work; the budget is 600,000 per check. ([B6.2](00-primer-spark.md#b62-who-proves-the-formulas), [B6.4](00-primer-spark.md#b64-reading-the-summary-table))
 
+Not the steps PS1 to VS8 of the system map ([Step](#step)).
+
 ### Stone and Bronze
 
 The lower steps of the ladder: the code is in the SPARK subset, and flow analysis passes. ([B7.1](00-primer-spark.md#b71-the-ladder-of-proof))
@@ -903,6 +905,10 @@ Two readings, one inside the other. The **essential route** is the part of the p
 The IETF draft draft-irtf-cfrg-longfellow-00, cited by section. In Ada, "specification" is also the `.ads` file of a package; and `Mdoc_Spec.Specification` is a row of upstream's table of archives (chapter 9). ([A1.2](00-primer-cryptography.md#a12-the-object-certified), [B1.1](00-primer-spark.md#b11-packages-specification-and-body))
 
 Aliases: "the draft" (throughout); "draft-03, draft-google-cfrg-libzk-03" (chapters 2 to 5: the earlier version of the same text, ADR 0079).
+
+### Step
+
+One of the stages of the proof of age on the [system map](system-map.md): PS1 to PS11 for the prover, VS1 to VS8 for the verifier, the rows of the performance matrix. Not a row of the trusted base register, whose identifiers P1 to P4 and V1 to V7 name trusted items, and not GNATprove's [steps](#steps), which count a solver's effort.
 
 ### The pin
 
