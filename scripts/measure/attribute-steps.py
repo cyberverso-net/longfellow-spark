@@ -22,8 +22,11 @@ Inputs:
                              the modules of its map lines
 
 Usage:
-  attribute-steps.py ours|upstream prove|verify time PERF_SCRIPT
-  attribute-steps.py ours|upstream prove|verify heap HEAPPROF_DUMP
+  attribute-steps.py SIDE prove|verify time PERF_SCRIPT
+  attribute-steps.py SIDE prove|verify heap HEAPPROF_DUMP
+
+SIDE is ours, upstream (the crates of d5e6be7) or upstream-single (the
+single crate longfellow_zk of 1c06629 and later).
 
 Output: one line per step and circuit, tab-separated: the step, the
 circuit (hash, sig or both), the samples or bytes, the share; then the
@@ -109,7 +112,7 @@ UPSTREAM = {
         (r"write_sumcheck_statement", "PS8", None),
         (r"symbolic_sumcheck_verifier_core", "PS9", None),
         (r"runtime_ligero::prover::.*::prove\b", "PS10", None),
-        (r"::write\b", "PS11", r"mdoc_zk_runtime::prover::run_mdoc_prover_inner"),
+        (r"^<[a-z0-9_:]*::proto::MdocProof\b.*>::write\b", "PS11", r"mdoc_zk_runtime::prover::run_mdoc_prover_inner"),
     ],
     "verify": [
         (r"mdoc_zk_artifacts::load_circuit", "VS1", None),
@@ -126,6 +129,54 @@ UPSTREAM = {
     ],
 }
 UP_PROGRAM = r"(heap_v7::main|^main$|mdoc_zk_runtime::prover::run_mdoc_prover_inner)"
+
+#  Upstream from 1c06629 on: one crate, longfellow_zk, whose modules
+#  replace the crates of d5e6be7 (mdoc::runtime::v1 for mdoc_zk_runtime,
+#  runtime::zk_v1 for runtime_zk, runtime::sumcheck_v1 for
+#  runtime_sumcheck, runtime::ligero for runtime_ligero). The step that
+#  d5e6be7 runs as symbolic_sumcheck_verifier_core is split in three:
+#  derive_verifier_data replays the transcript and binds the quads,
+#  symbolic::verify writes the equations, constraint_compiler::compile
+#  turns them into linear constraints. The verifier's three are kept
+#  together, as for d5e6be7.
+UPSTREAM_SINGLE = {
+    "prove": [
+        (r"^ZSTD_|^HUF_|^FSE_", "PS1", None),
+        (r"longfellow_zk::core::proto::(archive|reader)::", "PS1", None),
+        (r"mdoc::artifacts::|mdoc::runtime::v1::(provider::|circuits::decompress_circuits)", "PS1", None),
+        (r"::parse_mdoc\b", "PS2", None),
+        (r"mdoc::runtime::v1::.*push_witness_(hash|sig)\b", "PS3", None),
+        (r"mdoc::runtime::v1::.*generate_mac_ap\b", "PS3", None),
+        (r"runtime::sumcheck_v1::pad::sample", "PS4", None),
+        (r"runtime::ligero::prover::.*::commit\b", "PS5", None),
+        (r"runtime::zk_v1::prover::.*::commit\b", "PS5", None),
+        (r"mdoc::runtime::v1::.*push_macs\b", "PS6", None),
+        (r"mdoc::runtime::v1::.*push_input_(hash|sig)\b", "PS6", None),
+        (r"runtime::sumcheck_v1::(eval::)?eval_circuit", "PS7", None),
+        (r"runtime::zk_v1::prover::.*::prove\b", "PS7", None),
+        (r"runtime::sumcheck_v1::prover::prove_core", "PS8", None),
+        (r"write_sumcheck_statement", "PS8", None),
+        (r"runtime::sumcheck_v1::symbolic::verify\b", "PS9", None),
+        (r"runtime::zk_v1::constraint_compiler::compile\b", "PS9", None),
+        (r"runtime::ligero::prover::.*::prove\b", "PS10", None),
+        (r"^<[a-z0-9_:]*::proto::MdocProof\b.*>::write\b", "PS11", r"mdoc::runtime::v1::prover::run_mdoc_prover_inner"),
+    ],
+    "verify": [
+        (r"^ZSTD_|^HUF_|^FSE_", "VS1", None),
+        (r"longfellow_zk::core::proto::(archive|reader)::", "VS1", None),
+        (r"mdoc::artifacts::|mdoc::runtime::v1::(provider::|circuits::decompress_circuits)", "VS1", None),
+        (r"MdocProof.*::read\b", "VS2", None),
+        (r"mdoc::runtime::v1::verifier::run_mdoc_verifier_inner", "VS3", None),
+        (r"mdoc::runtime::v1::.*(push_macs|push_input_(hash|sig))\b", "VS3", None),
+        (r"write_sumcheck_statement", "VS4", None),
+        (r"runtime::sumcheck_v1::verifier::derive_verifier_data", "VS5-VS6", None),
+        (r"runtime::sumcheck_v1::symbolic::verify\b", "VS5-VS6", None),
+        (r"runtime::zk_v1::constraint_compiler::compile\b", "VS5-VS6", None),
+        (r"runtime::zk_v1::verifier::.*::verify\b", "VS4", None),
+        (r"runtime::ligero::verifier::.*::verify\b", "VS7", None),
+    ],
+}
+UP_SINGLE_PROGRAM = r"(heap_v7::main|^main$|mdoc::runtime::v1::prover::run_mdoc_prover_inner)"
 
 
 def circuit_of(name, side):
@@ -295,13 +346,23 @@ def heap_stacks(path):
         yield ["(allocated before the profiler was ready, or while it recorded)"], at - total
 
 
+SIDES = {
+    "ours": (OURS, OURS_PROGRAM),
+    "upstream": (UPSTREAM, UP_PROGRAM),
+    "upstream-single": (UPSTREAM_SINGLE, UP_SINGLE_PROGRAM),
+}
+
+
 def main(argv):
     if len(argv) != 5:
         print(__doc__, file=sys.stderr)
         return 2
     side, prog, kind, path = argv[1:]
-    roots = (OURS if side == "ours" else UPSTREAM)[prog]
-    program = OURS_PROGRAM if side == "ours" else UP_PROGRAM
+    if side not in SIDES:
+        print(__doc__, file=sys.stderr)
+        return 2
+    roots, program = SIDES[side]
+    roots = roots[prog]
     stacks = perf_stacks(path) if kind == "time" else heap_stacks(path)
     by = collections.Counter()
     per_root = collections.Counter()

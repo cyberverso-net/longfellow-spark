@@ -76,7 +76,7 @@ The stacks are walked by glibc's `backtrace()`, which needs unwind tables: GNAT 
 
 ### `attribute-steps.py`: a profile by step
 
-Reads a time profile (the text of `perf script` with call chains) or a dump of `heapprof.c`, and gives each sample or block to the step whose root subprogram is the nearest one on its stack. The roots of each step are listed in the script, for this project and for upstream at the pin; the units every step uses (the fields, the hashes) are leaves and take the step above them. It prints the share of each step and circuit, the share of the program's own code and the share not attributed, and, for a heap profile, the bytes at the peak by allocating subprogram.
+Reads a time profile (the text of `perf script` with call chains) or a dump of `heapprof.c`, and gives each sample or block to the step whose root subprogram is the nearest one on its stack. The roots of each step are listed in the script, for this project (side `ours`), for upstream at the pin (`upstream`, its crates) and for upstream from 1c06629 on (`upstream-single`, the one crate `longfellow_zk`); the units every step uses (the fields, the hashes) are leaves and take the step above them. It prints the share of each step and circuit, the share of the program's own code and the share not attributed, and, for a heap profile, the bytes at the peak by allocating subprogram.
 
 ```
 LONGFELLOW_CLI_BUILD=proved alr -n exec -- gprbuild -P cli/longfellow_verify.gpr -p -f -cargs -g
@@ -87,6 +87,8 @@ python3 -I scripts/measure/attribute-steps.py ours prove heap prove.dump
 ```
 
 Ours is the release build with `-g` only: GCC's code does not change, and the session of 13 November found the `.text` of both programs identical byte for byte to the release build's. Upstream's time profiles take a build with `-C force-frame-pointers=yes -C symbol-mangling-version=v0` and debug information, recorded with `--call-graph fp`, its names demangled by `c++filt` (`perf script --no-demangle ... | c++filt`); perf's own DWARF unwinder stops inside upstream's field multiplication.
+
+At 1c06629 the driver is `heap_v7_single_crate.rs`, built as the example `heap_v7` of the crate with `--features testonly,force-generic-arch`; the attribution takes the side `upstream-single`.
 
 ### `step-matrix.py`: the matrix
 

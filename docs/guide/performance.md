@@ -225,7 +225,7 @@ The proof from the Mustermann document takes 4.60 s and 131,516,648 B of peak he
 
 ## Upstream at a newer commit
 
-The first series against upstream at a commit newer than the pin (#128, reduced to time and peak heap; the per-stage column of #119 follows). The commit is 1c06629, the head of upstream's main on 3 November 2026, 70 commits after d5e6be7: among them the refactor of the Rust implementation into one crate (759b94a), the Longfellow v2 and the experimental ML-DSA circuits (f9d4318), the fix of the carries in the generic multiply-accumulate (7ec62ec), and the proofs in Lean. The mDoc runtime this project follows is its `v1` module there; the driver `scripts/measure/heap_v7_single_crate.rs` runs the same flow as `heap_v7.rs` on the new paths.
+The first series against upstream at a commit newer than the pin (#128, reduced to time and peak heap; the figures by step are in [Upstream at 1c06629](#upstream-at-1c06629)). The commit is 1c06629, the head of upstream's main on 3 November 2026, 70 commits after d5e6be7: among them the refactor of the Rust implementation into one crate (759b94a), the Longfellow v2 and the experimental ML-DSA circuits (f9d4318), the fix of the carries in the generic multiply-accumulate (7ec62ec), and the proofs in Lean. The mDoc runtime this project follows is its `v1` module there; the driver `scripts/measure/heap_v7_single_crate.rs` runs the same flow as `heap_v7.rs` on the new paths.
 
 **The version 7 proof of 1c06629 is identical byte for byte to the pin's** (360,276 bytes, the same deterministic seed, the same test data), each commit's verifier accepts the other's proof, and the archives, the example proofs and the witness files of the two commits are the same files, so the new column measures upstream's code and nothing else. One session (8 November, main 210065c), three runs of each program, upstream's drivers generic for the baseline processor, the same heap counter on every side:
 
@@ -356,13 +356,13 @@ To prove:
 | PS2 | [D] |  |  |  |  | 0.0 % | 3,000 B | 0.0 % |
 | PS3 | [P] | the two witnesses |  |  | 0.00 s | 0.1 % | 131,080 B | 0.1 % |
 | PS4 | [D] |  |  |  |  | 0.0 % | 59,568 B | 0.1 % |
-| PS5 | [P] | the rows of the encoding, the nodes of one level of the tree | 0.22 s | 0.03 s |  | 6.1 % | 20,777,800 B | 19.4 % |
+| PS5 | [P] | the rows of the encoding, the nodes of one level of the tree | 0.23 s | 0.03 s |  | 6.2 % | 20,777,800 B | 19.4 % |
 | PS6 | [T] |  |  |  |  | 0.0 % | 32,776 B | 0.0 % |
 | PS7 | [D] | the wires of one layer | 0.65 s | 0.01 s |  | 15.9 % | 28,584,272 B | 26.7 % |
-| PS8 | [T] | the terms of a round, the binding of a round | 2.95 s | 0.09 s |  | 73.8 % | 49,365,976 B | 46.1 % |
+| PS8 | [T] | the terms of a round, the binding of a round | 2.96 s | 0.09 s |  | 74.0 % | 49,365,976 B | 46.1 % |
 | PS9 | [D] |  | 0.01 s | 0.00 s |  | 0.2 % |  |  |
 | PS10 | [P] | the combined rows, the opened columns | 0.06 s | 0.00 s |  | 1.7 % |  |  |
-| PS11 | [D] |  | 0.01 s | 0.00 s | 0.01 s | 0.4 % |  |  |
+| PS11 | [D] |  |  |  | 0.01 s | 0.2 % |  |  |
 | program |  |  |  |  | 0.05 s | 1.2 % | 18,688 B | 0.0 % |
 | not attributed |  |  |  |  |  | 0.0 % |  |  |
 
@@ -402,7 +402,73 @@ To verify:
 
 ### Where the difference with upstream comes from
 
-To prove, this project takes 0.43 s more than upstream (4.55 s against 4.12 s). About 0.20 s is reading and checking the two circuit files in each process (PS1, 0.26 s against about 0.06 s with upstream's decompression); 0.14 s the commitment (PS5, 0.40 s against 0.25 s); 0.08 s the evaluation of the circuit (PS7, 0.74 s against 0.66 s); 0.04 s the linear constraints, the Ligero proof and the writing together (PS9 to PS11). The sumcheck, two thirds of the time here and three quarters upstream, is equal: 3.02 s against 3.04 s. To verify, it takes 0.95 s more (2.60 s against 1.65 s): 0.57 s the Ligero checks (VS7, 0.81 s against 0.24 s), where this verifier interpolates by Lagrange's formula and upstream's by an FFT ([Where the gap goes](#where-the-gap-goes)); 0.24 s reading and checking the circuits (VS1); 0.12 s the sumcheck's equations and bound quads (VS5 and VS6 together, 1.48 s against 1.37 s); 0.03 s the replay of the challenges (VS4). The parts are rounded and their sums are within 0.02 s of the differences.
+To prove, this project takes 0.43 s more than upstream (4.55 s against 4.12 s). About 0.20 s is reading and checking the two circuit files in each process (PS1, 0.26 s against about 0.06 s with upstream's decompression); 0.14 s the commitment (PS5, 0.40 s against 0.25 s); 0.08 s the evaluation of the circuit (PS7, 0.74 s against 0.66 s); 0.04 s the linear constraints, the Ligero proof and the writing together (PS9 to PS11). The sumcheck, two thirds of the time here and three quarters upstream, is equal: 3.02 s against 3.05 s. To verify, it takes 0.95 s more (2.60 s against 1.65 s): 0.57 s the Ligero checks (VS7, 0.81 s against 0.24 s), where this verifier interpolates by Lagrange's formula and upstream's by an FFT ([Where the gap goes](#where-the-gap-goes)); 0.24 s reading and checking the circuits (VS1); 0.12 s the sumcheck's equations and bound quads (VS5 and VS6 together, 1.48 s against 1.37 s); 0.03 s the replay of the challenges (VS4). The parts are rounded and their sums are within 0.02 s of the differences.
+
+### Upstream at 1c06629
+
+The matrices of upstream at the newer commit of [Upstream at a newer commit](#upstream-at-a-newer-commit), which this series breaks down by step. It is the same commit, not a newer one: 1c06629, committed on 3 November 2026 (authored on 31 October). Upstream's main was last read on 14 November 2026 at 15:14 CET and was still at 1c06629; its development continues on the branch `v2`, the next version of the protocol, which this page does not measure.
+
+- **The session.** One session of the proving machine on 14 November 2026: this project at cbe78a8, upstream at d5e6be7 and at 1c06629, three timed runs of each program, interleaved, and the profiles as in [How the matrices are made](#how-the-matrices-are-made). The totals are this session's: 4.14 s and 107,043,752 B to prove, 1.66 s and 48,138,192 B to verify.
+- **The same proof.** The version 7 proofs of the two upstream commits are again identical byte for byte, from fresh builds of both, and each commit's verifier accepts the other's proof.
+- **The roots.** At 1c06629 upstream's crates are modules of one crate, `longfellow_zk`: `mdoc::runtime::v1` for `mdoc_zk_runtime`, `runtime::zk_v1`, `runtime::sumcheck_v1` and `runtime::ligero` for the runtime's crates. The roots of each step were derived from the names in the profiles and checked against the source; `attribute-steps.py` lists them under the side `upstream-single`.
+- **The binaries profiled.** The time shares come from upstream's build with frame pointers, which is 1.4 % slower than its plain build to prove at 1c06629 (0.2 % at d5e6be7) and as fast to verify.
+- **What is missed.** Not attributed: at most 0.1 % of the samples and no byte of the heap at the peak. The program: 1.2 % of the samples to prove, zstd as at d5e6be7.
+
+To prove:
+
+| Step | Class | Parallel inside | Time, hash | Time, signature | Time, not per circuit | Share of the samples | Heap alive at the peak | Share of the peak |
+|---|---|---|---|---|---|---|---|---|
+| PS1 | [D] |  | 0.00 s | 0.00 s | 0.01 s | 0.3 % | 8,048,080 B | 7.5 % |
+| PS2 | [D] |  |  |  |  | 0.0 % | 3,000 B | 0.0 % |
+| PS3 | [P] | the two witnesses |  |  | 0.00 s | 0.1 % | 131,080 B | 0.1 % |
+| PS4 | [D] |  |  |  |  | 0.0 % | 59,568 B | 0.1 % |
+| PS5 | [P] | the rows of the encoding, the nodes of one level of the tree | 0.22 s | 0.03 s |  | 6.1 % | 20,778,424 B | 19.4 % |
+| PS6 | [T] |  |  |  |  | 0.0 % | 49,232 B | 0.0 % |
+| PS7 | [D] | the wires of one layer | 0.65 s | 0.01 s |  | 16.1 % | 28,584,272 B | 26.7 % |
+| PS8 | [T] | the terms of a round, the binding of a round | 2.98 s | 0.10 s |  | 74.4 % | 49,387,864 B | 46.1 % |
+| PS9 | [D] |  | 0.00 s |  |  | 0.0 % |  |  |
+| PS10 | [P] | the combined rows, the opened columns | 0.06 s | 0.00 s |  | 1.7 % |  |  |
+| PS11 | [D] |  |  |  | 0.01 s | 0.2 % |  |  |
+| program |  |  |  |  | 0.05 s | 1.2 % | 2,232 B | 0.0 % |
+| not attributed |  |  |  |  | 0.00 s | 0.0 % |  |  |
+
+To verify:
+
+| Step | Class | Parallel inside | Time, hash | Time, signature | Time, not per circuit | Share of the samples | Heap alive at the peak | Share of the peak |
+|---|---|---|---|---|---|---|---|---|
+| VS1 | [D] |  | 0.00 s | 0.00 s | 0.01 s | 0.7 % | 8,048,080 B | 16.7 % |
+| VS2 | [T] |  |  |  | 0.01 s | 0.4 % | 833,888 B | 1.7 % |
+| VS3 | [T] |  |  |  |  | 0.0 % | 16,760 B | 0.0 % |
+| VS4 | [T] |  |  |  |  | 0.0 % |  |  |
+| VS5 | [P] | the terms of a layer |  |  |  | 0.0 % |  |  |
+| VS6 | [D] |  |  |  |  | 0.0 % |  |  |
+| VS7 | [P] | the opened columns and their paths | 0.22 s | 0.03 s |  | 14.8 % |  |  |
+| VS8 | [D] |  |  |  |  | 0.0 % |  |  |
+| VS5-VS6 |  |  | 1.35 s | 0.05 s |  | 84.1 % | 38,875,304 B | 80.8 % |
+| program |  |  |  |  |  | 0.0 % | 364,160 B | 0.8 % |
+| not attributed |  |  |  |  | 0.00 s | 0.1 % |  |  |
+
+VS5 and VS6 are kept as one row, to compare with d5e6be7. 1c06629 splits that function in three, and its boundary can be read for the first time: `derive_verifier_data` replays the challenges and binds the quads (1.39 s), `symbolic::verify` writes the equations and `constraint_compiler::compile` turns them into linear constraints (under 0.01 s each). On the prover's side PS9 is the last two. VS4 has no sample at 1c06629: what d5e6be7 charges to VS4 is mostly the own code of its verifier's `verify` (page faults on fresh allocations, inlined field operations), and at 1c06629 work of that kind falls under `derive_verifier_data`. The attribution does not resolve that boundary, so the table below compares VS4 to VS6 together.
+
+**What moved between d5e6be7 and 1c06629.** The time of each step in this session, the step's share of the samples (median of three profiles, both circuits together) applied to the session's totals:
+
+| Step, this session | this project (cbe78a8) | upstream d5e6be7 | upstream 1c06629 |
+|---|---|---|---|
+| PS1 read the circuits | 0.26 s | 0.01 s | 0.01 s |
+| PS5 commitment | 0.40 s | 0.25 s | 0.25 s |
+| PS7 evaluate | 0.74 s | 0.67 s | 0.67 s |
+| PS8 sumcheck | 3.04 s | 3.05 s | 3.08 s |
+| PS9 linear constraints | 0.02 s | 0.01 s | 0.00 s |
+| PS10 Ligero proof | 0.08 s | 0.07 s | 0.07 s |
+| PS11 write | 0.03 s | 0.01 s | 0.01 s |
+| program | 0.00 s | 0.05 s | 0.05 s |
+| **to prove, median of three runs** | **4.58 s** | **4.13 s** | **4.14 s** |
+| VS1 read the circuits | 0.26 s | 0.01 s | 0.01 s |
+| VS4-VS6 replay, bound quads and equations | 1.54 s | 1.39 s | 1.40 s |
+| VS7 Ligero checks | 0.81 s | 0.25 s | 0.25 s |
+| **to verify, median of three runs** | **2.61 s** | **1.65 s** | **1.66 s** |
+
+The other steps take under 0.01 s on every side. Nothing moved beyond the spread between runs: the totals within 0.01 s, and no row by more than 0.03 s, the sumcheck PS8 (3.05 s and 3.08 s, 1 %). The 70 commits change upstream's structure, not its cost on this flow. The peak to prove rises by 22,512 B (107,021,240 B to 107,043,752 B) and the peak to verify falls by 24,480 B (48,162,672 B to 48,138,192 B); the objects alive at the peak are the same, to the byte. This project's differences are the same against both commits, 0.45 s and 0.44 s to prove, 0.96 s and 0.95 s to verify, so [Where the difference with upstream comes from](#where-the-difference-with-upstream-comes-from) holds at 1c06629. This project's peaks in this session, 131,514,840 B and 63,996,168 B, are 48 B and 16 B above those of "At the close of Phase D"; the difference is not explained. The full matrices of d5e6be7 and of this project in this session are kept with the session's raw figures; the matrices of d5e6be7 above are those of 13 November.
 
 ## After M2
 

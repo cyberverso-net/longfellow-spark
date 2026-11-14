@@ -88,6 +88,9 @@ The step lint (`make lint`), in both checks, holds these rules:
 - every unit named in a diagram of the guide or in a code map exists, every subprogram named
   is declared in its unit, and every unit of the proof partitions and of `cli/src` is in at
   least one map (`scripts/check-map.py`);
+- the attribution of profiles by step that the performance page's matrices use gives each
+  recorded call stack of its tests the expected step and circuit
+  (`scripts/measure/attribute-steps-test.py`);
 - no em-dash in any tracked file;
 - none of the attribution and tooling words that `scripts/check.sh` lists, in any tracked file.
 
