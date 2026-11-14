@@ -367,6 +367,10 @@ do_lint() {
    header "lint: the code maps of the guide (check-map.py)"
    python3 -I scripts/check-map-test.py
    python3 -I scripts/check-map.py
+   #  The roots by which the performance page's matrices by step are
+   #  attributed: recorded stacks and the step each must go to.
+   header "lint: the attribution of profiles by step (attribute-steps-test.py)"
+   python3 -I scripts/measure/attribute-steps-test.py
    header "lint: forbidden content over tracked files"
    #  git grep searches tracked files only, in one process, and exits 0
    #  exactly when something matched. This script is excluded from the
