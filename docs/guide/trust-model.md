@@ -220,7 +220,7 @@ Each item below has a row in the [trusted base register](trusted-base.md), named
 - The SMT solvers: CVC5, Z3 and Alt-Ergo (T3).
 - SPARKlib's functional sequences, used as a ghost model (T5; ADR 0031).
 - That `Same`, the logical equality of each field wrapper, is the equality of its element type. Its body is the predefined `=`, outside SPARK (T6; ADR 0023).
-- That the compiled code of the contracts at the level `Proof_Only` agrees with the source GNATprove proved; those contracts are never compiled (T8; ADR 0044).
+- That the compiled code of the units whose contracts are at the level `Proof_Only` has the properties GNATprove proved of their source; those contracts are never compiled, so no build checks them at run time (T8; ADR 0044).
 - The release build relies on the proof instead of checking at run time (T7, C2):
   - the units of `src/` are compiled without run-time checks, because GNATprove proves that none can fail; the units of `cli/src/` keep theirs (ADR 0068);
   - `scripts/check.sh cli` reads the switches each unit was compiled with from its ALI file, and fails if a unit of `cli/src/` was compiled without checks or a unit of `src/` with them; the instances of the library's generics made in `cli/src/` are compiled with the checks on;

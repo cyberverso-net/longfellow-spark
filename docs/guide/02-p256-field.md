@@ -171,7 +171,7 @@ A `Dynamic_Predicate` is a Boolean condition attached to a type: every value of 
    P : constant Big_Integer := To_Int (P_Limbs) with Ghost;
 ```
 
-`Weight (N)` is 2^(64 N), `Partial (L, N)` the value of the first N words, `To_Int` the value of the whole array, and `P` the prime, defined from its limbs so that no 256-bit literal appears anywhere. Every functional contract of the package is a statement about `To_Int`. `Pre` is a *precondition*: GNATprove proves it at every call and assumes it inside the body.
+`Weight (N)` is 2^(64 N), `Partial (L, N)` the value of the first N words, `To_Int` the value of the whole array, and `P` the prime, defined from its limbs so that no 256-bit literal appears anywhere. Every contract of the package on the arithmetic is a statement about `To_Int`; the few limb-wise ones (`Select_Limbs`, the byte conversions) compare limbs and bytes directly. `Pre` is a *precondition*: GNATprove proves it at every call and assumes it inside the body.
 
 ### 3.3 Lemmas
 
@@ -353,9 +353,9 @@ The ghost model, the lemmas and the contracts that mention them are at the level
 ## 6. What stays trusted, and the limits
 
 - Fermat's little theorem for `Inv`, and the exponent arithmetic of the chain, checked by the generator, not proved in SPARK (register row V3).
-- GNATprove's model of `Ada.Numerics.Big_Numbers.Big_Integers` and of the conversions from modular types is the mathematical integers (T4). Every Gold contract of the package is a statement about that model.
+- GNATprove's model of `Ada.Numerics.Big_Numbers.Big_Integers` and of the conversions from modular types is the mathematical integers (T4). Every contract of the package that mentions the model, `To_Int` of the limbs, is a statement about it.
 - The compiler and the builder, including the 128-bit arithmetic (T1), GNATprove (T2) and the SMT solvers (T3). The release build compiles the package without run-time checks and relies on the proof instead (T7).
-- The contracts at the level `Proof_Only`, which carry every functional contract of the package, are proved and never compiled, so that the compiled code agrees with the source GNATprove proved is trusted (T8).
+- The contracts at the level `Proof_Only`, every contract that mentions the model ([ADR 0044](../adr/0044-field-contracts-at-proof-only-level.md)), are proved and never compiled, so that the compiled code has the properties GNATprove proved of the source is trusted (T8). The limb-wise contracts (`Select_Limbs`, `To_Bytes`) and the type predicate of `Element` are executable and run in the test build; the part of `From_Bytes` at the level `Runtime` runs in every build.
 - The prime, the encoding and the sampling rule transcribe the pinned specification, which is trusted to describe the intended protocol (R1).
 - The target is 64-bit: `Unsigned_128` is required ([ADR 0012](../adr/0012-p256-limb-representation.md), P3).
 - Constant time is a discipline, scoped to the release build ([ADR 0006](../adr/0006-constant-time-discipline-and-scope.md), [A12.3](00-primer-cryptography.md#a123-the-observer-of-timing), S4): loop bounds and table indices are compile-time constants, every selection is masked. The `Runtime` part of the postcondition of `From_Bytes` runs in every build (Section 3.8). Nothing measures timing.

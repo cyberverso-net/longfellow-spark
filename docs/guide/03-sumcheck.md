@@ -198,7 +198,7 @@ The Ligero output is `Ligero_Terms (Max)`, the sparse matrix A in coordinate for
 
 The model is the layer of the ghost expansion, `Layer_Of (P, J)`, a slice of `Expand (P)`. Every result is stated on it exactly as the kernels of `Sumcheck_HQuad` state theirs on an expanded layer:
 
-- `Bind_Merge` gives the invariant of the rounds at round 0, as `Merge_Terms` does, when the eq2 table is used (logv at most 24). Without the table its contract gives the run count only, and the merged coefficients are tested, not proved; no caller uses that case.
+- `Bind_Merge` gives the invariant of the rounds at round 0, as `Merge_Terms` does, when the eq2 table is used (logv at most 24). Without the table its contract gives the run count only, and the merged coefficients are tested, not proved. The prover takes that case on a layer whose logv is above 24 (`Sumcheck_Prover`, with an empty table); no circuit held here has one, and `circuit_kat` tests the case on the small layers of every circuit it loads (register row V5).
 - `Bind_Quad_Packed` gives `EBQT_Ref`, and `Eval_Bound_Quad_Packed` gives `EBQ_Ref`.
 
 The proof follows the pattern of chapter 6 Section 3.7. The state of the merge after K terms is one hidden predicate, `Merged`, with a lemma per step (the first term, a term added to its run, a term that opens a run) and one at the end; the loop invariant of `Bind_Merge` is that predicate, with the walk's `Walked` and the walk's index tied to K. Both walks are proved to read `Layer_Of (P, J)` through `Lemma_Walked_Step` of `Packed_Circuits`, which states the coefficient of a term by `Same` as well as by `=`.
