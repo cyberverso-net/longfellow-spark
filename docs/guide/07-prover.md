@@ -476,7 +476,7 @@ The negative cases of `zk_prove.txt`:
 - `input_not_one`, on two circuits;
 - `not_satisfied`, on three circuits, one through an assertion;
 - `not_in_subfield`: boundary 4 with WR 2, where the first witness row is projected and 0x6c is not in GF(2^16); boundary 4 with WR 4 is `ok`, since nothing is projected;
-- `config_invalid`, on two circuits: 8192 columns at rate 1, a geometry that `Config_Fits` refuses, checked by the harness as a caller must.
+- `config_invalid`, on both fields: 70,000 columns at inverse rate 2, beyond the 2^16 points every encoded row may use (`Ligero_Geometry.Max_Encoded_Len`), a configuration that `Valid` refuses, checked by the harness as a caller must, before `Config_Fits` is asked. No vector reaches the prover's own status `Config_Invalid`, which only the Lagrange encoder can return.
 
 For each refused case that has a proof to refuse, the prover instance with `Validate => False` produces a proof that `Zk_Verifier` refuses: `linear_sum_failed` for the unsatisfied circuits, `merkle_failed` for the projected element.
 
