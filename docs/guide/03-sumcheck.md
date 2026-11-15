@@ -254,6 +254,8 @@ Each cell gives the GF(2^128) instance, then the P-256 one. The first column is 
 
 How to read the table: [B6.4](00-primer-spark.md#b64-reading-the-summary-table). The generic units (`Field_Signature`, `Ring_Laws`, `Sumcheck_Algebra`, `Sumcheck_Expression`, `Sumcheck_Verifier`, `Sumcheck_HQuad`, `Packed_HQuad`) have no checks of their own: GNATprove proves their instances, and the table gives the instances. `Sumcheck_HQuad` is proved inside the instances of `Sumcheck_Verifier`, as `HQ`. Which of CVC5 and Z3 is credited with a check varies from run to run.
 
+The flow analysis also prints warnings, which are not checks and are not counted in the tables. Their counts, as `vc-count.py` prints them: `Sumcheck_Verifier` 1 and 1; none in the other units of this chapter. `Packed_Eval`, the other unit of `packed_hquad`, is counted in chapter 7.
+
 In plain terms, for every input, not on samples:
 
 - no run-time error occurs in any unit of this chapter;

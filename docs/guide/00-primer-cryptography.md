@@ -52,7 +52,7 @@ The object is a reimplementation in Ada/SPARK (a programming language and its pr
 | `8d079211…` | 7 | 1 | upstream's Lean certificate of soundness at 116 bits, with the limits of [A11.4](#a114-how-strong-is-the-guarantee) |
 | `137e5a75…` | 6 | 1 | the same code and proofs of this project; no security level is claimed |
 
-The two rows run the same code of this project, with the same proofs and tests. What differs is the configuration of the circuits ([A8](#a8-reed-solomon-codes-and-ligero)): version 7 has the nominal rate 1/7 and opens 132 columns, version 6 the rate 1/4 and 128 columns (chapter 9 Section 1.2). Upstream's theorem is stated for the version 7 configuration, and no theorem covers the version 6 one, kept as the second archive upstream ships at the pin. So the difference between the rows is what may be claimed, not how the code is checked.
+The two rows run the same code of this project, with the same proofs and tests. What differs is the configuration of the circuits ([A8](#a8-reed-solomon-codes-and-ligero)): version 7 has the nominal rate 1/7 and opens 132 columns, version 6 the rate 1/4 and 128 columns ([chapter 9 Section 1.2](09-mdoc.md#12-the-production-circuits)). Upstream's theorem is stated for the version 7 configuration, and no theorem covers the version 6 one, kept as the second archive upstream ships at the pin. So the difference between the rows is what may be claimed, not how the code is checked.
 
 Anything else is refused before any work.
 
@@ -78,7 +78,7 @@ The proof is in fact two proofs, one per circuit, and a cheating prover could ta
 
 The prover builds the witness from the credential: `longfellow_prove_mdoc --mdoc` (chapter 9 Section 3.7).
 
-**The proof.** One byte string of about 360 kB for the version 7 row, in upstream's format, so that upstream's verifier accepts it and this project's verifier accepts upstream's (chapter 9 Section 1.5).
+**The proof.** One byte string of about 360 kB for the version 7 row, in upstream's format, so that upstream's verifier accepts it and this project's verifier accepts upstream's ([chapter 9 Section 1.5](09-mdoc.md#15-the-proof-format)).
 
 ### A1.3 The three digests
 
@@ -141,7 +141,7 @@ Some things a proof of age needs are not checked by this repository at all. They
 
 One distinction runs through the whole guide.
 
-This project's prover, working from a credential (`--mdoc`), is **honest**: its witness builder refuses, before any work, a credential the circuits would mishandle, such as a validity date in a form the circuit compares wrongly (chapter 9 Section 3.7). Its reference path from upstream's witness files (`--hash-witness`), for tests and interoperability, skips the builder and its checks.
+This project's prover, working from a credential (`--mdoc`), is **honest**: its witness builder refuses, before any work, a credential the circuits would mishandle, such as a validity date in a form the circuit compares wrongly (chapter 9 Section 3.7), with the exceptions the conditions table of chapter 9 Section 6 marks "The circuits refuse the proof": there the prover finds out only when the witness does not satisfy the circuit. Its reference path from upstream's witness files (`--hash-witness`), for tests and interoperability, skips the builder and its checks.
 
 But a verifier does not know who made a proof. **Any prover** may send one, including a program written to cheat, which skips every check of the honest builder. So those checks protect the holder who uses this project's prover, not a verifier. A verifier is protected only by what the circuits check and what the protocol guarantees; where the circuit does not check something, the guarantee rests on a condition of chapter 9 Section 6.
 
@@ -153,8 +153,8 @@ An evaluator should therefore read every claim with the question: does it hold f
 |---|---|
 | The profile | `Mdoc_Spec`; chapter 9 Section 6; ADR 0089 |
 | The entry points | `Mdoc_Prover.Prove_Profile`, `Mdoc_Verifier.Verify_Profile`; chapter 9 Sections 3.2 and 3.3 |
-| The circuit files | `tests/vectors/upstream/mdoc/`; chapter 9 Section 1.2 |
-| The public inputs, the tags, `e2` | `Mdoc_Inputs`, `Mdoc_Mac`, `Device_Auth`; chapter 9 Sections 1.3 and 1.4 |
+| The circuit files | `tests/vectors/upstream/mdoc/`; [chapter 9 Section 1.2](09-mdoc.md#12-the-production-circuits) |
+| The public inputs, the tags, `e2` | `Mdoc_Inputs`, `Mdoc_Mac`, `Device_Auth`; [chapter 9 Sections 1.3 and 1.4](09-mdoc.md#13-the-tags-that-bind-the-two-proofs) |
 | The witness from the credential | `Mdoc_Parse`, `Mdoc_Witness`; chapter 9 Sections 3.6 and 3.7 |
 | The four kinds of claim | `docs/guide/trust-model.md`, `docs/guide/trusted-base.md` |
 | The conditions for certifying the circuit | chapter 9 Section 6 |
@@ -395,7 +395,7 @@ From now on the prover cannot change w or the pads, and the proof does not show 
 | The commitment | `Ligero_Prover`; chapter 7 Section 1; chapter 5 Section 1.1 |
 | The combined witness and its layout | chapter 3 Sections 1.5 and 1.6 |
 | The random source | `Os_Random`, `Cli_Random`; the trusted base register, rows C1 and P4 |
-| The MAC pads | `Mdoc_Inputs.Place_Pads`; chapter 9 Section 1.6 |
+| The MAC pads | `Mdoc_Inputs.Place_Pads`; [chapter 9 Section 1.6](09-mdoc.md#16-the-witness) |
 
 ## A6. Circuits
 
@@ -454,7 +454,7 @@ two terms. The circuit accepts when y − w·w = 0, that is, when w is a square 
 |---|---|
 | The quad form and what "accepts" means | chapter 3 Section 1.1; `Eval_Circuit` in `Sumcheck_Algebra` |
 | The circuit file, its reader and its shape | chapter 6; `Circuit_Reader` |
-| The registered circuits | `tests/vectors/upstream/mdoc/`; chapter 9 Section 1.2 |
+| The registered circuits | `tests/vectors/upstream/mdoc/`; [chapter 9 Section 1.2](09-mdoc.md#12-the-production-circuits) |
 | What the circuits compute | the trusted base register, row R2; ADR 0091 |
 
 ## A7. The sumcheck
@@ -578,7 +578,7 @@ The equations of [A7.5](#a75-the-running-example), linear in w and the eleven pa
 | The verifier's interpolation | chapter 5 Section 2.3; `Lagrange` |
 | The tableau, the tests, the opened columns | chapter 5 Sections 1.3 to 1.6; `Ligero_Verifier`, `Ligero_Prover` |
 | The geometry: rows, columns, the 132 openings | chapter 5 Section 2.2; `Ligero_Geometry` |
-| The version 7 parameters | chapter 9 Section 1.2 |
+| The version 7 parameters | [chapter 9 Section 1.2](09-mdoc.md#12-the-production-circuits) |
 
 ## A9. Fiat-Shamir
 
@@ -620,7 +620,7 @@ Over P-256, the conversion of bytes into field elements discards a byte string t
 |---|---|
 | The transcript and its frames | `Transcript`; chapter 4 |
 | The replay of a proof's challenges | `Sumcheck_Transcript`; chapter 4 Section 2 |
-| The transcript of the proof of age | chapter 9 Section 1.4 |
+| The transcript of the proof of age | [chapter 9 Section 1.4](09-mdoc.md#14-the-public-inputs-and-the-transcript) |
 | Its completeness, trusted | the trusted base register, row S3 |
 
 ## A10. Signatures, CBOR and the mDoc
@@ -686,7 +686,7 @@ The circuits read the CBOR at the positions the prover gives, and check the byte
 |---|---|
 | The curve and ECDSA | `P256_Curve`, `Ecdsa_Witness`, `Q256_Field`; chapter 9 Section 3.5 |
 | The parse of the CBOR | `Cbor_Parse`, `Mdoc_Parse`; chapter 9 Section 3.6 |
-| `e2` | `Device_Auth`; chapter 9 Section 1.4 |
+| `e2` | `Device_Auth`; [chapter 9 Section 1.4](09-mdoc.md#14-the-public-inputs-and-the-transcript) |
 | The items, the MSO and the witness | `Mdoc_Witness`; chapter 9 Section 3.7 |
 
 ## A11. Longfellow, all together
@@ -713,11 +713,11 @@ The proof of age has two circuits, one per field, because the two halves of the 
 
 Each circuit gets its own commitment, sumcheck and Ligero proof: the proof of age is two Longfellow proofs.
 
-What makes them one statement is the binding of chapter 9 Section 1.3, with the MAC pads of [A5.3](#a53-the-four-kinds-of-randomness):
+What makes them one statement is the binding of [chapter 9 Section 1.3](09-mdoc.md#13-the-tags-that-bind-the-two-proofs), with the MAC pads of [A5.3](#a53-the-four-kinds-of-randomness):
 
 1. Both commitments are written first.
 2. Then a challenge, called `av`, is drawn from the Fiat-Shamir transcript ([A9](#a9-fiat-shamir)).
-3. Each circuit checks six tags, computed from `av`, the MAC pads, each used for one proof only, and the three secret values the circuits share: the digest `e` and the two coordinates of the device key ([A1.3](#a13-the-three-digests)). Each value has 256 bits and a field element of GF(2^128) holds 128, so each is split in two halves, with one tag each: three values, six tags. A message authentication code (MAC) computes each tag as tag = (av + pad) · half, in GF(2^128) (chapter 9 Section 1.3).
+3. Each circuit checks six tags, computed from `av`, the MAC pads, each used for one proof only, and the three secret values the circuits share: the digest `e` and the two coordinates of the device key ([A1.3](#a13-the-three-digests)). Each value has 256 bits and a field element of GF(2^128) holds 128, so each is split in two halves, with one tag each: three values, six tags. A message authentication code (MAC) computes each tag as tag = (av + pad) · half, in GF(2^128) ([chapter 9 Section 1.3](09-mdoc.md#13-the-tags-that-bind-the-two-proofs)).
 
 The tags are public. A prover that gave the two circuits different values would need the tags to agree by chance. Since `av` is drawn after both commitments, for one pair of different values that chance is at most one in 2^128. The composed bound of [A11.4](#a114-how-strong-is-the-guarantee) accounts for every attempt and for the several witnesses a commitment may be close to.
 
@@ -767,7 +767,7 @@ Four things limit the theorem:
 - Some of its numerical steps use a Lean feature, `native_decide`, which trusts the compiler of Lean as well as its kernel. [B8](00-primer-spark.md#b8-lean-and-spark-two-kinds-of-proof) explains what that adds to the trusted base.
 - It is about the protocol, taking the circuits as given. What the circuits compute is trusted ([A1.5](#a15-what-stays-outside)), and upstream's separate theorems on its ECDSA circuit hold only vacuously at the commit read ([B8.6](00-primer-spark.md#b86-the-rule-on-native_decide-and-upstreams-own-evidence)).
 
-**Zero knowledge**, that the proof reveals nothing beyond the statement, is also a theorem of upstream for the version 7 configuration: with 256-bit leaf nonces, the proof can be imitated by someone who does not know the secret, so that no one making at most 2^115 queries to the Merkle tree's hash can tell the imitation from a real proof, except with probability 2^-127. It carries one stated exception, in upstream's own terms: the imitation is told which of the six tagged halves are zero. A zero half gives a zero tag whatever the pad (chapter 9 Section 1.3). For a real credential no half is zero in practice, but the exception is part of the theorem as stated. The theorem also assumes that the prover's randomness, its pads and blinding values, is fresh, secret and uniform for each proof ([A12.2](#a122-the-curious-verifier)).
+**Zero knowledge**, that the proof reveals nothing beyond the statement, is also a theorem of upstream for the version 7 configuration: with 256-bit leaf nonces, the proof can be imitated by someone who does not know the secret, so that no one making at most 2^115 queries to the Merkle tree's hash can tell the imitation from a real proof, except with probability 2^-127. It carries one stated exception, in upstream's own terms: the imitation is told which of the six tagged halves are zero. A zero half gives a zero tag whatever the pad ([chapter 9 Section 1.3](09-mdoc.md#13-the-tags-that-bind-the-two-proofs)). For a real credential no half is zero in practice, but the exception is part of the theorem as stated. The theorem also assumes that the prover's randomness, its pads and blinding values, is fresh, secret and uniform for each proof ([A12.2](#a122-the-curious-verifier)).
 
 **What this project adds** to those theorems is the evidence of [A1.4](#a14-what-certifying-it-means) about its own code: that it follows the protocol (by proof and test, and by reading for the link to upstream's model), that it cannot fail at run time (Silver), that its building blocks compute what their references say (Gold, where stated), and that it interoperates with upstream byte for byte (tested). What it does not add, today, is a proof of what the circuits compute ([A1.5](#a15-what-stays-outside)).
 
@@ -778,7 +778,7 @@ Four things limit the theorem:
 | The commitment, the sumcheck, Ligero, the transcript | chapters 5, 3 and 4; units `Ligero_*`, `Sumcheck_*`, `Transcript` |
 | The prover's side | chapter 7; `Zk_Prover` |
 | The verifier's side | chapter 5 Section 1.6; `Zk_Verifier` |
-| The two circuits, the tags, `av`, the one transcript | chapter 9 Sections 1.3 and 1.4; `Mdoc_Mac`, `Mdoc_Prover`, `Mdoc_Verifier` |
+| The two circuits, the tags, `av`, the one transcript | [chapter 9 Sections 1.3 and 1.4](09-mdoc.md#13-the-tags-that-bind-the-two-proofs); `Mdoc_Mac`, `Mdoc_Prover`, `Mdoc_Verifier` |
 | The theorems and their scope | the Lean correspondence page |
 
 ## A12. Who attacks what
@@ -852,6 +852,6 @@ A verifier receives proof bytes from strangers, and a prover a credential file. 
 | What | Where |
 |---|---|
 | The adversaries and the claims | the trust model, "Outside the proofs, and what covers it" |
-| Fresh pads | `Mdoc_Inputs.Place_Pads`; chapter 9 Section 1.6; ADR 0089 |
+| Fresh pads | `Mdoc_Inputs.Place_Pads`; [chapter 9 Section 1.6](09-mdoc.md#16-the-witness); ADR 0089 |
 | Constant time and its exceptions | the headers of `GF2_128`, `P256_Field`, `Mdoc_Parse`; ADR 0006, ADR 0086; [chapter 4 Section 3.2, "Assertion levels"](04-transcript.md#assertion-levels-and-the-checks-kept-in-every-build) |
 | The bounds | the trust model, "What is proved", and chapter 9 Section 3 |

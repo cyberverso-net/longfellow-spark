@@ -292,6 +292,8 @@ How to read the table: [B6.4](00-primer-spark.md#b64-reading-the-summary-table).
 
 Z3 and CVC5 share almost every check the provers discharge, and which of the two is credited with one varies from run to run, since the first to answer wins. Alt-Ergo closes a few polynomial normalisation steps and bridges between modular words and the integer model (ADR 0020).
 
+The flow analysis prints no warning for the units of this chapter.
+
 In plain terms, for every input, not on samples:
 
 - no run-time error occurs anywhere in the package;

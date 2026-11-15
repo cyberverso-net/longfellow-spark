@@ -181,6 +181,8 @@ The last column gives the GF(2^128) instance, then the P-256 one. The P-256 inst
 
 How to read the table: [B6.4](00-primer-spark.md#b64-reading-the-summary-table). `Sumcheck_Transcript` is generic; the table gives its two instances.
 
+The flow analysis also prints warnings, which are not checks and are not counted in the tables. Their counts, as `vc-count.py` prints them: `Sumcheck_Transcript` 3 and 2; none in the other units of this chapter.
+
 In plain terms, for every input, not on samples:
 
 - no run-time error occurs in any unit of this chapter;

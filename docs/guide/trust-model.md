@@ -36,7 +36,7 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 **The sumcheck algebra** (chapter 3, for each of the two fields).
 
 - `Eq`, `Bindeq`, `Bind`, `Lagrange_Basis`, `Eval_Quad`, `Eval_Circuit`, `Bind_G`, `Eval_Bound_Quad` and every `Expression` operation are proved equal to a ghost reference. Each reference transcribes the specification's formula in a fixed order of operations. Equality is the logical equality `Same`.
-- `Eval_Circuit` carries the semantics of the Z assertions. `Symbolic_Round` is the specification's formula by definition.
+- `Eval_Circuit` carries the semantics of the assertions. `Symbolic_Round` is the specification's formula by definition.
 - `Verifier_Core` is Silver. It is proved to emit only terms the Ligero verifier can index, with the right pad indices for the quadratic triples.
 - `Verifier_Core` takes the shape of the circuit and the bound quad of each layer as inputs (ADR 0071, ADR 0080). That each bound quad equals the ghost reference `BQ_Ref` is proved where they are produced and asserted at the two calls of the core: the verifier computes them from the packed circuit with `Zk_Verifier.Bound_Quads`, through the merged runs of `Packed_HQuad` as upstream does (ADR 0073, ADR 0080); the prover takes them from its sumcheck, which uses the same kernels, and the postcondition of `Sumcheck_Prover.Prove` proves them equal to `BQ_Ref`. The core's own postcondition does not depend on that fact.
 - `Input_Constraint` is Gold against the formula of Section 6.7. Term W of the constraint has witness W and coefficient `Eq2 (npublic + W)`. The constant is the public binding, summed over the public inputs in order, minus the final claim. The last terms are the claim pads, built with the operations of `Expression` (ADR 0056).
@@ -162,10 +162,10 @@ The vectors live in `tests/vectors/`. Each generator is an independent Python pr
 - Proofs made under another seed, or with the system's random generator, are accepted by `longfellow_verify`.
 - Piece by piece, the prover matches an independent Python transcription of the reference prover: the pads and padded sumcheck proofs, the Merkle roots, the unencoded rows and the openings of the commitment.
 - The writers rewrite every proof in the repository identically.
-- The complete proofs of the small circuits are accepted by `Zk_Verifier`. The statuses `input_length`, `not_satisfied`, `not_in_subfield` and `config_invalid` are each triggered. A prover with input checks turned off makes proofs of false statements, and the verifier refuses them.
+- The complete proofs of the small circuits are accepted by `Zk_Verifier`. The statuses `input_length`, `input_not_one`, `not_satisfied`, `not_in_subfield` and `config_invalid` are each triggered. A prover with input checks turned off makes proofs of false statements, and the verifier refuses them.
 - The claim of each round, which the prover tracks to take p (1) from it as upstream does, is checked at the end of every layer of every test circuit against the two claims times the bound quad (ADR 0075). The round evaluations equal the reference ones only when that claim is the true sum.
 - The sixteen masks of the subfield projection are checked on all 65536 subfield elements.
-- The shape of the whole tableau is checked slot by slot (ADR 0052).
+- The shape of the whole tableau is checked slot by slot, and the polynomials of the Ligero proof through the byte identity and every proof accepted (V13; ADR 0052).
 - Both FFTs give the Lagrange codeword. Python transcriptions of the upstream transforms are checked against Lagrange interpolation (`gen_fft_vectors.py` for GF(2^128), `gen_rs_p256_vectors.py` for the real FFT over F_p^2), `fft_kat` checks the Ada units on those vectors and against `Lagrange.Evaluate` on random rows, and the prover's commitments and the two upstream proofs stay those of the Lagrange encoder.
 - A proof file made by this project was verified by the upstream `ZkVerifier`, by hand, through `tests/vectors/upstream/verify_proof_file.rs`.
 
@@ -230,7 +230,7 @@ Each item below has a row in the [trusted base register](trusted-base.md), named
 **Inputs and references.**
 
 - The pinned specification itself (R1).
-- The upstream circuit files, as to what they compute (R2). Their shape is proved `Well_Formed` on load and their identifier is recomputed (ADR 0046), except for the pinned list below. The version 7 pair's guarantee holds under explicit conditions on the issuer, the relying party and the circuit itself (matching by content, the SHA-256 padding, the wrapper lengths, the types in an item, the namespace, the separators of the dates, the docType, the issuer's key, e2 not zero), and the circuits support ES256 on P-256 only, with one COSE_Key form: chapter 9 Section 6, "Conditions for certifying the circuit".
+- The upstream circuit files, as to what they compute (R2). Their shape is proved `Well_Formed` on load and their identifier is recomputed (ADR 0046), except for the pinned list below. The version 7 pair's guarantee holds under explicit conditions on the issuer, the relying party and the circuit itself (matching by content, the SHA-256 padding, the wrapper lengths, the types in an item, the namespace, the separators of the dates, the docType, the issuer's key, e2 not 0 modulo n), and the circuits support ES256 on P-256 only, with one COSE_Key form and x(R) below n in each signature: chapter 9 Section 6, "Conditions for certifying the circuit".
 - The list of `Pinned_Circuits` in the command line: the digest of each circuit file and its identifier, checked once by a full `Read` in `interop_kat`. A file in the list is loaded without recomputing its identifier (R3; ADR 0074).
 - The upstream production reader at d5e6be7, as the definition of the LFC2 format (R4).
 - That the recordings of upstream's Ligero verifier, sumcheck core and transcript under `tests/vectors/upstream/` are faithful to d5e6be7 (R5; ADR 0027, ADR 0040).
@@ -251,6 +251,7 @@ Each item below has a row in the [trusted base register](trusted-base.md), named
 - That `GF2_128.Subfield_Coords` inverts `Inject` on the subfield (V8).
 - That `Bindeq` agrees with `Eq` (V9), that the Lagrange basis of the sumcheck interpolates (V10), and that the three Lagrange denominator inverses of each field are the inverses (V11).
 - That the Lagrange tables of the Ligero verifier interpolate (V12).
+- That the rows of the prover's tableau compose into the tableau of the specification, and that the polynomials of its Ligero proof are the reference's sums (V13; ADR 0052).
 - That the absorption into the transcript is complete beyond the two Appendix B.3 proofs. The sequence of calls in `Replay_Challenges` is the checklist (S3).
 
 **The machine.**

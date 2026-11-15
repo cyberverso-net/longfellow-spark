@@ -4,6 +4,8 @@ A formally verified reimplementation, in Ada/SPARK, of [Longfellow ZK](https://g
 
 It follows **IETF draft-irtf-cfrg-longfellow-00 (22 October 2026)**, the CFRG version of draft-google-cfrg-libzk-03, with the same technical text (ADR 0079). Changes in later drafts are handled as explicit migrations (ADR 0002).
 
+With it, a holder proves one fact about a signed credential, for example that they are over 18, and the relying party learns that fact and nothing else of the credential. The code runs on inputs an adversary chooses, the proofs, the circuits and the credential, so a crash, a read out of bounds or a wrong field operation would be a flaw whatever the cryptography guarantees. This project proves, for every input, that its code has no such error and that its arithmetic and building blocks compute the specification's formulas, and lists what is only tested or trusted, so that an evaluator can follow the evidence from the specification and upstream's proofs down to the code.
+
 The project is built in phases, each released when complete:
 
 | Phase | What it adds | Release | Checks proved |
@@ -64,18 +66,7 @@ The prover settings are in `longfellow_spark.gpr` (ADR 0020): CVC5, Z3 and Alt-E
 
 `scripts/check.sh` defines these steps. `make build`, `make prove`, `make test`, `make cli`, `make vectors` and `make lint` run them one at a time. The full proof takes about an hour on a laptop.
 
-The project's proving machine, a virtual machine on Google Cloud (c4-standard-24, 12 cores, one thread per core), runs the same check on demand (ADR 0060, 0062):
-
-```bash
-scripts/remote-check.sh               # make check on the pushed commit, posts the status prove
-scripts/remote-check.sh --collect     # picks up that run later, if the terminal was closed
-scripts/remote-check.sh --digest      # the proof inputs of HEAD, their digest, the proved ancestor with the same
-scripts/remote-check.sh --full        # the proof from scratch even when the inputs are unchanged
-scripts/remote-check.sh --tree prove  # the working tree as it is, any target, posts nothing
-scripts/remote-check.sh --tree-collect  # picks up a tree run later, if the terminal was closed
-```
-
-Neither run depends on the connection: the laptop may sleep. The machine keeps the result and shuts itself down; the script reads the result when it next reaches it, and for a pushed commit posts the status. A tree run started while another run holds the machine is refused. Two runs launched at the same moment are not yet kept apart, so running one job at a time is still a rule to follow.
+The project's proving machine, a virtual machine on Google Cloud, runs the same check on demand and posts the status `prove` ([ADR 0060](docs/adr/0060-proving-machine-on-google-cloud.md), ADR 0062); [the development process](docs/process.md), "The proving machine", describes `scripts/remote-check.sh` and its modes.
 
 ## Testing
 
@@ -124,7 +115,7 @@ The mDoc circuits under `tests/vectors/upstream/mdoc/` are in a fixed list, `cli
 
 `cli/bin/longfellow_prove` makes a proof from an LFC2 circuit file and an inputs file (chapter 7). The inputs file uses the format of the upstream test data: a JSON array of decimal strings, with the public inputs first.
 
-It exits with 0 when the proof is written, 1 on a prover or circuit status, and 2 on a usage or file error. The prover statuses are `input_length`, `not_satisfied`, `not_in_subfield`, `config_invalid` and `exhausted`.
+It exits with 0 when the proof is written, 1 on a prover or circuit status, and 2 on a usage or file error. The prover statuses are `input_length`, `input_not_one`, `not_satisfied`, `not_in_subfield`, `config_invalid` and `exhausted`.
 
 By default the randomness comes from the operating system. `--seed N` switches to the generator of the upstream test instead. That makes the proof reproducible, and also predictable, so it is for testing only. With the upstream seeds, the two upstream proofs come out byte for byte:
 
@@ -143,7 +134,7 @@ cli/bin/longfellow_prove --field p256 \
 cmp /tmp/ecdsa2_proof.bin tests/vectors/upstream/circuits/ecdsa2_proof.bin
 ```
 
-At Phase C each took about six seconds on the author's laptop; Phase D has made the prover much faster since ([the performance page](docs/guide/performance.md)). Without `--seed` the proof changes at every run, and `longfellow_verify` accepts it. To check a proof with the upstream verifier, see `tests/vectors/upstream/verify_proof_file.rs`.
+The times are on [the performance page](docs/guide/performance.md). Without `--seed` the proof changes at every run, and `longfellow_verify` accepts it. To check a proof with the upstream verifier, see `tests/vectors/upstream/verify_proof_file.rs`.
 
 ## The mDoc proof of age
 
@@ -153,7 +144,7 @@ At Phase C each took about six seconds on the author's laptop; Phase D has made 
 scripts/measure-mdoc.sh mdoc
 ```
 
-On the proving machine the proof of age from the credential takes 4.60 s and a peak heap of 132 MB, its verification 2.63 s and 64 MB, against 4.16 s and 107 MB, 1.65 s and 48 MB for upstream's generic code on the same document in the same session (1.11 and 1.23 times for the proof, 1.59 and 1.33 for the verification; [the performance page](docs/guide/performance.md), "The proof of age from the credential"); the parse and the witnesses cost nothing measurable beside the proof from the witness files; about six and three seconds on the author's laptop. The verifier accepts upstream's own example proofs too. To check a proof with upstream's mDoc verifier, see `tests/vectors/upstream/verify_mdoc.rs`. `make mdoc-cases` proves and verifies every one of upstream's 38 test documents (`tests/vectors/upstream/mdoc/testcases/`) with upstream's own requests, as the `cli` step of `make check` does on the proving machine at every gate; at version 6 an item must hold `elementValue` right after `elementIdentifier` (chapter 9 Section 3.7).
+On the proving machine, at release 0.5.0, the proof of age from the credential takes 4.55 s and a peak heap of 132 MB, its verification 2.60 s and 64 MB, against 4.12 s and 107 MB, 1.65 s and 48 MB for upstream's generic code on the same document in the same session (1.10 and 1.23 times for the proof, 1.58 and 1.33 for the verification; [the performance page](docs/guide/performance.md)); the parse and the witnesses cost nothing measurable beside the proof from the witness files. The verifier accepts upstream's own example proofs too. To check a proof with upstream's mDoc verifier, see `tests/vectors/upstream/verify_mdoc.rs`. `make mdoc-cases` proves and verifies every one of upstream's 38 test documents (`tests/vectors/upstream/mdoc/testcases/`) with upstream's own requests, as the `cli` step of `make check` does on the proving machine at every gate; at version 6 an item must hold `elementValue` right after `elementIdentifier` (chapter 9 Section 3.7).
 
 ## Continuous integration
 
