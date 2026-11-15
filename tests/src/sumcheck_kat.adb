@@ -20,6 +20,7 @@ pragma SPARK_Mode (Off);
 with Ada.Command_Line;
 with Ada.Directories;
 with Ada.Text_IO;
+with Kat_Sections;
 with Interfaces; use Interfaces;
 with GF2_128;
 with P256_Field;
@@ -172,8 +173,12 @@ procedure Sumcheck_KAT is
       elsif Field = "p256" then
          P_KAT.Run_File (Path, Passed, Failed);
       else
+         --  The file is still a section, so that its failure is in the
+         --  counts by section as in the total.
+         Kat_Sections.Start (Path, Passed, Failed);
          TIO.Put_Line ("FAIL " & Path & ": no field line");
          Failed := Failed + 1;
+         Kat_Sections.Count ("", Passed, Failed);
       end if;
    end Run;
 
@@ -212,6 +217,7 @@ begin
       end loop;
    end if;
 
+   Kat_Sections.Print;
    TIO.Put_Line ("passed" & Passed'Image & ", failed" & Failed'Image);
    if Failed > 0 or else Passed = 0 then
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);

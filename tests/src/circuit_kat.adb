@@ -41,6 +41,7 @@ with Ada.Directories;
 with Ada.Exceptions;
 with Ada.Streams.Stream_IO;
 with Ada.Text_IO;
+with Kat_Sections;
 with Ada.Unchecked_Deallocation;
 with Interfaces; use Interfaces;
 with Bytes;      use Bytes;
@@ -813,6 +814,7 @@ procedure Circuit_KAT is
    begin
       TIO.Put_Line ("Circuit_Reader known-answer tests: " & Path);
       TIO.Open (File, TIO.In_File, Path);
+      Kat_Sections.Start (Path, Passed, Failed);
       Line_No := 0;
       while not TIO.End_Of_File (File) loop
          declare
@@ -821,10 +823,13 @@ procedure Circuit_KAT is
             Line_No := Line_No + 1;
             if Line'Length > 0 and then Line (Line'First) /= '#' then
                Check_Case (Line);
+               Kat_Sections.Count
+                 (Kat_Sections.Kind_Of (Line), Passed, Failed);
             end if;
          end;
       end loop;
       TIO.Close (File);
+      Kat_Sections.Count ("the end of the file", Passed, Failed);
       GF_Checks.Release;
       P_Checks.Release;
    end Run_File;
@@ -839,6 +844,7 @@ begin
          Run_File (Ada.Command_Line.Argument (I));
       end loop;
    end if;
+   Kat_Sections.Print;
    TIO.Put_Line ("passed" & Passed'Image & ", failed" & Failed'Image);
    if Failed > 0 or else Passed = 0 then
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);

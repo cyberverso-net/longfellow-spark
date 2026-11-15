@@ -5,6 +5,7 @@ with Interfaces; use Interfaces;
 with Ada.Directories;
 with Ada.Exceptions;
 with Ada.Text_IO;
+with Kat_Sections;
 with Transcript;
 with Ligero_Geometry;
 with Verifier_Status;
@@ -72,6 +73,43 @@ package body Sumcheck_KAT_Generic is
       end if;
    end Check;
 
+   --  The parts of a file, in the counts by section: tier 1 (the
+   --  explicit circuits), tier 2 (the algebra), and the steps of tier 3.
+   type Part_Kind is
+     (None, Tier1, Tier2, Records, Packed, Core, Replay, Ligero, Complete);
+
+   function Name_Of (K : Part_Kind) return String is
+     (case K is
+         when None     => "",
+         when Tier1    => "tier 1: the explicit circuits",
+         when Tier2    => "tier 2: the algebra",
+         when Records  => "tier 3: reading the records",
+         when Packed   => "tier 3: the packed form",
+         when Core     => "tier 3: the core",
+         when Replay   => "tier 3: the reader and the replay",
+         when Ligero   => "tier 3: the steps of the Ligero verifier",
+         when Complete => "tier 3: the complete proof and its negative cases");
+
+   --  The step of tier 3 under way, None outside them. A check counted
+   --  while a step is under way belongs to it, a failure raised inside
+   --  the step and caught by Check_Case included.
+   Active : Part_Kind := None;
+
+   --  The checks counted since the previous call belong to K.
+   procedure Part (K : Part_Kind) is
+   begin
+      Kat_Sections.Count (Name_Of (K), N_Pass, N_Fail);
+   end Part;
+
+   --  Closes the step under way, if any, and opens K.
+   procedure Open (K : Part_Kind) is
+   begin
+      if Active /= None then
+         Part (Active);
+      end if;
+      Active := K;
+   end Open;
+
    --  The circuit block under construction.
    Max_Layers : constant := 64;
    Max_Terms  : constant := 4096;
@@ -111,7 +149,7 @@ package body Sumcheck_KAT_Generic is
    Max_Elems : constant := 8192;
    type Elem_Buf is array (0 .. Max_Elems - 1) of Element;
    type Nat_Buf is array (0 .. Max_Elems - 1) of Natural;
-   Tier3        : Boolean;
+   Tier3        : Boolean := False;
    Pub_Buf      : Wire_Buf;
    Have_Public  : Boolean;
    Pad_Base_Val : Natural;
@@ -933,8 +971,11 @@ package body Sumcheck_KAT_Generic is
          --  Stage 5: the Ligero verifier continues on this transcript;
          --  then the complete verifier from the proof string.
          if Same then
+            Open (Ligero);
             Check_Ligero (Name, C, A2, B2, Lqc2);
+            Open (Complete);
             Check_Zk (Name, C, Pub);
+            Open (Replay);
          end if;
       end;
       --  A proof with a non-canonical element must be refused, for the
@@ -1112,6 +1153,7 @@ package body Sumcheck_KAT_Generic is
             for I in 0 .. Proof_Count - 1 loop
                Prf.Evals (I) := Proof_Buf (I);
             end loop;
+            Open (Core);
             Check (Pad_Base_Val = C_Ninput - C_Npublic,
                    "tier 3 " & Name & ": pad_base is not ninput - npublic");
             Check (Chal_Count = SV.Chal_Total (Shape_Of (C))
@@ -1120,12 +1162,16 @@ package body Sumcheck_KAT_Generic is
             declare
                BQ : Element_Array (0 .. C.Last_Layer);
             begin
+               Open (Packed);
                Check_Packed (Name, C, Ch, BQ);
                Check_Bound_Quads (Name, C, Ch, BQ);
+               Open (Core);
                SV.Verifier_Core
                  (Shape_Of (C), Pub, Prf, Ch, BQ, A, B, Lqc);
             end;
+            Open (Replay);
             Check_Replay (Name, C, Pub, Prf, Ch, A, B, Lqc);
+            Open (Core);
             --  b, per constraint.
             for Cidx in 0 .. C_NL loop
                if Exp_B_Given (Cidx) then
@@ -1629,6 +1675,18 @@ package body Sumcheck_KAT_Generic is
             & Ada.Exceptions.Exception_Message (Ex));
    end Check_Case;
 
+   --  The part of a line's checks outside a step of tier 3: the lines
+   --  of the algebra are tier 2; the end of a circuit block is tier 1,
+   --  or tier 3 for a recording (a failure while it is read).
+   function Default_Part (Op : String) return Part_Kind is
+     (if Op = "const" or else Op = "eq" or else Op = "eq2"
+        or else Op = "bindeq" or else Op = "bind" or else Op = "lagrange"
+      then Tier2
+      elsif Tier3
+        or else (Op'Length > 3 and then Op (Op'First .. Op'First + 2) = "zk_")
+      then Records
+      else Tier1);
+
    procedure Run_File (Path : String; Passed, Failed : in out Natural) is
       File : TIO.File_Type;
    begin
@@ -1636,6 +1694,7 @@ package body Sumcheck_KAT_Generic is
                     & ") known-answer tests: " & Path);
       N_Pass := 0;
       N_Fail := 0;
+      Kat_Sections.Start (Path, N_Pass, N_Fail);
       TIO.Open (File, TIO.In_File, Path);
       Line_No := 0;
       while not TIO.End_Of_File (File) loop
@@ -1645,6 +1704,12 @@ package body Sumcheck_KAT_Generic is
             Line_No := Line_No + 1;
             if Line'Length > 0 and then Line (Line'First) /= '#' then
                Check_Case (Line);
+               if Active /= None then
+                  Part (Active);
+                  Active := None;
+               else
+                  Part (Default_Part (Kat_Sections.Kind_Of (Line)));
+               end if;
             end if;
          end;
       end loop;
@@ -1653,6 +1718,7 @@ package body Sumcheck_KAT_Generic is
          Report_Failure ("file ends inside a circuit block");
          In_Circuit := False;
       end if;
+      Kat_Sections.Count ("the end of the file", N_Pass, N_Fail);
       Passed := Passed + N_Pass;
       Failed := Failed + N_Fail;
    end Run_File;

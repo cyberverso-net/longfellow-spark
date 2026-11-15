@@ -31,6 +31,7 @@ pragma SPARK_Mode (Off);
 with Ada.Command_Line;
 with Ada.Exceptions;
 with Ada.Text_IO;
+with Kat_Sections;
 with Interfaces;    use Interfaces;
 with GF2_128;       use GF2_128;
 with Additive_Fft;
@@ -138,6 +139,7 @@ procedure FFT_KAT is
    procedure Run_File (Path : String) is
       File : TIO.File_Type;
    begin
+      Kat_Sections.Start (Path, Passed, Failed);
       TIO.Open (File, TIO.In_File, Path);
       while not TIO.End_Of_File (File) loop
          declare
@@ -206,11 +208,15 @@ procedure FFT_KAT is
             else
                raise Parse_Error with "unknown operation '" & Fld (1) & "'";
             end if;
+            Kat_Sections.Count
+              (Kat_Sections.Kind_Of (Line), Passed, Failed);
          exception
             when E : Parse_Error | Constraint_Error =>
                Failed := Failed + 1;
                TIO.Put_Line ("FAIL line" & Line_No'Image & ": "
                              & Ada.Exceptions.Exception_Message (E));
+               Kat_Sections.Count
+                 (Kat_Sections.Kind_Of (Line), Passed, Failed);
          end;
       end loop;
       TIO.Close (File);
@@ -345,14 +351,20 @@ begin
          Run_File (Ada.Command_Line.Argument (I));
       end loop;
    end if;
+   Kat_Sections.Start
+     ("the transform against Lagrange interpolation", Passed, Failed);
    for S of Shapes loop
       Against_Lagrange (S.N, S.M);
    end loop;
+   Kat_Sections.Count ("GF(2^128)", Passed, Failed);
    --  P-256: transform sizes 2 to 1024, both kinds of leaf, and the row
    --  shapes of the two Phase C geometries of ecdsa2.
    for S of Shapes_P256 loop
       Against_Lagrange_P256 (S.N, S.M);
    end loop;
+   Kat_Sections.Count ("P-256", Passed, Failed);
+   Kat_Sections.Start
+     ("the prefix of the code word (dblock)", Passed, Failed);
    --  dblock against the full code word: small rows, the Phase C
    --  geometries, and rows of the mdoc circuits over 4151 columns.
    for S of Shapes loop
@@ -362,12 +374,15 @@ begin
    end loop;
    Prefix (1000, 1999, 4151);
    Prefix (1383, 2765, 4151);
+   Kat_Sections.Count ("GF(2^128)", Passed, Failed);
    for S of Shapes_P256 loop
       if 2 * S.N - 1 <= S.M then
          Prefix_P256 (S.N, 2 * S.N - 1, S.M);
       end if;
    end loop;
    Prefix_P256 (1000, 1999, 4151);
+   Kat_Sections.Count ("P-256", Passed, Failed);
+   Kat_Sections.Print;
    TIO.Put_Line ("passed" & Passed'Image & ", failed" & Failed'Image);
    if Failed > 0 or else Passed = 0 then
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
