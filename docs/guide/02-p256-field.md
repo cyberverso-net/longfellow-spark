@@ -1,6 +1,10 @@
-# Chapter 2: the P-256 base field F_p
+# Chapter 2: the base field of P-256
 
-Package `P256_Field` (`src/p256_field.ads`, `src/p256_field.adb`). Stage 2 of phase A. Decisions: [ADR 0012](../adr/0012-p256-limb-representation.md) to [ADR 0017](../adr/0017-p256-test-anchors.md), and [ADR 0069](../adr/0069-p256-montgomery-multiplication.md), which replaced the direct representation and the Solinas reduction of ADR 0013 by the Montgomery form and the multiplication of upstream. Specification: draft-irtf-cfrg-longfellow-00, Table 1 (p256, FieldID 0x01), Section 7.2.1 (serialisation), Section 3.4.3 (rejection of non-canonical values). Curve constants: RFC 5903 Section 3.1, identical to SEC 2 v2.0 Section 2.4.2.
+Package `P256_Field` (`src/p256_field.ads`, `src/p256_field.adb`). It gives the arithmetic of the field of the signature circuit, F_p: addition, subtraction, multiplication in the Montgomery form, inversion, the 32-byte encoding, and the laws of the field that the protocol code uses.
+
+Specification: draft-irtf-cfrg-longfellow-00, Table 1 (p256, FieldID 0x01), Section 7.2.1 (the encoding), Section 3.4.3 (rejection of non-canonical values). Curve constants: RFC 5903 Section 3.1, identical to SEC 2 v2.0 Section 2.4.2. Decisions: [ADR 0012](../adr/0012-p256-limb-representation.md) (limbs), [ADR 0014](../adr/0014-p256-functional-specification-and-ghost-model.md) to [ADR 0017](../adr/0017-p256-test-anchors.md) (the ghost model, canonical form, inversion, test anchors), [ADR 0069](../adr/0069-p256-montgomery-multiplication.md) (the Montgomery form and upstream's multiplication), [ADR 0070](../adr/0070-sumcheck-and-ligero-kernels-as-upstream.md) (scalar limbs and the ring laws), [ADR 0076](../adr/0076-field-operations-without-call-and-finalisation-overhead.md) (bodies without `Big_Integer` terms), [ADR 0077](../adr/0077-p256-montgomery-round-as-cios.md) (the CIOS round).
+
+Before reading: arithmetic modulo a prime and the base field of P-256, in the primer's [A2.2](00-primer-cryptography.md#a22-arithmetic-modulo-a-prime); chapter 1, whose Ada constructs this chapter does not explain again.
 
 ## 1. The mathematics
 
@@ -11,9 +15,9 @@ The ECDSA signatures on mDoc credentials are over the NIST curve P-256, whose po
     p = 2^256 - 2^224 + 2^192 + 2^96 - 1
       = FFFFFFFF 00000001 00000000 00000000 00000000 FFFFFFFF FFFFFFFF FFFFFFFF (hex)
 
-(draft-03 Table 1 prints it in decimal; RFC 5903 Section 3.1 in hex). The circuits that verify an ECDSA signature inside the zero-knowledge proof compute in this field, so the verifier and prover need its arithmetic. It is the *base* field, in which the curve equation y^2 = x^3 - 3x + b lives; it is not the *scalar* field of order n in which signature scalars live. The draft is inconsistent on this point in two places (Section 3.4.3 and Appendix B.3.2 say "scalar field"), but the prime it prints is p.
+(Table 1 of the specification prints it in decimal; RFC 5903 Section 3.1 in hex). The circuits that verify an ECDSA signature inside the zero-knowledge proof ([A10.1](00-primer-cryptography.md#a101-ecdsa-on-p-256)) compute in this field, so the verifier and prover need its arithmetic. It is the *base* field, in which the curve equation y^2 = x^3 - 3x + b lives; it is not the *scalar* field of order n in which signature scalars live (chapter 9). The specification is inconsistent on this point in two places (Section 3.4.3 and Appendix B.3.2 say "scalar field"), but the prime it prints is p.
 
-The shape of p is a Solinas prime: a sum of a few signed powers of two, all multiples of 2^32. Until ADR 0077 the reduction used that shape, with shifts and additions only; it is now upstream's generic Montgomery round (Section 1.5), which uses one property of p, p = -1 modulo 2^64. Unlike GF(2^128), where addition was xor and there were no carries, F_p is the integers modulo p: addition carries, multiplication produces a 512-bit integer, and every result has to be brought back below p.
+The shape of p is a Solinas prime: a sum of a few signed powers of two, all multiples of 2^32. The reduction does not use that shape: it is upstream's generic Montgomery round (Section 1.5), which uses one property of p, p = -1 modulo 2^64. Unlike GF(2^128), where addition was xor and there were no carries, F_p is the integers modulo p: addition carries, multiplication produces a 512-bit integer, and every result has to be brought back below p.
 
 ### 1.2 Representation and canonical form
 
@@ -21,11 +25,11 @@ An element is an integer in 0 .. p - 1, stored as four 64-bit limbs in little-en
 
     To_Int (L) = L(0) + L(1) * 2^64 + L(2) * 2^128 + L(3) * 2^192.
 
-Every integer below 2^256 has exactly one such representation, and p < 2^256, so elements have exactly one representation each: this is *canonical form*. Keeping every element canonical makes equality a limb comparison. Serialisation is not a copy of the stored limbs: since the Montgomery form below, the limbs store x R mod p, and `To_Bytes` first converts out of that form, then writes the canonical integer x (Section 2.3). The package enforces it with a type predicate ([ADR 0015](../adr/0015-p256-canonical-form-and-conditional-subtraction.md)): no `Element` can exist whose value is p or more.
+Every integer below 2^256 has exactly one such representation, and p < 2^256, so elements have exactly one representation each: this is *canonical form*. Keeping every element canonical makes equality a limb comparison. Serialisation is not a copy of the stored limbs: in the Montgomery form below, the limbs store x R mod p, and `To_Bytes` first converts out of that form, then writes the canonical integer x (Section 2.3). The package enforces it with a type predicate ([ADR 0015](../adr/0015-p256-canonical-form-and-conditional-subtraction.md)): no `Element` can exist whose value is p or more.
 
 **The Montgomery form** ([ADR 0069](../adr/0069-p256-montgomery-multiplication.md)). The element of value x does not store x. It stores x R mod p, with R = 2^256. The stored integer is still canonical, so the two paragraphs above hold for it: one representation per element, equality as a limb comparison. What changes is the meaning of the limbs. Zero stores 0; One stores R mod p = 2^256 - p; the sum of two stored integers is the stored integer of the sum, since (x R + y R) mod p = (x + y) R mod p. Only the product and the boundaries need care: the bytes, the constants and the parsers convert in and out (Sections 2.3 and 3.8).
 
-Serialisation (Section 7.2.1) writes the 32 bytes of the integer least significant byte first, so limb i occupies bytes 8i .. 8i + 7. An encoding whose integer is p or more is not the encoding of any element and is rejected, as the upstream Rust reference does; the draft's sampling rule (Section 3.4.3) assumes the same canonical range.
+Serialisation (Section 7.2.1) writes the 32 bytes of the integer least significant byte first, so limb i occupies bytes 8i .. 8i + 7. An encoding whose integer is p or more is not the encoding of any element and is rejected, as upstream's Rust reference implementation does; the specification's sampling rule (Section 3.4.3) assumes the same canonical range.
 
 ### 1.3 Addition, subtraction, negation
 
@@ -46,13 +50,7 @@ The division is exact because p = -1 mod W for this prime, so T + r p = r - r = 
 
 ### 1.5 The reduction step for this p
 
-Since p = -1 mod W, the multiplier of p in each round is the low word r of T itself, and T + r p is computed as T + a_i B is: four 128-bit multiply-accumulates with the limbs of p, t_j + r p_j + c, then the carry into the two words above. This is upstream's generic CIOS step ([ADR 0077](../adr/0077-p256-montgomery-round-as-cios.md)).
-
-Until ADR 0077 the round used the special form of the prime,
-
-    p = 2^256 - 2^224 + 2^192 + 2^96 - 1,
-
-to add r p by shifted copies of r, without a multiplication: upstream's `p256_reduction_step`. On the proving machine that form, two six-word carry chains as GCC compiles them, was slower than the four multiply-accumulates.
+Since p = -1 mod W, the multiplier of p in each round is the low word r of T itself, and T + r p is computed as T + a_i B is: four 128-bit multiply-accumulates with the limbs of p, t_j + r p_j + c, then the carry into the two words above. This is upstream's generic CIOS step ([ADR 0077](../adr/0077-p256-montgomery-round-as-cios.md)). Upstream also has a step that adds r p by shifted copies of r, using the special form of the prime, without a multiplication (`p256_reduction_step`); on the proving machine it is slower than the four multiply-accumulates, and the package does not use it (ADR 0077).
 
 ### 1.6 Inversion
 
@@ -106,7 +104,7 @@ Write X_k for E^(2^k - 1). As in Chapter 1, X_(a+b) = (X_a)^(2^b) * X_b, so X_2,
 
 ## 3. The Ada/SPARK implementation
 
-This section follows `p256_field.ads` and `p256_field.adb` and explains each construct the first time it appears; Chapter 1 covered modular types, expression functions, `Ghost`, `Global`, `Post`, `Subprogram_Variant` and loop invariants.
+This section follows `p256_field.ads` and `p256_field.adb` and explains each construct the first time it appears; chapter 1 covered modular types, expression functions, `Ghost`, `Global`, `Post`, `Subprogram_Variant` and loop invariants. The ghost model, the lemmas, the assertions and every contract that mentions the model are at the level `Proof_Only` ([B4.2](00-primer-spark.md#b42-assertion-levels-which-contracts-ever-run), [ADR 0044](../adr/0044-field-contracts-at-proof-only-level.md)): proved for all inputs, never compiled. The type predicate and the contracts that do not mention the model stay executable. The excerpts below leave out the level where it does not matter to the reading.
 
 ### 3.1 Types
 
@@ -156,7 +154,7 @@ A `Dynamic_Predicate` is a Boolean condition attached to a type: every value of 
    Two_64 : constant Big_Integer := Conv (Unsigned_64'Last) + 1 with Ghost;
 ```
 
-`Ada.Numerics.Big_Numbers.Big_Integers` provides arbitrary-precision integers, which GNATprove understands as mathematical integers. `Unsigned_Conversions` is a *generic package*: a template parameterised by a type, here instantiated for `Unsigned_64` to obtain the conversion of a word to its integer value. `Two_64` is written as `Conv (Unsigned_64'Last) + 1` rather than `2 ** 64` because the provers evaluate the conversion of a literal but treat exponentiation as opaque; this detail decided the feasibility experiment behind [ADR 0014](../adr/0014-p256-functional-specification-and-ghost-model.md).
+`Ada.Numerics.Big_Numbers.Big_Integers` provides arbitrary-precision integers, which GNATprove understands as mathematical integers (register row T4). `Unsigned_Conversions` is a *generic package*: a template parameterised by a type, here instantiated for `Unsigned_64` to obtain the conversion of a word to its integer value. `Two_64` is written as `Conv (Unsigned_64'Last) + 1` rather than `2 ** 64` because the provers evaluate the conversion of a literal but treat exponentiation as opaque; this detail decided the feasibility experiment behind [ADR 0014](../adr/0014-p256-functional-specification-and-ghost-model.md).
 
 ```ada
    function Weight (N : Natural) return Big_Integer is
@@ -177,7 +175,7 @@ A `Dynamic_Predicate` is a Boolean condition attached to a type: every value of 
 
 ### 3.3 Lemmas
 
-A *lemma* in SPARK is a ghost procedure whose postcondition states a fact and whose body proves it, usually by a sequence of `pragma Assert`. Calling the lemma makes the fact available at the call site. The project accepts no lemma with a null body: that would be an axiom ([ADR 0014](../adr/0014-p256-functional-specification-and-ghost-model.md)). The package has these:
+A *lemma* in SPARK is a ghost procedure whose postcondition states a fact and whose body proves it, usually by a sequence of `pragma Assert` ([B3.4](00-primer-spark.md#b34-lemmas-theorems-the-provers-use)). Calling the lemma makes the fact available at the call site. The project accepts no lemma with a null body: that would be an axiom ([ADR 0014](../adr/0014-p256-functional-specification-and-ghost-model.md)). The package has these:
 
 - `Lemma_To_Int_Bounds` (and `Lemma_Partial_Bounds`, by recursion on N): 0 <= `To_Int (L)` < 2^(64 Length). A recursive lemma carries a `Subprogram_Variant` like a recursive function.
 - `Lemma_Split`: a 128-bit value equals its low half plus 2^64 times its high half. Proved from `X / 2 ** 64` and `X mod 2 ** 64`, which the provers connect both to the shift and mask forms and to the integer model.
@@ -236,7 +234,7 @@ The contract of `Mul` speaks of the stored integers:
                        = To_Int (T'Old) + Conv (X) * To_Int (B) + Conv (R) * P);
 ```
 
-The body is three calls: `Mac_Row` adds X B, `Mac_Row` adds r p with the limbs of p, and `Down` drops the low word. The proof states, at each call, why the value stays below 2^384. Until ADR 0077 the round formed r p from shifted copies of r, V (r) - U (r), with two six-word carry chains; GCC compiled those chains with two carry steps per word. The low word is then zero: with p = W P1 - 1 (`Lemma_P1`), the value is W times an integer, and `Lemma_Digit`, the uniqueness of a base-W digit, makes the low word 0. `Lemma_Div_Bound` carries the bound below 2p from T W to T.
+The body is three calls: `Mac_Row` adds X B, `Mac_Row` adds r p with the limbs of p, and `Down` drops the low word. The proof states, at each call, why the value stays below 2^384. The low word is then zero: with p = W P1 - 1 (`Lemma_P1`), the value is W times an integer, and `Lemma_Digit`, the uniqueness of a base-W digit, makes the low word 0. `Lemma_Div_Bound` carries the bound below 2p from T W to T.
 
 *The rounds.* `Mont_Mul` loops over the four words of A with a ghost `Q : Big_Integer` and the invariant
 
@@ -247,11 +245,11 @@ The body is three calls: `Mac_Row` adds X B, `Mac_Row` adds r p with the limbs o
 
 After the loop, `Lemma_Six_Split` shows that word 5 is zero and word 4 at most one, and the conditional subtraction of Section 2.2 gives a result below p, equal to T or T - p. It is written branch by branch, with `Lemma_To_Int_Eq` for the selected array, as in `Add`. `Lemma_Mont_Final` closes. From T 2^256 = A B + Q p and 2^256 R_Inv = 1 + K p, the result is A B R_Inv plus a multiple of p, and lies in 0 .. p - 1, so `Lemma_Mod_Multiple` makes it A B R_Inv mod p. `Mul` returns `Of_Limbs (Mont_Mul (Limbs (A), Limbs (B)))`; `Square` is `Mul (E, E)`.
 
-*Associativity.* `Lemma_Mul_Assoc` (ADR 0066) now meets the factor R_Inv twice on each side: both products are X Y Z R_Inv^2 mod p, by `Lemma_Mod_Mul` twice, and `Lemma_Inj` turns equal integers into equal elements.
+*Associativity.* `Lemma_Mul_Assoc` ([ADR 0066](../adr/0066-lagrange-tables-by-prefix-and-suffix.md), which needs it) meets the factor R_Inv twice on each side: both products are X Y Z R_Inv^2 mod p, by `Lemma_Mod_Mul` twice, and `Lemma_Inj` turns equal integers into equal elements.
 
-*The other ring laws* (ADR 0070): commutativity, `One` as unit, distributivity over `Add` and `Sub`, and the laws of `Add`, `Neg` and `Sub` that the sumcheck kernels use. Each is proved the same way: the two sides have the same integer mod p, and `Lemma_Inj` makes them equal elements. `Field_P256` restates them with `Same`, through `Laws.Lemma_Same`, which needs nothing more than `X = Y` since the limbs are scalar components.
+*The other ring laws* (ADR 0070): commutativity, `One` as unit, distributivity over `Add` and `Sub`, and the laws of `Add`, `Neg` and `Sub` that the sumcheck kernels use. Each is proved the same way: the two sides have the same integer mod p, and `Lemma_Inj` makes them equal elements. `Field_P256` restates them with `Same` ([B4.4](00-primer-spark.md#b44-logical-equality-same)), through `Laws.Lemma_Same`, which needs nothing more than `X = Y` since the limbs are scalar components; chapter 3 Section 3.1 describes that package.
 
-A ghost variable (`Q : Big_Integer with Ghost`) exists only for proof and is removed with the other ghost code when assertions are disabled; square-bracket aggregates `[a, b, c]` are the Ada 2022 array notation; `A (0 .. 7)` is a *slice*, a contiguous part of an array. `Add_Words`, `Sub_Words`, `Mac_Row` and `Round` are `Inline`, so that the compiler sees their lengths and unrolls the loops.
+A ghost variable (`Q : Big_Integer with Ghost`) exists only for proof and is never compiled; square-bracket aggregates `[a, b, c]` are the Ada 2022 array notation; `A (0 .. 7)` is a *slice*, a contiguous part of an array. `Add_Words`, `Sub_Words`, `Mac_Row` and `Round` are `Inline`, so that the compiler sees their lengths and unrolls the loops.
 
 ### 3.7 Inv
 
@@ -259,66 +257,62 @@ A ghost variable (`Q : Big_Integer with Ghost`) exists only for proof and is rem
 
 ### 3.8 Encoding
 
-`Limb_Of_8` assembles a word from eight bytes by shifts and `or`; `Bytes_Of_Limb` extracts them with `Byte_Of`, and its postcondition is the 64-bit round trip. `Limbs_Of_Bytes` and `Bytes_Of_Limbs` work on four slices of the 32-byte array, so the 256-bit round trip in the postcondition of `Bytes_Of_Limbs` composes from the 64-bit one. `From_Bytes` decodes, tests canonical form with `Sub_Limbs`, selects the limbs or zero through the masked selection, and stores `Mont_Mul (S, R2)`. `Lemma_R2` proves R2 R_Inv = 2^256 + K2 p for the constant R2 = 2^512 mod p, and `Lemma_To_Mont` turns that into (S R2 R_Inv) mod p = (S 2^256) mod p. The postcondition says which encodings are accepted, that a refused one gives `Zero`, and that an accepted one stores its integer times 2^256 mod p. `To_Canonical (E)` is `Mont_Mul (Limbs (E), [1, 0, 0, 0])`, the integer E R_Inv mod p below p, and `To_Bytes` encodes it. `From_Canonical (L)`, for constants and parsers, and `Of_Natural (X)` are `Mont_Mul` by R2 again.
+`Limb_Of_8` assembles a word from eight bytes by shifts and `or`; `Bytes_Of_Limb` extracts them with `Byte_Of`, and its postcondition is the 64-bit round trip. `Limbs_Of_Bytes` and `Bytes_Of_Limbs` work on four slices of the 32-byte array, so the 256-bit round trip in the postcondition of `Bytes_Of_Limbs` composes from the 64-bit one. `From_Bytes` decodes, tests canonical form with `Sub_Limbs`, selects the limbs or zero through the masked selection, and stores `Mont_Mul (S, R2)`. `Lemma_R2` proves R2 R_Inv = 2^256 + K2 p for the constant R2 = 2^512 mod p, and `Lemma_To_Mont` turns that into (S R2 R_Inv) mod p = (S 2^256) mod p. The postcondition says which encodings are accepted, that a refused one gives `Zero`, and that an accepted one stores its integer times 2^256 mod p. Its first part, `Ok = Is_Canonical (...)` and the `Zero` of a refused encoding, is at the level `Runtime`, a cheap check compiled in every build, the release build included; the second part, about the integer, is at `Proof_Only`. Where `From_Bytes` decodes a secret value, the time of that check can reveal whether the value is canonical: these are the declared exceptions to the rule that `Runtime` checks are on public values ([chapter 4 Section 3.2, "Assertion levels"](04-transcript.md#assertion-levels-and-the-checks-kept-in-every-build), register row S4). `To_Canonical (E)` is `Mont_Mul (Limbs (E), [1, 0, 0, 0])`, the integer E R_Inv mod p below p, and `To_Bytes` encodes it. `From_Canonical (L)`, for constants and parsers, and `Of_Natural (X)` are `Mont_Mul` by R2 again.
 
 ## 4. What the proofs guarantee
 
-GNATprove 16.1 with the project's prover configuration ([ADR 0020](../adr/0020-prover-configuration-step-budget.md): CVC5, Z3 and Alt-Ergo, `--steps=600000`, `--timeout=120`).
+The proof of the package, from a run of the partition `p256` ([B6.5](00-primer-spark.md#b65-partitions-and-the-whole)) on the proving machine:
 
-- `P256_Field` alone, proved from an empty object directory: 2897 checks, all proved.
-- The whole project with the scalar limbs of ADR 0070: 21332 checks, all proved. With the bound-quad reuse of ADR 0071: 25331 checks, all proved. At the close of M2 (ADR 0078): 26339 checks, all proved.
-- With the CIOS round of ADR 0077: the P-256 partition (`P256_Field`, `Field_P256` and its laws), 3078 checks, all proved.
-- No justification, no `pragma Assume`.
-- Maximum steps for a single successful proof in `P256_Field`: 204295, within the budget of 600000.
+- **commit** 4f1e104 (main), proof inputs `be44efe9bc9d` (`scripts/remote-check.sh --digest`);
+- **toolchain** GNATprove 16.1.0 with gnat_native 16.1.0 (Alire); the prover configuration of `package Prove` in the project file, CVC5, Z3 and Alt-Ergo with `--steps=600000` and `--timeout=120` ([ADR 0020](../adr/0020-prover-configuration-step-budget.md));
+- **command** `make prove-partition PARTITION=p256`;
+- **run** 14 November 2026, on the proving machine, from a clean session: proved, not reused from an earlier proof.
 
-The checks by category and by subprogram below were taken at ADR 0070 and are kept as the record of that proof; the counts above are current.
+| Check | `P256_Field` | Discharged by |
+|-------|--------------|---------------|
+| Data dependencies (`Global`) | 90 | flow analysis |
+| Initialisation | 26 | flow analysis |
+| Termination | 34 | flow analysis |
+| Range checks | 22 | provers |
+| Division checks (`/`, `mod`) | 90 | provers |
+| Overflow checks | 33 | provers |
+| Index checks | 46 | provers |
+| Length checks | 2 | provers |
+| Type predicates | 1735 | provers |
+| Preconditions of the calls | 640 | provers |
+| Assertions | 221 | provers |
+| Loop invariants (base case and preservation) | 16 | provers |
+| Postconditions | 77 | provers |
+| Variants of the recursive functions | 3 | provers |
+| **Total** | **3035** | all proved: none justified, none unproved, no `pragma Assume` |
 
-| Category | Checks | Discharged by |
-|----------|--------|---------------|
-| Data dependencies (`Global => null`) | 71 | flow analysis |
-| Initialization | 26 | flow analysis |
-| Run-time checks (indices, ranges, overflow, predicates) | 1523 | 83% trivial, the rest mostly Z3, then CVC5 |
-| Assertions (`pragma Assert`, loop invariants, variants) | 214 | Z3 and CVC5, Alt-Ergo about 5%, trivial 1% |
-| Functional contracts (postconditions, lemma postconditions, preconditions at calls) | 540 | Z3 and CVC5, Alt-Ergo about 1% |
-| Termination | 38 | 35 flow, 3 Z3 |
+Most of the checks the provers discharge are type predicates: every `Element` carries the canonical-form predicate (Section 3.1), checked wherever an element is built or passed.
 
-Where the proof checks were, by subprogram, at ADR 0070 (excluding flow; ADR 0077 replaced `Mul_Row` and `Lemma_VU` by `Mac_Row` and its lemmas):
+How to read the table: [B6.4](00-primer-spark.md#b64-reading-the-summary-table). The summary GNATprove prints covers the three units of the partition, 3,078 checks; the table gives `P256_Field`. `Field_P256` and its laws, the other two, are counted in chapter 3.
 
-- The field operations are small: `Add` 45, `Sub` 44, `Neg` 7, `Mul` 13, `Square` 10, `Is_Canonical` 4, `From_Bytes` 54, `From_Canonical` 13, `To_Canonical` 31, `Of_Natural` 23, `To_Bytes` 1, `Inv` and `Square_N` 0.
-- The word primitives and the multiplication carry more: `Add_Words` 41, `Sub_Words` 66, `Mul_Row` 54, `Round` 147, `Mont_Mul` 177.
-- The lemmas carry the rest. The largest are `Lemma_Unfold` (124), `Lemma_VU` (114), `Lemma_Sub_Step` (85), `Lemma_Mul_Assoc` (80), `Lemma_Add_Step` (79), `Lemma_R_Inv` and `Lemma_Mont_Final` (78 each), `Lemma_To_Mont` (75) and `Lemma_R2` (72).
-
-Three solvers are needed. Z3 and CVC5 share almost everything, and which of the two is credited with a check varies from run to run, since the first to answer wins. Alt-Ergo closes a few polynomial normalisation steps and bridges between modular words and the integer model, as listed in ADR 0020.
-
-Four lessons from closing the proofs, recorded here because they are reusable in the next stages:
-
-- The provers evaluate the conversion of a *literal* to `Big_Integer` but treat `**` as opaque, so `Two_64` is `Conv (Unsigned_64'Last) + 1`, not `2 ** 64`.
-- Modular word arithmetic is connected to the integer model only through small lemmas (`Lemma_Split`, `Lemma_Sub128`, `Lemma_Add128`, `Lemma_Ext64`), each proved once from `/`, `mod` and the no-wrap condition.
-- Polynomial identities prove by normalisation when every weight is written out as a monomial in one base (`Lemma_Unfold`); a recursive definition left folded is an atom the normaliser cannot see through.
-- Large contexts time out even when every fact is present. The cure is structural: one subprogram per step with its own postcondition (`Round`, then `Mont_Mul`), and one lemma per identity with exactly the hypotheses it needs (`Lemma_Mac_Close`, `Lemma_Mont_Final`).
-
-Two more came with the Montgomery form ([ADR 0069](../adr/0069-p256-montgomery-multiplication.md)):
-
-- A shift of a word reaches the integer model most easily through a 128-bit product: r 2^32 as `Unsigned_128`, whose halves are the two shifted words, by `Lemma_Mul_Split` and `Lemma_Split`. Reasoning on `Conv` of `Shift_Left` or `mod 2 ** 32` directly did not close.
-- GNAT 16 stops with an internal error on ghost constants declared in a `declare` block of executable code. The final argument of `Mont_Mul` is therefore a ghost procedure, `Lemma_Mont_Final`, which is also the clearer form.
-
-One came with the profiles of the close of M2 ([ADR 0076](../adr/0076-field-operations-without-call-and-finalisation-overhead.md)):
-
-- An assertion at the level `Proof_Only` is not compiled, but its `Big_Integer` temporaries can be. GNAT keeps their finalisation nodes, and a finaliser that runs at every call, when the assertion is an `if`, `and then` or `or else` form or a loop invariant, and when a ghost call takes a `Big_Integer` term as an actual. In a compiled body, a `Big_Integer` term therefore appears only in a simple assertion; the rest goes into a ghost lemma on the limbs (`Lemma_Add_Mod`, `Lemma_Sub_Mod`, `Lemma_Mont_Close`). The expanded code (`-gnatG`) shows whether a body still holds `master_node` objects.
+Z3 and CVC5 share almost every check the provers discharge, and which of the two is credited with one varies from run to run, since the first to answer wins. Alt-Ergo closes a few polynomial normalisation steps and bridges between modular words and the integer model (ADR 0020).
 
 In plain terms, for every input, not on samples:
 
 - no run-time error occurs anywhere in the package;
 - every `Element` holds an integer in 0 .. p - 1, and `Is_Canonical` decides exactly that;
 - `To_Int (Add (A, B)) = (To_Int (A) + To_Int (B)) mod p`, and likewise for `Sub` and `Neg`; `To_Int (Mul (A, B)) = To_Int (A) To_Int (B) 2^-256 mod p`, and likewise for `Square`, so that in the Montgomery form the elements add and multiply as the field does;
+- the product is associative and commutative with `One` as unit and distributes over `Add` and `Sub`; the sum is associative and commutative with `Zero` as unit, `Neg` gives the opposite and `Sub (A, B)` is `Add (A, Neg (B))`;
 - `From_Bytes` accepts an encoding exactly when its integer x is below p and then stores x 2^256 mod p, a refused encoding gives `Zero`; `To_Canonical` returns the integer back, below p, and `To_Bytes` encodes it;
 - every subprogram terminates.
 
-Reproduce with `make prove`, which runs `gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on` with the switches of `package Prove` in the project file (`--prover=cvc5,z3,altergo --steps=600000 --timeout=120 --memlimit=1000 --report=all`) and prints the summary of `obj/development/gnatprove/gnatprove.out`; a plain `alr exec -- gnatprove -P longfellow_spark.gpr` proves the same thing.
+Reproduce with:
+
+```bash
+make prove-partition PARTITION=p256
+python3 -I scripts/vc-count.py --partition p256 p256_field
+```
+
+The first command proves the partition and prints GNATprove's summary. The second checks that the files are those of a run of that partition and that its units add up to the summary, then prints the table from the files GNATprove writes for each unit (`obj/development/gnatprove/<unit>.spark`) and says whether any check is unproved or justified or any unit has a `pragma Assume`. Its line "discharged by the provers" is also the sum of the counts per subprogram of `obj/development/gnatprove/gnatprove.out` for the unit. The lessons of these proofs are in the verification approach, "Lessons of the proofs".
 
 ## 5. What is only tested
 
-The proofs relate the code to the model and the model to the polynomial form of p. They do not say that `P_Limbs` is the prime of Table 1 (a wrong limb would move `P` and every proof would still succeed), nor that the byte order is the one of Section 7.2.1, nor that `Inv` inverts. The vectors cover these ([ADR 0017](../adr/0017-p256-test-anchors.md)):
+The proofs relate the code to the model and the model to the polynomial form of p. They do not say that `P_Limbs` is the prime of Table 1 (a wrong limb would move `P` and every proof would still succeed), nor that the byte order is the one of Section 7.2.1, nor that `Inv` inverts. The vectors cover these ([ADR 0017](../adr/0017-p256-test-anchors.md)), run by the harness `p256_kat` in the test build:
 
 | File | Cases | External anchors |
 |------|-------|------------------|
@@ -327,23 +321,42 @@ The proofs relate the code to the model and the model to the polynomial form of 
 | `p256_inv.txt` | 46 | inv 1, inv 2 = (p + 1) / 2, inv (p - 1), the inverses of Gx, Gy and b; `Inv (Zero) = Zero`; Fermat and Euclid references agree, and the harness re-checks E * Inv (E) = One |
 | `p256_bytes.txt` | 61 | the encodings of b, Gx, Gy; p - 1 accepted, p, p + 1, 2^256 - 1 rejected; `To_Bytes` round trip |
 
-Why the curve equation is an external anchor: b, Gx and Gy were published by NIST and are used by every P-256 implementation; the identity Gy^2 = Gx^3 - 3 Gx + b holds only for the right prime, the right reduction and the right byte order at once, and its three operands were produced by nobody involved in this code. The generator refuses to write the files if the identity fails for its own reference. In addition the generator re-derives the reduction table, its exact quotients and the bounds of Section 1.5, and replays the inversion chain on exponents.
+Why the curve equation is an external anchor: b, Gx and Gy were published by NIST and are used by every P-256 implementation; the identity Gy^2 = Gx^3 - 3 Gx + b holds only for the right prime, the right reduction and the right byte order at once, and its three operands were produced by nobody involved in this code. The generator refuses to write the files if the identity fails for its own reference. It also replays the inversion chain on exponents and checks that it computes p - 2.
 
-The Appendix B vectors of the draft are not field anchors: B.2 states a secp256k1 prime, and B.3.2 mislabels the field; both are logged as specification issues ([ADR 0002](../adr/0002-pin-the-specification.md)).
+The Appendix B vectors of the specification are not field anchors: B.2 states a secp256k1 prime, and B.3.2 mislabels the field; both are logged as specification issues ([ADR 0002](../adr/0002-pin-the-specification.md)).
 
 Reproduce with:
 
 ```bash
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
-tests/bin/p256_kat           # expected: passed 467, failed 0
+tests/bin/p256_kat
 ```
 
-Until the consolidation after Phase A the test build was slow (about three minutes for these cases) because every `Mul` evaluated its postcondition with `Big_Integer` arithmetic and `Inv` performs 267 multiplications per case; since [ADR 0044](../adr/0044-field-contracts-at-proof-only-level.md) the model, the lemmas and the contracts that mention them are at the proof-only assertion level, proved for all inputs and never compiled, and the 467 cases take under a second. The type predicate of `Element` stays executable.
+The harness reads the four files by default, or the files given on its command line. Its last lines give the checks by section, each file and, in a file with more than one kind of line, each kind, then the total:
+
+```text
+checks by section:
+  tests/vectors/p256_add.txt: passed 221, failed 0
+    add: passed 78, failed 0
+    sub: passed 73, failed 0
+    neg: passed 70, failed 0
+  tests/vectors/p256_mul.txt: passed 139, failed 0
+    mul: passed 95, failed 0
+    square: passed 44, failed 0
+  tests/vectors/p256_inv.txt: passed 46, failed 0
+  tests/vectors/p256_bytes.txt: passed 61, failed 0
+passed 467, failed 0
+```
+
+The ghost model, the lemmas and the contracts that mention them are at the level `Proof_Only` and do not run in the test build; the type predicate of `Element` does, and what the harness checks of the arithmetic is its results against the vectors.
 
 ## 6. What stays trusted, and the limits
 
-- Fermat's little theorem for `Inv`, and the exponent arithmetic of the chain (checked by the generator, not proved in SPARK).
-- GNATprove's model of `Ada.Numerics.Big_Numbers.Big_Integers` and of the conversions from modular types; the SMT solvers; the compiler, including its 128-bit arithmetic.
-- The target is 64-bit: `Unsigned_128` is required ([ADR 0012](../adr/0012-p256-limb-representation.md)).
-- Constant time is a discipline, scoped to assertion-free builds ([ADR 0006](../adr/0006-constant-time-discipline-and-scope.md)); loop bounds and table indices are compile-time constants, every selection is masked, `From_Bytes` may branch on its Boolean result because encodings are public data. Nothing measures timing.
-- Performance: since [ADR 0069](../adr/0069-p256-montgomery-multiplication.md) `Mul` is upstream's Montgomery multiplication, and since [ADR 0077](../adr/0077-p256-montgomery-round-as-cios.md) its CIOS step: thirty-two 128-bit multiply-accumulates. On the proving machine it takes 19.9 ns (throughput), against 11.4 ns for upstream's generic code; the Solinas form it replaced took 230 ns on the author's laptop. `Inv` costs 267 multiplications. A specialised squaring remains available behind the same contracts.
+- Fermat's little theorem for `Inv`, and the exponent arithmetic of the chain, checked by the generator, not proved in SPARK (register row V3).
+- GNATprove's model of `Ada.Numerics.Big_Numbers.Big_Integers` and of the conversions from modular types is the mathematical integers (T4). Every Gold contract of the package is a statement about that model.
+- The compiler and the builder, including the 128-bit arithmetic (T1), GNATprove (T2) and the SMT solvers (T3). The release build compiles the package without run-time checks and relies on the proof instead (T7).
+- The contracts at the level `Proof_Only`, which carry every functional contract of the package, are proved and never compiled, so that the compiled code agrees with the source GNATprove proved is trusted (T8).
+- The prime, the encoding and the sampling rule transcribe the pinned specification, which is trusted to describe the intended protocol (R1).
+- The target is 64-bit: `Unsigned_128` is required ([ADR 0012](../adr/0012-p256-limb-representation.md), P3).
+- Constant time is a discipline, scoped to the release build ([ADR 0006](../adr/0006-constant-time-discipline-and-scope.md), [A12.3](00-primer-cryptography.md#a123-the-observer-of-timing), S4): loop bounds and table indices are compile-time constants, every selection is masked. The `Runtime` part of the postcondition of `From_Bytes` runs in every build (Section 3.8). Nothing measures timing.
+- `Mul` is upstream's Montgomery multiplication with the CIOS step, thirty-two 128-bit multiply-accumulates; `Inv` costs 267 multiplications. [The performance page](performance.md) compares their times with upstream's.

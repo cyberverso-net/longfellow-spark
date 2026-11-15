@@ -120,7 +120,7 @@ The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. I
 
 - The largest item is the hash circuit in memory: 236.7 MB here, 7.76 million terms of 32 bytes; upstream keeps both circuits in about 3 MB, in the compressed form of the file.
 - The first step removed a copy of the largest layer in the verifier (114 MB) and the provisional buffers of the command-line prover.
-- Block 2 of the milestone binds and merges the first step of a layer from the packed form (chapter 3, Section 3.5), with a working array of one entry per run of equal hands. On the mDoc hash circuit, measured by `first_step_bench` in the release build on the proving machine:
+- Block 2 of the milestone binds and merges the first step of a layer from the packed form (chapter 3, Sections 2.6 and 3.6), with a working array of one entry per run of equal hands. On the mDoc hash circuit, measured by `first_step_bench` in the release build on the proving machine:
 
 | Layer of the hash circuit | terms | runs | expanded layer | working array | `Bind_Quad` | `Bind_Quad_Packed` |
 |---|---|---|---|---|---|---|
