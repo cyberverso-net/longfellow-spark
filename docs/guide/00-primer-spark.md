@@ -343,7 +343,7 @@ One piece of ghost vocabulary appears in almost every Gold contract of the proto
 
 Why not write `A = B`? A field element is a record of words (two of 64 bits for GF(2^128), four for P-256), and for the provers the predefined `=` on records is a function that compares the words. That is correct, but it does not let them **substitute**. Knowing `A = B` and having to prove `F (A) = F (B)`, they must look inside again.
 
-On long chains of algebra, `a·(b + c) = a·b + a·c = …`, this makes the proof time out. Chapter 3 records the case: a link between the circuit's two representations, stated with `=` on the coefficients, left ten checks unproved on GF(2^128), and proved once the coefficients were also stated with `Same` (chapter 3 Sections 3.5 and 4.1).
+On long chains of algebra, `a·(b + c) = a·b + a·c = …`, this makes the proof time out. The project met the case: a link between the circuit's two representations, stated with `=` on the coefficients, left checks unproved on GF(2^128), and proved once the coefficients were also stated with `Same` (chapter 3 Sections 3.6 and 4.1; the verification approach, "Lessons of the proofs").
 
 `Same` is declared with the annotation `Logical_Equal`, which tells the provers to treat it as true equality of terms, so they substitute freely. Its body is the predefined `=`, kept outside SPARK, so the test build executes it as `=`. That the two agree is a trusted item (register row T6), reduced by every contract that runs in the test build.
 
@@ -353,7 +353,7 @@ On long chains of algebra, `a·(b + c) = a·b + a·c = …`, this makes the proo
 |---|---|
 | A ghost reference | `GF2_128.Mul_Ref` and the postcondition of `Mul`, `src/gf2_128.ads`; chapter 1 Section 2 |
 | The level `Proof_Only` | `src/proof_levels.ads`; ADR 0044 |
-| `Runtime` and its exceptions | chapter 4 Section 3.2; the trusted base register, row S4 |
+| `Runtime` and its exceptions | [chapter 4 Section 3.2, "Assertion levels"](04-transcript.md#assertion-levels-and-the-checks-kept-in-every-build); the trusted base register, row S4 |
 | The two builds | `tests/longfellow_spark_tests.gpr`, `cli/longfellow_verify.gpr`; ADR 0068 |
 | `Same` | `src/field_gf2_128.ads`; chapter 3 Section 4.1 |
 | The trusted items | the trusted base register, rows T6, T7, T8 and C2 |

@@ -91,6 +91,9 @@ The step lint (`make lint`), in both checks, holds these rules:
 - the attribution of profiles by step that the performance page's matrices use gives each
   recorded call stack of its tests the expected step and circuit
   (`scripts/measure/attribute-steps-test.py`);
+- the script that gives each chapter of the guide its table of verification conditions counts
+  small runs right and refuses those whose units do not add up to the summary of GNATprove
+  (`scripts/vc-count-test.py`, for `scripts/vc-count.py`);
 - no em-dash in any tracked file;
 - none of the attribution and tooling words that `scripts/check.sh` lists, in any tracked file.
 
@@ -193,6 +196,9 @@ A block is done when:
 - the documentation it owes is written: the chapter, the records (*Accepted* when the code that
   realises them is merged), the package headers, the trust model, the trusted base register
   for an item it adds or discharges, the changelog;
+- a chapter it changes describes the design as it is: no chapter or record carries a dated
+  "Update" paragraph. What changed, and when, goes in the records and the changelog; an
+  Accepted record's body is not edited, its Status line carries a dated note (ADR 0042);
 - the pull request has been reviewed against the checklist below.
 
 ## Review checklist
@@ -205,7 +211,8 @@ A block is done when:
 - Do the measurements satisfy the measurement rules, and is the comparison with upstream at equal
   scope?
 - Are the chapter, the records, the headers and the changelog consistent with the code, names
-  and numbers included?
+  and numbers included? Does the chapter describe the current design, with no dated "Update"
+  paragraph?
 - Is the issue's "out of scope" respected, with nothing added on the way?
 
 ## Labels

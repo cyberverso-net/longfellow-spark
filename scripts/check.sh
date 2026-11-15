@@ -371,6 +371,11 @@ do_lint() {
    #  attributed: recorded stacks and the step each must go to.
    header "lint: the attribution of profiles by step (attribute-steps-test.py)"
    python3 -I scripts/measure/attribute-steps-test.py
+   #  The script that gives the guide its tables of verification
+   #  conditions: small runs it must count, or refuse when they do not
+   #  add up to their summary.
+   header "lint: the counts of verification conditions (vc-count-test.py)"
+   python3 -I scripts/vc-count-test.py
    header "lint: forbidden content over tracked files"
    #  git grep searches tracked files only, in one process, and exits 0
    #  exactly when something matched. This script is excluded from the

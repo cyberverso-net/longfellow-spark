@@ -660,7 +660,7 @@ The comment at the top of a specification that states what the unit implements a
 
 ### Heap
 
-Two senses. (1) The **Merkle heap**: a Merkle tree stored in one array. (2) The **heap** as memory, which a program allocates while it runs; the working sets of a verification or a proof are there, and enough of it is trusted (register row P1). ([chapter 5 Section 2.1](05-ligero.md#21-merkle-heap-batch-opening-and-batch-verification), [chapter 5 Section 3.5](05-ligero.md#35-memory-the-working-set-as-locals-sized-by-the-geometry-the-supported-scale))
+Two senses. (1) The **Merkle heap**: a Merkle tree stored in one array. (2) The **heap** as memory, which a program allocates while it runs; the working sets of a verification or a proof are there, and enough of it is trusted (register row P1). ([chapter 5 Section 2.1](05-ligero.md#21-merkle-heap-batch-opening-and-batch-verification), [chapter 5 Section 3.5](05-ligero.md#35-memory-the-working-sets-on-the-heap-and-the-supported-scale))
 
 See: [Merkle tree](#merkle-tree).
 
@@ -732,7 +732,7 @@ A condition Ada checks while the program runs: an index in range, no overflow, n
 
 ### Runtime
 
-The assertion level compiled in every build, the release build included, for cheap checks on public values, with three declared exceptions. ([B4.2](00-primer-spark.md#b42-assertion-levels-which-contracts-ever-run), [A12.3](00-primer-cryptography.md#a123-the-observer-of-timing))
+The assertion level compiled in every build, the release build included, for cheap checks on public values, with three declared exceptions. ([B4.2](00-primer-spark.md#b42-assertion-levels-which-contracts-ever-run), [A12.3](00-primer-cryptography.md#a123-the-observer-of-timing), [chapter 4 Section 3.2, "Assertion levels"](04-transcript.md#assertion-levels-and-the-checks-kept-in-every-build))
 
 ### Same
 

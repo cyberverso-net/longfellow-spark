@@ -853,5 +853,5 @@ A verifier receives proof bytes from strangers, and a prover a credential file. 
 |---|---|
 | The adversaries and the claims | the trust model, "Outside the proofs, and what covers it" |
 | Fresh pads | `Mdoc_Inputs.Place_Pads`; chapter 9 Section 1.6; ADR 0089 |
-| Constant time and its exceptions | the headers of `GF2_128`, `P256_Field`, `Mdoc_Parse`; ADR 0006, ADR 0086; chapter 4 Section 3.2 |
+| Constant time and its exceptions | the headers of `GF2_128`, `P256_Field`, `Mdoc_Parse`; ADR 0006, ADR 0086; [chapter 4 Section 3.2, "Assertion levels"](04-transcript.md#assertion-levels-and-the-checks-kept-in-every-build) |
 | The bounds | the trust model, "What is proved", and chapter 9 Section 3 |
