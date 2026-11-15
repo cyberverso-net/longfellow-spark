@@ -25,6 +25,7 @@ pragma SPARK_Mode (Off);
 with Ada.Command_Line;
 with Ada.Exceptions;
 with Ada.Text_IO;
+with Kat_Sections;
 with Interfaces;  use Interfaces;
 with Bytes;       use type Bytes.Byte_Array;
 with P256_Field;  use P256_Field;
@@ -284,6 +285,7 @@ procedure P256_KAT is
    begin
       TIO.Put_Line ("P256_Field known-answer tests: " & Path);
       TIO.Open (File, TIO.In_File, Path);
+      Kat_Sections.Start (Path, Passed, Failed);
       Line_No := 0;
       while not TIO.End_Of_File (File) loop
          declare
@@ -292,10 +294,13 @@ procedure P256_KAT is
             Line_No := Line_No + 1;
             if Line'Length > 0 and then Line (Line'First) /= '#' then
                Check_Case (Line);
+               Kat_Sections.Count
+                 (Kat_Sections.Kind_Of (Line), Passed, Failed);
             end if;
          end;
       end loop;
       TIO.Close (File);
+      Kat_Sections.Count ("the end of the file", Passed, Failed);
    end Run_File;
 
 begin
@@ -309,6 +314,7 @@ begin
       end loop;
    end if;
 
+   Kat_Sections.Print;
    TIO.Put_Line ("passed" & Passed'Image & ", failed" & Failed'Image);
    if Failed > 0 or else Passed = 0 then
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);

@@ -21,6 +21,7 @@ with Ada.Directories;
 with Ada.Exceptions;
 with Ada.Streams.Stream_IO;
 with Ada.Text_IO;
+with Kat_Sections;
 with Ada.Characters.Handling;
 with Ada.Unchecked_Deallocation;
 with Interfaces;   use Interfaces;
@@ -560,6 +561,7 @@ procedure MDOC_PARSE_KAT is
    procedure Process_File (Path : String) is
       F : TIO.File_Type;
    begin
+      Kat_Sections.Start (Path, Passed, Failed);
       TIO.Open (F, TIO.In_File, Path);
       while not TIO.End_Of_File (F) loop
          declare
@@ -567,6 +569,8 @@ procedure MDOC_PARSE_KAT is
          begin
             Line_No := Line_No + 1;
             Process_Line (Line);
+            Kat_Sections.Count
+              (Kat_Sections.Kind_Of (Line), Passed, Failed);
          end;
       end loop;
       TIO.Close (F);
@@ -596,7 +600,9 @@ procedure MDOC_PARSE_KAT is
    end Built_In;
 
 begin
+   Kat_Sections.Start ("the checks without a vector file", Passed, Failed);
    Built_In;
+   Kat_Sections.Count ("", Passed, Failed);
    if Ada.Command_Line.Argument_Count = 0 then
       TIO.Put_Line ("Cbor_Parse, Mdoc_Parse and Sha256.Trace known-answer tests: " & Default_Path);
       Process_File (Default_Path);
@@ -607,6 +613,7 @@ begin
          Process_File (Ada.Command_Line.Argument (I));
       end loop;
    end if;
+   Kat_Sections.Print;
    TIO.Put_Line ("passed" & Passed'Image & ", failed" & Failed'Image);
    if Failed > 0 or else Passed = 0 then
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);

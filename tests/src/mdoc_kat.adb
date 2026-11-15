@@ -28,6 +28,7 @@ with Ada.Directories;
 with Ada.Exceptions;
 with Ada.Streams.Stream_IO;
 with Ada.Text_IO;
+with Kat_Sections;
 with Ada.Unchecked_Deallocation;
 with Interfaces; use Interfaces;
 with Bytes;      use Bytes;
@@ -574,6 +575,7 @@ procedure Mdoc_KAT is
    procedure Process_File (Path : String) is
       File : TIO.File_Type;
    begin
+      Kat_Sections.Start (Path, Passed, Failed);
       TIO.Open (File, TIO.In_File, Path);
       Line_No := 0;
       while not TIO.End_Of_File (File) loop
@@ -582,6 +584,8 @@ procedure Mdoc_KAT is
          begin
             Line_No := Line_No + 1;
             Process_Line (Line);
+            Kat_Sections.Count
+              (Kat_Sections.Kind_Of (Line), Passed, Failed);
          end;
       end loop;
       TIO.Close (File);
@@ -834,8 +838,13 @@ begin
          Process_File (Ada.Command_Line.Argument (I));
       end loop;
    end if;
+   Kat_Sections.Start ("the checks without a vector file", Passed, Failed);
    Built_In;
+   Kat_Sections.Count ("", Passed, Failed);
+   Kat_Sections.Start ("the buffers of the supported profile", Passed, Failed);
    Profile_Buffers;
+   Kat_Sections.Count ("", Passed, Failed);
+   Kat_Sections.Print;
    TIO.Put_Line ("mdoc_kat:" & Passed'Image & " passed," & Failed'Image
                  & " failed");
    if Failed > 0 or else Passed = 0 then
