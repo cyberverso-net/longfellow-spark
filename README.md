@@ -4,7 +4,15 @@ A formally verified reimplementation, in Ada/SPARK, of [Longfellow ZK](https://g
 
 It follows **IETF draft-irtf-cfrg-longfellow-00 (22 October 2026)**, the CFRG version of draft-google-cfrg-libzk-03, with the same technical text (ADR 0079). Changes in later drafts are handled as explicit migrations (ADR 0002).
 
-With it, a holder proves one fact about a signed credential, for example that they are over 18, and the relying party learns that fact and, by upstream's zero-knowledge theorem, nothing else of the credential but which of six hidden values are zero, and for a real credential none is in practice ([the primer, A11.4](docs/guide/00-primer-cryptography.md#a114-how-strong-is-the-guarantee)). The code runs on inputs an adversary chooses, the proofs, the circuits and the credential, so a crash, a read out of bounds or a wrong field operation would be a flaw whatever the cryptography guarantees. This project proves that its SPARK code has no run-time error for any input that meets the preconditions of its units, and that its fields and the formulas of its building blocks are those of their references, and it lists what is only tested (SHA-256 and AES-256 among them) or trusted (the command-line programs outside SPARK, a failed allocation, the compiler and the provers), so that an evaluator can follow the evidence from the specification and upstream's proofs down to the code.
+What the system does, and why its proofs matter:
+
+- A holder proves one fact about a signed credential, for example that they are over 18.
+- The relying party learns that fact. By upstream's zero-knowledge theorem it learns nothing else of the credential but which of six hidden values are zero, and for a real credential none is in practice ([the primer, A11.4](docs/guide/00-primer-cryptography.md#a114-how-strong-is-the-guarantee)).
+- The code runs on inputs an adversary chooses: the proofs, the circuits and the credential. A crash, a read out of bounds or a wrong field operation would be a flaw, whatever the cryptography guarantees.
+- This project proves that its SPARK code has no run-time error, for any input that meets the preconditions of its units.
+- It proves that its fields and the formulas of its building blocks are those of their references.
+- It lists what is only tested, SHA-256 and AES-256 among them, and what is trusted: the command-line programs outside SPARK, a failed allocation, the compiler and the provers.
+- So an evaluator can follow the evidence from the specification and upstream's proofs down to the code.
 
 The project is built in phases, each released when complete:
 
@@ -25,7 +33,7 @@ In Phase D, milestone M2 closed at a round trip of 8.13 s for the two mDoc proof
 Every claim is either proved, tested or trusted. The full list is in [the trust model](docs/guide/trust-model.md), and every trusted item has a row in [the trusted base register](docs/guide/trusted-base.md). In short:
 
 - **No run-time errors.** GNATprove shows that no SPARK code can overflow, index out of range or read uninitialised data, for any input that meets the preconditions of the units. Proofs and circuits come from untrusted parties, so this matters on its own. A failed allocation, code outside SPARK and the probabilistic termination of the samplers stay outside, as the trust model lists.
-- **Correct arithmetic.** Both fields are proved equal to simple reference implementations. Test vectors from outside the project confirm that the references follow the specification.
+- **Correct arithmetic.** Both fields are proved equal to simple reference implementations. Test vectors, whose expected answers do not come from the code under test, confirm that the references follow the specification.
 - **Faithful building blocks.** The sumcheck, Merkle and Ligero pieces and the proof reader and writers are proved against transcriptions of the specification's formulas. The circuit loader is proved to return only well-formed circuits; that it decodes the terms the file encodes is tested against upstream.
 - **Interoperability.** The verifier accepts the proofs the upstream prover makes. The prover reproduces upstream's proofs byte for byte. Both are tested.
 - **Not proved.** Soundness and zero knowledge are properties of the protocol, not of the code. The implementation follows the specification step by step instead. Constant time is a coding discipline, valid only in builds without assertions.
