@@ -208,6 +208,8 @@ In the columns with two counts, the GF(2^128) instance comes first, then the P-2
 
 How to read the table: [B6.4](00-primer-spark.md#b64-reading-the-summary-table). The generic units have no checks of their own; the table gives their instances.
 
+The flow analysis also prints warnings, which are not checks and are not counted in the tables. Their counts, as `vc-count.py` prints them: `Ligero_Geometry` 4, `Ligero_Verifier` 5 and 6, `Zk_Verifier` 3 and 3; none in the other units of this chapter.
+
 In plain terms, for every input, not on samples:
 
 - no run-time error occurs in any unit of this chapter;

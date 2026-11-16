@@ -118,6 +118,21 @@ every release tag, every milestone close, and once a week on `main`, started on 
 launchd agent that runs `--full origin/main`); the run is detached on the machine and its
 status is posted on the head of `main` when it ends.
 
+## The proving machine
+
+The proving machine is a virtual machine on Google Cloud (c4-standard-24, 12 cores, one thread per core; ADR 0060, ADR 0062). It runs `make check` on demand through `scripts/remote-check.sh`:
+
+```bash
+scripts/remote-check.sh               # make check on the pushed commit, posts the status prove
+scripts/remote-check.sh --collect     # picks up that run later, if the terminal was closed
+scripts/remote-check.sh --digest      # the proof inputs of HEAD, their digest, the proved ancestor with the same
+scripts/remote-check.sh --full        # the proof from scratch even when the inputs are unchanged
+scripts/remote-check.sh --tree prove  # the working tree as it is, any target, posts nothing
+scripts/remote-check.sh --tree-collect  # picks up a tree run later, if the terminal was closed
+```
+
+No run depends on the connection: the laptop may sleep. The machine keeps the result and shuts itself down; the script reads the result when it next reaches it, and for a pushed commit posts the status. A tree run started while another run holds the machine is refused. Two runs launched at the same moment are not kept apart, so one job at a time is a rule to follow.
+
 ## Proof rules
 
 - No `pragma Assume`, anywhere, ever.

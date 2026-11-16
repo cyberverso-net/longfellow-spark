@@ -51,7 +51,7 @@ Where it is in the code:
 | D2.1 | [`Packed_Circuits`](../../src/packed_circuits.ads), [`Circuit_Reader`](../../src/circuit_reader.ads) | `Read_Packed`, `Expand` (ghost) | proved on the expansion: well formed, every assertion on wires of its own (`Isolated`, `Dead_End`), the identifier; partition `circuits` | `circuit_kat` | Section 6.3; ADR 0080 | `core_proto` LFC2 reader |
 | D2.2, D2.3, D2.4 | [`Packed_Eval`](../../src/packed_eval.ads), [`Sumcheck_Algebra`](../../src/sumcheck_algebra.ads) | `Eval_Circuit` | Gold on the expansion against the references `Layer_Holds` and `Layer_Z`; partitions `packed_hquad`, `sumcheck` | `prover_kat`, `sumcheck_kat` | Sections 6.3.2, 6.3.3; ADR 0072 | `runtime_sumcheck::eval_circuit` |
 
-Chapter 3 defined a circuit as data: layers, each a list of terms (g, h0, h1, k) with k an element, meaning Q[g, h0, h1] = k in the quad representation of Section 6.3.2 of the specification (k = 0 marks a Z assertion, Section 6.3.3), and the counts `noutput`, `ninput`, `npublic`. The verifier needs nothing else of a circuit's meaning, but it needs its shape to be right. `Well_Formed` of `Sumcheck_Algebra` says:
+Chapter 3 defined a circuit as data: layers, each a list of terms (g, h0, h1, k) with k an element, meaning Q[g, h0, h1] = k in the quad representation of Section 6.3.2 of the specification (k = 0 marks an assertion, Section 6.3.3), and the counts `noutput`, `ninput`, `npublic`. The verifier needs nothing else of a circuit's meaning, but it needs its shape to be right. `Well_Formed` of `Sumcheck_Algebra` says:
 
 - every term names an output wire below its layer's output width and input wires below its input width;
 - `nw <= 2^logw`;
@@ -292,6 +292,8 @@ In the columns with two counts, the GF(2^128) instance comes first, then the P-2
 
 How to read the table: [B6.4](00-primer-spark.md#b64-reading-the-summary-table). The generic units have no checks of their own; the table gives their instances.
 
+The flow analysis also prints warnings, which are not checks and are not counted in the tables. Their counts, as `vc-count.py` prints them: `Circuit_Reader` 1 and 1; none in the other units of this chapter.
+
 In plain terms, for every input, not on samples:
 
 - no run-time error occurs in any unit of this chapter, on any byte string;
@@ -317,7 +319,7 @@ The `make` command proves the partition and prints GNATprove's summary. The `pyt
 
 ### 5.2 Tier 2: an independent reader and writer
 
-The same generator writes the Appendix B.3 circuits and the Z-assertion circuit of chapter 3 in LFC2, in the two encodings of Section 1.3 and a third, `sparse`, with tokens of empty segments at the start, between terms and at the end of each layer, with their identifiers; `circuit_kat` loads them and compares every term with the term lists the vectors of chapter 3 were generated from. One more good file has a layer whose tokens all name an empty segment, so a layer without terms.
+The same generator writes the Appendix B.3 circuits and the circuit with an assertion of chapter 3 in LFC2, in the two encodings of Section 1.3 and a third, `sparse`, with tokens of empty segments at the start, between terms and at the end of each layer, with their identifiers; `circuit_kat` loads them and compares every term with the term lists the vectors of chapter 3 were generated from. One more good file has a layer whose tokens all name an empty segment, so a layer without terms.
 
 Then 30 malformed files, each built from a B.3 circuit with one defect and the status it must give:
 

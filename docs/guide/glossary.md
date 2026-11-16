@@ -46,7 +46,7 @@ The form of upstream's soundness theorem: except with negligible probability, a 
 
 ### Honest prover
 
-This project's prover working from a credential: its witness builder refuses, before any work, a credential the circuits would mishandle. Its checks protect the holder, not a verifier. ([A1.6](00-primer-cryptography.md#a16-the-honest-prover-and-any-prover))
+This project's prover working from a credential: its witness builder refuses, before any work, a credential the circuits would mishandle, with the exceptions the conditions table of chapter 9 Section 6 marks "The circuits refuse the proof". Its checks protect the holder, not a verifier. ([A1.6](00-primer-cryptography.md#a16-the-honest-prover-and-any-prover))
 
 ### Imitation
 
@@ -152,7 +152,7 @@ Which of the six halves bound by the tags are zero. A zero half always gives a z
 
 A term with coefficient 0, which states that the product of its two hands is zero; it adds nothing to any wire. Not an Ada assertion (`pragma Assert`), a check the provers must prove. ([A6.2](00-primer-cryptography.md#a62-what-the-circuit-accepts-means))
 
-Aliases: "Z assertion, Z term" (chapters 3, 6, 7, the trust model); "assert-zero term" (the Lean correspondence page).
+Aliases: "Z term" (upstream's name, chapter 3); "assert-zero term" (the Lean correspondence page, after upstream's Lean).
 
 ### Batch proof
 

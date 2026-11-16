@@ -2,6 +2,24 @@
 
 This page records how fast the project proves and verifies the production mDoc circuits, how it got there, and how it compares with upstream. The milestones are set by [ADR 0055](../adr/0055-phase-d-scope-mdoc-scale.md) and [ADR 0067](../adr/0067-performance-milestones-by-trust.md); M2 closes with [ADR 0078](../adr/0078-milestone-m2-closed.md), the memory milestone with [ADR 0084](../adr/0084-memory-milestone-closed.md), the mDoc milestone and Phase D with [ADR 0090](../adr/0090-mdoc-milestone-closed-phase-d-complete.md).
 
+## The current state
+
+The latest measurement, one session of the proving machine on 11 November 2026 at release 0.5.0 (9f790cf), upstream at d5e6be7 in the same session: the proof of age of the version 7 pair, both circuits in one process, from upstream's `TEST_DATA` document on both sides, generic arithmetic for the baseline processor, one core.
+
+| | this project | upstream | ratio |
+|---|---|---|---|
+| prove, wall time, median of 3 | 4.55 s | 4.12 s | 1.10 |
+| prove, peak heap | 132 MB | 107 MB | 1.23 |
+| verify, wall time, median of 3 | 2.60 s | 1.65 s | 1.58 |
+| verify, peak heap | 64 MB | 48 MB | 1.33 |
+
+- **How fast:** 7.15 s for the round trip against upstream's 5.77 s. The difference sits in the verifier's Ligero checks, which interpolate by Lagrange's formula where upstream uses an FFT, and in reading and checking the circuit files ([Where the difference with upstream comes from](#where-the-difference-with-upstream-comes-from)).
+- **How much memory:** both peaks within the criterion of the memory milestone, twice upstream's ([At the close of Phase D](#at-the-close-of-phase-d)).
+- **How measured:** the next section, the same protocol for every series on this page.
+- **Upstream's newer code** measures the same on this flow ([Upstream at 1c06629](#upstream-at-1c06629)).
+
+The sections after "The milestones" are the history, in the order the work was done; each names its session and its commits.
+
 ## What is measured
 
 - **The round trip:** the two proofs of the version 7 mDoc circuits (hash over GF(2^128), signature over P-256) and their two verifications.
@@ -28,6 +46,22 @@ This page records how fast the project proves and verifies the production mDoc c
 | M4 | Parallelism | to be set | optional |
 
 M2 has no target figure. It closes on a criterion (ADR 0067): every remaining cost is either work upstream's generic code also does, by the same algorithm, or a cost that only tested code removes.
+
+## The prover's encoder: Lagrange against the additive FFT
+
+The additive FFT replaced the Lagrange encoder of the prover on GF(2^128) at block 3 of Phase D (chapter 8, [ADR 0057](../adr/0057-additive-fft.md)). One session of the proving machine, 20 October 2026: main at 9c552e0, which encoded by Lagrange, against the block at fc0c8ce, which encoded the hash circuit by the additive FFT; the signature circuit kept the Lagrange encoder on both sides. Version 7 circuits, rate 7, NREQ 132, the default 8 MB stack, one run of each program, the command-line build of each commit; wall time and maximum resident set:
+
+| Run | Lagrange encoder (9c552e0) | Additive FFT (fc0c8ce) |
+|---|---|---|
+| hash, prove | 19 min 59 s, 672 MB | 6 min 30 s, 599 MB |
+| hash, verify | 2 min 02 s, 371 MB | 2 min 02 s, 371 MB |
+| signature, prove | 18 min 51 s, 216 MB | 18 min 49 s, 216 MB |
+| signature, verify | 53 s, 41 MB | 54 s, 41 MB |
+
+- The hash proof was three times faster, and both hash proofs were identical byte for byte, which tested the FFT on every row of the tableau of a production circuit.
+- The verifier, which keeps Lagrange on the NREQ opened columns, did not change, nor did the signature proof, still encoded by Lagrange.
+- In the profile of the hash proof, the Ligero commitment, FFT included, fell below 0.5 % of the time, from 60 %. What remained was the sumcheck: the sumcheck prover 75 % (`Round_Evals` 51 %), and the verifier core the prover runs 24 %, almost all of it `Eval_Bound_Quad`, the cost M1 and M2 then addressed.
+- Block 4 replaced the encoder of the signature circuit by the real FFT: the version 7 signature proof in 41 s and 74 MB, against 1,129 s and 216 MB with Lagrange, the proof the same bytes (ADR 0057, "Block 4, as realised").
 
 ## The path through M2
 
@@ -130,7 +164,7 @@ The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. I
 
   The time of a layer is the median of three calls; one session, the tree of the pull request of block 2. The packed path costs 5 % more over the circuit: it rebuilds each term from the deltas where the expanded path reads an array already laid out, and the rounds are the same code on the same merged entries. On the signature circuit (P-256, 481,833 terms, 285,426 runs) 84 ms against 90 ms.
 
-  The verifier and the prover still take the expanded circuit in this block; the peak heap moves when they take the packed form, in the next block.
+  In this block the verifier and the prover took the expanded circuit; the peak heap moved when they took the packed form, in block 3.
 - Block 3, first part: the verifier takes the packed circuit (chapter 6, Section 3.7), and the expanded circuit leaves its path. Peak heap of `longfellow_verify` on the mDoc v7 circuits, one session on the proving machine, three runs each, upstream's `heap_v7` (a small driver on its mDoc runtime that verifies the two v7 proofs in one process, generic code, baseline CPU) under the same counter:
 
 | Peak heap, verifier | before (main 7946d77) | after block 3a | upstream (both circuits) |
@@ -138,7 +172,7 @@ The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. I
 | hash | 401 MB | 79 MB | 48 MB |
 | signature | 36 MB | 11 MB | |
 
-  The peaks are identical from run to run. The verifier's peak falls 5.1 times on the hash circuit and 3.3 times on the signature circuit; the hash verification alone takes 1.6 times upstream's peak for both circuits, from 8.3 times, within the criterion of the milestone for the verifier. The maximum resident set agrees (405 MB to 83 MB on the hash circuit). The fall on the hash circuit, 321 MB, is more than the expanded circuit, 7,757,579 terms of 32 bytes, 248 MB: the rest was held beside it on the expanded path and is not attributed here; what remains, 79 MB, is the packed form (4.4 MB), the proof and the working sets of `Verify` (chapter 6, Section 3.4); the second part of the block measures its largest piece (below). The verification time, median of three, goes from 2.54 s to 2.43 s on the hash circuit and from 0.29 s to 0.28 s on the signature circuit. The proofs are identical byte for byte; the prover, which still loads the expanded circuit, keeps its peak (621 MB and 60 MB) and its time until the second part of the block.
+  The peaks are identical from run to run. The verifier's peak falls 5.1 times on the hash circuit and 3.3 times on the signature circuit; the hash verification alone takes 1.6 times upstream's peak for both circuits, from 8.3 times, within the criterion of the milestone for the verifier. The maximum resident set agrees (405 MB to 83 MB on the hash circuit). The fall on the hash circuit, 321 MB, is more than the expanded circuit, 7,757,579 terms of 32 bytes, 248 MB: the rest was held beside it on the expanded path and is not attributed here; what remains, 79 MB, is the packed form (4.4 MB), the proof and the working sets of `Verify` (chapter 6, Section 3.4); the second part of the block measures its largest piece (below). The verification time, median of three, goes from 2.54 s to 2.43 s on the hash circuit and from 0.29 s to 0.28 s on the signature circuit. The proofs are identical byte for byte; the prover, which loaded the expanded circuit until the second part of the block, kept its peak (621 MB and 60 MB) and its time.
 - Block 3, second part: the prover takes the packed circuit (chapter 7, Sections 2.1 and 3.3), and the expanded path leaves the executable code. Peak heap and round trip of both programs on the mDoc v7 circuits, one session on the proving machine, three runs each, upstream's `heap_v7` (one proof and one verification of the two v7 circuits in one process, generic code, baseline CPU) under the same counter in the same session:
 
 | Peak heap | before (main cc5fb49) | after block 3b | upstream (both circuits) |
@@ -148,7 +182,7 @@ The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. I
 | verifier, hash | 79 MB | 79 MB | 48 MB |
 | verifier, signature | 11 MB | 11 MB | |
 
-  The peaks are identical from run to run. The prover's peak falls 2.7 times on the hash circuit and 2.2 times on the signature circuit; the hash proof alone takes 2.1 times upstream's peak for both circuits, from 5.8 times. The maximum resident set agrees (629 MB to 234 MB on the hash circuit). The fall, 395 MB, is again more than the expanded circuit (248 MB): the per-layer term arrays of the expanded path went with it. The round trip does not move: the hash proof takes 5.01 s (from 5.05 s), the signature proof 0.49 s, the verifications 2.43 s and 0.29 s as in the first part; the proofs are identical byte for byte. `first_step_bench` on the hash circuit, three processes: the packed first step over the 17 layers 1.44 s, the exact `Eval_Bound_Quad` 22.6 s (it visits every term for each of the 2 × Logw bound coefficients; the kernel merges the runs first); on the signature circuit 92 ms against 1.01 s. The largest object either program now allocates for a layer is the working array of the rounds, 36.9 MB on layer 13 of the hash circuit (1,153,333 runs of 32 bytes), freed with the layer: it is most of the verifier's 79 MB above the packed form. The prover holds beside it the wires of every layer, the pads, the Ligero tableau and the proof.
+  The peaks are identical from run to run. The prover's peak falls 2.7 times on the hash circuit and 2.2 times on the signature circuit; the hash proof alone takes 2.1 times upstream's peak for both circuits, from 5.8 times. The maximum resident set agrees (629 MB to 234 MB on the hash circuit). The fall, 395 MB, is again more than the expanded circuit (248 MB): the per-layer term arrays of the expanded path went with it. The round trip does not move: the hash proof takes 5.01 s (from 5.05 s), the signature proof 0.49 s, the verifications 2.43 s and 0.29 s as in the first part; the proofs are identical byte for byte. `first_step_bench` on the hash circuit, three processes: the packed first step over the 17 layers 1.44 s, the exact `Eval_Bound_Quad` 22.6 s (it visits every term for each of the 2 × Logw bound coefficients; the kernel merges the runs first); on the signature circuit 92 ms against 1.01 s. After this block, the largest object either program allocates for a layer is the working array of the rounds, 36.9 MB on layer 13 of the hash circuit (1,153,333 runs of 32 bytes), freed with the layer: it is most of the verifier's 79 MB above the packed form. The prover held beside it the wires of every layer, the pads, the Ligero tableau and the proof.
 - Block 4, first part (#106): the prover's wires in one heap segment per layer, freed as the layer is proved. The profile of #60 (3 November, same session as upstream's prover under the same counter, both at the peak of the hash proof, layer 13): the wires alive 55.2 MB here against 28.6 MB upstream, the five working vectors of the rounds 72.2 against 21.7, the merged terms 36.9 against 27.7, the eq2 tables alive inside `Eq2_Table` 33.6 against none; these four explain the 119 MB between the two peaks. Measured in one session (4 November, main af26481 against 6889a56, three runs each, the peaks identical from run to run; upstream's prover under the same counter in the same session):
 
 | Peak heap | before (main af26481) | after block 4a | upstream (both circuits) |
@@ -168,7 +202,7 @@ The memory milestone ([ADR 0080](../adr/0080-milestone-memory.md)) follows M2. I
 | verifier, hash | 79 MB | 79 MB | 48 MB |
 | verifier, signature | 11 MB | 11 MB | |
 
-  The hash proof's peak falls by 57.8 MB, within 32 bytes of the five vectors of layer 13 less the accumulator that stays; the peak is still inside `Eq2_Table` of layer 13, before the half-width vector of hand 0 exists, so the two eq2 tables (33.6 MB, #105) and the merged terms (36.9 MB) are now its largest pieces. It is 1.32 times upstream's peak for both circuits in one process, from 1.86, and 66 % of the criterion of the milestone. The maximum resident set agrees (206 MB to 148 MB). The hash proof is 0.09 s faster (4.96 to 4.87 s, no copy of the wires per hand); the signature proof 0.48 s; the verifications unchanged. The proofs are identical byte for byte.
+  The hash proof's peak falls by 57.8 MB, within 32 bytes of the five vectors of layer 13 less the accumulator that stays; the peak is still inside `Eq2_Table` of layer 13, before the half-width vector of hand 0 exists, so the two eq2 tables (33.6 MB, #105) and the merged terms (36.9 MB) were then its largest pieces. It is 1.32 times upstream's peak for both circuits in one process, from 1.86, and 66 % of the criterion of the milestone. The maximum resident set agrees (206 MB to 148 MB). The hash proof is 0.09 s faster (4.96 to 4.87 s, no copy of the wires per hand); the signature proof 0.48 s; the verifications unchanged. The proofs are identical byte for byte.
 - The eq2 table in one array (#105): `Eq2_Table` fills its table by upstream's recursion (`fill_recursive` of `eq.rs`), the weights of the two challenges carried down the recursion, where it built a second table of the same length and added it (chapter 3, Section 3.3). Measured in one session (5 November, main b28a8a9 against 1b4cabb, three runs each, the peaks identical from run to run; upstream's prover and verifier under the same counter in the same session):
 
 | Peak heap | before (main b28a8a9) | after #105 | upstream (both circuits) |
