@@ -1,5 +1,5 @@
 --  Packed_HQuad: the first step of the bound quad of a layer, read from
---  the packed circuit (the memory milestone, ADR 0080, block 2). As
+--  the packed circuit (ADR 0080). As
 --  upstream's bind_g (rust/runtime/sumcheck/src/hquad.rs at d5e6be7),
 --  the terms of the layer are rebuilt one at a time from the deltas
 --  (Packed_Circuits, the walk), bound with g, and merged as they come:
@@ -8,15 +8,18 @@
 --  has 439,013 runs; the largest working array, 1,153,333 entries, is
 --  the one of a layer of 1,429,054 terms.
 --
+--  Documentation: docs/guide/03-sumcheck.md, Sections 2.6 and 3.6.
+--  Decisions: ADR 0063, 0071, 0073, 0080.
+--
 --  Layer_Runs counts the runs, so that the working array is allocated
 --  once at its size. Bind_Merge is the shared kernel: the verifier's
---  Bind_Quad_Packed uses it here, the prover in Sumcheck_Prover (block
---  3 of the milestone). The rounds then run Bind_H of Sumcheck_HQuad,
+--  Bind_Quad_Packed uses it here, the prover in Sumcheck_Prover. The
+--  rounds then run Bind_H of Sumcheck_HQuad,
 --  unchanged, on the merged entries: Bind_Step, one round of one hand
 --  with the invariant of the rounds carried over, is the verifier's
 --  form of it. Eval_Bound_Quad_Packed is the verifier's form when the eq
 --  tables do not fit (Logv or Logw above Max_Bindeq_Log): a sum over
---  the walk, with no array at all. Since block 3 these kernels are the
+--  the walk, with no array at all. These kernels are the
 --  only first step of a layer in the programs; the expanded path
 --  (Bind_G_T, Merge_Runs, Eval_Bound_Quad) stays in the library as the
 --  oracle of the tests.
@@ -34,12 +37,19 @@
 --  Proof status: Gold for every subprogram against the references
 --  above, except that Bind_Merge without the eq2 table (Logv above
 --  Max_Bindeq_Log) states the run count only, as Merge_Terms does: its
---  coefficients are tested, not proved. The prover takes that branch on
+--  coefficients are tested, not proved (register row V5). The prover
+--  takes that branch on
 --  a layer whose Logv is above Max_Bindeq_Log, where the verifier sums
 --  the bound quad over the walk; the rounds on the merged entries then
---  keep the assurance they have had since ADR 0063: tested against the
---  reference terms by the harness.
+--  are tested against the reference terms by the harness (ADR 0063).
+--  No circuit held here has such a layer; circuit_kat tests the branch
+--  on the small layers of every circuit it loads.
 --  The kernels of Sumcheck_HQuad and their contracts are unchanged.
+--  Tested: the packed path against the expanded kernels (sumcheck_kat,
+--  circuit_kat, first_step_bench --check; register row V5). Trusted:
+--  that the ghost expansion is what the programs run on, a chain of
+--  proofs and tests (docs/guide/trust-model.md, "The circuit
+--  loader"); Same (T6); the contracts at the level Proof_Only (T8).
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, circuits and
 --  challenges are public data (ADR 0037).

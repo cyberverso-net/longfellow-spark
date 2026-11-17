@@ -1,57 +1,67 @@
 --  Sumcheck_Prover: the padded sumcheck proof of draft Section 6.6
---  (Phase C, ADR 0049, 0050, 0051, 0052), sumcheck_prove, sumcheck_
---  prove_layer, eval_round_poly and bind of the reference
+--  (ADR 0049, 0050, 0051, 0052), sumcheck_prove, sumcheck_prove_layer,
+--  eval_round_poly and bind of the reference
 --  (docs/specs/rust/src/sumcheck/prover.rs at d5e6be7) and the pads of
 --  sumcheck/pad.rs. Generic over the transcript glue of a field, which
 --  carries the algebra and the verifier core (hence the layouts of the
---  padded proof, of the challenges and of the pad variables), and over
+--  padded proof, of the challenges and of the pad variables), over
 --  the sampling instance of that field, which carries the randomness
---  source (ADR 0050).
+--  source (ADR 0050), and over the packed kernels of Packed_HQuad.
 --
 --  The prover drives the live transcript (one transcript at a time,
 --  ADR 0031): the caller has written the label, the root and the
---  statement; Prove then draws and absorbs exactly what Replay_
---  Challenges of stage 4 replays, records every challenge it draws in
---  the Challenges record of stage 3 and draws alpha_input last, so
---  that Verifier_Core can be called with the challenges as input where
---  the reference replays the core on a copy of the transcript (ADR
---  0049). The wires of every layer come from Eval_Circuit of Packed_Eval
---  (ADR 0080), one heap segment per layer, and Prove frees the segment
---  of a layer once the layer is proved, as upstream's prove_core drops
---  each layer's vector, and binds the hands where they are (hand 1 in
---  the segment itself, hand 0 in a vector of half its width made at
---  round 0, Bind_In_Place of Sumcheck_Algebra), one accumulator for
---  the round polynomial; the pads from Sample_Pads in the order the reference
---  consumes its randomness: per layer, per round the two pads of hand 0
---  then the two of hand 1, then the two claim pads, the product pad
---  computed. Lqc_Triples numbers the quadratic constraints of the claim
---  pads in the witness vector of the commitment (generate_lqc_triples).
+--  statement; Prove then draws and absorbs exactly what
+--  Replay_Challenges of Sumcheck_Transcript replays, records every
+--  challenge it draws in the Challenges record of Sumcheck_Verifier and
+--  draws alpha_input last, so that Verifier_Core can be called with
+--  the challenges as input where the reference replays the core on a
+--  copy of the transcript (ADR 0049). The wires of every layer come
+--  from Eval_Circuit of Packed_Eval (ADR 0080), one heap segment per
+--  layer, and Prove frees the segment of a layer once the layer is
+--  proved, as upstream's prove_core drops each layer's vector, and
+--  binds the hands where they are (hand 1 in the segment itself, hand
+--  0 in a vector of half its width made at round 0, Bind_In_Place of
+--  Sumcheck_Algebra), one accumulator for the round polynomial; the
+--  pads from Sample_Pads in the order the reference consumes its
+--  randomness: per layer, per round the two pads of hand 0 then the
+--  two of hand 1, then the two claim pads, the product pad computed.
+--  Lqc_Triples numbers the quadratic constraints of the claim pads in
+--  the witness vector of the commitment (generate_lqc_triples).
 --
---  Documentation: docs/guide/07-prover.md.
+--  Documentation: docs/guide/07-prover.md, Sections 1.2, 1.3, 2.3 and
+--  3.3.
 --
 --  Proof status (per instance). Silver with the ownership checks on
 --  the heap buffers. Gold, structural (ADR 0052): Round_Evals equals
 --  the ghost transcription Ev0_Ref, Ev2_Ref of eval_round_poly in its
 --  order of operations, through the logical equality Same (p (1) is
---  not emitted, so its sum is not transcribed). Since M1 (ADR 0063)
---  Prove computes the round polynomial in the dense form of the
---  production prover, Round_Evals_Dense, Gold against QW_Ref and
---  D0_Ref, and against D2_Ref when the claim of the round it is given
---  is the true sum (ADR 0075: two products per pair, p (1) from the
---  claim, as upstream); Round_Evals stays as the reference, and the
---  harness checks that the two agree. Prove keeps the terms merged as the
---  production prover does, from the packed circuit (ADR 0080, block 3):
---  Bind_Merge of Packed_HQuad (Gold on the layer of the ghost expansion:
---  bind_g with the eq2 table and the runs of equal hands merged from the
---  walk, one entry per run) and Bind_H (Gold, structural, against Rd
---  and Corner_K); the bound quad of a layer (ADR 0071) is Gold against
---  BQ_Ref on the expansion. Bind_G and Update_Terms stay as the
---  reference, and the harness checks that the round polynomials agree
---  on every round.
---  The padded values are the evaluations minus the pads by the two
---  statements that compute them. Completeness (the verifier accepts the
---  honest proof) is tested, not proved; so is the claim of each round
---  that Prove tracks (ADR 0075).
+--  not emitted, so its sum is not transcribed). Prove computes the
+--  round polynomial in the dense form of the production prover
+--  (ADR 0063), Round_Evals_Dense, Gold against QW_Ref and D0_Ref, and
+--  against D2_Ref when the claim of the round it is given is the true
+--  sum (ADR 0075: two products per pair, p (1) from the claim, as
+--  upstream); Round_Evals stays as the reference, and the harness
+--  checks that the two agree. Prove keeps the terms merged as the
+--  production prover does, from the packed circuit (ADR 0080):
+--  Bind_Merge of Packed_HQuad (Gold on the layer of the ghost
+--  expansion: bind_g with the eq2 table and the runs of equal hands
+--  merged from the walk, one entry per run) and Bind_H (Gold,
+--  structural, against Rd and Corner_K); the bound quad of each layer
+--  (ADR 0071) is Gold against BQ_Ref on the expansion, a postcondition
+--  of Prove at the level Proof_Only (register row T8). The predicate
+--  checks of the circuit are proved, and suppressed in the compiled
+--  code of the body (ADR 0072, register row T7). Bind_G and
+--  Update_Terms stay as the reference, and the harness checks that the
+--  round polynomials agree on every round. Lqc_Triples equals the
+--  layout of the core (Pad_Off). The padded values are the evaluations
+--  minus the pads by the two statements that compute them.
+--
+--  Tested, not proved: completeness (the verifier accepts the honest
+--  proof, register row V6), and with it the claim of each round that
+--  Prove tracks (ADR 0075); on a layer whose logv is above 24, the
+--  merged coefficients of Bind_Merge without the eq2 table (row V5).
+--  Sample_Pads is declared possibly non-terminating on P-256 (row V4).
+--  Trusted: the zero knowledge the pads give (row S1).
 --
 --  Constant-time discipline (ADR 0051): constant time by construction.
 --  Round_Evals loops over the terms of the layer, a public structure,
@@ -75,8 +85,8 @@ with Packed_HQuad;
 generic
    with package ST is new Sumcheck_Transcript (<>);
    with package SP is new Sampling (F => ST.SA.F, others => <>);
-   --  The first step of a layer from the packed circuit (block 2 of the
-   --  memory milestone), over the algebra and the kernels of ST.
+   --  The first step of a layer from the packed circuit (ADR 0080),
+   --  over the algebra and the kernels of ST.
    with package PH is new Packed_HQuad
      (SA => ST.SA, HQ => ST.SV.HQ, others => <>);
 package Sumcheck_Prover is
@@ -264,7 +274,7 @@ package Sumcheck_Prover is
           Same (Ev2, Ev2_Ref (T, Active, NA, Other, NO, H, X2, T'Length)));
 
    -------------------------------------------------------------------
-   --  The dense round polynomial (Phase D, M1; ADR 0063), as the
+   --  The dense round polynomial (ADR 0063), as the
    --  production prover computes it (rust/runtime/sumcheck/src/
    --  prover.rs, layer and quad_round_poly): each term adds k times its
    --  other-hand wire to qw at its active-hand index, then p (0) and

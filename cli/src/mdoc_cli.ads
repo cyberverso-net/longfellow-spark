@@ -1,11 +1,17 @@
---  Mdoc_Cli: what the two mDoc command-line programs share (Phase D,
---  block 5, ADR 0058): the command line of a request (the
---  specification, the issuer's key, the session transcript, the date,
---  the document type, the attributes), the files, the hex, and the
---  loading of the two circuits of a specification with the checks the
---  library asks of them. Outside the proof perimeter (SPARK_Mode Off):
---  file input and output, the command line; every computation is in
---  the library.
+--  Mdoc_Cli: what the two mDoc command-line programs share (ADR 0058):
+--  the command line of a request (the specification, the issuer's key,
+--  the session transcript, the date, the document type, the
+--  attributes), the files, the hex, and the loading of the two
+--  circuits of a specification with the checks the library asks of
+--  them. Every computation is in the library.
+--
+--  Documentation: docs/guide/09-mdoc.md, Section 3.3.
+--
+--  Proof status: outside SPARK (SPARK_Mode Off), since it does file
+--  input and output and reads the command line; compiled with the
+--  run-time checks on (register rows C2 and T7). Trusted: that the
+--  checks here, with those of the two programs, establish in code the
+--  preconditions of the library's entry points they call (row C2).
 --
 --  The circuits: --spec names an archive by its combined identifier
 --  (Mdoc_Spec); the two LFC2 payloads are read from --circuits DIR

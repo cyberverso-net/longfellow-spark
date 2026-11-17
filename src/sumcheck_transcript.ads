@@ -1,18 +1,21 @@
 --  Sumcheck_Transcript: the glue between the field-agnostic Transcript
---  and the sumcheck verifier core of stage 3: the sampler of draft
+--  and the sumcheck verifier core of chapter 3: the sampler of draft
 --  Section 3.4.3, the element frames, the statement of Section 3.3
 --  (zk/common.rs), the protocol helpers of sumcheck/common.rs, the
 --  replay of every challenge of a proof into the Challenges record of
 --  Sumcheck_Verifier, and the reader of the sumcheck part of a proof
---  (Section 7.3) into Sumcheck_Proof. Generic over the three stage 3
---  instances of a field.
+--  (Section 7.3) into Sumcheck_Proof. Generic over the three sumcheck
+--  instances of a field (Sumcheck_Algebra, Sumcheck_Expression,
+--  Sumcheck_Verifier).
 --
---  Documentation: docs/guide/04-transcript.md. Decisions: ADR 0028
+--  Documentation: docs/guide/04-transcript.md, Sections 3.3 to 3.6.
+--  Decisions: ADR 0028
 --  (scope, the absorption order of zk/verifier.rs, the status), 0030
 --  (Sample as a literal rejection loop, terminating exactly when the
 --  field does not reject), 0031 (Gold on the frames and the statement;
---  Silver with proved shape on the replay and the reader); frame: ADR
---  0022, 0024. Index: docs/adr/README.md.
+--  Silver with proved shape on the replay and the reader), 0085 (the
+--  replay from the statement, for two proofs on one transcript);
+--  frame: ADR 0022, 0024. Index: docs/adr/README.md.
 --
 --  Proof status (per instance).
 --    Sample           : Silver; Always_Terminates exactly when
@@ -25,10 +28,11 @@
 --                       Transcript; Write_Element_Slice one element at
 --                       a time, its frame by recursion (Elements_Frame,
 --                       ADR 0039).
---    Begin_Circuit, Begin_Layer, Replay_Challenges : Silver with the
---                       Exhausted flag sticky; Replay_Challenges fills
+--    Begin_Circuit, Begin_Layer, Replay_From_Statement,
+--    Replay_Challenges : Silver with the
+--                       Exhausted flag sticky; the replays fill
 --                       a record whose shape the preconditions fix and
---                       reports Exhausted when the generator ran out.
+--                       report Exhausted when the generator ran out.
 --    Read_Sumcheck_Proof : Silver; Bad_Element when an encoding is not
 --                       canonical, as read_elt_field fails upstream.
 --
@@ -42,6 +46,10 @@
 --  end_layer (the two claims as one slice), and after the last layer
 --  one draw, alpha_input. Agreement with the upstream verifier is
 --  tested on the recorded runs of Appendix B.3 (ADR 0032).
+--  That the absorption is complete beyond those two proofs is trusted
+--  (register row S3), compared with upstream by reading; so are the
+--  recordings (R5) and, on P-256, the termination of the sampler and
+--  its callers (V4).
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0029.
 --  Public data only.

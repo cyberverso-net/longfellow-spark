@@ -1,6 +1,6 @@
---  Rfft_P256: the Reed-Solomon extension of draft-03 Section 2.2.1 on the
---  P-256 base field (Phase D, block 4, ADR 0057), as the production
---  prover computes it (longfellow-zk/longfellow-zk at d5e6be7,
+--  Rfft_P256: the Reed-Solomon extension of draft Section 2.2.1 on the
+--  P-256 base field (ADR 0057), as the production prover computes it
+--  (longfellow-zk/longfellow-zk at d5e6be7,
 --  rust/runtime/algebra/src/reed_solomon.rs, middle_product.rs, rfft.rs,
 --  fp2.rs, p256/mod.rs).
 --
@@ -30,17 +30,22 @@
 --  where bitrev of rfft.rs walks the reversed index with XOR: the same
 --  permutation.
 --
---  Documentation: docs/guide/08-additive-fft.md (section 1.5 and the P-256
---  sections). Decisions: ADR 0057, 0051 (constant time), 0047 (the work
---  arrays on the heap).
+--  Documentation: docs/guide/08-additive-fft.md, Sections 1.5 and 3.2.
+--  Decisions: ADR 0057, 0051 (constant time), 0047 (the work arrays on
+--  the heap).
 --
 --  Proof status. Silver: no run-time error for any row of 1 to 2^16
---  values and any output length up to 2^16, with the ownership checks on
---  the work arrays. Gold, structural: Extend leaves the first n values as
---  they are. That the other values are the Lagrange extension is tested:
---  gen_rs_p256_vectors.py checks a transcription of the reference against
---  Lagrange interpolation, the harness against Lagrange.Evaluate, and the
---  proofs made with this encoder against those made with Lagrange.
+--  values and any output length up to 2^16, with the ownership checks
+--  on the work arrays, and a proved shape: Extend leaves the first n
+--  values as they are, stated with Same (register row T6). That the
+--  other values are the Lagrange extension is tested, not proved
+--  (register row V2):
+--  gen_rs_p256_vectors.py checks a transcription of the reference
+--  against Lagrange interpolation, fft_kat checks this unit on those
+--  vectors and against Lagrange.Evaluate, and the ecdsa2 proof, which
+--  this encoder makes, is upstream's byte for byte. Trusted with the
+--  same row: the real FFT over F_p^2 with upstream's root of unity, as
+--  upstream implements it.
 --
 --  Constant-time discipline (ADR 0051): constant time by construction.
 --  Every loop bound, index and twiddle depends on n and m, the public

@@ -1,7 +1,7 @@
 --  Mdoc_Prover: the prover of an mDoc proof of age, run_mdoc_prover_inner
 --  of the reference from the witnesses on (longfellow-zk/longfellow-zk
---  d5e6be7, rust/applications/mdoc_zk/runtime/src/prover.rs; Phase D,
---  block 5, ADR 0058), on the two phases of Zk_Prover (ADR 0085).
+--  d5e6be7, rust/applications/mdoc_zk/runtime/src/prover.rs; ADR
+--  0058), on the two phases of Zk_Prover (ADR 0085).
 --  Generic over the two prover chains, one per field, so that the
 --  library instance (Mdoc_Prover_Lib, the test source Simple_Rng) is
 --  proved and the command line instantiates it again with the
@@ -30,11 +30,12 @@
 --
 --  Steps 2 and 3 come before step 4 so that av depends on both
 --  commitments: a prover that could choose its tags after seeing av
---  could bind two unrelated witnesses. In this block the private
---  inputs, mac_ap and the three messages come from upstream's witness
---  files (Mdoc_Inputs.Witness_Parts); block 6 builds them from the
---  credential (Prove_Mdoc: the parse, the two witnesses, then Prove;
---  ADR 0086). The checks that do not need the transcript come first:
+--  could bind two unrelated witnesses. Prove takes the private
+--  inputs, mac_ap and the three messages as given: on the reference
+--  path they come from upstream's witness files
+--  (Mdoc_Inputs.Witness_Parts); Prove_Mdoc builds them from the
+--  credential (the parse, the two witnesses, then Prove; ADR 0086).
+--  The checks that do not need the transcript come first:
 --  the transcript's bound, the attributes against the version's
 --  layout, the counts of the public inputs against the circuits'.
 --
@@ -68,7 +69,7 @@
 --  only under such pads, and pads used under two challenges reveal
 --  them (chapter 9 Section 1.3; ADR 0089, the caller's obligations).
 --  longfellow_prove_mdoc draws them for each proof; drawing them here
---  is deferred to Phase E (#156).
+--  needs a random source in the library, which issue #156 tracks.
 
 pragma SPARK_Mode (On);
 
@@ -245,7 +246,7 @@ package Mdoc_Prover is
                         | Mdoc_Status.Profile_Mismatch
                         | Mdoc_Status.Attribute_Count;
 
-   --  The proof from the credential (block 6, ADR 0086): Mdoc is the
+   --  The proof from the credential (ADR 0086): Mdoc is the
    --  document as the holder presents it; it is parsed (Mdoc_Parse),
    --  the two witnesses are built from the parse and the pads Ap
    --  (Mdoc_Witness) into Hash_W and Sig_W, the caller's buffers of the
@@ -326,8 +327,8 @@ package Mdoc_Prover is
                         | Mdoc_Status.Profile_Mismatch
                         | Mdoc_Status.Attribute_Count;
 
-   --  The prover's entry point of the supported profile (ADR 0089,
-   --  #79): Profile is the profile's name, the combined identifier of a
+   --  The prover's entry point of the supported profile (ADR
+   --  0089): Profile is the profile's name, the combined identifier of a
    --  row of Mdoc_Spec; Hash_Id, Hash_Sfb, Sig_Id and Sig_Sfb the
    --  identifiers and subfield boundaries of the two circuits given
    --  (from their files' headers). The profile is checked first

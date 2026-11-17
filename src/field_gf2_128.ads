@@ -1,17 +1,29 @@
 --  Field_GF2_128: GF(2^128) as a Field_Signature instance (ADR 0024,
 --  ADR 0025).
 --
---  P2 is the third sumcheck evaluation point of draft-03 Section 6.4,
---  inj (2) of Section 2.2.2: the second element beta_1 of the subfield
---  basis, the same upstream constant that anchors the stage 1 vectors
---  (longfellow-zk/longfellow-zk d5e6be7, docs/specs/rust/src/algebra/
---  gf2_128.rs, SUBFIELD_BASIS [1]).
+--  Documentation: docs/guide/03-sumcheck.md, Section 3.1; the field
+--  itself is chapter 1 (docs/guide/01-gf2_128.md).
+--
+--  P2 is the third sumcheck evaluation point of Section 6.4 of the
+--  spec, inj (2) of Section 2.2.2: the second element beta_1 of the
+--  subfield basis, the same upstream constant that anchors the vectors
+--  of GF2_128 (longfellow-zk/longfellow-zk d5e6be7,
+--  docs/specs/rust/src/algebra/gf2_128.rs, SUBFIELD_BASIS [1]).
 --
 --  In characteristic 2 subtraction is addition, so the Lagrange
 --  denominators are d0 = P2, d1 = 1 + P2, d2 = P2 (1 + P2). The
 --  inverses below are computed by tests/vectors/gen_sumcheck_vectors.py
 --  (extended Euclid in GF(2)[x], checked by d * inv (d) = 1) and
---  re-checked by the harness sumcheck_kat with Mul at every run.
+--  re-checked by the harness sumcheck_kat with Mul at every run:
+--  tested, not proved (register row V11).
+--
+--  Proof status: Silver, with no functional contract of its own, as
+--  chapter 3 Section 3.1 says. The ten ring laws of the signature are
+--  proved for the operations of GF2_128 (ghost lemmas at the level
+--  Proof_Only, register row T8); Checked_Inv returns Ok only when
+--  R * D = One, checked at run time (ADR 0037), so nothing is assumed
+--  of Inv. Same is taken as given: its body is the predefined "=",
+--  outside SPARK (register row T6).
 
 pragma SPARK_Mode (On);
 

@@ -1,17 +1,17 @@
 --  Zk_Prover: ZkProver::commit and ZkProver::prove of the reference
 --  (docs/specs/rust/src/zk/prover.rs at d5e6be7), from the circuit and
---  its inputs to the proof string of Section 7.5 (Phase C, ADR 0049,
---  0050, 0051), as two phases on a transcript the caller opens
+--  its inputs to the proof string of Section 7.5 (ADR 0049, 0050,
+--  0051), as two phases on a transcript the caller opens
 --  (Commit, Prove_Committed; ADR 0085, for the mDoc layer of ADR 0058,
 --  which commits two circuits before it proves either) and as their
 --  composition on a fresh transcript for one proof (Prove). Generic
 --  over the Ligero prover of a field (which carries the verifier units,
 --  the sampling instance and the randomness source), the sumcheck
 --  prover over the same transcript glue, the writers and the
---  evaluation of the packed circuit. Since the memory milestone (ADR
---  0080) the circuit comes in its packed form, never expanded: the
---  sizes from its shape, the wires from the walk (Packed_Eval), the
---  sumcheck from the walk (Sumcheck_Prover with Packed_HQuad).
+--  evaluation of the packed circuit. The circuit comes in its packed
+--  form, never expanded (ADR 0080): the sizes from its shape, the
+--  wires from the walk (Packed_Eval), the sumcheck from the walk
+--  (Sumcheck_Prover with Packed_HQuad).
 --
 --  The checks, as statuses (ADR 0049): the private inputs are
 --  ninput - npublic elements and the public ones npublic
@@ -35,24 +35,38 @@
 --  Ligero commitment (Commit; Config_Invalid when a Lagrange
 --  denominator has no inverse) and the root on the transcript.
 --  Prove_Committed makes the checks on the public inputs and the
---  satisfiability check, which needs both (ADR 0085: before the
---  commitment in ADR 0049, in the proving phase since), then the
+--  satisfiability check, which needs both (ADR 0085), then the
 --  statement, the sumcheck proof on the live transcript with its
 --  challenges recorded (Sumcheck_Prover.Prove), the verifier core on
 --  those challenges for the constraints (ADR 0022, 0049), the Ligero
---  proof under the fixed statement hash of zk/ common.rs (Exhausted
+--  proof under the fixed statement hash of zk/common.rs (Exhausted
 --  when the generator passes its bound), and the bytes (Write_Proof).
 --  Memory: the pads, the witness vector, the proofs and the constraints
 --  live on the heap (ADR 0047), held by Committed between the phases;
 --  the wires one heap segment per layer, each freed by the sumcheck
---  prover once its layer is proved (ADR 0080, block 4).
+--  prover once its layer is proved (ADR 0080).
 --
---  Documentation: docs/guide/07-prover.md.
+--  Documentation: docs/guide/07-prover.md, Sections 2.6, 3.7 and 3.8.
 --
 --  Proof status (per instance). Silver with the ownership checks on
---  the heap objects; the lengths and offsets of the proof string by the
---  writers' contracts. Completeness (the verifier accepts the proof) is
---  tested, not proved (ADR 0052).
+--  the heap objects, the record Committed between the phases included
+--  (Is_Null, Fits): every allocation is freed on every path that does
+--  not return it. The statuses of the phases are proved as their
+--  postconditions state them; the lengths and offsets of the proof
+--  string by the writers' contracts. The precondition at the level
+--  Proof_Only asks of the circuit what the loader proves of it
+--  (register row T8). The predicate checks of the circuit are proved,
+--  and suppressed in the compiled code of this unit (ADR 0072,
+--  register row T7). The global state is synthesised (Prove, below).
+--
+--  Tested, not proved: completeness, that the verifier accepts the
+--  proof (register row V6, ADR 0052), and with it the tableau and the
+--  Ligero proof as a whole (row V13). The phases are declared possibly
+--  non-terminating on both fields (row V4). Trusted: the soundness and
+--  zero knowledge of the protocol (row S1) and the fixed statement hash
+--  (row R6); on the command line, the source of the randomness (rows
+--  C1 and P4) and the preconditions the programs establish in code
+--  before each call (row C2).
 --
 --  Constant-time discipline (ADR 0051): the two branches on witness-
 --  derived values are the satisfiability check and the subfield check,
@@ -101,8 +115,8 @@ package Zk_Prover is
    --  checked once where a circuit enters the program (the loader proves
    --  them, the command line checks their executable part), and the
    --  expression functions below, which the command line calls with the
-   --  circuit, do not walk it again. GNATprove proves these checks as
-   --  before.
+   --  circuit, do not walk it again. GNATprove proves these checks all
+   --  the same: the suppression applies only to the compiled code.
    pragma Suppress (Predicate_Check);
 
    subtype Element is LPR.LV.ST.SA.Element;

@@ -1,5 +1,5 @@
 --  Mdoc_Witness: the two witnesses of the mDoc proof of age from the
---  parsed credential (Phase D, block 6, ADR 0086), in the layouts of
+--  parsed credential (ADR 0086), in the layouts of
 --  upstream's runtime/src/concrete/legacy/private.rs at d5e6be7
 --  (push_witness_hash, push_witness_attrs, push_witness_sig) with the
 --  encodings of concrete/builder.rs.
@@ -34,27 +34,28 @@
 --  on the device authentication digest under the device key
 --  (Ecdsa_Witness, 1,034 elements each); then per bound value the two
 --  pads and the two halves of the value, each as 64 elements of two
---  bits (push_plucked_128_legacy: the chunk v as 2 v - 3), where block
---  5 already placed the pads (Mdoc_Inputs.Place_Pads). 2,839 elements.
+--  bits (push_plucked_128_legacy: the chunk v as 2 v - 3), the layout
+--  that Mdoc_Inputs.Place_Pads writes. 2,839 elements.
 --
---  Refusals, as statuses: an attribute of the request that the document
---  does not hold (upstream's AttributeNotFound), an item that does not
---  pad into two blocks (above Max_Item_Bytes: upstream refuses 256 and
---  above with AttributeTooLong and stops on 120 to 255), a signature
---  value s at or above the group order (upstream stops; the ECDSA
---  witness requires it below); and, at version 6 only, an item whose
---  elementValue entry does not follow its elementIdentifier entry
---  (Item_Order_Unsupported, #150): the version 6 circuit shifts the
---  item by the identifier's offset and compares one span, the
---  identifier's text, the key elementValue and the value, with the
---  request (upstream's lib/circuits/mdoc/mdoc_hash.h before 0d92f80,
+--  Seven refusals, as statuses, the seven of Mdoc_Status from the
+--  document (chapter 9 Section 3.7); Sig_Witness makes the last, and
+--  Hash_Witness the six others. An attribute of the request that the
+--  document does not hold (Attribute_Not_Found, upstream's
+--  AttributeNotFound); an item that does not pad into two blocks
+--  (Attribute_Too_Long, above Max_Item_Bytes: upstream refuses 256 and
+--  above with AttributeTooLong and stops on 120 to 255); at version 6
+--  only, an item whose elementValue entry does not follow its
+--  elementIdentifier entry (Item_Order_Unsupported): the version 6
+--  circuit shifts the item by the identifier's offset and compares one
+--  span, the identifier's text, the key elementValue and the value,
+--  with the request (upstream's lib/circuits/mdoc/mdoc_hash.h before 0d92f80,
 --  assert_attribute over the shifted bytes; mdoc_witness.h,
 --  fill_attribute), so that any other order fails in the circuit after
 --  the commitment; the version 7 circuit reads the order of the four
 --  entries from the witness. Upstream's builder has no such status (a
 --  deliberate divergence, noted on ADR 0086); and, at both versions, a
 --  validFrom or validUntil that is not tag 0 over the 20 bytes
---  YYYY-MM-DDThh:mm:ssZ (Validity_Form_Unsupported, #165): both circuits
+--  YYYY-MM-DDThh:mm:ssZ (Validity_Form_Unsupported): both circuits
 --  compare the dates with the verifier's time byte for byte, so a
 --  lower-case t or z, fractional seconds or an offset would make the
 --  comparison wrong (a lower-case t admits a time up to one day after
@@ -64,15 +65,20 @@
 --  and, at both versions, a deviceKeyInfo that is not a map of one
 --  entry, deviceKey, a COSE_Key of exactly four entries in the order
 --  kty 2, crv 1, x and y as byte strings of 32 bytes
---  (Device_Key_Form_Unsupported, #165), the one form both circuits
+--  (Device_Key_Form_Unsupported), the one form both circuits
 --  compare byte for byte (mdoc_hash.h at 0d92f80c, 218 to 227): a kid,
 --  an alg or another order would fail in the circuit after the
 --  commitment; and, at both versions, a requested item whose random is
---  not a byte string of at least 16 bytes (Random_Form_Unsupported,
---  #165; ISO/IEC 18013-5, 9.1.2.5): the circuits do not check the type
---  of random, so a text string of the same length would pass them.
---  On a refusal the witness array is zero (postcondition): nothing of
---  the credential stays in it.
+--  not a byte string of at least 16 bytes (Random_Form_Unsupported;
+--  ISO/IEC 18013-5, 9.1.2.5): the circuits do not check the type
+--  of random, so a text string of the same length would pass them;
+--  and a signature value s, of either signature, at or above the group
+--  order n (Signature_Not_Canonical; upstream stops; the ECDSA witness
+--  requires it below). On a refusal the witness array is zero
+--  (postcondition): nothing of the credential stays in it. Nothing
+--  else of the signed values is refused here: an issuer's digest of n
+--  or above, or an x(R) of n or above, is refused only by the circuits
+--  (chapter 9 Section 6, "Conditions for certifying the circuit").
 --
 --  Documentation: docs/guide/09-mdoc.md, Section 3.7.
 --
@@ -91,8 +97,12 @@
 --              pieces and the elements are upstream's is tested: the
 --              byte identity with the four witness files of the two
 --              archives (mdoc_witness_kat) and the digests of both
---              witnesses of the 38 test documents against an
---              independent Python transcription.
+--              witnesses of the test documents against an
+--              independent Python transcription (mdoc_witness.txt).
+--              The ECDSA part rests on Ecdsa_Witness (register rows
+--              R11 and V7), the values read from the document on the
+--              parse (R12). Trusted: the layout of the hash witness
+--              as upstream's code specifies it (register row R14).
 --    Messages, Reduce : Silver.
 --
 --  Constant time: the encodings are fixed loops over fixed widths, and
@@ -100,11 +110,23 @@
 --  (the bit as a limb, the chunk through Inject, the pair through the
 --  field's arithmetic); the compression of every block of the capacity
 --  is constant time; the arithmetic is the fields' and the curve's (ADR
---  0051, ADR 0086). What branches on the document is its structure,
---  which ADR 0086 declares: the length of an item against the bound,
---  the lookup of the requested attribute (identifiers of public
---  length), and the padding of the message and of the item, declared
---  outside the perimeter with the parse.
+--  0051, ADR 0086). The decisions whether to make a proof from the
+--  credential branch on values derived from it, and are declared by
+--  their statuses (register row S4; notes of 15 and 16 November 2026
+--  on the Status line of ADR 0086; chapter 9 Section 3.7): the seven
+--  refusals, Attribute_Not_Found, Attribute_Too_Long,
+--  Validity_Form_Unsupported, Device_Key_Form_Unsupported,
+--  Random_Form_Unsupported, Item_Order_Unsupported and
+--  Signature_Not_Canonical. The time of each reveals that the
+--  credential is refused, and by which check, which the status returned
+--  to the holder's own program says anyway. The dates, the device key
+--  and the signatures decide on a mask gathered over the bytes, so that
+--  the work does not say which byte or which signature failed; the
+--  others branch directly on a byte, a length or the first date's
+--  result. What else branches on the document is its structure, which
+--  ADR 0086 declares: the offsets and lengths of the parse, the
+--  position and the order of the requested item, and the padding of
+--  the message and of the item, outside the perimeter with the parse.
 
 pragma SPARK_Mode (On);
 

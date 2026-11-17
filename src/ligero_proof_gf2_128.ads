@@ -1,3 +1,7 @@
+--  Ligero_Proof over GF(2^128) (ADR 0035): a library-level instance,
+--  proved by GNATprove with make prove (partition ligero). What is
+--  proved, tested and trusted is stated in the header of Ligero_Proof.
+
 pragma SPARK_Mode (On);
 
 with Ligero_Proof;

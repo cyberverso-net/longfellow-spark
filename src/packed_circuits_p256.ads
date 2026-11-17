@@ -1,4 +1,7 @@
---  Packed_Circuits over the P-256 base field.
+--  Packed_Circuits over the P-256 base field (ADR 0080): a
+--  library-level instance, proved by GNATprove with make prove
+--  (partition circuits). What is proved, tested and trusted is stated
+--  in the header of Packed_Circuits.
 
 pragma SPARK_Mode (On);
 

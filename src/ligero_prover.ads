@@ -1,11 +1,12 @@
---  Ligero_Prover: the commitment of draft Section 4.3 (Phase C, ADR
---  0049, 0050, 0051, 0052), layout_tableau and commit of the reference
+--  Ligero_Prover: the commitment of draft Section 4.3 (ADR 0049, 0050,
+--  0051, 0052), layout_tableau and commit of the reference
 --  (docs/specs/rust/src/ligero/prover.rs at d5e6be7), the Reed-Solomon
 --  encoder of ligero/reed_solomon.rs on all NCOL columns and
 --  commit_merkle_heap of merkle.rs. Generic over the Ligero verifier of
 --  a field, which carries the transcript glue, the proof layout, the
---  Lagrange tables and the geometry, and over the sampling instance of
---  that field, which carries the randomness source.
+--  Lagrange tables and the geometry, over the sampling instance of
+--  that field, which carries the randomness source, and over the
+--  encoder of the rows (ADR 0057).
 --
 --  The tableau has NROW rows of NCOL elements. Before encoding, row 0
 --  is BLOCK random elements, row 1 DBLOCK random elements with the sum
@@ -14,16 +15,19 @@
 --  NREQ random elements (in the subfield when the row lies wholly below
 --  the subfield boundary) followed by the witnesses i WR .. i WR + WR
 --  - 1 (zero beyond NW), and the quadratic rows x, y, z the same prefix
---  followed by the triples' values; every row is encoded with the
---  Lagrange table of its length (the systematic part is the row
---  itself). Randomness is consumed in that order, the three rows x, y,
---  z of one quadratic row interleaved as the reference samples them,
---  then one 32-byte nonce per committed column (NCOL - DBLOCK of
---  them), all before any leaf is hashed. A leaf is SHA-256 of the nonce
---  and the column's elements, row by row, as To_Bytes writes them; the
---  tree is Merkle.Build, the root its node 1.
+--  followed by the triples' values. Every row is encoded on all NCOL
+--  columns, the systematic part being the row itself: by the FFT of
+--  chapter 8 in both production instances (Additive_Fft, Rfft_P256),
+--  or by the Lagrange table of its length, the reference encoder.
+--  Randomness is consumed in that order, the three rows x, y, z of one
+--  quadratic row interleaved as the reference samples them, then one
+--  32-byte nonce per committed column (NCOL - DBLOCK of them), all
+--  before any leaf is hashed. A leaf is SHA-256 of the nonce and the
+--  column's elements, row by row, as To_Bytes writes them; the tree is
+--  Merkle.Build, the root its node 1.
 --
---  Documentation: docs/guide/07-prover.md.
+--  Documentation: docs/guide/07-prover.md, Sections 1.4, 1.5, 2.4,
+--  2.5 and 3.4; docs/guide/08-additive-fft.md, Section 3.3.
 --
 --  Proof status (per instance). Silver with the ownership checks on
 --  the heap commitment. Gold, structural (ADR 0052), on the row
@@ -31,29 +35,38 @@
 --  the row (Encode_Row); the parity part is Lagrange.Evaluate when the
 --  instance encodes with Lagrange, and with the FFT, as both production
 --  instances do, the FFT's parity equal to Lagrange is tested with
---  vectors (register row V2), not proved; row R
---  of the tableau receives the encoding and the other rows are
---  untouched (Commit_Row); the witness slots of a row before encoding
---  hold the witnesses i WR .. i WR + WR - 1 and zero beyond NW, or the
---  triples' values and zero beyond NQ, or zero (Fill_Witness_Slots,
+--  vectors (register row V2), not proved; row R of the tableau
+--  receives the encoding and the other rows are untouched
+--  (Commit_Row); the witness slots of a row before encoding hold the
+--  witnesses i WR .. i WR + WR - 1 and zero beyond NW, or the triples'
+--  values and zero beyond NQ, or zero (Fill_Witness_Slots,
 --  Fill_Quad_Slots, Zero_Slots); the witness slots of row 2 of the
---  tableau are zero (Fixed_Rows). The composition over the NROW rows
---  (the shapes of the whole tableau) is not a postcondition of Commit:
---  its proof needed frame bookkeeping over the whole tableau that the
---  provers did not complete within the budget, and it is tested slot
---  by slot by prover_kat against the reference. Commit's postcondition
---  is the shape of the commitment and Root = Heap (1) (Merkle.Build's
+--  tableau are zero (Fixed_Rows). The postcondition of Encode_Row and
+--  others of the body are at the level Proof_Only (register row T8),
+--  and are stated with Same (row T6). Commit's postcondition is the
+--  shape of the commitment and Root = Heap (1) (Merkle.Build's
 --  postcondition gives the tree). What the random slots hold is not
---  stated (it is the randomness). Prove (block 5) is Silver: its
---  polynomials are the reference's sums over the tableau, tested by
---  the byte identity with the upstream proofs and by the verifier's
---  acceptance (ADR 0053); its opening is Merkle.Open (Gold there).
+--  stated (it is the randomness). Prove is Silver; its opening is
+--  Merkle.Open (Gold there).
+--
+--  Tested, not proved (register row V13): the composition over the
+--  NROW rows (the shapes of the whole tableau) is not a postcondition
+--  of Commit, since its frame reasoning over the whole tableau does
+--  not close within the step budget (ADR 0052), and it is tested slot
+--  by slot by prover_kat against the reference; the polynomials of
+--  Prove are the reference's sums over the tableau, tested by the byte
+--  identity with the upstream proofs and by the verifier's acceptance
+--  (ADR 0053).
+--
+--  Declared possibly non-terminating (register row V4): Commit on
+--  P-256, through the sampler, and Prove on both fields, through the
+--  choice of the columns.
 --
 --  Constant-time discipline (ADR 0051): constant time by construction.
 --  The row layout branches on positions and the geometry (public) and
 --  on the subfield boundary (public); the witnesses are copied by fixed
---  loops and multiplied by public Lagrange coefficients; the hashes run
---  over fixed-length data. The guarantee is scoped to builds with
+--  loops and multiplied by public coefficients; the hashes run over
+--  fixed-length data. The guarantee is scoped to builds with
 --  assertions disabled (ADR 0006).
 
 pragma SPARK_Mode (On);
@@ -156,7 +169,7 @@ package Ligero_Prover is
    subtype Leaf_Index is Natural range 0 .. Merkle.Max_Leaves - 1;
 
    --  What the prover keeps after commit for the proof (Section 4.4,
-   --  block 5): the tableau, the nonces, the Merkle heap (root at node
+   --  the tableau, the nonces, the Merkle heap (root at node
    --  1), the two Lagrange tables over the parity columns (one element
    --  each, unused, with the FFT).
    type Commitment

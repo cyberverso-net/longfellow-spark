@@ -1,7 +1,8 @@
 --  Circuit_Reader over GF(2^128) (ADR 0046): FieldID 4 of
 --  lib/proto/circuit_io.h, a binary field. A library-level generic
 --  instantiation: GNATprove analyses this instance and make prove
---  counts its checks.
+--  counts its checks (partition circuits). What is proved, tested and
+--  trusted is stated in the header of Circuit_Reader.
 
 pragma SPARK_Mode (On);
 

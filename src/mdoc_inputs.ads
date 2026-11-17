@@ -3,7 +3,7 @@
 --  circuit versions 5 to 7 (longfellow-zk/longfellow-zk d5e6be7,
 --  rust/applications/mdoc_zk/runtime/src/concrete/legacy/public.rs,
 --  push_legacy_input_hash and push_legacy_input_sig, and private.rs,
---  push_witness_hash; Phase D, block 5, ADR 0058).
+--  push_witness_hash; ADR 0058).
 --
 --  A circuit takes its inputs as field elements, one per wire. The
 --  builders of upstream push one element per bit for everything that
@@ -40,8 +40,9 @@
 --  compares with the circuit's (AttributeNumberMismatch), and so does
 --  this layer (Mdoc_Status.Input_Count).
 --
---  The witness of the hash circuit (block 6 builds it; this block reads
---  it from upstream's files) begins with the three values the tags
+--  The witness of the hash circuit (Mdoc_Witness builds it from the
+--  credential; the reference path reads it from upstream's witness
+--  files) begins with the three values the tags
 --  bind, as 32 little-endian bytes each, as bits (768 elements), and
 --  ends with mac_ap, the six pads as elements: Witness_Parts reads both
 --  ends. The witness of the signature circuit ends with, for each of
@@ -61,12 +62,15 @@
 --  Proof status. Gold on the counts: Hash_Count is the closed formula
 --  above, Hash_Inputs fills exactly that many elements and puts the
 --  constant one first and the tags and av last at the stated positions;
---  Sig_Inputs the same for its first four elements; Place_Pads leaves
---  the pads where Witness_Parts and Sig_Pads_Match read them. Silver on
---  everything. That the bits are upstream's is tested: the harness
---  mdoc_kat compares the arrays with the Python transcription
---  (tests/vectors/mdoc_layer.txt) and with the public parts of
---  upstream's witness files.
+--  Sig_Inputs the same for its first four elements; Witness_Parts,
+--  when it accepts, returns the last six elements as the pads, and
+--  Place_Pads leaves the pads where Witness_Parts and Sig_Pads_Match
+--  read them. Silver on everything. That the bits are upstream's is
+--  tested: the harness mdoc_kat compares the arrays with the Python
+--  transcription (tests/vectors/mdoc_layer.txt) and with the public
+--  parts of upstream's witness files. Trusted: the layouts of the
+--  public inputs as upstream's code specifies them, since no document
+--  of the pinned draft covers them (register row R8).
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE to the public
 --  inputs, which are public. Witness_Parts, Sig_Pads_Match and

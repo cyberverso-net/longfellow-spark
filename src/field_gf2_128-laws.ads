@@ -1,6 +1,10 @@
 --  Field_GF2_128.Laws: the predefined equality of two elements gives Same
 --  (ADR 0066). In a unit of its own: in the body of Field_GF2_128, which
 --  implements Same, the provers do not establish it.
+--
+--  Documentation: docs/guide/03-sumcheck.md, Section 3.1. Proof status:
+--  the lemma is proved, at the level Proof_Only (register row T8); it
+--  rests on Same being the equality of the element type (row T6).
 
 pragma SPARK_Mode (On);
 

@@ -1,6 +1,6 @@
 --  Ecdsa_Witness: the private inputs of one ECDSA verification in
 --  upstream's signature circuit, in the legacy form of versions 5 to 7
---  (chapter 9, block 6; ADR 0086). From a public key (x, y), a digest
+--  (chapter 9 Section 3.5; ADR 0086). From a public key (x, y), a digest
 --  e and a signature (r, s), the 1,034 elements that
 --  push_legacy_verify_witness_3 of runtime/src/concrete/legacy/
 --  private.rs pushes at d5e6be7, computed as circuits/ecdsa2/src/
@@ -28,7 +28,8 @@
 --  must be below q: upstream's builder converts it with
 --  words64_to_element and stops on a value at or above q, where e and
 --  r are reduced; the precondition of Push_Legacy states it, and the
---  caller refuses such a signature with a status (block 6c).
+--  caller refuses such a signature with a status
+--  (Mdoc_Witness.Sig_Witness, Signature_Not_Canonical).
 --
 --  Proof status: Silver, with one Gold fact, the frame: Push_Legacy
 --  changes nothing outside W (First .. First + Count - 1). That it
@@ -36,7 +37,9 @@
 --  P256_Field (Gold), Q256_Field (Gold but Inv) and P256_Curve (Silver)
 --  and is tested: the vectors of tests/vectors/ecdsa_witness.txt and
 --  the byte identity with the signature witness files of upstream's
---  two archives (ecdsa_kat).
+--  two archives (ecdsa_kat). Trusted: the layout of the 1,034
+--  elements as upstream's code specifies it (register row R11); the
+--  curve arithmetic and Q256_Field.Inv are tested, not proved (V7).
 --
 --  Constant time (ADR 0086): the key, the digest and the signature
 --  are secrets of the credential. Every step is a fixed sequence of

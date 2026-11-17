@@ -133,6 +133,8 @@ The verifier computes the bound quad of each layer as upstream's `bind_quad` doe
 
 Inside the generic the operations are reached through wrappers `"+"`, `"-"`, `"*"`, `Neg` with `Global => null` and no postcondition. This is deliberate: the contracts of the concrete field never enter a protocol proof, and the verification conditions are the same for both instances. A protocol proof that needs a law of the field calls the lemma of the signature.
 
+The two instances are Silver, with no functional contract of their own: the ten ring laws of the signature are proved for each field's operations (ghost lemmas at the level `Proof_Only`, register row T8), `Checked_Inv` returns `Ok` only when R * D = One, checked at run time ([ADR 0037](../adr/0037-checked-inv-and-public-data-scope.md)), and `Same` is taken as given (register row T6).
+
 ### 3.2 Circuits as data: Term, Layer, Circuit and their predicates
 
 A `Term` is (K, G, H0, H1) with the wire indices bounded by `Max_Wires`. A `Raw_Circuit (Last_Layer, NT)` is a *discriminated record*: its discriminants size the arrays inside it (`Layers (0 .. Last_Layer)`, `Terms (1 .. NT)`), so a circuit of any size is one object with no pointers. Each `Layer` owns a contiguous range of the flat term list. `Circuit` is a subtype of `Raw_Circuit` with the *type predicate* `Well_Formed`: the layers partition the term list, every term names wires in range (g < nw_out, h < nw_in), nw_in fits in logw bits and the last layer reads exactly the inputs. The predicate lives on a subtype rather than on the record itself because its function takes the record as argument; every subprogram taking a `Circuit` may assume it, and the harness checks it when it builds a circuit from a vector file.

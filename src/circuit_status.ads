@@ -1,6 +1,6 @@
---  Circuit_Status: the outcome of loading a circuit file (Phase B, ADR
---  0046). One value per cause the loader can produce, no exceptions,
---  as Verifier_Status does for the verifier (ADR 0039).
+--  Circuit_Status: the outcome of loading a circuit file (ADR 0046).
+--  One value per cause the loader can produce, no exceptions, as
+--  Verifier_Status does for the verifier (ADR 0039).
 --
 --    Ok                 the circuit is loaded, well formed, its
 --                       identifier matches
@@ -9,17 +9,21 @@
 --    Unsupported_Copies ncopies is not 1
 --    Bad_Integer        a ULEB128 integer of more than four bytes
 --    Bound_Exceeded     a count outside this project's bounds (wires,
---                       layers, logw, terms) or no layer at all
+--                       layers, logw, terms; for Read_Packed also the
+--                       deltas, segments, segment entries and kept
+--                       tokens over the whole circuit) or no layer at
+--                       all
 --    Bad_Element        a constant that is not a canonical element
 --    Bad_Index          a constant, delta or segment index out of range,
 --                       or a wire index outside 0 .. Max_Wires - 1
 --    Truncated          bytes missing
 --    Trailing_Bytes     bytes after the identifier
---    Id_Mismatch        the stored identifier is not the circuit's
---    Not_Well_Formed    the loaded circuit violates Well_Formed of the
---                       core (a wire outside its layer's width, a width
---                       above 2^logw, a last layer not reading ninput
---                       wires, npublic above ninput)
+--    Id_Mismatch        the stored identifier is not the circuit's,
+--                       or, on a pinned load, not the caller's
+--    Not_Well_Formed    the loaded circuit violates Well_Formed of
+--                       Sumcheck_Algebra (a wire outside its layer's
+--                       width, a width above 2^logw, a last layer not
+--                       reading ninput wires, npublic above ninput)
 --    Not_Isolated       an assertion (a term of constant zero) shares
 --                       its wire with another term (Isolated of
 --                       upstream's Lean proofs, ADR 0064; stricter than
@@ -27,8 +31,12 @@
 --    Not_Dead_End       a term reads an assertion of the layer below
 --                       (DeadEnd, ADR 0064; stricter than upstream)
 --
---  Documentation: docs/guide/06-circuits.md. Proof status: an
---  enumeration, nothing to prove.
+--  Documentation: docs/guide/06-circuits.md. Decisions: ADR 0046 (the
+--  status), 0064 (the two premises), 0080 (the bounds of Read_Packed).
+--  Index: docs/adr/README.md.
+--
+--  Proof status: an enumeration, nothing to prove. The postconditions
+--  of Circuit_Reader state what Ok implies.
 
 pragma SPARK_Mode (On);
 

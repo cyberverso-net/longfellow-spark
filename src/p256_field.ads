@@ -8,16 +8,18 @@
 --  direct representation and the Solinas reduction of ADR 0013), 0014
 --  (ghost big-integer model, lemma policy), 0015 (canonical form
 --  predicate, constant-time conditional subtraction), 0016 (Inv), 0017
---  (test anchors); frame: ADR 0002, 0003, 0006, 0020. Index:
+--  (test anchors), 0044 (contracts at Proof_Only), 0070 (scalar limbs
+--  and the ring laws), 0076 (bodies without Big_Integer terms), 0077
+--  (the CIOS round); frame: ADR 0002, 0003, 0006, 0020, 0079. Index:
 --  docs/adr/README.md.
 --
 --  Proof status (Silver = absence of run-time errors, Gold = proved
 --  functional contracts against the ghost model To_Int). All the
 --  verification conditions of this package are discharged by GNATprove
 --  with the project's proof switches (package Prove in
---  longfellow_spark.gpr, ADR 0020: the level 2 provers with a step
+--  longfellow_spark.gpr, ADR 0020: CVC5, Z3 and Alt-Ergo with a step
 --  budget), with no justification and no pragma Assume; see
---  docs/guide/02-p256-field.md for the table.
+--  docs/guide/02-p256-field.md, Section 4, for the table.
 --
 --    Is_Canonical : Gold, equals To_Int (L) < P.
 --    Add, Sub     : Gold, the stored integer is the sum or difference
@@ -27,17 +29,33 @@
 --                   Montgomery product of upstream (ADR 0069), hence
 --                   the element is the product.
 --    Square       : Gold by composition over Mul.
+--    Lemma_Mul_*, Lemma_Add_*, Lemma_Sub_Def : proved ghost lemmas,
+--                   the laws of the field that the protocol code uses
+--                   (ADR 0070): the product associative and commutative
+--                   with One as unit and distributive over Add and Sub;
+--                   the sum associative and commutative with Zero as
+--                   unit; Neg the opposite; Sub (A, B) = Add (A, Neg B).
 --    From_Bytes   : Gold, accepts exactly the canonical encodings and
---                   stores their value times 2^256 mod P; To_Bytes
---                   gives the value back (To_Canonical).
+--                   stores their value times 2^256 mod P, a refused
+--                   encoding gives Zero; To_Bytes gives the value back
+--                   (To_Canonical).
 --    From_Canonical, To_Canonical, Of_Natural : Gold, the conversions
 --                   into and out of the Montgomery form.
 --    Inv          : Silver only (AoRTE), plus known-answer tests
 --                   (tests/vectors/p256_inv.txt). Fermat correctness
---                   is out of SMT reach by design decision (ADR 0016).
+--                   is out of SMT reach by design decision (ADR 0016):
+--                   tested, not proved (register row V3).
 --                   Inv is total: Inv (Zero) = Zero, consistent with
 --                   GF2_128 (ADR 0008); the upstream Rust reference
 --                   asserts on zero and the upstream C++ returns zero.
+--
+--  Tested, not proved: that P_Limbs is the prime of Table 1 and that
+--  the byte order is that of Section 7.2.1 (tests/vectors/p256_*.txt,
+--  anchored on b, Gx and Gy of RFC 5903 through the curve equation).
+--  Trusted (docs/guide/trusted-base.md): the pinned spec (R1),
+--  GNATprove's model of Big_Integers as the integers (T4), the
+--  agreement of the compiled code with the source proved for the
+--  contracts at Proof_Only (T8), a 64-bit target for Unsigned_128 (P3).
 --
 --  Pinned spec: IETF draft-irtf-cfrg-longfellow-00 (22 October 2026),
 --  Table 1 (p256, FieldID 0x01, the base field of NIST P-256), Section
@@ -61,16 +79,22 @@
 --  mentions the model are at the level Proof_Only (Proof_Levels):
 --  proved for all inputs by GNATprove, never compiled in any build.
 --  The type predicate (Is_Canonical, a four-limb subtraction) and the
---  contracts that do not mention the model stay executable. What the
+--  contracts that do not mention the model stay executable. The part
+--  of the postcondition of From_Bytes at the level Runtime (Ok is the
+--  canonical test, Zero on refusal) runs in every build. What the
 --  test build checks of the arithmetic is its result against the
 --  vectors (tests/vectors/p256_*.txt).
 --
---  Constant-time discipline (ADR 0006): no secret-dependent branching
---  or indexing in executable code; selections use arithmetic masks;
---  if-expressions appear only in contracts and ghost code; loop bounds
---  and table indices are compile-time constants. The guarantee is
---  scoped to builds with assertions disabled, where the remaining
---  executable contracts and the type predicate do not run.
+--  Constant-time discipline (ADR 0006, register row S4): no
+--  secret-dependent branching or indexing in executable code;
+--  selections use arithmetic masks; if-expressions appear only in
+--  contracts and ghost code; loop bounds and table indices are
+--  compile-time constants. The guarantee is scoped to builds with
+--  assertions disabled, where the remaining executable contracts and
+--  the type predicate do not run. The Runtime part of From_Bytes runs
+--  there too: by its time it can reveal at most whether the value
+--  decoded is canonical (chapter 4 Section 3.2, "Assertion levels",
+--  lists every call).
 
 pragma SPARK_Mode (On);
 
@@ -90,7 +114,7 @@ package P256_Field is
    subtype Limb_Array is Word_Array (Limb_Index);     --  256 bits
    subtype Five_Array is Word_Array (0 .. 4);         --  320 bits
 
-   --  p = 2^256 - 2^224 + 2^192 + 2^96 - 1 as limbs (draft-03 Table 1;
+   --  p = 2^256 - 2^224 + 2^192 + 2^96 - 1 as limbs (Table 1 of the draft;
    --  RFC 5903 Section 3.1).
    P_Limbs : constant Limb_Array :=
      [0 => 16#FFFF_FFFF_FFFF_FFFF#,
@@ -380,12 +404,12 @@ package P256_Field is
      Global => null;
 
    -------------------------------------------------------------------
-   --  Encoding (draft-03 Section 7.2.1): 32 bytes, least significant
+   --  Encoding (Section 7.2.1): 32 bytes, least significant
    --  byte first; limb I occupies bytes 8 I .. 8 I + 7.
    -------------------------------------------------------------------
 
    --  The byte type is the shared one of package Bytes (ADR 0028);
-   --  these subtypes keep the stage 2 contracts unchanged.
+   --  these subtypes keep the field's contracts as they are.
    subtype Byte_Array is Bytes.Byte_Array;
    subtype Bytes_32 is Bytes.Bytes_32;
    subtype Bytes_8  is Bytes.Bytes_8;
@@ -431,7 +455,7 @@ package P256_Field is
    with Global => null,
         Post   => Limbs_Of_Bytes (To_Bytes'Result) = To_Canonical (E);
 
-   --  The element X for a natural X (stage 5: the Reed-Solomon
+   --  The element X for a natural X (the Reed-Solomon
    --  evaluation point x of the Ligero code, reed_solomon_eval_point).
    function Of_Natural (X : Natural) return Element with
      Global => null,

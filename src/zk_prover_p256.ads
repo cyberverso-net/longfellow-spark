@@ -1,8 +1,9 @@
---  Zk_Prover over P-256 with the test source Simple_Rng (ADR 0049,
---  ADR 0050). A library-level generic instantiation: GNATprove analyses
---  this instance and make prove counts its checks; the command-line
---  prover instantiates the generic again with the operating system's
---  source.
+--  Zk_Prover over P-256 with the test source Simple_Rng (ADR 0049, ADR
+--  0050): a library-level instance, proved by GNATprove with make prove
+--  (partition ligero-prover). The command-line provers instantiate the
+--  generic again, as Zk_Prover_Cli_P256, over their own source
+--  Cli_Random (outside SPARK, register row C2). What is proved, tested
+--  and trusted is stated in the header of Zk_Prover.
 
 pragma SPARK_Mode (On);
 

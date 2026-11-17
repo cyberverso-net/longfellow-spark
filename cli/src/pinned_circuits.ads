@@ -6,12 +6,17 @@
 --  the identifier that a full Read of that file recomputed. A file in
 --  the list is loaded with the identifier pinned (Read_Pinned, or
 --  Read_Packed with Pinned True), any other with the identifier
---  recomputed. The two command-line programs load the packed form
---  (Read_Packed below, the memory milestone, ADR 0080); Read, the
---  expanded one, serves the tests. interop_kat checks every entry
---  against a full load of its file in tests/vectors, in both forms.
---  Outside the proof perimeter (SPARK_Mode Off); the trust model lists
---  the table as trusted.
+--  recomputed. The command-line programs load the packed form
+--  (Read_Packed below, ADR 0080); Read, the expanded one, serves the
+--  tests.
+--
+--  Documentation: docs/guide/06-circuits.md, Section 3.6.
+--
+--  Proof status: outside SPARK (SPARK_Mode Off), compiled with the
+--  run-time checks on (register rows C2 and T7). Trusted: the table,
+--  the digest of each file and its identifier (register row R3).
+--  Tested: interop_kat checks every entry against a full load of its
+--  file in tests/vectors, in both forms, at every make check.
 
 pragma SPARK_Mode (Off);
 

@@ -1,7 +1,7 @@
 --  Device_Auth: the digest the device signed, e2, from the session
 --  transcript and the document type (longfellow-zk/longfellow-zk
 --  d5e6be7, rust/applications/mdoc_zk/circuits/src/cbor/mdoc.rs,
---  compute_transcript_hash; Phase D, block 5, ADR 0058).
+--  compute_transcript_hash; ADR 0058).
 --
 --  In ISO 18013-5 the holder's device signs, with the key the
 --  credential carries, the structure
@@ -19,9 +19,10 @@
 --  The signature circuit verifies the device's ECDSA signature on e2,
 --  so e2 is a public input of that circuit (Mdoc_Inputs.Sig_Inputs):
 --  the verifier computes it from the session transcript and the
---  document type it knows, and so does the prover of this block, since
---  the witness files carry no digest; the prover of block 6 takes it
---  from the parsed credential, which is the same value by construction.
+--  document type it knows, and so does the prover (Mdoc_Prover.Prove),
+--  on both paths: the witness files carry no digest, and the parse of
+--  the credential (Mdoc_Parse) computes the digest of the device's
+--  signature with this same function, so the two are one value.
 --
 --  The bytes, in the order they reach SHA-256:
 --
@@ -41,7 +42,8 @@
 --
 --  The session transcript is bounded at Max_Session_Transcript bytes,
 --  65,000, which upstream's pull request 223 proposes for its C++
---  entry point (not merged at d5e6be7; to be re-read with issue #122).
+--  entry point (not merged at d5e6be7; register row R13, which issue
+--  #122 re-reads against upstream).
 --  The bound is a precondition here and a status of the layer
 --  (Mdoc_Status.Transcript_Too_Long); the command-line tools check it
 --  before calling. The document type is bounded at Max_Doc_Type bytes,
@@ -56,7 +58,10 @@
 --  is tested against the Python transcription of the layout
 --  (tests/vectors/mdoc_layer.txt, gen_mdoc_layer_vectors.py) and
 --  against the signature circuit's public inputs in upstream's witness
---  files, which hold e2 as the fourth element.
+--  files, which hold e2 as the fourth element. Trusted: the fixed
+--  headers above, as upstream's compute_transcript_hash writes them
+--  from ISO 18013-5 (register row R9), and the bound on the session
+--  transcript (R13).
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE. The session
 --  transcript and the document type are the relying party's public

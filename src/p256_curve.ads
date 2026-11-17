@@ -1,6 +1,6 @@
 --  P256_Curve: the group of NIST P-256 in projective coordinates, for
---  the ECDSA witness of upstream's signature circuit (chapter 9, block
---  6; ADR 0086). The witness holds the projective points of every
+--  the ECDSA witness of upstream's signature circuit (chapter 9
+--  Section 3.5; ADR 0086). The witness holds the projective points of every
 --  round of the circuit's scalar multiplication, so the formulas and
 --  the representation are upstream's, not merely the group law:
 --  core/algebra/src/ec.rs at d5e6be7, the complete addition and
@@ -26,10 +26,13 @@
 --  arithmetic; Gold on the selections (Select_Point and Select_8
 --  return the point the mask or the index names). Nothing here is
 --  proved against the group law: that the formulas compute the sum of
---  the points is an algebraic fact out of SMT reach, anchored by the
---  vectors of tests/vectors/p256_curve.txt (RFC 5903 key pairs for
---  Scalar_Mul, random points against the Python transcription) and by
---  the byte identity of the ECDSA witness with upstream's files.
+--  the points is an algebraic fact out of SMT reach, tested (register
+--  row V7) by the vectors of tests/vectors/ecdsa_witness.txt (RFC 5903
+--  key pairs for Scalar_Mul, random points against the Python
+--  transcription; ecdsa_kat) and by the byte identity of the ECDSA
+--  witness with upstream's files. Trusted: the formulas and the
+--  representation as upstream's code specifies them (register row
+--  R11).
 
 pragma SPARK_Mode (On);
 

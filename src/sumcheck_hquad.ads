@@ -5,17 +5,28 @@
 --  one hand at a time; the coefficient left at hands (0, 0) after the
 --  last round is the bound quad.
 --
+--  Documentation: docs/guide/03-sumcheck.md, Section 3.6. Decisions:
+--  ADR 0070, 0071, 0073, 0080.
+--
 --  The ghost package BQ holds the invariant of the rounds of ADR 0071:
 --  for every pair of hands, the sum of the coefficients of the merged
 --  terms equals the sum over the terms of the layer of Bound_KT times
 --  the factors of the challenges drawn so far. Merge_Terms gives it at
 --  round 0, each Bind_H carries it to the next hand, and at the end it
---  gives EBQT_Ref. Since the memory milestone (ADR 0080, block 3) the
---  programs reach the first step of a layer through Packed_HQuad, from
---  the packed circuit: Bind_Merge gives the invariant at round 0 and
+--  gives EBQT_Ref. The programs reach the first step of a layer
+--  through Packed_HQuad, from the packed circuit (ADR 0080):
+--  Bind_Merge gives the invariant at round 0 and
 --  Bind_H, here, runs the rounds. Bind_G_T, Merge_Runs and Merge_Terms,
 --  the first step on an expanded layer, stay proved as the oracle the
 --  harnesses compare Bind_Merge with; they are not on the program path.
+--
+--  Proof status: Gold, structural (ADR 0023): each kernel is proved
+--  against the references above, with BQ and the costly references at
+--  the level Proof_Only (register row T8). Proved inside the instances
+--  of Sumcheck_Verifier, as HQ; the generic has no check of its own.
+--  Without the tables (Tab False), Merge_Terms states the run count
+--  only, not the merged coefficients.
+--  Trusted: Same (T6).
 --
 --  Generic over Sumcheck_Algebra; the sums of the proof are taken with
 --  its wrappers, so that the contracts of the field stay out of them.
@@ -55,7 +66,7 @@ package Sumcheck_HQuad is
    with Global => null;
 
    -------------------------------------------------------------------
-   --  The merged terms (Phase D, M1; ADR 0063), as the production
+   --  The merged terms (ADR 0063), as the production
    --  prover keeps them (rust/runtime/sumcheck/src/hquad.rs, bind_g and
    --  bind_h): g bound with the eq2 table, the consecutive terms with
    --  the same hands merged into one, then at each round the two

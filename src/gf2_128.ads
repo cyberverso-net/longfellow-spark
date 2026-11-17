@@ -6,66 +6,74 @@
 --  Decisions implemented here: ADR 0004 (element representation),
 --  0005 (Mul_Ref as proof target), 0006 (constant-time scope),
 --  0007 (Square), 0008 (Inv), 0024 (Sub and Neg for the field
---  signature), with 0002 (pinned spec), 0003 (proof policy) and 0020
---  (prover configuration) as the frame; see docs/adr/README.md.
+--  signature), 0028 (the encoding), 0044 (contracts at Proof_Only),
+--  0051 (the subfield projection), 0065 (the carry-less product), with
+--  0002 and 0079 (pinned spec), 0003 (proof policy) and 0020 (prover
+--  configuration) as the frame; see docs/adr/README.md.
 --
 --  Proof status. SPARK assurance levels: Silver = absence of run-time
---  errors, Gold = proved functional contracts. Stage 1 of Phase A is
---  complete: every subprogram below is at least Silver, and the Gold
---  kernels are Add, Xtime, Mul and Square. All verification conditions
---  are discharged by GNATprove with the project's proof switches
---  (package Prove in longfellow_spark.gpr, ADR 0020: the level 2
---  provers with a step budget; 41 checks).
+--  errors, Gold = proved functional contracts. Every subprogram below
+--  is at least Silver, and the Gold kernels are Add, Xtime, Mul and
+--  Square. All verification conditions are discharged by GNATprove
+--  with the project's proof switches (package Prove in
+--  longfellow_spark.gpr, ADR 0020), none justified, no pragma Assume.
 --
 --    Add     : Gold, functional Post proved (addition is limb-wise xor).
 --    Sub, Neg: Gold, Sub = Add and Neg = identity (characteristic 2),
---              stated for the protocol code of stage 3 (ADR 0024).
+--              stated for the protocol code (ADR 0024).
 --    Xtime   : Gold, exact bit-level Post proved (multiplication by x
 --              with reduction).
 --    Mul     : Gold, Post proved against the ghost reference Mul_Ref
---              (MSB-first Horner over the bits of B). Since milestone
---              M2 (ADR 0065) Mul is the carry-less multiplication of
---              upstream's generic.rs: three 64 by 64 products of
---              Clmul64 (Karatsuba) and two folds; the proof goes
---              through the 256-bit product, linear in B and equal to
---              Mul_Ref on each single bit. Mul_Serial is the former
---              bit-by-bit Mul, Gold against Mul_Ref, kept as the
---              reference the harness compares with. NOTE: the proof
---              establishes Mul = Mul_Ref for all inputs; that Mul_Ref
---              itself matches the pinned spec's convention is anchored
---              by known-answer tests (tests/vectors/gf2_128_mul.txt,
---              with anchors from the upstream subfield basis constants),
---              not by proof.
+--              (MSB-first Horner over the bits of B). Mul is the
+--              carry-less multiplication of upstream's generic.rs
+--              (ADR 0065): three 64 by 64 products of Clmul64
+--              (Karatsuba) and two folds; the proof goes through the
+--              256-bit product, linear in B and equal to Mul_Ref on
+--              each single bit. Mul_Serial is the same product bit by
+--              bit, Gold against Mul_Ref, kept as the reference the
+--              harness compares with. NOTE: the proof establishes
+--              Mul = Mul_Ref for all inputs; that Mul_Ref itself
+--              matches the pinned spec's convention is anchored by
+--              known-answer tests (tests/vectors/gf2_128_mul.txt, with
+--              anchors from the upstream subfield basis constants), not
+--              by proof; the spec itself is trusted (register row R1).
 --    Square  : Gold by composition: thin wrapper over Mul, Post proved
---              against Mul_Ref (E, E, 128). The linear (Frobenius)
---              fast path is a later optimisation.
+--              against Mul_Ref (E, E, 128) (ADR 0007).
+--    Lemma_Mul_Assoc, Lemma_Mul_Comm, Lemma_Mul_One, Lemma_Mul_Distrib,
+--    Lemma_Mul_Distrib_Sub : proved ghost lemmas, the laws of the
+--              product that the protocol code uses through the field
+--              signature.
 --    Inv     : Silver only (AoRTE), plus known-answer tests
 --              (tests/vectors/gf2_128_inv.txt). Fermat correctness
---              (E * Inv (E) = 1) is out of SMT reach by design decision.
+--              (E * Inv (E) = 1) is out of SMT reach by design decision:
+--              tested, not proved (register row V3).
 --              Inv is total: Inv (Zero) = Zero, which is what the Fermat
 --              chain yields with no extra branch and matches the
 --              upstream C++ (the upstream Rust reference asserts
 --              instead). Callers that must reject zero do so themselves.
 --    Bit, Mul_Ref, Inject_Ref : Ghost, specification vocabulary only,
 --              at the assertion level Proof_Only (ADR 0044) with the
---              postconditions of Xtime, Mul, Square and Inject and the
---              loop invariants that state them: proved for all inputs,
---              never compiled in any build. What the test build checks
---              of these operations is their result against the vectors.
---    Inject  : Gold (stage 5): Inject (X) = Inject_Ref (X, 16). Branch
---              free since 30 October 2026: the bit of X selects each
---              basis element through a mask, since the prover applies
---              Inject to the coordinates of private inputs (ADR 0051).
---    Subfield_Coords, In_Subfield : Silver (Phase C, ADR 0051): the
---              fixed projection to the subfield coordinates; that it
---              inverts Inject on the subfield is tested on the masks
---              and on coordinates against the generator's independent
---              derivation (gf2_128_bytes.txt), not proved.
---    To_Bytes, From_Bytes : Gold (stage 4, ADR 0028): the 16-byte
---              little-endian encoding of draft Section 7.2.1, every
---              16-byte string accepted (Ok is always True); the value
---              read is Limbs_Of_Bytes (B) and To_Bytes round-trips.
---              The byte order is anchored on the draft by
+--              postconditions of Xtime, Mul, Mul_Serial, Square and
+--              Inject and the loop invariants that state them: proved
+--              for all inputs, never compiled in any build. That the
+--              compiled code agrees with the source proved is trusted
+--              (register row T8); what the test build checks of these
+--              operations is their result against the vectors.
+--    Inject  : Gold: Inject (X) = Inject_Ref (X, 16). Branch free: the
+--              bit of X selects each basis element through a mask,
+--              since the prover applies Inject to the coordinates of
+--              private inputs (ADR 0051).
+--    Subfield_Coords, In_Subfield : Silver (ADR 0051): the fixed
+--              projection to the subfield coordinates; that it inverts
+--              Inject on the subfield is tested on the masks and on
+--              coordinates against the generator's independent
+--              derivation (gf2_128_bytes.txt), not proved (register
+--              row V8).
+--    To_Bytes, From_Bytes : Gold (ADR 0028): the 16-byte little-endian
+--              encoding of Section 7.2.1 of the spec, every 16-byte
+--              string accepted (Ok is always True); the value read is
+--              Limbs_Of_Bytes (B) and To_Bytes round-trips. The byte
+--              order is anchored on the spec by
 --              tests/vectors/gf2_128_bytes.txt.
 --
 --  Pinned spec: IETF draft-irtf-cfrg-longfellow-00 (22 October 2026),
@@ -73,25 +81,27 @@
 --    Q(x) = x^128 + x^7 + x^2 + x + 1
 --  and x is a generator of the multiplicative group. The spec also defines
 --  a subfield GF(2^16) via g = x^((2^128 - 1) / (2^16 - 1)), basis
---  beta_i = g^i: the tower must be modelled explicitly (handoff v3).
+--  beta_i = g^i: the tower must be modelled explicitly.
 --  Q(x) coincides with the GHASH/GCM polynomial, so x^128 reduces to the
 --  low mask 2#1000_0111# (16#87#). CAUTION: GCM known-answer vectors are
 --  reusable ONLY if the element encoding also matches; GCM uses reflected
 --  bit order, the draft uses bit-injection basis coordinates. Verify the
 --  encoding against the spec before importing any GCM vectors.
 --
---  Constant-time discipline: no secret-dependent branching or indexing
---  in any executable statement of this package. Conditional xors are
---  realised with arithmetic masks (0 - bit); if-expressions appear only
---  in contracts and ghost code. SCOPE OF THE GUARANTEE (independent
---  review, P2): the executable contracts are compiled and EXECUTED when
+--  Constant-time discipline (register row S4): no secret-dependent
+--  branching or indexing in any executable statement of this package.
+--  Conditional xors are realised with arithmetic masks (0 - bit);
+--  if-expressions appear only in contracts and ghost code. SCOPE OF THE
+--  GUARANTEE: the executable contracts are compiled and EXECUTED when
 --  assertions are enabled (-gnata / Alire validation profile); Mul_Ref,
---  which branches on the bits of B, is proof-only since ADR 0044 and
---  never compiled, but the limb-wise postconditions still run. The
+--  which branches on the bits of B, is proof-only (ADR 0044) and never
+--  compiled, but the limb-wise postconditions still run. The
 --  constant-time property therefore holds ONLY for builds with
 --  assertions disabled (Assertion_Policy Ignore, e.g. the release
 --  profile). Never benchmark, measure, or deploy this code with
---  assertions enabled.
+--  assertions enabled. The integer multiplications of Clmul64 assume
+--  that the processor's multiplier takes a time independent of its
+--  operands (ADR 0065).
 
 pragma SPARK_Mode (On);
 
@@ -115,7 +125,7 @@ package GF2_128 is
    Zero : constant Element := (Limbs => (others => 0));
    One  : constant Element := (Limbs => (0 => 1, 1 => 0));
 
-   --  x^128 = x^7 + x^2 + x + 1 mod Q(x)   (draft-03, Sec 2.2.2)
+   --  x^128 = x^7 + x^2 + x + 1 mod Q(x)   (Section 2.2.2)
    Reduction_Low : constant Unsigned_64 := 16#87#;
 
    subtype Bit_Index_128 is Natural range 0 .. 127;
@@ -187,7 +197,7 @@ package GF2_128 is
      Post   => (Proof_Only => Mul'Result = Mul_Ref (A, B, 128));
 
    --  The same product bit by bit: 128 steps of Xtime and a masked xor,
-   --  the form of Mul before milestone M2, kept as the reference that
+   --  the bit-by-bit form of the product, kept as the reference that
    --  the harness compares Mul with (ADR 0065).
    function Mul_Serial (A, B : Element) return Element with
      Global => null,
@@ -223,7 +233,7 @@ package GF2_128 is
      Global => null,
      Post   => Mul (A, Sub (B, C)) = Sub (Mul (A, B), Mul (A, C));
 
-   --  Field squaring, E * E mod Q(x). Thin wrapper over Mul for now.
+   --  Field squaring, E * E mod Q(x). A thin wrapper over Mul (ADR 0007).
    function Square (E : Element) return Element with
      Global => null,
      Post   => (Proof_Only => Square'Result = Mul_Ref (E, E, 128));
@@ -237,7 +247,7 @@ package GF2_128 is
      Global => null;
 
 
-   --  Serialisation (draft-03 Section 7.2.1, stage 4): an element is
+   --  Serialisation (Section 7.2.1): an element is
    --  the 128-bit integer whose bit i is the coefficient of x^i,
    --  written as 16 bytes least significant first, that is Limbs (0)
    --  little-endian then Limbs (1). The byte type is the shared one
@@ -269,10 +279,10 @@ package GF2_128 is
         Post   => Limbs_Of_Bytes (To_Bytes'Result) = E.Limbs;
 
 
-   --  The subfield GF(2^16) (draft-03 Section 2.2.2, stage 5): basis
+   --  The subfield GF(2^16) (Section 2.2.2): basis
    --  beta_i = g^i, g = x^((2^128 - 1) / (2^16 - 1)), the sixteen
    --  constants of the upstream reference (docs/specs/rust/src/algebra/
-   --  gf2_128.rs, SUBFIELD_BASIS at d5e6be7), anchored by the stage 1
+   --  gf2_128.rs, SUBFIELD_BASIS at d5e6be7), anchored by the
    --  vectors (ADR 0009). Inject (X) is the element with coordinates
    --  the bits of X on that basis: the Reed-Solomon evaluation point x
    --  of the Ligero code (reed_solomon_eval_point) and the decoding of
@@ -318,7 +328,7 @@ package GF2_128 is
      Post   => (Proof_Only => Inject'Result = Inject_Ref (X, 16));
 
    --  The inverse of Inject on the subfield, as a fixed linear map
-   --  (Phase C, ADR 0051): coordinate I of an element is the parity of
+   --  (ADR 0051): coordinate I of an element is the parity of
    --  the element's low limb masked by Subfield_Mask (I). The sixteen
    --  masks are a left inverse of the basis matrix on the bit positions
    --  0 .. 12 and 14 .. 16, computed from the basis by Gaussian

@@ -8,13 +8,18 @@
 --  makes the prover's output reproducible, which is what the byte-for-
 --  byte comparison with the shipped upstream proofs needs, and it makes
 --  it predictable, which forfeits zero knowledge. The command-line
---  prover offers it behind an explicit option only; its default source
+--  provers offer it behind the option --seed only; their default source
 --  is the operating system's generator. It is a library unit of src/
 --  because the library-level instances of the prover units name their
 --  source at instantiation (ADR 0050, Decision).
 --
---  Documentation: docs/guide/07-prover.md. Proof status: Silver; the
---  recurrence is tested by the byte identity with the upstream proofs.
+--  Documentation: docs/guide/07-prover.md, Section 3.2.
+--
+--  Proof status. Silver. Trusted: that it is the generator of
+--  upstream's test, transcribed from upstream (register row R7); the
+--  byte identity of the prover's output with upstream's two proofs
+--  tests it.
+--
 --  Constant-time discipline: not applicable, the state is not a secret
 --  of the protocol and the source is for tests.
 

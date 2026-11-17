@@ -1,7 +1,7 @@
 --  Mdoc_Mac: the tags that bind the two circuits of an mDoc proof, in
 --  the legacy form of circuit versions 5 to 7 (longfellow-zk/
 --  longfellow-zk d5e6be7, rust/applications/mdoc_zk/runtime/src/mac.rs,
---  push_legacy_macs; Phase D, block 5, ADR 0058).
+--  push_legacy_macs; ADR 0058).
 --
 --  Why there are tags at all. The hash circuit, over GF(2^128), proves
 --  facts about the credential's bytes: the digest the issuer signed,
@@ -42,7 +42,12 @@
 --
 --  Proof status. Gold: Legacy_Tags returns the six products of the
 --  equation above, stated with the field's Mul and Add and the halves
---  of each message. Silver on everything.
+--  of each message. Silver on everything. Trusted: that the legacy
+--  tags are the construction upstream's code specifies, since no
+--  document of the pinned draft covers it (register row R8); tested,
+--  by the six tags of each of upstream's hash witness files,
+--  recomputed and equal to the file's and the example proof's
+--  (mdoc_kat).
 --
 --  Constant-time discipline (ADR 0006): APPLIES. The messages and the
 --  pads are secret (they are in the witness); av and the tags are

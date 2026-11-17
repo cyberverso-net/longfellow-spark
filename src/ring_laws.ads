@@ -5,6 +5,12 @@
 --  the concrete field stay out of these proofs. Ghost lemmas stated
 --  with Same; each is proved from the laws, and each field proves
 --  those for its own operations.
+--
+--  Documentation: docs/guide/03-sumcheck.md, Section 3.3. Proof status:
+--  ghost code only, at the level Proof_Only (register row T8), proved
+--  in the instances of Sumcheck_Algebra, once per field; the generic
+--  has no check of its own. The lemmas rest on Same being the equality
+--  of the element type (row T6).
 
 pragma SPARK_Mode (On);
 

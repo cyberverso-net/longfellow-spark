@@ -1,8 +1,8 @@
---  Circuit_Reader: the loader of LFC2 circuit files (Phase B, ADR
---  0046), generic over the sumcheck algebra of a field, so that the
---  loaded circuit is the Raw_Circuit of stage 3 and the constants are
---  read with the field's From_Bytes. The format is the one the
---  upstream production reader defines (longfellow-zk/longfellow-zk d5e6be7,
+--  Circuit_Reader: the loader of LFC2 circuit files (ADR 0046), generic
+--  over the sumcheck algebra of a field, so that the loaded circuit is
+--  the Raw_Circuit of Sumcheck_Algebra and the constants are read with
+--  the field's From_Bytes. The format is the one the upstream
+--  production reader defines (longfellow-zk/longfellow-zk d5e6be7,
 --  rust/core/proto/src/reader/lfc2.rs): the magic "LFC2"; the ULEB128
 --  integers field_id, nv, ncopies (1), npublic_input,
 --  subfield_boundary, ninput, nl; nconst constants of Section 7.2.1;
@@ -14,43 +14,59 @@
 --
 --  Read makes two passes over the bytes: the first validates and counts
 --  the layers and terms, the second allocates the circuit once on the
---  heap (ADR 0047) and fills it; then Well_Formed of the core and the
---  two premises are checked and the identifier recomputed and compared.
---  Where this project is stricter than upstream the header of
+--  heap (ADR 0047) and fills it; then Well_Formed of Sumcheck_Algebra
+--  and the two premises are checked and the identifier recomputed and
+--  compared. Where this project is stricter than upstream the header of
 --  Circuit_Status says so. The circuit is returned through an access
 --  type under SPARK's ownership rules; the caller passes C.all to the
 --  verifier and calls Free when done.
 --
---  Read_Packed (the memory milestone, ADR 0080) reads the same files
---  into Packed_Circuits, the form the file keeps, without expanding the
---  terms. Its walks prove, at each step, that they read the layers of
---  the ghost expansion Expand, so its checks are checks on Expand (P).
---  It is the loader of the two command-line programs since block 3 of
---  the milestone; Read and Read_Pinned, the expanded circuit, stay
---  proved as the oracle of Read_Packed in the tests and are not on the
---  path of the programs.
---  It keeps the dictionaries, so it bounds them over the whole circuit:
+--  Read_Packed (ADR 0080) reads the same files into Packed_Circuits,
+--  the form the file keeps, without expanding the terms. Its walks
+--  prove, at each step, that they read the layers of the ghost
+--  expansion Expand, so its checks are checks on Expand (P). It is the
+--  loader of the command-line programs; Read and Read_Pinned, the
+--  expanded circuit, are proved as the oracles of Read_Packed in the
+--  harnesses and no program loads the expanded circuit. Read_Packed
+--  keeps the dictionaries, so it bounds them over the whole circuit:
 --  deltas, segments, segment entries and kept tokens, each at most
 --  Max_Terms, beyond which Bound_Exceeded (guide chapter 6, 1.5).
 --
 --  Documentation: docs/guide/06-circuits.md. Decisions: ADR 0046
---  (scope, the format, the status), 0047 (the heap), 0048 (vectors);
---  frame: ADR 0011, 0022.
+--  (scope, the format, the status), 0047 (the heap), 0048 (vectors),
+--  0064 (the two premises), 0074 (the identifier checked once), 0080
+--  (the packed form); frame: ADR 0011, 0022. Index: docs/adr/README.md.
 --
---  Proof status. Silver on arbitrary bytes, with the ownership checks
---  (no dangling or null dereference, every allocation freed on every
---  path that does not return it). Gold on the shape of the result: on
---  Ok the circuit is well formed, satisfies the premises Isolated and
---  Dead_End of upstream's Lean proofs (ADR 0064) and its identifier is
---  the stored one, recomputed by Read and equal to the caller's by
---  Read_Pinned (ADR 0074); on any other status no circuit is returned. The
---  same for Read_Packed on Expand (P): Silver on arbitrary bytes, Gold on
---  the shape of the expansion and its identifier. The expansion of
---  deltas, segments and tokens agrees with upstream by the vectors (ADR
---  0048), not by proof; circuit_kat checks that Read_Packed gives Read's
---  status, header and terms on every shipped circuit.
+--  Proof status (per instance). Silver on arbitrary bytes, with the
+--  ownership checks (no dangling or null dereference, every allocation
+--  freed on every path that does not return it). Gold on the shape of
+--  the result: on Ok the circuit is well formed, satisfies the premises
+--  Isolated and Dead_End of upstream's Lean proofs (ADR 0064) and its
+--  identifier is the stored one, recomputed by Read and equal to the
+--  caller's by Read_Pinned (ADR 0074); on any other status no circuit
+--  is returned. The same for Read_Packed on Expand (P): Silver on
+--  arbitrary bytes, Gold on the shape of the expansion and its
+--  identifier.
 --
---  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037.
+--  Tested (ADR 0048): that the expansion of deltas, segments and tokens
+--  and Compute_Id are upstream's, on the two upstream circuit files,
+--  the mDoc circuits and the circuits an independent reader and writer
+--  encode, with malformed files each giving its status (circuit_kat);
+--  that Read_Packed gives Read's status, header and terms, pinned and
+--  unpinned (circuit_kat).
+--
+--  Trusted: the upstream production reader as the definition of the
+--  format, and the upstream files as what d5e6be7 ships (register row
+--  R4); what the circuit files compute, which the loader does not
+--  check (R2); on a pinned load, the caller's identifier, which the
+--  command line takes from the list of Pinned_Circuits (R3); that
+--  Sha256 computes SHA-256 beyond the vectors (V1); enough memory, a
+--  failed allocation raising Storage_Error outside the proofs (P1),
+--  and GNAT's in-place construction of an aggregate allocator (P2);
+--  the contracts at Proof_Only, never compiled (T8).
+--
+--  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037
+--  (register row S4).
 
 pragma SPARK_Mode (On);
 
@@ -76,7 +92,7 @@ package Circuit_Reader is
    type Circuit_Access is access Raw_Circuit;
 
    --  What the file carries besides the circuit: the field identifier,
-   --  the subfield boundary (the prover's, Phase C) and the identifier
+   --  the subfield boundary (the prover's) and the identifier
    --  the transcript binds (Write_Sumcheck_Statement).
    type Header is record
       Field_Id          : Natural;
@@ -210,7 +226,7 @@ package Circuit_Reader is
      Post   => C = null;
 
    -------------------------------------------------------------------
-   --  The packed reader (the memory milestone, ADR 0080)
+   --  The packed reader (ADR 0080)
    -------------------------------------------------------------------
 
    subtype Packed_Circuit is PC.Packed_Circuit;
