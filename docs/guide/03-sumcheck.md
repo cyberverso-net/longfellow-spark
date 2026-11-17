@@ -133,7 +133,7 @@ The verifier computes the bound quad of each layer as upstream's `bind_quad` doe
 
 Inside the generic the operations are reached through wrappers `"+"`, `"-"`, `"*"`, `Neg` with `Global => null` and no postcondition. This is deliberate: the contracts of the concrete field never enter a protocol proof, and the verification conditions are the same for both instances. A protocol proof that needs a law of the field calls the lemma of the signature.
 
-The two instances are Silver, with no functional contract of their own: the ten ring laws of the signature are proved for each field's operations (ghost lemmas at the level `Proof_Only`, register row T8), `Checked_Inv` returns `Ok` only when R * D = One, checked at run time ([ADR 0037](../adr/0037-checked-inv-and-public-data-scope.md)), and `Same` is taken as given (register row T6).
+The two instances are Silver, and Gold on the contracts they declare: `Checked_Inv` returns `Ok` only when R * D = One, which its body checks at run time ([ADR 0037](../adr/0037-checked-inv-and-public-data-scope.md)), so nothing is assumed of `Inv`, whose result no contract states; the ten ring laws of the signature are proved for each field's operations (ghost lemmas at the level `Proof_Only`, register row T8); and `Same` is taken as given (register row T6).
 
 ### 3.2 Circuits as data: Term, Layer, Circuit and their predicates
 

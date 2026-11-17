@@ -17,13 +17,13 @@
 --  re-checked by the harness sumcheck_kat with Mul at every run:
 --  tested, not proved (register row V11).
 --
---  Proof status: Silver, with no functional contract of its own, as
---  chapter 3 Section 3.1 says. The ten ring laws of the signature are
---  proved for the operations of GF2_128 (ghost lemmas at the level
---  Proof_Only, register row T8); Checked_Inv returns Ok only when
---  R * D = One, checked at run time (ADR 0037), so nothing is assumed
---  of Inv. Same is taken as given: its body is the predefined "=",
---  outside SPARK (register row T6).
+--  Proof status: Silver, and Gold on the contracts the unit declares
+--  (chapter 3 Section 3.1). Checked_Inv: Ok implies R * D = One, which
+--  the body checks at run time (ADR 0037), so nothing is assumed of
+--  Inv, whose result no contract states. The ten ring laws of the
+--  signature, for the operations of GF2_128: ghost lemmas at the level
+--  Proof_Only (register row T8). Same is taken as given: its body is
+--  the predefined "=", outside SPARK (register row T6).
 
 pragma SPARK_Mode (On);
 

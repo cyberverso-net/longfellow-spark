@@ -101,8 +101,9 @@
 --              independent Python transcription (mdoc_witness.txt).
 --              The ECDSA part rests on Ecdsa_Witness (register rows
 --              R11 and V7), the values read from the document on the
---              parse (R12). Trusted: the layout of the hash witness
---              as upstream's code specifies it (register row R14).
+--              parse (R12). Trusted: the layouts of both witnesses,
+--              the ECDSA part apart, as upstream's code specifies them
+--              (register row R14).
 --    Messages, Reduce : Silver.
 --
 --  Constant time: the encodings are fixed loops over fixed widths, and
@@ -121,9 +122,11 @@
 --  credential is refused, and by which check, which the status returned
 --  to the holder's own program says anyway. The dates, the device key
 --  and the signatures decide on a mask gathered over the bytes, so that
---  the work does not say which byte or which signature failed; the
---  others branch directly on a byte, a length or the first date's
---  result. What else branches on the document is its structure, which
+--  the work does not say which byte or which signature failed. Each
+--  date has its own mask, and the second is checked only when the first
+--  conforms, so the time of Validity_Form_Unsupported also says which
+--  date failed. The others branch directly on a byte or a length. What
+--  else branches on the document is its structure, which
 --  ADR 0086 declares: the offsets and lengths of the parse, the
 --  position and the order of the requested item, and the padding of
 --  the message and of the item, outside the perimeter with the parse.
