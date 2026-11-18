@@ -1,5 +1,5 @@
 --  Merkle: the Merkle tree of draft Section 4.1 over SHA-256: heap
---  construction (4.1.2), batch opening (4.1.3, the prover's, Phase C)
+--  construction (4.1.2), batch opening (4.1.3, used by the prover)
 --  and batch proof verification (4.1.4). The nonce-blinded leaves of
 --  4.1.1 are built by the Ligero verifier and the Ligero prover, which
 --  hand this package leaf digests.
@@ -30,16 +30,24 @@
 --                   verification succeeds only if there is at least one
 --                   index, every index is below N, no index repeats, and
 --                   the proof holds exactly the digests the reconstruction
---                   consumes; and Gold on the reconstruction, through the
---                   ghost On_Path and Missing_Before: every node on a
---                   path is Hash_Pair of its two children, each child the
+--                   consumes. The reconstruction is proved as the loop
+--                   invariant of the walk, not as a postcondition: through
+--                   the ghost Child and Path_At, every node on a path is
+--                   Hash_Pair of its two children, each child the
 --                   computed node when it is on a path and otherwise the
 --                   next digest of the proof, left before right, nodes
 --                   from N - 1 down to 1, and the root compared is node 1.
---                   What SHA-256 does with the bytes is tested (ADR 0029).
+--
+--  Tested: Appendix B.1.1 and the trees and negative cases of
+--  merkle.txt (ligero_kat); an honest opening of Open accepted by
+--  Verify (ligero_commit.txt, prover_kat).
+--
+--  Trusted: that Sha256 computes SHA-256 beyond the vectors (register
+--  row V1, ADR 0029); the hash as a random oracle in the soundness
+--  argument (S2).
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037:
---  the commitment's opened columns are public data.
+--  the commitment's opened columns are public data (register row S4).
 
 pragma SPARK_Mode (On);
 
@@ -180,7 +188,7 @@ package Merkle is
    --  False, with no other effect, when there is no index, an index is at
    --  or above N, an index repeats, the proof is shorter or longer than
    --  the reconstruction needs, or the reconstructed root differs.
-   --  Section 4.1.3, open_merkle_heap of merkle.rs (Phase C, ADR 0052):
+   --  Section 4.1.3, open_merkle_heap of merkle.rs (ADR 0052):
    --  the sibling digests the verifier needs for the leaves Indices,
    --  taken from the heap of Build, node N - 1 down to 1, one per
    --  missing child of a node on a path. Count digests are written to

@@ -1,13 +1,12 @@
 --  Packed_Eval: the forward evaluation of a circuit from its packed form
---  (the memory milestone, ADR 0080, block 3). The prover computes the
---  wires of every layer here, as upstream's eval_circuit does with
---  for_each_term (rust/runtime/sumcheck/src/eval.rs at d5e6be7): the
---  terms of a layer are rebuilt one at a time from the deltas
---  (Packed_Circuits, the walk) and accumulated as they come. Eval_Layer
---  is Eval_Quad of Sumcheck_Algebra over the walk; Eval_Circuit drives
---  the layers as the expanded Eval_Circuit does, each layer's wires in
---  a heap segment of its own (block 4), so that the prover frees them
---  once the layer is proved.
+--  (ADR 0080). The prover computes the wires of every layer here, as
+--  upstream's eval_circuit does with for_each_term
+--  (rust/runtime/sumcheck/src/eval.rs at d5e6be7): the terms of a layer
+--  are rebuilt one at a time from the deltas (Packed_Circuits, the
+--  walk) and accumulated as they come. Eval_Layer is Eval_Quad of
+--  Sumcheck_Algebra over the walk; Eval_Circuit drives the layers as
+--  the expanded Eval_Circuit does, each layer's wires in a heap segment
+--  of its own, so that the prover frees them once the layer is proved.
 --
 --  The model is the ghost expansion Expand (P). Every result is stated
 --  on it, at level Proof_Only, exactly as Eval_Quad and Eval_Circuit
@@ -18,10 +17,19 @@
 --  references name the shape of the expansion, Lemma_Off_Eq joins the
 --  two, since Off hides its recursion.
 --
---  Proof status: Gold against the references of Sumcheck_Algebra on the
---  expansion. The expanded Eval_Circuit stays proved as the oracle that
---  prover_kat compares this unit with on the small circuits; it is not
---  on the path of the programs.
+--  Documentation: docs/guide/07-prover.md, Sections 2.1 and 4.1;
+--  docs/guide/06-circuits.md for the packed form.
+--
+--  Proof status (per instance). Silver with the ownership checks on the
+--  heap segments. Gold against the references of Sumcheck_Algebra on
+--  the expansion, at the level Proof_Only (register row T8) and through
+--  Same (row T6): every segment is the quad sum of the next, the last
+--  is the inputs, every segment has the size of its layer, and the
+--  status is that every assertion holds and every output wire is zero.
+--  The expansion is ghost and never runs; prover_kat tests this unit
+--  against the expanded Eval_Circuit wire by wire. The expanded
+--  Eval_Circuit stays proved as that oracle; it is not on the path of
+--  the programs.
 --
 --  Constant-time discipline (ADR 0051): as Eval_Quad, which Eval_Layer
 --  follows statement by statement. The branch on k = Zero reads a
@@ -128,7 +136,7 @@ package Packed_Eval is
                                PC.Layer_Len (P, J), G))));
 
    --  Eval_Circuit of Sumcheck_Algebra from the packed form, the wires
-   --  one segment per layer (ADR 0080, block 4): Wr comes with every
+   --  one segment per layer (ADR 0080): Wr comes with every
    --  segment null (Allocate_Segs) and leaves with segment J the wires
    --  computed by layer J and the last segment the inputs W, each in
    --  its own heap array of Seg_Size (S, J) elements; OK says whether

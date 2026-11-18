@@ -1,6 +1,6 @@
 --  Mdoc_Parse: the walk of the mDoc that upstream's parse_mdoc makes
 --  (circuits/src/cbor/mdoc.rs at d5e6be7), over the table of
---  Cbor_Parse (Phase D, block 6, ADR 0086). From the document the
+--  Cbor_Parse (ADR 0086). From the document the
 --  holder presents it reads what the two circuits need:
 --
 --    - documents[0].issuerSigned.issuerAuth, a COSE_Sign1 array (tag
@@ -18,7 +18,7 @@
 --    - documents[0].deviceSigned.deviceAuth.deviceSignature, a
 --      COSE_Sign1 array whose fourth element is the device's signature;
 --      the digest it signed is Device_Auth.Digest of the session
---      transcript and the document type (block 5);
+--      transcript and the document type;
 --    - the issuer-signed items of issuerSigned.nameSpaces: per item its
 --      wrapped bytes (tag 24, head and map), the identifier, the value,
 --      the locator of its four entries (digestID, random,
@@ -46,9 +46,11 @@
 --                   result lying inside the document and the MSO
 --                   (the postcondition). That the values are upstream's
 --                   is tested: against a Python transcription on the
---                   38 test documents, and against the front of the
---                   hash witness files of both archives
---                   (mdoc_parse_kat).
+--                   38 test documents and on synthetic ones, and
+--                   against the front of the hash witness files of
+--                   both archives (mdoc_parse_kat). What the parse
+--                   extracts and where is trusted as upstream's code
+--                   specifies it (register row R12).
 --    Signed_Message, Find_Item : Silver.
 --
 --  Constant time: NOT constant time, declared (ADR 0086), as

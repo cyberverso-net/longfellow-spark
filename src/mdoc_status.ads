@@ -1,5 +1,5 @@
---  Mdoc_Status: the outcome of the mDoc layer (Phase D, blocks 5 and
---  6, ADR 0058, ADR 0086), one value per cause and never an exception,
+--  Mdoc_Status: the outcome of the mDoc layer (ADR 0058, ADR 0086),
+--  one value per cause and never an exception,
 --  as Prover_Status and Verifier_Status. The layer drives two provers, or two
 --  verifiers, on one transcript; when one of them reports a status of
 --  its own, the layer says which one (Hash_Failed, Sig_Failed) and
@@ -29,10 +29,12 @@
 --                         than 96 bytes (Hash_Failed), or bytes after
 --                         the signature proof (Sig_Failed).
 --
---  From the document (block 6, Mdoc_Prover.Prove_Mdoc):
+--  From the document (Mdoc_Prover.Prove_Mdoc): the parse, then the
+--  seven refusals of the witness builders (chapter 9 Section 3.7):
 --
 --    Parse_Failed         the credential did not parse; the parser's
---                         status is handed back beside this one.
+--                         status and the CBOR reader's are handed
+--                         back beside this one.
 --    Attribute_Not_Found  a requested attribute is not an item of the
 --                         document (upstream's AttributeNotFound).
 --    Attribute_Too_Long   the item does not pad into two SHA-256
@@ -42,29 +44,28 @@
 --                         at version 6, the item's elementValue entry
 --                         does not follow its elementIdentifier entry,
 --                         the one order the version 6 circuit frames
---                         (#150; upstream's builder has no such status
+--                         (upstream's builder has no such status
 --                         and its circuit refuses the proof).
 --    Validity_Form_Unsupported
 --                         the document's validFrom or validUntil is not
 --                         tag 0 over YYYY-MM-DDThh:mm:ssZ, the one form
---                         the circuits compare byte for byte (#165;
---                         upstream's builder has no such status).
+--                         the circuits compare byte for byte
+--                         (upstream's builder has no such status).
 --    Device_Key_Form_Unsupported
 --                         the device key is not a COSE_Key of exactly
 --                         kty, crv, x, y in that order (no kid, no alg)
 --                         alone in deviceKeyInfo, the one form the
---                         circuits compare byte for byte (#165).
+--                         circuits compare byte for byte.
 --    Random_Form_Unsupported
 --                         a requested item's random is not a byte string
 --                         of at least 16 bytes (ISO/IEC 18013-5,
---                         9.1.2.5), which the circuits do not check
---                         (#165).
+--                         9.1.2.5), which the circuits do not check.
 --    Signature_Not_Canonical
 --                         a signature value s of the document is not
 --                         below the group order, which the ECDSA
 --                         witness requires (upstream stops there).
 --
---  From the profile (#79, ADR 0089, Mdoc_Spec.Select_Profile, the
+--  From the profile (ADR 0089, Mdoc_Spec.Select_Profile, the
 --  entry points Mdoc_Prover.Prove_Profile and
 --  Mdoc_Verifier.Verify_Profile):
 --
@@ -75,8 +76,9 @@
 --                         configurations, or a buffer is not of the
 --                         row's length.
 --    Attribute_Count      the request does not hold the row's number of
---                         attributes (one, for both rows: two to four
---                         are refused until an archive is pinned).
+--                         attributes (one, for both rows: no archive
+--                         with more than one attribute is pinned, so
+--                         two to four are refused).
 --
 --  Documentation: docs/guide/09-mdoc.md. Proof status: an
 --  enumeration, nothing to prove.

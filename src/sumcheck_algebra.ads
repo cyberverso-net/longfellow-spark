@@ -1,24 +1,29 @@
 --  Sumcheck_Algebra: the array vocabulary of the sumcheck protocol
---  (draft-03 Sections 6.1 to 6.4), the circuit types and their
+--  (Sections 6.1 to 6.4 of the spec), the circuit types and their
 --  evaluation (Section 6.3), generic over a field (ADR 0024).
 --
---  Documentation: docs/guide/03-sumcheck.md. Decisions implemented
---  here: ADR 0022 (stage 3 scope and index names), 0023 (structural
---  Gold against ghost references), 0024 (field by formal package),
---  0025 (polynomials and Lagrange constants), 0026 (not here), 0027
---  (vectors); frame: ADR 0002, 0003, 0011, 0020.
+--  Documentation: docs/guide/03-sumcheck.md, Sections 3.2 and 3.3.
+--  Decisions implemented here: ADR 0022 (scope and index names), 0023
+--  (structural Gold against ghost references), 0024 (field by formal
+--  package), 0025 (polynomials and Lagrange constants), 0027
+--  (vectors), 0070 (the kernels in upstream's form and the ring laws),
+--  0080 (the shape and the eq2 table); frame: ADR 0002, 0003, 0011,
+--  0020, 0079.
 --
 --  Proof status, per instance (Sumcheck_Algebra_GF2_128 and
 --  Sumcheck_Algebra_P256 are both library units and both proved).
+--  Every subprogram is Silver.
 --  Gold here is structural (ADR 0023): the postcondition says that the
 --  executable code equals a ghost reference transcribing the formula
---  of the draft or of the upstream reference implementation, with the
+--  of the spec or of the upstream reference implementation, with the
 --  operations in the order the reference applies them. No contract
 --  below uses a field law. The bodies of Bind and Bindeq compute in
 --  upstream's form, with fewer products, and reach the reference
 --  through the ring laws of Field_Signature (ADR 0070). The algebraic
---  facts about the formulas themselves (bindeq agrees with eq, the
---  Lagrange basis interpolates) are tested, not proved.
+--  facts about the formulas themselves are tested, not proved: that
+--  bindeq agrees with eq (register row V9), that the Lagrange basis
+--  interpolates (V10), that the denominator inverses are inverses
+--  (V11).
 --
 --    Eq               : Gold against Eq_Ref (product over the bits of
 --                       X, least significant first, from One).
@@ -27,6 +32,10 @@
 --                       recursive definition of Section 6.2.
 --    Bind             : Gold, the formula of Section 6.1 with zero
 --                       padding is the postcondition.
+--    Bind_In_Place    : Gold, the postcondition of Bind on the vector
+--                       as it came, the entries above untouched.
+--    Eq2_Table        : Gold against Beq2: entry X is
+--                       bindeq (G0) (X) + alpha bindeq (G1) (X).
 --    Lagrange_Basis   : Gold by definition, with the per-field
 --                       denominator inverses (ADR 0025).
 --    Eval_Quad        : Gold against Acc_Ref (quad sum per output wire
@@ -36,28 +45,40 @@
 --                       flat wire buffer: the input segment is W, every
 --                       layer segment is the quad sum of the next, and
 --                       the status is "all Z assertions hold and every
---                       output wire is Zero". Since the memory milestone
---                       (ADR 0080, block 3) the prover evaluates the
+--                       output wire is Zero". The prover evaluates the
 --                       packed circuit (Packed_Eval, Gold against the
---                       same references on the expansion); Eval_Quad and
---                       Eval_Circuit stay as the oracle prover_kat
---                       compares it with, not on the program path.
+--                       same references on the expansion, ADR 0080);
+--                       Eval_Quad and Eval_Circuit stay as the oracle
+--                       prover_kat compares it with, not on the program
+--                       path.
 --    Bind_G           : Gold, the per-term formula is the
 --                       postcondition.
 --    Eval_Bound_Quad  : Gold against EBQ_Ref (sum over terms in order).
---    Eval_Bound_Quad_T: Gold against EBQT_Ref (Phase D, M1): the same
+--    Eval_Bound_Quad_T: Gold against EBQT_Ref: the same
 --                       sum with eq read from the bindeq tables of
 --                       Section 6.2, built once per layer, instead of
 --                       computed bit by bit for every term. That the two
 --                       sums agree is the tested fact that bindeq agrees
 --                       with eq; Eval_Bound_Quad stays as the reference.
+--                       Bind_G, Eval_Bound_Quad and Eval_Bound_Quad_T
+--                       are not on the program path either: they are
+--                       the oracles of the harnesses.
 --    Shape_Of         : Gold by definition: the circuit without its
---                       terms (the memory milestone, ADR 0080). The
+--                       terms (ADR 0080). The
 --                       sizes of the proof, the challenges, the pads and
 --                       the wires are functions of the shape, so that
 --                       the units that need sizes only never hold the
 --                       terms. Lemma_Shape_Of: a well-formed circuit has
 --                       a shape that satisfies Shape_Ok.
+--
+--  Tested (docs/guide/03-sumcheck.md, Section 5): the explicit circuits
+--  of Appendix B.3 and the algebra against an independent Python
+--  reference (sumcheck_kat, tiers 1 and 2). Trusted
+--  (docs/guide/trusted-base.md): that Same is the equality of the
+--  element type (T6); the agreement of the compiled code with the
+--  source proved, for the contracts and ghost code at the level
+--  Proof_Only (T8); enough memory for the wire segments and tables on
+--  the heap (P1).
 --
 --  Errors are statuses (ADR 0022, D6): a Z assertion that fails or an
 --  output wire that is not Zero makes OK False; nothing is raised.
@@ -74,18 +95,16 @@
 --  serve the prover as well, on the wires of a layer, private data:
 --  their loops are fixed by the lengths and read no element in a
 --  branch (ADR 0051); the guarantee is scoped to builds with
---  assertions disabled (ADR 0006).
+--  assertions disabled (ADR 0006, register row S4).
 --
 --  Eq2_Table is filled by recursion, as upstream's fill_recursive
---  (rust/runtime/sumcheck/src/eq.rs at d5e6be7, ADR 0080 #105): the
+--  (rust/runtime/sumcheck/src/eq.rs at d5e6be7, ADR 0080): the
 --  entries split at their high bit, the weights of the two tables
 --  carried down, in one array. The depth is L, at most Max_Bindeq_Log
 --  (24), bounded by a Subprogram_Variant: the stack holds 24 frames of
---  two weights each. It is the third recursion of the library's
---  executable code, after the transforms of Additive_FFT and
---  Rfft_P256. The table depends on public data only (the challenges);
---  the recursion branches on L alone, so the constant-time discipline
---  is not engaged.
+--  two weights each. The table depends on public data only (the
+--  challenges); the recursion branches on L alone, so the
+--  constant-time discipline is not engaged.
 
 pragma SPARK_Mode (On);
 
@@ -447,7 +466,7 @@ package Sumcheck_Algebra is
                 Same (B (I),
                       (One - X) * Pad (A, 2 * I) + X * Pad (A, 2 * I + 1)));
 
-   --  Bind in place (dense::bind of the reference, ADR 0080 block 4):
+   --  Bind in place (dense::bind of the reference, ADR 0080):
    --  entry I of the first (N + 1) / 2 from entries 2 I and 2 I + 1 of
    --  the first N of the array as it came, the entries from N on
    --  untouched; N halves. The same reference as Bind, on A'Old. The
@@ -563,8 +582,8 @@ package Sumcheck_Algebra is
    subtype Circuit is Raw_Circuit
      with Dynamic_Predicate => Well_Formed (Circuit);
 
-   --  The shape of a circuit: the circuit without its terms (the memory
-   --  milestone, ADR 0080). The sizes of the proof, the challenges, the
+   --  The shape of a circuit: the circuit without its terms (ADR
+   --  0080). The sizes of the proof, the challenges, the
    --  pads and the wires depend on the shape alone, so the units that
    --  need sizes only take it, and the packed form (Packed_Circuits)
    --  gives its shape without expanding a term. Shape_Ok is what
@@ -706,7 +725,7 @@ package Sumcheck_Algebra is
    with Global => null;
 
    -------------------------------------------------------------------
-   --  The wires one segment per layer (ADR 0080, block 4). The prover
+   --  The wires one segment per layer (ADR 0080). The prover
    --  holds segment J in its own heap array of Seg_Size (S, J) elements
    --  and frees it once the layer that reads it is proved, as upstream's
    --  prove_core takes and drops each layer's vector
@@ -967,7 +986,7 @@ package Sumcheck_Algebra is
         Subprogram_Variant => (Decreases => N);
 
    -------------------------------------------------------------------
-   --  The bound quad by tables (Phase D, M1). The value of eq at X on
+   --  The bound quad by tables (ADR 0063). The value of eq at X on
    --  the first L challenges of C, read from bindeq of Section 6.2
    --  (Zero beyond the table), and eq2 the same way.
    -------------------------------------------------------------------

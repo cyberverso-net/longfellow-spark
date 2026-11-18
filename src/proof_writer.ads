@@ -1,6 +1,6 @@
---  Proof_Writer: the serialisation of a complete proof (Phase C, ADR
---  0049, 0051, 0052), the writers of Sections 7.3, 7.4 and 7.5 as the
---  inverses of the readers of stages 4 and 5 (Sumcheck_Transcript.
+--  Proof_Writer: the serialisation of a complete proof (ADR 0049, 0051,
+--  0052), the writers of Sections 7.3, 7.4 and 7.5 as the inverses of
+--  the readers of chapters 4 and 5 (Sumcheck_Transcript.
 --  Read_Sumcheck_Proof, Ligero_Proof.Read, Zk_Verifier.Read_Proof),
 --  write_sumcheck_proof, write_ligero_proof and write_zk_proof of the
 --  reference (docs/specs/rust/src/sumcheck/proof.rs, ligero/proof.rs,
@@ -23,7 +23,7 @@
 --  of consecutive rows of one kind, so at most three, and the first,
 --  possibly empty, is a full-field run, as the reader requires.
 --
---  Documentation: docs/guide/07-prover.md.
+--  Documentation: docs/guide/07-prover.md, Sections 2.6 and 3.5.
 --
 --  Proof status (per instance). Silver. Gold, structural: the 7.4
 --  writer produces bytes that satisfy Well_Coded of the reader at the
@@ -39,7 +39,14 @@
 --  and From_Bytes are inverses, chapters 1 and 2); it is tested on
 --  every proof file of the repository (writer_kat), since the readers
 --  state their structure, not the values they read, and the encodings
---  are formals of the field signature without contracts.
+--  are formals of the field signature without contracts. The
+--  contracts at the level Proof_Only are proved, never compiled
+--  (register row T8).
+--
+--  Tested, not proved (register row V8): that GF2_128.Subfield_Coords,
+--  which To_Subfield_Bytes applies on GF(2^128) to the opened values of
+--  the subfield rows, inverts Inject. Nothing checks the projection
+--  again here; a wrong one would give a proof the verifier refuses.
 --
 --  Constant-time discipline (ADR 0006, ADR 0051): the run structure
 --  depends on the geometry and the subfield boundary, never on an

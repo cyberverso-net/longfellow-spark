@@ -5,9 +5,9 @@
 --      FC632551,
 --  which the witness of the ECDSA circuit needs for s^-1, e s^-1 and
 --  r s^-1 mod q (upstream's Q256Field and ecdsa2/concrete.rs; chapter
---  9, block 6; ADR 0086).
+--  9 Section 3.5; ADR 0086).
 --
---  A sibling of P256_Field, by the design of block 6 (decision 3): the
+--  A sibling of P256_Field: the
 --  same Montgomery arithmetic on four 64-bit limbs, the same contracts
 --  and the same proof structure, with the constants of q. The one
 --  difference in the code is the reduction step: p is one below a
@@ -43,9 +43,11 @@
 --                   into and out of the Montgomery form; From_Canonical
 --                   reduces any 256-bit integer.
 --    Inv          : Silver only (AoRTE), plus known-answer tests
---                   (tests/vectors/q256_inv.txt). Fermat correctness
---                   is out of SMT reach by design decision (ADR 0016).
---                   Inv is total: Inv (Zero) = Zero.
+--                   (tests/vectors/q256_field.txt, q256_kat). Fermat
+--                   correctness is out of SMT reach by design decision
+--                   (ADR 0016), so that Inv is the inverse is tested,
+--                   not proved (register row V7). Inv is total:
+--                   Inv (Zero) = Zero.
 --
 --  Curve constants: RFC 5903 Section 3.1 (identical to SEC 2 v2.0
 --  Section 2.4.2), where the order is printed as n; q here, as in
@@ -394,7 +396,7 @@ package Q256_Field is
    -------------------------------------------------------------------
 
    --  The byte type is the shared one of package Bytes (ADR 0028);
-   --  these subtypes keep the stage 2 contracts unchanged.
+   --  these subtypes keep the field's contracts as they are.
    subtype Byte_Array is Bytes.Byte_Array;
    subtype Bytes_32 is Bytes.Bytes_32;
    subtype Bytes_8  is Bytes.Bytes_8;

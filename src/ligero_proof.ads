@@ -1,7 +1,8 @@
 --  Ligero_Proof: a Ligero proof (draft Section 4.4.4, LigeroProof of
 --  ligero/common.rs at d5e6be7) and its reader from the proof string
 --  of Section 7.4 (read_ligero_proof of ligero/proof.rs). Generic over
---  the stage 3 algebra of a field, for the element array type.
+--  the sumcheck algebra of a field (Sumcheck_Algebra), for the element
+--  array type.
 --
 --  The record holds the four response polynomials (BLOCK, DBLOCK, NREQ
 --  and DBLOCK - BLOCK elements), the NREQ column nonces, the opened
@@ -31,12 +32,19 @@
 --  Proof status (per instance). Read is Gold on the rules, proof-only
 --  (Proof_Levels): when it accepts, the columns part of the string
 --  satisfies Well_Coded, the rules of 7.4 transcribed as a recursive
---  predicate over the runs, and Next is within the string. That it
---  never rejects a well-coded string is tested (ADR 0040). The
+--  predicate over the runs, and Next is within the string. The
 --  canonicity of the elements is the field's From_Bytes, Silver here.
 --
+--  Tested (ADR 0040): that Read never rejects a well-coded string, and
+--  each rule violated one at a time, by ligero_proof.txt (ligero_kat);
+--  the Ligero parts of the two proofs of Appendix B.3, read to their
+--  last byte (sumcheck_kat).
+--
+--  Trusted: the contracts at Proof_Only, never compiled (register row
+--  T8).
+--
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037.
---  Public data only.
+--  Public data only (register row S4).
 
 pragma SPARK_Mode (On);
 

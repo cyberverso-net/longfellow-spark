@@ -1,6 +1,6 @@
 --  Mdoc_Proof: the layout of an mDoc proof (longfellow-zk/longfellow-zk
 --  d5e6be7, rust/applications/mdoc_zk/runtime/src/proto.rs,
---  MdocProof::write and read; Phase D, block 5, ADR 0058). The proof
+--  MdocProof::write and read; ADR 0058). The proof
 --  is one byte string: the six tags of Mdoc_Mac, each as its 128-bit
 --  value in 16 little-endian bytes (96 bytes); then the proof of the
 --  hash circuit, the proof string of draft Section 7.5 that

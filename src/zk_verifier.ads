@@ -7,57 +7,75 @@
 --  field (Packed_HQuad), which carries the packed circuit.
 --
 --  A proof string is the Merkle root (32 bytes), the sumcheck part
---  (Section 7.3, read by the stage 4 reader) and the Ligero part
+--  (Section 7.3, read by Sumcheck_Transcript) and the Ligero part
 --  (Section 7.4), with no trailing bytes. Verify checks the public
---  input count, reads the string, replays the transcript of stage 4
---  (label, root, statement, the challenges of the core), computes the
---  bound quad of each layer (Bound_Quads), runs the symbolic core of
---  stage 3 for the constraints A, b and the quadratic triples, and
---  hands them with the number of witnesses (Witness_Count of the core)
---  to the Ligero verifier under the fixed statement hash of the
---  reference, DEFAULT_STATEMENT_HASH (ADR 0035: everything
---  statement-specific is already in the transcript). Since ADR 0085 it
---  is the composition of the two phases of ZkVerifier on a fresh
---  transcript: Receive (the proof read from the start of a buffer, the
+--  input count, reads the string, replays the transcript (label, root,
+--  statement, the challenges of the core), computes the bound quad of
+--  each layer (Bound_Quads), runs the symbolic core (Verifier_Core of
+--  Sumcheck_Verifier) for the constraints A, b and the quadratic
+--  triples, and hands them with the number of witnesses (Witness_Count
+--  of the core) to the Ligero verifier under the fixed statement hash
+--  of the reference, DEFAULT_STATEMENT_HASH (ADR 0035: everything
+--  statement-specific is already in the transcript). It is the
+--  composition of the two phases of ZkVerifier on a fresh transcript
+--  (ADR 0085): Receive (the proof read at an offset of a buffer, the
 --  root written) and Verify_Received (the statement, the replay, the
 --  core, Ligero), which a flow with two proofs on one transcript (the
 --  mDoc layer, ADR 0058) drives itself.
 --
---  The circuit is the packed form (Packed_Circuits, the memory
---  milestone, ADR 0080): its shape gives every size, the walk of each
---  layer gives the bound quads, and the expanded circuit is never
---  built. The expansion, Expand (P), exists at level Proof_Only as the
---  model the contracts name.
+--  The circuit is the packed form (Packed_Circuits, ADR 0080): its
+--  shape gives every size, the walk of each layer gives the bound
+--  quads, and the expanded circuit is never built. The expansion,
+--  Expand (P), exists at level Proof_Only as the model the contracts
+--  name.
 --
 --  Documentation: docs/guide/05-ligero.md, docs/guide/06-circuits.md.
 --  Decisions: ADR 0035 (scope, the statement hash), 0039 (sizes, the
---  status), 0028 (the replay), 0071 and 0073 (the bound quads), 0080
---  (the packed form); frame: ADR 0022, 0024. Index: docs/adr/README.md.
+--  status), 0028 (the replay), 0047 (the heap), 0064 (the first public
+--  input), 0071 and 0073 (the bound quads), 0080 (the packed form),
+--  0085 (the two phases); frame: ADR 0022, 0024. Index:
+--  docs/adr/README.md.
 --
---  Proof status (per instance). Silver with proved shape: the status is one
+--  Proof status (per instance). Silver with proved shape, with the
+--  ownership checks on the working set and on Received: the status is one
 --  of the listed values; Public_Input_Length exactly when the public inputs
---  are not the circuit's; Public_Input_Not_One exactly when there are
---  public inputs and the first is not 1 (ADR 0064); the two length statuses
---  of the Ligero verifier cannot occur, since the reader sizes the record
---  by the same geometry. The preconditions of the Ligero verifier (every
---  term and triple of the core below the slots of the constraint vector)
---  are discharged from the postcondition of the core (every witness index
---  below Witness_Count) and the geometry's rows covering the witnesses.
---  Bound_Quads is Gold against BQ_Ref on the expansion, from the
---  postconditions of the packed kernels; Verify asks of the circuit, at
---  level Proof_Only, what the loader's postcondition gives (Valid, and
---  the expansion well formed). Soundness is the paper's theorem, out of
---  scope.
+--  are not the circuit's; Public_Input_Not_One exactly when their count is
+--  right, there are public inputs and the first is not 1 (ADR 0064); the
+--  two length statuses of the Ligero verifier cannot occur, since the
+--  reader sizes the record by the same geometry. The preconditions of the
+--  Ligero verifier (every term and triple of the core below the slots of
+--  the constraint vector) are discharged from the postcondition of the
+--  core (every witness index below Witness_Count) and the geometry's rows
+--  covering the witnesses. Bound_Quads is Gold against BQ_Ref on the
+--  expansion, from the postconditions of the packed kernels; Verify asks
+--  of the circuit, at level Proof_Only, what the loader's postcondition
+--  gives (Valid, and the expansion well formed). Verify and
+--  Verify_Received are declared possibly non-terminating: the samplers
+--  reject (register row V4).
+--
+--  Tested: the two complete proofs of Appendix B.3 accepted, with their
+--  negative cases, each with the status it must give (sumcheck_kat);
+--  the two upstream proofs accepted from their files and the altered
+--  copies refused, in the release build (interop_kat).
+--
+--  Trusted: soundness and zero knowledge, theorems of the protocol and
+--  not contracts here (register row S1, ADR 0035), with the hash and
+--  the transcript as random oracles (S2), and every public value
+--  absorbed before each challenge (S3); the core beyond the recorded
+--  runs (V5); the fixed statement hash (R6); Same as the equality of
+--  the field (T6); the contracts at Proof_Only, never compiled (T8).
 --
 --  Sizes (ADR 0039, ADR 0047): the proof, the challenges, the
 --  constraints and the quadratic triples form one record sized by the
 --  circuit and the geometry, allocated on the heap for the duration of
 --  Verify under SPARK's ownership rules and freed on every path; the
 --  Ligero verifier does the same for its own working set. The
---  supported scale is the available memory (chapter 6).
+--  supported scale is the available memory (chapter 6); a failed
+--  allocation raises Storage_Error, outside the proofs (register row
+--  P1).
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037.
---  Public data only.
+--  Public data only (register row S4).
 
 pragma SPARK_Mode (On);
 

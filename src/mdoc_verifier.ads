@@ -1,7 +1,7 @@
 --  Mdoc_Verifier: the verifier of an mDoc proof of age,
 --  run_mdoc_verifier_inner of the reference (longfellow-zk/longfellow-zk
---  d5e6be7, rust/applications/mdoc_zk/runtime/src/verifier.rs; Phase D,
---  block 5, ADR 0058), on the two phases of Zk_Verifier (ADR 0085) over
+--  d5e6be7, rust/applications/mdoc_zk/runtime/src/verifier.rs; ADR
+--  0058), on the two phases of Zk_Verifier (ADR 0085) over
 --  the library instances of the two fields.
 --
 --  The flow, in the reference's order: the tags are read from the
@@ -122,8 +122,8 @@ package Mdoc_Verifier is
        (St in Mdoc_Status.Hash_Failed | Mdoc_Status.Sig_Failed)
        = (Detail /= Verifier_Status.Ok);
 
-   --  The verifier's entry point of the supported profile (ADR 0089,
-   --  #79): Profile is the profile's name, the combined identifier of a
+   --  The verifier's entry point of the supported profile (ADR
+   --  0089): Profile is the profile's name, the combined identifier of a
    --  row of Mdoc_Spec; Hash_Id and Sig_Id the identifiers of the two
    --  circuits given (from their files' headers). The profile is
    --  checked first (Mdoc_Spec.Select_Profile: Profile_Unknown,

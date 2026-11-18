@@ -1,10 +1,15 @@
 --  Os_Random: the operating system's random generator as a byte stream
---  for the prover (ADR 0050): Fill reads /dev/urandom, the realisation
---  of the system's cryptographically secure generator on macOS and
---  Linux at this date. Outside the proof perimeter (SPARK_Mode Off):
---  it does input and output on a device file, which SPARK does not
---  model; the trust model lists it as trusted for the zero-knowledge
---  property of the proofs longfellow_prove makes without --seed.
+--  for the prover (ADR 0050): Fill reads /dev/urandom, the system's
+--  cryptographically secure generator on macOS and Linux.
+--
+--  Documentation: docs/guide/07-prover.md, Section 3.2.
+--
+--  Proof status: outside SPARK (SPARK_Mode Off), since it does input
+--  and output on a device file, which SPARK does not model; compiled
+--  with the run-time checks on (register row T7). Trusted: that the
+--  bytes are fresh and unpredictable (register rows C1 and P4), on
+--  which the zero knowledge of the proofs the command-line provers make
+--  without --seed depends.
 
 pragma SPARK_Mode (Off);
 

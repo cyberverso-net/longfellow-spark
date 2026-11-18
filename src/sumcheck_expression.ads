@@ -1,10 +1,11 @@
 --  Sumcheck_Expression: sparse affine expressions over the combined
 --  witness, k + SUM_i a[i] * Var (i), for the symbolic sumcheck verifier
---  (draft-03 Section 6.7; zk/expression.rs of the reference). Generic
+--  (Section 6.7 of the spec; zk/expression.rs of the reference). Generic
 --  over an instance of Sumcheck_Algebra, from which it takes the field
 --  (ADR 0024) and the logical equality Same (ADR 0023).
 --
---  Documentation: docs/guide/03-sumcheck.md. Decision: ADR 0026.
+--  Documentation: docs/guide/03-sumcheck.md, Section 3.4. Decision:
+--  ADR 0026.
 --
 --  Representation: a discriminated record with a Capacity, a Length, a
 --  sorted array of (variable, coefficient) pairs with no duplicate
@@ -12,7 +13,8 @@
 --  coefficients are kept (ADR 0026): a stored coefficient is what the
 --  field operations produced, never dropped by a test on its value.
 --
---  Proof status (per instance). Every operation is Gold against the
+--  Proof status (per instance). Every operation is Silver and Gold
+--  against the
 --  coefficient model: Find gives the position of a variable, Has and
 --  Coef (ghost) read the model, and each postcondition states which
 --  variables are present in the result (every variable of the operands,
@@ -25,6 +27,9 @@
 --  Zero + K the body computes Zero + K. Lengths are exact: Add and Sub
 --  state the number of variables of F that are new to E (New_Count),
 --  which is what the capacity bound of the symbolic core rests on.
+--  Tested through the verifier core against recorded upstream runs
+--  (sumcheck_kat, tier 3). Trusted: that Same is the equality of the
+--  element type (register row T6).
 --
 --  Cost: Find is a linear scan and insertion shifts the tail; the
 --  expressions of the verifier core hold at most a few hundred terms

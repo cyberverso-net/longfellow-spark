@@ -1,7 +1,7 @@
---  Clmul64: the carry-less product of two 64-bit words (Phase D,
---  milestone M2, ADR 0065), as clmul64 of upstream's generic.rs
---  computes it (rust/runtime/algebra/src/arch/generic.rs at d5e6be7),
---  with no special instruction.
+--  Clmul64: the carry-less product of two 64-bit words (ADR 0065), as
+--  clmul64 of upstream's generic.rs computes it
+--  (rust/runtime/algebra/src/arch/generic.rs at d5e6be7), with no
+--  special instruction.
 --
 --  The low word, Clmul_Lo, splits each operand into four classes of bit
 --  positions (one bit in four) and adds up sixteen integer products of
@@ -10,7 +10,7 @@
 --  Clmul_Hi, is the low word of the bit-reversed operands, reversed and
 --  shifted right by one.
 --
---  Documentation: docs/guide/01-gf2_128.md.
+--  Documentation: docs/guide/01-gf2_128.md, Section 2.7.
 --
 --  Clmul_Kara makes the three products of one Karatsuba step and shares
 --  the reversals among them; GF2_128.Mul calls it.
@@ -23,11 +23,16 @@
 --  a number in base 16 whose digits are sums of 0 and 1, and shows that
 --  no digit below the top one reaches 16 (the lemmas of the body).
 --  The lemmas below are the ones GF2_128 uses to prove Mul.
+--  The references, the postconditions and the lemmas are at the
+--  assertion level Proof_Only (ADR 0044): proved, never compiled, so
+--  that the compiled code agrees with the source proved is trusted
+--  (register row T8). Tested through GF2_128.Mul on the vectors of
+--  gf2_128_kat.
 --
---  Constant-time discipline (ADR 0006): no branch and no memory access
---  depend on the operands. The integer multiplications assume that the
---  processor's multiplier takes a time independent of its operands
---  (ADR 0065), as upstream does.
+--  Constant-time discipline (ADR 0006, register row S4): no branch and
+--  no memory access depend on the operands. The integer
+--  multiplications assume that the processor's multiplier takes a time
+--  independent of its operands (ADR 0065), as upstream does.
 
 pragma SPARK_Mode (On);
 

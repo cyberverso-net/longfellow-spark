@@ -12,12 +12,18 @@
 --  formulas of LigeroGeometry::new and satisfy the constraints of
 --  Section 4.2.1, stated once as the predicate Consistent of the
 --  subtype Valid_Geometry, so that every unit taking a Valid_Geometry
---  has them. The row index functions are Gold trivially (below
---  Total_Rows). Valid is the executable form of 4.2.1 on a
---  configuration; a configuration that fails it is the caller's error,
---  checked before anything is sized.
+--  has them. The row index functions are Gold by definition, and in
+--  range (below Total_Rows) through that predicate. Lemma_Rows_Cover
+--  proves that the witness rows cover NW. Valid is the executable form
+--  of 4.2.1 on a configuration; a configuration that fails it is the
+--  caller's error, checked before anything is sized.
 --
---  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037.
+--  Tested: ligero_geometry.txt (ligero_kat), configurations against
+--  LigeroGeometry::new transcribed, the numbers of Appendix B.3.2 and
+--  violations of 4.2.1 among them.
+--
+--  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037
+--  (register row S4).
 
 pragma SPARK_Mode (On);
 
@@ -25,7 +31,7 @@ package Ligero_Geometry is
 
    --  Bounds (ADR 0039): the encoded length (NCOL) is also the range
    --  of the Reed-Solomon evaluation points, below 2^16 on GF(2^128);
-   --  Max_Witnesses covers Max_Wires of stage 3 plus the pads.
+   --  Max_Witnesses covers Max_Wires of Sumcheck_Algebra plus the pads.
    Max_Encoded_Len : constant := 2**16;
    Max_Queries     : constant := 2**12;
    Max_Rate_Inv    : constant := 2**16;

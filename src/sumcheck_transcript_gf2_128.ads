@@ -1,5 +1,7 @@
 --  Sumcheck_Transcript over GF(2^128) (ADR 0028): a library-level
---  instance, proved by GNATprove with make prove.
+--  instance, proved by GNATprove with make prove. Proof status and
+--  documentation: see Sumcheck_Transcript and
+--  docs/guide/04-transcript.md, Section 4.3.
 
 pragma SPARK_Mode (On);
 

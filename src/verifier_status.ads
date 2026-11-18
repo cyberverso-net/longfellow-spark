@@ -25,7 +25,13 @@
 --                           a run-length violation, a count that does
 --                           not fit, bytes missing or trailing.
 --
---  Documentation: docs/guide/05-ligero.md. Index: docs/adr/README.md.
+--  Documentation: docs/guide/05-ligero.md. Decisions: ADR 0039 (the
+--  enumeration), 0043 (Exhausted), 0064 (Public_Input_Not_One). Index:
+--  docs/adr/README.md.
+--
+--  Proof status: an enumeration, nothing to prove. The postconditions
+--  of the readers and of the two verifiers state what their statuses
+--  imply.
 
 pragma SPARK_Mode (On);
 

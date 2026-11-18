@@ -1,5 +1,5 @@
 --  Cbor_Parse: a bounded parser for CBOR (RFC 8949), for the mDoc the
---  holder presents (Phase D, block 6, ADR 0086). It transcribes
+--  holder presents (ADR 0086). It transcribes
 --  upstream's parser, circuits/src/cbor/parse.rs at d5e6be7 (parse_exact):
 --  the major types 0 to 7, lengths of 1, 2, 4 or 8 bytes (additional
 --  information 24 to 27), indefinite lengths and the reserved values
@@ -10,7 +10,8 @@
 --  Where upstream recurses into a tree on the heap, this parser walks
 --  the bytes once with an explicit stack of Max_Depth frames and fills
 --  a table of at most Max_Elements elements: the kind, the byte range
---  (Start, the first byte after the head, Stop), the argument of the
+--  (Start, the first byte of the head; Content, the first byte after
+--  it; Stop, the end), the argument of the
 --  head, the parent, the first child and the next sibling. Positions
 --  are relative to the first index of the parsed array, so that the
 --  same table serves a slice of the document (the wrapped MSO, an
@@ -23,13 +24,17 @@
 --  Proof status (Silver = absence of run-time errors, Gold = proved
 --  functional contracts).
 --
---    Parse_Exact : Silver on any bytes; Gold on the invariants of the
---                  table (Valid): every element's range lies inside
---                  the parsed bytes, every child lies inside its
---                  parent, the links point forward within the table.
---                  That the table is the CBOR structure of the bytes
---                  is tested, against a Python transcription and on
---                  upstream's 38 test documents (mdoc_parse_kat).
+--    Parse_Exact : Silver on any bytes within Max_Bytes; Gold on the
+--                  invariants of the table (Valid): every element's
+--                  range lies inside the parsed bytes, the head before
+--                  the content, every child lies inside its parent,
+--                  the links point forward within the table, the root
+--                  and only the root has no parent. That the table is
+--                  the CBOR structure of the bytes, what upstream's
+--                  parser reads and refuses, is tested, against a
+--                  Python transcription and on upstream's 38 test
+--                  documents (mdoc_parse_kat); it is trusted as
+--                  upstream's code specifies it (register row R12).
 --    The accessors: Silver; their results are elements of the table
 --                  or zero.
 --

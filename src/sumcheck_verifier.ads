@@ -1,14 +1,16 @@
---  Sumcheck_Verifier: the symbolic sumcheck verifier core of draft-03
---  Section 6.7 (zk/symbolic_sumcheck_verifier.rs of the reference),
+--  Sumcheck_Verifier: the symbolic sumcheck verifier core of Section 6.7
+--  of the spec (zk/symbolic_sumcheck_verifier.rs of the reference),
 --  challenges as input (ADR 0022). Generic over an instance of
 --  Sumcheck_Algebra and the matching instance of Sumcheck_Expression.
 --
---  Documentation: docs/guide/03-sumcheck.md. Decisions: ADR 0022 (scope,
---  the Challenges record, index names), 0023 (structural Gold), 0026
---  (expressions); frame: ADR 0011, 0020, 0024, 0025.
+--  Documentation: docs/guide/03-sumcheck.md, Sections 3.5 and 3.6.
+--  Decisions: ADR 0022 (scope, the Challenges record, index names),
+--  0023 (structural Gold), 0026 (expressions), 0056 (the input
+--  constraint), 0071 and 0073 (the bound quads), 0080 (the shape);
+--  frame: ADR 0011, 0020, 0024, 0025.
 --
---  What it computes. Given the shape of a circuit (Sumcheck_Algebra, the
---  memory milestone), its public inputs, the bound quad of each layer,
+--  What it computes. Given the shape of a circuit (Sumcheck_Algebra,
+--  ADR 0080), its public inputs, the bound quad of each layer,
 --  the padded sumcheck proof and every verifier challenge, the core
 --  replays the
 --  verifier of Section 6.7 on symbolic witnesses and emits the
@@ -16,7 +18,8 @@
 --  layer and one after the input layer (A * W + b = 0, A as sparse
 --  Ligero_Term triples, b as a vector), and one quadratic triple per
 --  layer (W [c0] * W [c1] = W [cr], generate_lqc_triples). It never
---  touches a transcript: the challenges come from stage 4.
+--  touches a transcript: the challenges come from the transcript of
+--  chapter 4 (Sumcheck_Transcript).
 --
 --  Layouts (ADR 0022). Challenges.G holds the MAX_LOGW output-binding
 --  challenges; the core reads the first Ceil_Lg2 (noutput). For layer J,
@@ -43,17 +46,26 @@
 --  p2 l2, p1 = claim - p0, written with the Gold operations of
 --  Sumcheck_Expression. Input_Constraint is Gold against the formula
 --  of Section 6.7 (ADR 0056): term W has witness W and coefficient
---  In_Coef (npublic + W), eq2 read from the bindeq tables (Phase D,
---  M1), the public inputs fold into the constant as
+--  In_Coef (npublic + W), eq2 read from the bindeq tables, the public
+--  inputs fold into the constant as
 --  Pub_Binding_Ref in input order, and the claims come last as the
 --  terms of Input_Tail, built with the Gold operations of
 --  Sumcheck_Expression. Verify_Layer and Verifier_Core are Silver with
---  postconditions on the sizes emitted and on the pad indices of the
---  quadratic triples (Gold trivially);
+--  proved shape: their postconditions state the sizes emitted and the
+--  pad indices of the quadratic triples;
 --  every claim expression keeps its variables below the current pad
 --  pointer, which is what bounds the expression lengths by 4 logw + 5
---  (ADR 0026). Agreement with the upstream verifier on the emitted
---  constraints is tested on recorded runs (ADR 0027).
+--  (ADR 0026). The core takes the bound quads as inputs; that each
+--  equals the ghost BQ_Ref is proved where they are produced and
+--  asserted at the calls of the core, and the core's own
+--  postcondition does not depend on it (ADR 0071, ADR 0080).
+--
+--  Tested, not proved: agreement with the upstream verifier on the
+--  emitted constraints, on recorded runs with injected challenges
+--  (ADR 0027, sumcheck_kat tier 3; register row V5). Trusted: the
+--  recordings (R5); that the challenges are those of the transcript
+--  (S3); the soundness of the protocol (S1); Same (T6); the contracts
+--  at the level Proof_Only (T8).
 --
 --  Errors as status (ADR 0022): sizes are checked by preconditions on
 --  the records; nothing is raised. Public data only; no constant-time
@@ -381,7 +393,8 @@ package Sumcheck_Verifier is
         Pre => J <= S.Last_Layer and then H <= 1;
 
    --  The bound quad of layer J: by the tables when they fit, term by
-   --  term otherwise, as Verify_Layer chose before ADR 0071.
+   --  term otherwise: the reference the bound quads given to the core are
+   --  proved equal to (ADR 0071).
    function BQ_Ref (C : Circuit; Ch : Challenges; J : Natural) return Element
    is
      (if Layer_Logv (Shape_Of (C), J) <= Max_Bindeq_Log
@@ -573,7 +586,7 @@ package Sumcheck_Verifier is
 
    --  The coefficient of input I in the input constraint: eq2 at I of
    --  the final binding, read from the eq2 table of bindeq when it fits
-   --  (Phase D, M1), computed bit by bit otherwise. That the two agree
+   --  (ADR 0063), computed bit by bit otherwise. That the two agree
    --  is the tested fact that bindeq agrees with eq.
    function In_Coef (I : Natural; State : Claims_State; Alpha : Element)
                      return Element

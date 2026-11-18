@@ -1,10 +1,11 @@
---  Packed_Circuits: a circuit held as its LFC2 file holds it (the memory
---  milestone, ADR 0080). Per layer, the terms are not stored: the file
---  gives a dictionary of term deltas (dg, dh0, dh1, a constant), segments
---  (runs of dictionary entries) and a sequence of tokens (segments), and
---  the terms are the prefix sums of the deltas met in token order, from
---  zero at the start of each layer. On the mDoc hash circuit this form
---  takes 4.2 MB where the expanded terms take 236.7 MB (circuit_kat).
+--  Packed_Circuits: a circuit held as its LFC2 file holds it (ADR
+--  0080). Per layer, the terms are not stored: the file gives a
+--  dictionary of term deltas (dg, dh0, dh1, a constant), segments
+--  (runs of dictionary entries) and a sequence of tokens (segments),
+--  and the terms are the prefix sums of the deltas met in token order,
+--  from zero at the start of each layer. On the mDoc hash circuit this
+--  form is about 57 times smaller than the expanded circuit (chapter
+--  6, Section 3.7; circuit_kat prints both sizes).
 --
 --  The model is the expanded circuit of Sumcheck_Algebra, Raw_Circuit:
 --  Expand gives it, at level Proof_Only, from one recursive ghost
@@ -28,20 +29,34 @@
 --  require it at every call; the rest of each precondition still runs.
 --
 --  Shape_Of gives the shape of the form, the header and the layer table
---  (Sumcheck_Algebra.Shape, block 3): the verifier takes every size from
---  it, and Lemma_Shape_Of proves it a Shape from the loader's
+--  (Sumcheck_Algebra.Shape): the verifier takes every size from it,
+--  and Lemma_Shape_Of proves it a Shape from the loader's
 --  postcondition. Pack is the packed form of an expanded circuit, for
 --  the circuits the tests build by hand, proved by the walk to expand
 --  back to it.
 --
---  Proof status: Gold for the walk against Cursor_At (absence of
---  run-time errors and the Posts below), Gold for Pack against Expand.
---  Nothing here relates the packed form to the bytes of a file: as
---  before, the expansion agrees with upstream's by the vectors (ADR
---  0048).
+--  Documentation: docs/guide/06-circuits.md (Section 3.7). Decisions:
+--  ADR 0080 (the packed form), 0048 (the vectors). Index:
+--  docs/adr/README.md.
+--
+--  Proof status (per instance): Gold for the walk against Cursor_At
+--  (absence of run-time errors and the Posts below), Gold for Pack
+--  against Expand (Valid (Pack (C)) and Expand (Pack (C)) = C), Gold
+--  for Lemma_Shape_Of. Nothing here relates the packed form to the
+--  bytes of a file.
+--
+--  Tested: that the expansion of deltas, segments and tokens is
+--  upstream's, by the vectors (ADR 0048): circuit_kat loads each of
+--  its circuit files with Read_Packed and compares the terms the walk
+--  reads with those of Read, term for term.
+--
+--  Trusted: the upstream production reader as the definition of the
+--  format (register row R4); Same as the equality of the field, for
+--  the coefficients of the walk (T6); the contracts at Proof_Only,
+--  Expand and Cursor_At among them, never compiled (T8).
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, circuits are
---  public data (ADR 0037).
+--  public data (ADR 0037; register row S4).
 
 pragma SPARK_Mode (On);
 
@@ -438,7 +453,7 @@ package Packed_Circuits is
                         Expand (P).Terms (P.Layers (J).First + K - 1).K);
 
    -------------------------------------------------------------------
-   --  The shape, and the packing of an expanded circuit (block 3)
+   --  The shape, and the packing of an expanded circuit
    -------------------------------------------------------------------
 
    --  The shape of P: its header and its layer table, which Expand

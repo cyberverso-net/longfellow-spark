@@ -1,6 +1,7 @@
 --  Packed_HQuad over the P-256 base field. HQ is the verifier's instance
 --  of Sumcheck_HQuad, the one the prover uses: the kernels are proved
---  once, with Sumcheck_Verifier_P256.
+--  once, with Sumcheck_Verifier_P256. Proof status and documentation:
+--  see Packed_HQuad and docs/guide/03-sumcheck.md, Section 4.2.
 
 pragma SPARK_Mode (On);
 

@@ -1,7 +1,8 @@
 --  Sumcheck_Algebra over the P-256 base field (ADR 0024). A
 --  library-level generic instantiation: GNATprove analyses this
 --  instance, with the contracts of P256_Field visible, and make prove
---  counts its checks.
+--  counts its checks. Proof status and documentation: see
+--  Sumcheck_Algebra and docs/guide/03-sumcheck.md, Section 4.2.
 
 pragma SPARK_Mode (On);
 

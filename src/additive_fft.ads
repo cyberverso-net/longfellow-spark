@@ -1,6 +1,6 @@
---  Additive_Fft: the Reed-Solomon extension of draft-03 Section 2.2.2 on
+--  Additive_Fft: the Reed-Solomon extension of draft Section 2.2.2 on
 --  GF(2^128) by the additive FFT of Lin, Chung and Han (2014) in the
---  novel polynomial basis (Phase D, block 3, ADR 0057), in the form of
+--  novel polynomial basis (ADR 0057), in the form of
 --  the production prover (longfellow-zk/longfellow-zk at d5e6be7,
 --  rust/runtime/algebra/src/lch14.rs and lch14_reed_solomon.rs).
 --
@@ -19,19 +19,23 @@
 --  Twiddle (i, coset + offset), where twiddles of lch14.rs builds the
 --  same values incrementally.
 --
---  Documentation: docs/guide/08-additive-fft.md. Decisions: ADR 0057,
---  0051 (constant time), 0047 (the work arrays on the heap).
+--  Documentation: docs/guide/08-additive-fft.md, Sections 1.1 to 1.4,
+--  2 and 3.1. Decisions: ADR 0057, 0051 (constant time), 0047 (the
+--  work arrays on the heap).
 --
 --  Proof status. Silver: no run-time error for any row of 1 to 2^16
 --  values and any output length up to 2^16, with the ownership checks
---  on the two work arrays. Gold, structural: Extend leaves the first n
---  values as they are (the systematic part of the code). That the other
---  values are those of the polynomial through the first n, the values
---  of the Lagrange encoding of chapter 5, is tested, not proved: on the
+--  on the two work arrays, and a proved shape: Extend leaves the first
+--  n values as they are (the systematic part of the code), stated with
+--  Same (register row T6). That the other values are those of the
+--  polynomial through the first n, the values of the Lagrange encoding
+--  of chapter 5, is tested, not proved (register row V2): on the
 --  vectors of gen_fft_vectors.py, where a transcription of lch14.rs is
 --  checked against barycentric Lagrange interpolation, in fft_kat
---  against Lagrange.Evaluate, and by the byte identity of the proofs
---  made with either encoder. The points stay in the subfield because m
+--  against Lagrange.Evaluate, and by the byte identity of the sha256
+--  proof, which this encoder makes, with upstream's. Trusted with the
+--  same row: the novel basis and the algorithm of Lin, Chung and Han as
+--  upstream implements them. The points stay in the subfield because m
 --  is at most 2^16; Twiddle reads the sixteen low bits of its index, so
 --  the bounds on the cosets below only exclude overflow.
 --

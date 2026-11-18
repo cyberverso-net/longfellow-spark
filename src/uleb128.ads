@@ -1,5 +1,5 @@
 --  Uleb128: the unsigned LEB128 integers of the LFC2 circuit format
---  (Phase B, ADR 0046), as the upstream production reader defines them
+--  (ADR 0046), as the upstream production reader defines them
 --  (longfellow-zk/longfellow-zk d5e6be7, rust/core/proto/src/uleb.rs,
 --  read_uleb128_max4): at most four bytes, each carrying seven bits
 --  least significant group first and a continuation bit; a fourth byte
@@ -8,7 +8,8 @@
 --  Zigzag decoding of the deltas as decode_delta_u32: even values are
 --  halved, odd values v give -(v / 2) - 1.
 --
---  Documentation: docs/guide/06-circuits.md.
+--  Documentation: docs/guide/06-circuits.md. Decisions: ADR 0046 (the
+--  format). Index: docs/adr/README.md.
 --
 --  Proof status. Gold: Read succeeds exactly when a byte without the
 --  continuation bit lies within four bytes of Pos; on success it
@@ -18,8 +19,14 @@
 --  continuing) from a truncated one (the file ends first). Zigzag is
 --  its definition. Silver on everything.
 --
+--  Tested: through Circuit_Reader on the circuit files of circuit_kat,
+--  a five-byte integer among the malformed ones.
+--
+--  Trusted: the upstream production reader at d5e6be7 as the
+--  definition of the format (register row R4).
+--
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037:
---  a circuit file is public data.
+--  a circuit file is public data (register row S4).
 
 pragma SPARK_Mode (On);
 

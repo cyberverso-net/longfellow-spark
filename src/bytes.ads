@@ -1,11 +1,11 @@
 --  Bytes: the byte array shared by the protocol code, and the ghost
 --  byte sequence that models what a transcript has absorbed.
 --
---  Documentation: docs/guide/04-transcript.md. Decisions implemented
---  here: ADR 0028 (one byte type for stage 4; P256_Field keeps its
---  Byte_Array as a subtype of this one), ADR 0031 (the absorbed-bytes
---  model as a functional sequence from SPARKlib); frame: ADR 0002,
---  0003, 0020. Index: docs/adr/README.md.
+--  Documentation: docs/guide/04-transcript.md, Sections 3.1 and 3.2.
+--  Decisions implemented here: ADR 0028 (one byte type; P256_Field
+--  keeps its Byte_Array as a subtype of this one), ADR 0031 (the
+--  absorbed-bytes model as a functional sequence from SPARKlib);
+--  frame: ADR 0002, 0003, 0020. Index: docs/adr/README.md.
 --
 --  Proof status. Byte_Array and its subtypes carry no code. Byte_Seqs
 --  is an instance of SPARKlib's functional infinite sequences
@@ -13,9 +13,9 @@
 --  pinned in alire.toml to the release of the toolchain); its
 --  contracts are AdaCore's and are used here as given, with the same
 --  standing as Big_Integers in the P-256 ghost model (trusted as a
---  model, ADR 0031). Append is a ghost function, Gold: its
---  postcondition states the length, the unchanged prefix and the
---  appended elements.
+--  model, ADR 0031, register row T5). Append is a ghost function,
+--  Gold: its postcondition states the length, the unchanged prefix and
+--  the appended elements.
 --
 --  The model is proof-only. SPARKlib declares its lemma vocabulary
 --  (Equal_Prefix and the like) at its assertion level SPARKlib_Full,

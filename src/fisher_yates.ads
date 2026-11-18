@@ -5,15 +5,18 @@
 --  (in Transcript, with the sequence model in scope, the same
 --  invariants ran out of steps).
 --
---  Documentation: docs/guide/04-transcript.md. Decisions: ADR 0028,
---  ADR 0031 (Gold: k distinct indices below n, by the permutation
---  invariant of the array); frame: ADR 0002, 0003, 0020. Index:
---  docs/adr/README.md.
+--  Documentation: docs/guide/04-transcript.md, Section 4.1. Decisions:
+--  ADR 0028, ADR 0031 (Gold: k distinct indices below n, by the
+--  permutation invariant of the array); frame: ADR 0002, 0003, 0020.
+--  Index: docs/adr/README.md.
 --
 --  Proof status. Choose : Gold, the results are distinct and below n,
 --  for every input satisfying the precondition, through a ghost
 --  inverse of the array (a linear invariant, see the body). Silver
---  everywhere.
+--  everywhere. Record_Draw: Gold, the draws stay below their bounds.
+--  n is at most Max_N (2^16), because the array lives on the stack.
+--  Tested through Transcript.Choose on the choose lists of
+--  Appendix B.2 (transcript_kat).
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0029
 --  (public data: the transcript's draws).

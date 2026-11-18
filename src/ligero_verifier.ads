@@ -4,9 +4,9 @@
 --  the length checks, the challenges u_ldt, alphal, alphaq, u_quad,
 --  the four response polynomials absorbed as element slices, the
 --  column indices chosen, then verify_merkle, verify_ldt, verify_dot
---  with its sum check, verify_quad. Generic over the stage 4 transcript
---  glue of a field (sampling, element frames), the proof record and
---  the Lagrange tables of the same field.
+--  with its sum check, verify_quad. Generic over the transcript glue of
+--  a field (Sumcheck_Transcript: sampling, element frames), the proof
+--  record and the Lagrange tables of the same field.
 --
 --  Each step is a visible subprogram, so that a harness can run them
 --  in the reference's order and compare every intermediate value with
@@ -26,8 +26,9 @@
 --  Documentation: docs/guide/05-ligero.md. Decisions: ADR 0035
 --  (scope, the order), 0036 (the tables), 0037 (Checked_Inv behind
 --  Matrix_Failed), 0038 (Gold: the four tests structural, the verifier
---  Silver with proved shape), 0039 (sizes, the status); frame: ADR
---  0023, 0024, 0031. Index: docs/adr/README.md.
+--  Silver with proved shape), 0039 (sizes, the status), 0043
+--  (Exhausted, the streaming slice), 0047 (the heap); frame: ADR 0023,
+--  0024, 0031. Index: docs/adr/README.md.
 --
 --  Proof status (per instance). Proof-only contracts (Proof_Levels).
 --    Axpy, Vaxpy, Dot, Dot1 : Gold, their formulas.
@@ -39,25 +40,44 @@
 --                       comparison of the two.
 --    Build_A_Full     : Silver; the constraint vector a_full of
 --                       verify_dot (the terms accumulated, then the
---                       quadratic copies), tested on the recordings.
+--                       quadratic copies), tested on the recordings
+--                       (register row V5).
 --    Draw_Challenges, Absorb_Polynomials, Choose_Columns, Verify_Merkle,
 --    Build_Tables     : Silver with proved shape; Absorb_Polynomials is
 --                       Gold on its frames (the four slices, as in
 --                       Sumcheck_Transcript); Choose_Columns has the
 --                       distinct indices below the leaf count.
 --    Verify           : Silver with proved shape; the status is one of
---                       the listed values, Exhausted exactly when the
---                       generator ran out.
---  Soundness is the paper's theorem, out of scope (ADR 0035).
+--                       the listed values, Exhausted only when the
+--                       generator ran out, a test verdict only with live
+--                       challenges, the two length statuses only on a
+--                       record not of the geometry's shape.
+--  Draw_Challenges on P-256, Choose_Columns and Verify are declared
+--  possibly non-terminating: the samplers reject (register row V4).
+--
+--  Tested: every step against the recordings of the upstream verifier
+--  on the two circuits of Appendix B.3, with a negative case for each
+--  test (upstream/ligero_*_b3_*.txt, sumcheck_kat); the complete
+--  proofs of Appendix B.3 and the upstream proofs through Zk_Verifier.
+--
+--  Trusted: soundness and zero knowledge, theorems of the protocol and
+--  not contracts here (register row S1, ADR 0035), with the hash and
+--  the transcript as random oracles (S2), and every public value
+--  absorbed before each challenge (S3); Build_A_Full beyond the
+--  recordings (V5); that the Lagrange tables interpolate (V12); the
+--  recordings faithful to d5e6be7 (R5); Same as the equality of the
+--  field (T6); the contracts at Proof_Only, never compiled (T8).
 --
 --  Sizes (ADR 0047): the working set of Verify (the challenges, the
 --  chosen columns, the two Lagrange tables, the evaluation vectors of
 --  the tests, the constraint vector of the linear test) is one record
 --  sized by the geometry, allocated on the heap for the duration of
---  Verify under SPARK's ownership rules and freed on every path.
+--  Verify under SPARK's ownership rules and freed on every path. A
+--  failed allocation raises Storage_Error, outside the proofs
+--  (register row P1).
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037.
---  Public data only.
+--  Public data only (register row S4).
 
 pragma SPARK_Mode (On);
 

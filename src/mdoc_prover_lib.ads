@@ -2,8 +2,12 @@
 --  source Simple_Rng (ADR 0049, ADR 0050). A library-level generic
 --  instantiation: GNATprove analyses this instance and make prove
 --  counts its checks (the partition mdoc); the command-line prover
---  instantiates the generic again with the operating system's source
+--  instantiates the generic again over Cli_Random, which reads the
+--  operating system's generator, or Simple_Rng under --seed
 --  (Mdoc_Prover_Cli).
+--
+--  Documentation: docs/guide/09-mdoc.md, Section 3.2. Proof status:
+--  that of Mdoc_Prover, which GNATprove proves through this instance.
 
 pragma SPARK_Mode (On);
 

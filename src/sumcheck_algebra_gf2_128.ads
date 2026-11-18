@@ -1,6 +1,8 @@
 --  Sumcheck_Algebra over GF(2^128) (ADR 0024). A library-level
 --  generic instantiation: GNATprove analyses this instance, with the
 --  contracts of GF2_128 visible, and make prove counts its checks.
+--  Proof status and documentation: see Sumcheck_Algebra and
+--  docs/guide/03-sumcheck.md, Section 4.2.
 
 pragma SPARK_Mode (On);
 

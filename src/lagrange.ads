@@ -14,34 +14,42 @@
 --  in the order i = 0 .. k - 1. The verifier needs L at the NREQ
 --  queried columns only, all at or beyond DBLOCK >= k, so the identity
 --  block never enters: Build fills a table of k rows and one column
---  per queried column x >= k, once per geometry, and Evaluate is
+--  per queried column x >= k, once per verification, and Evaluate is
 --  encode_row at one of those columns. (The identity block of the
 --  reference's matrix exists in the test generator, where the
 --  interpolation property is checked.)
 --
 --  Documentation: docs/guide/05-ligero.md. Decisions: ADR 0036, 0037
 --  (Checked_Inv for the denominators), 0038 (structural Gold), 0039
---  (sizes); frame: ADR 0023, 0024. Index: docs/adr/README.md.
+--  (sizes), 0066 (the table filled by prefix and suffix); frame: ADR
+--  0023, 0024. Index: docs/adr/README.md.
 --
 --  Proof status (per instance). Diff_Product, Build and Evaluate are
 --  Gold, structural (ADR 0023): equal, through Same, to the ghost
 --  references Diff_Product_Ref and Dot_Ref, which transcribe the
 --  reference's loops; the inverses of Build satisfy Inv_D (i) times
---  the denominator = One by Checked_Inv. The interpolation property
---  (the code agrees with its input at the first k points) is tested
---  (ADR 0040), not proved.
+--  the denominator = One by Checked_Inv.
 --
 --  The structural contracts are proof-only: they sit at the project's
 --  assertion level Proof_Only (Proof_Levels), proved for all inputs
---  and never compiled, because the assertion-enabled test build could
---  not afford them (at the time every P-256 multiplication executed
---  its big-integer postcondition, since moved to the same level by
---  ADR 0044, and a recursive reference in a loop invariant is
---  recomputed at every iteration: a table of dimension 10 on P-256
---  took over ten minutes). What the test build checks of this package
---  is its output against the vectors. Preconditions stay executable.
+--  and never compiled, because in the assertion-enabled test build a
+--  recursive reference in a loop invariant would be recomputed at
+--  every iteration. What the test build checks of this package is its
+--  output against the vectors. Preconditions stay executable.
 --
---  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037.
+--  Tested (ADR 0040): lagrange_gf2_128.txt and lagrange_p256.txt
+--  (ligero_kat), every entry and inverse recomputed and the encoding
+--  checked against the interpolating polynomial.
+--
+--  Trusted: that the tables interpolate, that is, the code agrees with
+--  its input at the first k points (register row V12, tested, not
+--  proved); Fermat's little theorem behind Inv, which affects
+--  completeness only, since a wrong inverse gives Matrix_Failed (V3);
+--  Same as the equality of the field (T6); the contracts at Proof_Only,
+--  never compiled (T8).
+--
+--  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037
+--  (register row S4).
 
 pragma SPARK_Mode (On);
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-07, at the merge of pull request #121, the close of the milestone; proposed 2026-10-29, after milestone M2 of Phase D). Amended 2026-10-30 by [ADR 0082](0082-order-after-the-memory-milestone.md): the order after this milestone is the mDoc layer, the guide, the certification block, then M3. The milestone closed 2026-11-07 by [ADR 0084](0084-memory-milestone-closed.md): the criterion met, the peak heap on the hash circuit 1.17 times upstream's for the prover and 1.30 times for the verifier; the run entry of the merged terms (#110) and the truncation of the eq2 table (#120) remain as issues.
+Accepted (2026-11-07, at the merge of pull request #121, the close of the milestone; proposed 2026-10-29, after milestone M2 of Phase D). Amended 2026-10-30 by [ADR 0082](0082-order-after-the-memory-milestone.md): the order after this milestone is the mDoc layer, the guide, the certification block, then M3. The milestone closed 2026-11-07 by [ADR 0084](0084-memory-milestone-closed.md): the criterion met, the peak heap on the hash circuit 1.17 times upstream's for the prover and 1.30 times for the verifier; the run entry of the merged terms (#110) and the truncation of the eq2 table (#120) remain as issues. Note of 2026-11-16 (#190): the sentence of block 3 that `Read` "stays as the prover's loader" held for the first part of that block only; from its second part every program, the command-line prover among them, loads with `Read_Packed`, and `Read` stays as the oracle of the tests (chapter 6 Sections 3.2 and 3.6, chapter 7 Section 3.7).
 
 ## Date
 

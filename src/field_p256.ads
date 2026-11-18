@@ -1,14 +1,26 @@
 --  Field_P256: the P-256 base field as a Field_Signature instance
 --  (ADR 0024, ADR 0025).
 --
+--  Documentation: docs/guide/03-sumcheck.md, Section 3.1; the field
+--  itself is chapter 2 (docs/guide/02-p256-field.md).
+--
 --  P2 = 2, the third sumcheck evaluation point for fields of odd
---  characteristic (draft-03 Section 6.4). The Lagrange denominators
+--  characteristic (Section 6.4 of the spec). The Lagrange denominators
 --  are d0 = (0 - 1) (0 - 2) = 2, d1 = (1 - 0) (1 - 2) = -1 and
 --  d2 = (2 - 0) (2 - 1) = 2, so the inverses are (p + 1) / 2, p - 1
 --  and (p + 1) / 2. They are computed by
 --  tests/vectors/gen_sumcheck_vectors.py (checked by d * inv (d) = 1)
---  and re-checked by the harness sumcheck_kat with Mul at every run.
+--  and re-checked by the harness sumcheck_kat with Mul at every run:
+--  tested, not proved (register row V11).
 --  Limbs are little-endian, as in P256_Field.
+--
+--  Proof status: Silver, and Gold on the contracts the unit declares
+--  (chapter 3 Section 3.1). Checked_Inv: Ok implies R * D = One, which
+--  the body checks at run time (ADR 0037), so nothing is assumed of
+--  Inv, whose result no contract states. The ten ring laws of the
+--  signature, for the operations of P256_Field: ghost lemmas at the level
+--  Proof_Only (register row T8). Same is taken as given: its body is
+--  the predefined "=", outside SPARK (register row T6).
 
 pragma SPARK_Mode (On);
 

@@ -1,5 +1,12 @@
 --  Field_Signature: what the protocol code needs from a field.
 --
+--  Documentation: docs/guide/03-sumcheck.md, Section 3.1. Decisions:
+--  ADR 0023 (structural Gold with Same), 0024 (the signature package),
+--  0025 (the Lagrange constants), 0028 (the encoding), 0030 (the
+--  sampling), 0036 and 0037 (the checked inverse and the evaluation
+--  points), 0051 (the subfield encoding), 0066 and 0070 (the ring
+--  laws).
+--
 --  A signature package (ADR 0024): a generic with formal parameters
 --  only and nothing declared inside. Its instances carry no code;
 --  they exist so that a protocol unit can take a whole field, type
@@ -12,6 +19,14 @@
 --  constants of ADR 0025. GNATprove analyses the instances of the
 --  protocol units, not the generics, so every proof of protocol code
 --  is made once per field with the actual contracts visible.
+--
+--  Proof status: this unit has no code and no check of its own. What
+--  it states is proved by each field for its own operations (the ring
+--  laws) and used by the instances of the protocol units. Trusted
+--  (docs/guide/trusted-base.md): that Same is the equality of the
+--  element type (register row T6); the lemmas are at the assertion
+--  level Proof_Only (row T8). Tested, not proved: the three Lagrange
+--  denominator inverses (row V11).
 --
 --  Equality is the predefined "=" of the formal private type. Neg is
 --  listed separately from "-" because the reference implementation
@@ -30,25 +45,25 @@
 --  test build and is assumed, not checked, by the provers; what is
 --  proved with Same implies the predefined equality.
 --
---  Serialisation and sampling (stage 4, ADR 0028). Serialized_Size is
---  the byte length of an element (draft Section 7.2.1), To_Bytes its
---  canonical little-endian encoding and From_Bytes the inverse: Ok
+--  Serialisation and sampling (ADR 0028). Serialized_Size is
+--  the byte length of an element (Section 7.2.1 of the spec), To_Bytes
+--  its canonical little-endian encoding and From_Bytes the inverse: Ok
 --  exactly when the bytes are a canonical encoding (below p for P-256,
 --  always for GF(2^128)). Sampling_Rejects says whether the sampler of
 --  Section 3.4.3 can reject a draw: the generic glue of the transcript
 --  draws Serialized_Size bytes and repeats until From_Bytes accepts,
 --  and its termination is proved exactly when Sampling_Rejects is
---  False (ADR 0030). The actuals take the field's fixed byte subtype
---  (Bytes_32, Bytes_16); callers pass arrays of Serialized_Size bytes
---  indexed from 0.
+--  False (ADR 0030; otherwise register row V4). The actuals take the
+--  field's fixed byte subtype (Bytes_32, Bytes_16); callers pass
+--  arrays of Serialized_Size bytes indexed from 0.
 --
 --  The three constants L0_Den_Inv, L1_Den_Inv and L2_Den_Inv are the
 --  inverses of the Lagrange denominators on the evaluation points
 --  0, 1, P2 (ADR 0025): d0 = (0 - 1) (0 - P2), d1 = (1 - 0) (1 - P2),
 --  d2 = (P2 - 0) (P2 - 1). They are computed by the vector generator,
 --  checked there by d * inv (d) = 1, and re-checked at run time by the
---  harness with the library's multiplication; the verifier never
---  calls Inv.
+--  harness with the library's multiplication; the sumcheck verifier
+--  inverts nothing.
 --
 --  The laws of a commutative ring, as ghost lemmas stated with Same.
 --  Each field proves them for its own operations.
@@ -108,7 +123,7 @@ generic
    with procedure From_Bytes
      (B : Bytes.Byte_Array; E : out Element; Ok : out Boolean);
    Sampling_Rejects : Boolean;
-   --  Stage 5 (ADR 0036, 0037): a checked inverse, the Reed-Solomon
+   --  For Ligero (ADR 0036, 0037): a checked inverse, the Reed-Solomon
    --  evaluation point of column X, and the decoding of a subfield
    --  element of Subfield_Size bytes (draft Section 7.2.2; the field
    --  itself for P-256, 2 bytes on the basis for GF(2^128)).
@@ -120,7 +135,7 @@ generic
      (B : Bytes.Byte_Array; E : out Element; Ok : out Boolean);
    --  The Subfield_Size bytes of an element of the subfield (Section
    --  7.2.2), the inverse of From_Subfield_Bytes there; the prover's
-   --  writer uses it on the subfield rows of the tableau (Phase C, ADR
+   --  writer uses it on the subfield rows of the tableau (ADR
    --  0051). On an element outside the subfield the result is
    --  unspecified; the prover checks membership first.
    with function To_Subfield_Bytes (E : Element) return Bytes.Byte_Array;

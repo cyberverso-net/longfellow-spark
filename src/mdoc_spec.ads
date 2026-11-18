@@ -1,7 +1,7 @@
 --  Mdoc_Spec: the table of the circuit pairs this project holds, as
 --  upstream's table of specifications names them (longfellow-zk/
 --  longfellow-zk d5e6be7, rust/applications/mdoc_zk/runtime/src/
---  zk_spec.rs, ZK_SPECS; Phase D, block 5, ADR 0058). A specification
+--  zk_spec.rs, ZK_SPECS; ADR 0058). A specification
 --  is a circuit version, a number of attributes, the combined
 --  identifier of the archive, which is SHA-256 of the signature
 --  circuit's identifier followed by the hash circuit's (the archive is
@@ -18,7 +18,7 @@
 --  caller gives, load the two circuits of the archive, and check that
 --  the identifiers the loader returns are the row's and that their
 --  combined hash is the row's. The two rows are the supported profile
---  of ADR 0089 (#79): Select_Profile is the check the library's two
+--  of ADR 0089: Select_Profile is the check the library's two
 --  entry points begin with, the profile's name, the circuits'
 --  identifiers and the number of attributes, one for both rows.
 --
@@ -32,7 +32,8 @@
 --  are upstream's is tested: the harness mdoc_kat checks each row
 --  against tests/vectors/mdoc_layer.txt, written from zk_spec.rs by
 --  gen_mdoc_layer_vectors.py, and checks Combined_Of on the two
---  identifiers of each row.
+--  identifiers of each row. Trusted: the table as upstream's code
+--  specifies it (register row R8).
 --
 --  Constant-time discipline (ADR 0006): NOT APPLICABLE. Public data.
 

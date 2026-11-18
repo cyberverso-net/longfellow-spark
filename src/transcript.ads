@@ -5,38 +5,42 @@
 --  serialised bytes it is given: this package is not generic and
 --  knows nothing of field elements.
 --
---  Documentation: docs/guide/04-transcript.md. Decisions implemented
---  here: ADR 0028 (scope, the package with state, the Exhausted flag
---  at the 2^40 block bound), 0030 (literal rejection sampling, declared
---  non-termination), 0031 (the Gold perimeter: codec over a ghost byte
---  sequence, nat, choose); frame: ADR 0002, 0003, 0020, 0029. Index:
---  docs/adr/README.md.
+--  Documentation: docs/guide/04-transcript.md, Sections 3.2 and 3.4.
+--  Decisions implemented here: ADR 0028 (scope, the package with
+--  state, the Exhausted flag at the 2^40 block bound), 0030 (literal
+--  rejection sampling, declared non-termination), 0031 (the Gold
+--  perimeter: codec over a ghost byte sequence, nat, choose); frame:
+--  ADR 0002, 0003, 0020, 0029. Index: docs/adr/README.md.
 --
 --  One transcript at a time. The package holds the state; Reset starts
 --  a new transcript from a label, as Transcript::new does in the
 --  reference (docs/specs/rust/src/transcript.rs at d5e6be7). A program
---  that needs two transcripts drives them in sequence (ADR 0031).
+--  that needs two transcripts drives them in sequence (ADR 0031); a
+--  flow with two proofs on one transcript drives both on it in the
+--  order of ADR 0085.
 --
 --  Proof status (Silver = absence of run-time errors, Gold = proved
---  functional contracts). The Gold statements about the absorbed bytes
+--  functional contracts). Every subprogram is Silver. The Gold
+--  statements about the absorbed bytes
 --  are proof-only: they sit at SPARKlib's assertion level SPARKlib_Full
 --  (see bytes.ads), are proved by GNATprove for all inputs and are
 --  never compiled, in no build profile. They are stated with
 --  Byte_Seqs.Logical_Eq, the logical equality of sequences, for the
---  same reason stage 3 states its equalities with Same (ADR 0023):
---  the extensional "=" of SPARKlib gives the provers no congruence,
---  and the proof of a frame is a chain of substitutions.
+--  same reason the sumcheck units state their equalities with Same
+--  (ADR 0023): the extensional "=" of SPARKlib gives the provers no
+--  congruence, and the proof of a frame is a chain of substitutions.
 --
 --    Absorbed     : ghost model, the bytes handed to SHA-256 so far.
 --                   Appended to in exactly two places, Absorb and
 --                   Absorb_Byte in the body, which are also the only
 --                   calls of Sha256.Update.
---    Reset, Write_Bytes, Write0, Write_Element, Write_Slice :
+--    Reset, Write_Bytes, Write0, Write_Element, Write_Slice,
+--    Begin_Slice, Slice_Element :
 --                   Gold, structural (ADR 0023): each appends its frame
 --                   of Section 3.2 to Absorbed, as the ghost functions
---                   Bytes_Frame, Zero_Frame, Element_Frame and
---                   Slice_Frame spell it out piece by piece, and
---                   discards the generator.
+--                   Bytes_Frame, Zero_Frame, Element_Frame,
+--                   Slice_Header and Slice_Frame spell it out piece by
+--                   piece, and discards the generator.
 --    Get_Random_Bytes : Silver with proved shape: the generator is live
 --                   afterwards (seeded from the digest when it was not),
 --                   Exhausted is sticky. That the bytes are AES-256 of
@@ -53,10 +57,20 @@
 --                   bytes from then on and the flag never clears, so a
 --                   replay reports it as a status.
 --
+--  Tested, not proved: that the frames hashed and the keystream are
+--  SHA-256 and AES-256 of the specification (register row V1; the
+--  NIST vectors and the chained steps of Appendix B.2 in
+--  transcript_fs.txt, harness transcript_kat). Trusted
+--  (docs/guide/trusted-base.md): the termination of Nat and Choose, a
+--  probabilistic property (V4); SPARKlib's functional sequences as a
+--  model (T5); the ideal objects of the security argument, each
+--  challenge an ideal coin and the transcript a random oracle (S2).
+--
 --  Pinned spec: IETF draft-irtf-cfrg-longfellow-00, Sections 3.1, 3.1.1,
 --  3.2, 3.4.1, 3.4.2; test vectors Appendix B.2.
 --
---  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0029.
+--  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0029
+--  (register row S4).
 --  The transcript processes the public content of a proof string; it
 --  MUST NOT be given secret data.
 

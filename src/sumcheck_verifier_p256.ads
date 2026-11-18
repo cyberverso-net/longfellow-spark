@@ -1,5 +1,7 @@
 --  Sumcheck_Verifier over the P-256 base field (ADR 0022, ADR 0024): a
 --  library-level instance, proved by GNATprove with make prove.
+--  Proof status and documentation: see Sumcheck_Verifier and
+--  docs/guide/03-sumcheck.md, Section 4.2.
 
 pragma SPARK_Mode (On);
 

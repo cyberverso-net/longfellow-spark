@@ -171,7 +171,7 @@ The run-length structure of Section 7.4 is decided by position, not by value ([A
 
 Every unit of the prover that draws randomness is generic over the source. `Sampling` takes a field signature and a formal procedure `Fill (B : out Byte_Array)`; `Sumcheck_Prover`, `Ligero_Prover` and `Zk_Prover` take an instance of `Sampling` among their formal packages.
 
-GNATprove analyses an instance, not the generic, so a proof holds for whatever `Fill` the instance names: the library instances name `Simple_Rng.Fill`, the command-line prover's instances a procedure that reads the operating system. Nothing in the proofs depends on the bytes being random. What is proved is absence of run-time errors and the structural contracts, for any byte stream; what the randomness buys, zero knowledge, is the paper's theorem (register row S1).
+GNATprove analyses an instance, not the generic, so a proof holds for whatever `Fill` the instance names: the library instances name `Simple_Rng.Fill`, the command-line provers' instances `Cli_Random.Fill`, which reads the operating system's generator, or `Simple_Rng` under `--seed` (Section 3.2). Nothing in the proofs depends on the bytes being random. What is proved is absence of run-time errors and the structural contracts, for any byte stream; what the randomness buys, zero knowledge, is the paper's theorem (register row S1).
 
 The sampling loops of P-256 are literal rejection loops with no cap, declared possibly non-terminating as in chapter 4 (`Always_Terminates => not Sampling_Rejects`, register row V4). On GF(2^128) the loop is dead and the procedure is proved terminating.
 
@@ -500,7 +500,7 @@ The times and the peaks of the prover, and their comparison with upstream's, are
 
 ## 6. What stays trusted, and the limits
 
-- The operating system's generator, for the zero knowledge of the proofs `longfellow_prove` makes without `--seed` (register rows C1 and P4). A proof made with `--seed` is reproducible and predictable, by design, for tests.
+- The operating system's generator, for the zero knowledge of the proofs `longfellow_prove` and `longfellow_prove_mdoc` make without `--seed` (register rows C1 and P4). A proof made with `--seed` is reproducible and predictable, by design, for tests.
 - That `Simple_Rng` is upstream's test generator (register row R7), transcribed and confirmed by the byte identity, and that upstream's proofs are the ones its test asserts.
 - The zero-knowledge and completeness theorems of the padded sumcheck and of Ligero (register row S1); the completeness of this prover is tested (register row V6).
 - The termination of the rejection samplers (register row V4).

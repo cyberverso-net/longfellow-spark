@@ -2,12 +2,13 @@
 --  accumulator of the Fiat-Shamir transcript (draft Section 3.1: the
 --  seed of the generator is SHA-256 of everything absorbed so far).
 --
---  Documentation: docs/guide/04-transcript.md. Decisions implemented
---  here: ADR 0029 (written in SPARK, Silver, functional correctness
---  by NIST vectors, constant-time exemption); frame: ADR 0002, 0003,
---  0020. Index: docs/adr/README.md. The ghost model of the absorbed
---  bytes (ADR 0031) lives in Transcript, the single caller of Update,
---  because GNAT 16 has no ghost record components.
+--  Documentation: docs/guide/04-transcript.md, Sections 3.1 and 4.2.
+--  Decisions implemented here: ADR 0029 (written in SPARK, Silver,
+--  functional correctness by NIST vectors, constant-time exemption);
+--  frame: ADR 0002, 0003, 0020. Index: docs/adr/README.md. The ghost
+--  model of the absorbed bytes (ADR 0031) lives in Transcript, the
+--  single caller of Update, because GNAT 16 has no ghost record
+--  components.
 --
 --  Proof status (Silver = absence of run-time errors, Gold = proved
 --  functional contracts).
@@ -16,12 +17,11 @@
 --              the absorbed bytes is NOT proved; it is tested against
 --              the FIPS 180-4 examples and CAVP short messages
 --              (tests/vectors/sha256.txt, harness transcript_kat) and,
---              through the transcript, against draft Appendix B.2.
---              Since block 6 of Phase D the child Sha256.Trace repeats
+--              through the transcript, against draft Appendix B.2
+--              (register row V1). The child Sha256.Trace repeats
 --              the compression of a block with its trace, over the same
 --              round functions and constants, declared in the private
---              part below for both (ADR 0086); this unit's own code
---              path is unchanged.
+--              part below for both (ADR 0086).
 --
 --  Interface. A Context accumulates bytes (Update); Digest is a
 --  function, so it returns the hash of everything absorbed so far and
@@ -38,8 +38,13 @@
 --  Hash_Leaves), which are secret until the proof is written; ADR 0051
 --  admits that use because the compression function has
 --  data-independent control flow and memory access, and each leaf is
---  hashed over a fixed length. No other use on secret data is admitted
---  without a new decision.
+--  hashed over a fixed length. The trace of the credential's hash, in
+--  the child Sha256.Trace, is admitted by ADR 0086 on the same ground,
+--  over the circuit's maximum number of blocks. The parse of the
+--  credential hashes the signed MSO with this package
+--  (Mdoc_Parse.Issuer_Digest); ADR 0086 places the parse outside the
+--  discipline. No other use on secret data is admitted without a new
+--  decision (register row S4).
 
 pragma SPARK_Mode (On);
 
@@ -52,7 +57,7 @@ package Sha256 is
 
    --  The eight working words of the hash (FIPS 180-4 Section 5.3.3),
    --  public so that the child Sha256.Trace exposes the compression of
-   --  one block with its trace (Phase D, block 6, ADR 0086).
+   --  one block with its trace (ADR 0086).
    type Word_Index is range 0 .. 7;
    type State is array (Word_Index) of Unsigned_32;
 

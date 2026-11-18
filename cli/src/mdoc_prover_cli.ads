@@ -1,7 +1,11 @@
 --  Mdoc_Prover over the chains of longfellow_prove_mdoc, with the
---  source of the command line (Cli_Random, ADR 0050). Outside the
---  proof perimeter: the source is; the generic is proved on its
---  library instance Mdoc_Prover_Lib.
+--  source of the command line (Cli_Random, ADR 0050).
+--
+--  Proof status: outside SPARK (SPARK_Mode Off), compiled with the
+--  run-time checks on (register rows C2 and T7). GNATprove proves the
+--  generic on its library instance Mdoc_Prover_Lib, over Simple_Rng
+--  (header of src/mdoc_prover.ads); this instance is the same generic
+--  over Cli_Random, whose bytes are trusted (rows C1 and P4).
 
 pragma SPARK_Mode (Off);
 

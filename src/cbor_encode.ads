@@ -5,7 +5,7 @@
 --  the high three bits, then the length itself when it is below 24,
 --  or the additional-information value 24, 25 or 26 followed by the
 --  length in one, two or four big-endian bytes. The mDoc layer uses it
---  twice (Phase D, block 5, ADR 0058): for the identifier of an
+--  twice (ADR 0058): for the identifier of an
 --  attribute among the public inputs of the hash circuit, encoded as
 --  a text string (Mdoc_Inputs), and for the byte strings and the
 --  document type inside the device authentication structure

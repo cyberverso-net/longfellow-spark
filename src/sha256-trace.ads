@@ -1,5 +1,5 @@
 --  Sha256.Trace: the compression function of SHA-256 with its trace,
---  for the witness of the hash circuit (Phase D, block 6, ADR 0086).
+--  for the witness of the hash circuit (ADR 0086).
 --  Upstream's circuits/sha256/src/concrete.rs (derived) exposes, per
 --  block, the 48 words w[16 .. 63] of the message schedule, the e and
 --  the a of each of the 64 rounds and the state after the block;
@@ -38,6 +38,10 @@
 --  marker and the length where the message ends, so its work depends
 --  on the message's length; ADR 0086 declares it outside the perimeter
 --  with the parse, which has handled that length already.
+--
+--  Trusted: that the trace and its place in the hash witness are those
+--  upstream's code specifies (register row R14); SHA-256 itself is
+--  tested, not proved (V1).
 
 pragma SPARK_Mode (On);
 
