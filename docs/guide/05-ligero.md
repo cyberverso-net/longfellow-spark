@@ -67,7 +67,21 @@ For the quadratic constraints the tableau has three extra rows per block of WR t
 
 ### 2.1 Merkle heap, batch opening and batch verification
 
-Appendix B.1.1 gives five leaves, their root, and the batch proofs for leaves (0, 1) and (1, 3). For n = 5 the heap has nodes 1 .. 9 with the leaves at 5 .. 9; the path of leaf 0 (node 5) goes through nodes 2 and 1, the path of leaf 1 (node 6) through the same, so the batch proof for (0, 1) is the one sibling of node 2, node 3; for (1, 3), nodes 6 and 8, the proof is the sibling 5 of node 6, the sibling 9 of node 8, and nothing more since nodes 2, 3 and 4 are all on the paths (node 4 is the parent of 8 and 9, node 9 is off the paths and is read from the proof). Verification walks i from n - 1 down to 1: when node i is on a path, its two children are taken from the recomputed nodes if on a path and from the proof otherwise, left first, and node i is their hash; the proof must be consumed exactly, and node 1 must equal the root. `gen_ligero_vectors.py` transcribes the three procedures and reproduces B.1.1.
+Appendix B.1.1 gives five leaves, their root, and the batch proofs for leaves (0, 1) and (1, 3). For n = 5 the heap has nodes 1 .. 9, the children of node i are 2i and 2i + 1, and leaf j is node n + j, so leaves 0 to 4 are nodes 5 to 9:
+
+```
+              1
+        2           3
+     4     5     6     7
+    8 9
+```
+
+Leaf 0 (node 5) goes up through node 2, leaf 1 (node 6) through node 3, and both reach node 1. `Merkle.Open` walks i from n - 1 down to 1 and, at every node on a path, pushes the child that is not on a path:
+
+- for (0, 1): node 3 pushes node 7 and node 2 pushes node 4, so the proof is [7, 4];
+- for (1, 3), nodes 6 and 8: node 4 pushes node 9, node 3 pushes node 7 and node 2 pushes node 5, so the proof is [9, 7, 5].
+
+These are the digests Appendix B.1.1 lists: for (0, 1), leaf 2 and the hash of node 4; for (1, 3), leaves 4, 2 and 0. Verification walks i from n - 1 down to 1: when node i is on a path, its two children are taken from the recomputed nodes if on a path and from the proof otherwise, left first, and node i is their hash; the proof must be consumed exactly, and node 1 must equal the root. `gen_ligero_vectors.py` transcribes the three procedures and reproduces B.1.1.
 
 ### 2.2 Geometry: from (RATE_INV, NREQ, NCOL) and (NW, NQ) to the rows
 
