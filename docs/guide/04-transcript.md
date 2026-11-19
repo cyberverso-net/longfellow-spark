@@ -78,7 +78,16 @@ Section 7.3 serialises, per layer, per round the four elements l (P0), r (P0), l
 - the key schedule as fifteen round keys;
 - `Xtime` with a data-dependent conditional.
 
-Both are Silver: absence of run-time errors and termination for every input; that they compute SHA-256 and AES is tested ([ADR 0029](../adr/0029-sha256-and-aes256-in-spark.md)). The constant-time discipline of chapter 1 is declared not applicable to them and to the transcript: the data are the public content of a proof string, and the headers say so. The schedule and the output are zeroed before they are filled, the shifts are literal, and `Put` has a postcondition on the fill count that the padding loop of `Digest` needs for its variant; the verification approach, "Lessons of the proofs", says why.
+Both are Silver: absence of run-time errors and termination for every input; that they compute SHA-256 and AES is tested ([ADR 0029](../adr/0029-sha256-and-aes256-in-spark.md)). Whether the constant-time discipline of chapter 1 applies depends on the use, as the header of `Sha256` states:
+
+- the transcript, `Aes256` and the verifier's hashing handle the public content of a proof string, so the discipline does not apply to them ([ADR 0029](../adr/0029-sha256-and-aes256-in-spark.md));
+- the prover hashes the nonces and the columns of its committed tableau, which are secret until the proof is written (`Ligero_Prover.Hash_Leaves`, chapter 7); [ADR 0051](../adr/0051-constant-time-in-the-prover.md) admits this use because the compression function's control flow and memory accesses do not depend on the data, and each leaf is hashed over a fixed length;
+- the trace of the credential's hash (`Sha256.Trace`, chapter 9) is admitted on the same ground, over the circuit's maximum number of blocks ([ADR 0086](../adr/0086-mdoc-witness-bounds-and-constant-time.md));
+- the parse of the credential hashes the signed MSO with this package (`Mdoc_Parse.Issuer_Digest`), and ADR 0086 places the parse outside the discipline.
+
+No other use on secret data is admitted without a new decision (register row S4).
+
+ The schedule and the output are zeroed before they are filled, the shifts are literal, and `Put` has a postcondition on the fill count that the padding loop of `Digest` needs for its variant; the verification approach, "Lessons of the proofs", says why.
 
 ### 3.2 Transcript: a package with state, and the ghost absorbed sequence
 
@@ -257,7 +266,7 @@ Section 3.4.3 and the description of B.3.2 call P-256 a "scalar field"; the prim
 - SPARKlib's functional sequences as a model, with the same standing as `Big_Integers` in chapter 2: their contracts are AdaCore's and are used as given ([ADR 0031](../adr/0031-transcript-gold-perimeter.md), T5).
 - Full absorption beyond what the two B.3 proofs exercise: the sequence of calls in `Replay_Challenges` is the checklist, compared with upstream by reading; a public element the protocol should absorb and upstream also omits would pass every test here (S3).
 - The ideal objects of the security argument: each challenge an ideal coin, the transcript a random oracle (S2).
-- The constant-time exemption of the transcript, the hash and the cipher: justified by the data being public, and void if a future use ever gives them a secret (ADR 0029, S4).
+- The constant-time exemption of the transcript, the cipher and the verifier's hashing: justified by the data being public (ADR 0029). The prover's hashing of its columns and the trace of the credential rest instead on a compression function whose time does not depend on the data, over a fixed length (ADR 0051, ADR 0086). Any other use on a secret needs a new decision (S4).
 - That the specification's vectors were produced by the protocol it describes (R1), and that the recordings of chapter 3 are faithful (R5).
 - The compiler and the builder (T1), GNATprove (T2), the SMT solvers (T3); the release build without run-time checks (T7).
 
