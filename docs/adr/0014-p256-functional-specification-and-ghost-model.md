@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-09, after review). Amended 2026-10-16 by [ADR 0044](0044-field-contracts-at-proof-only-level.md): the ghost model, the lemmas and the functional contracts are at the assertion level Proof_Only, never compiled.
+Accepted (2026-10-09, after review). Amended 2026-10-16 by [ADR 0044](0044-field-contracts-at-proof-only-level.md): the ghost model, the lemmas and the functional contracts are at the assertion level Proof_Only, never compiled. Note of 2026-11-19 (#180): the sentence of the Decision "A lemma with a null body is an axiom and is not accepted" does not hold in SPARK. The postcondition of a lemma with a null body is still a verification condition, and GNATprove proves it from the precondition and the definitions in scope (`Lemma_Conv_Bounds` of `P256_Field`, for example). What the rule excludes is a fact left unproved: `pragma Assume`, and a postcondition the provers do not discharge.
 
 ## Date
 

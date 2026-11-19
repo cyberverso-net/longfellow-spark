@@ -68,7 +68,7 @@ Upstream's generator produces both files, and this project reads them as data. I
 - `Mdoc_Prover.Prove_Profile` for the prover;
 - `Mdoc_Verifier.Verify_Profile` for the verifier.
 
-Each begins by checking that the request names a row of the profile and that the identifiers of the circuits it is given are that row's; that the files are the pinned ones is checked by the programs ([A6.4](#a64-the-registered-circuits-are-data)). Two command-line programs use them: `longfellow_prove_mdoc` and `longfellow_verify_mdoc` (chapter 9 Section 3). The prover program can also take upstream's witness files instead of a credential (`--hash-witness`); that path checks the profile and skips the witness builder ([A1.6](#a16-the-honest-prover-and-any-prover)).
+Each begins by checking that the request names a row of the profile and that the identifiers of the circuits it is given are that row's; that the files are the pinned ones is checked by the programs ([A6.4](#a64-the-registered-circuits-are-data)). Two command-line programs use them: `longfellow_prove_mdoc` and `longfellow_verify_mdoc` (chapter 9 Section 3). The prover program can also take upstream's witness files instead of a credential (`--hash-witness` and `--sig-witness`); that path checks the profile and skips the witness builder ([A1.6](#a16-the-honest-prover-and-any-prover)).
 
 **The public inputs**, which come from the relying party: the issuer's public key, the session transcript with its fresh nonce, the requested attribute (its identifier and the value asked for), the date `now` and the document type.
 
@@ -823,17 +823,23 @@ The defence is a coding discipline, **constant time**: no branch and no memory i
 The evidence for it is of three kinds, and an evaluator should weigh each:
 
 - **Reading:** each unit follows the discipline its header states.
-- **Inspection:** the machine code of the sites that select on a secret was inspected on arm64 and x86-64, and has no branch on a secret.
-- **Nothing measured yet:** no timing measurement has been made and no measured claim is made; a measurement of the field kernels and an automatic check of the generated code are planned for a later stage of this project, the certification block.
+- **Inspection:** where the source tests a value that may be secret, the machine code of the release build was inspected on arm64 and x86-64: the prover's two checks and the multiplication of the P-256 field have no branch on a secret (ADR 0051, its notes).
+- **Nothing measured yet:** no timing measurement has been made, and no measured claim is made. An automatic check of the generated code is planned (#70), and a timing campaign belongs to the certification block, a later stage of this project.
 
 The discipline also assumes, as upstream does, that the processor's multiplier takes a time independent of its operands.
 
 Its scope is stated, not implied:
 
-- **Only builds without assertions.** Enabled contracts and ghost code branch on secret values, so the guarantee is for the release build ([B4](00-primer-spark.md#b4-ghost-code-assertion-levels-and-builds)). A few contract checks stay on in every build. Each is on a public value except three, all in the decoding of P-256 elements, whose time can reveal at most whether a decoded value is canonical, that is, written in its one standard form, below the modulus: the prover's random draws ([A9.4](#a94-how-the-transcript-makes-challenges)), the private inputs of the reference program `longfellow_prove`, and the signature witness that `longfellow_prove_mdoc` reads on its witness-file path.
-- **Declared branches on admission.** Before it makes a proof, the prover checks that the witness satisfies the circuit and that its inputs lie in the right subfield, and the witness builder checks that the signatures are canonical. Each ends with a branch on the result, the decision whether to make a proof at all, which reveals only what the absence of a proof reveals anyway.
-- **Not the parse of the credential.** Its time depends on the credential's structure (lengths, positions, number of items) and, through the check of UTF-8, on the bytes of its text strings; the padding of a message into SHA-256 blocks depends on the message's length. Both are declared outside the discipline (ADR 0086). Neither depends on the digests, the signatures or the key, which the parse copies by length; every other operation on an extracted value is constant time.
-- **Not the public side.** The transcript, the hashes over public data and the verifier handle only public content, and the discipline does not apply to them.
+- **Only builds without assertions.** Enabled contracts and ghost code branch on secret values, so the guarantee is for the release build ([B4](00-primer-spark.md#b4-ghost-code-assertion-levels-and-builds)). A few contract checks stay on in every build. Each is on a public value except three, all in the decoding of P-256 elements, whose time can reveal at most whether a decoded value is canonical, that is, written in its one standard form, below the modulus:
+  - the prover's random draws ([A9.4](#a94-how-the-transcript-makes-challenges)), on the supported profile;
+  - outside it, the private inputs of the reference program `longfellow_prove`;
+  - outside it, the signature witness that `longfellow_prove_mdoc` reads on its witness-file path (`--hash-witness` and `--sig-witness`).
+- **Declared decisions on admission.** Nine decisions whether to make a proof at all branch on values derived from the witness, and each is declared by its status. The prover checks that the witness satisfies the circuit and that its inputs lie in the right subfield. Before that, the witness builder refuses a credential the circuits would mishandle, with seven statuses ([A1.6](#a16-the-honest-prover-and-any-prover)). Three things tell the holder's side about a refusal, and they differ:
+  - the refusal, no proof, says that the credential is refused;
+  - the status, returned to the holder's own program, says by which check;
+  - the time says the same check, and for the dates one fact more. Three of the builder's checks decide on a mask gathered over the bytes: the validity dates, the form of the device key, the canonical signatures. Each date has its own mask, and the second is checked only when the first conforms, so the time also says which date failed. The other checks branch directly on a byte or a length. An issue, #195, is to gather one mask first, over both dates as well.
+- **Not the parse of the credential.** Its time depends on the credential's structure (lengths, positions, number of items), on the bytes of its text strings through the check of UTF-8, and on the identifiers of its items: the lookup of the requested attribute compares the request with every identifier of the same length, to its end, and stops at the first that matches. The padding of a message into SHA-256 blocks depends on the message's length. Both are declared outside the discipline (ADR 0086). Neither depends on the digests, the signatures or the key, which the parse copies by length. The discipline applies to every operation on a value once extracted, apart from the decisions above.
+- **Not the public side.** The transcript, the hashes over public data and the verifier handle only public content, and the discipline does not apply to them. The prover's hashing of its secret columns, and the hash of the credential, run over a fixed length on a compression function whose time does not depend on the data.
 
 ### A12.4 Anyone sending inputs
 
