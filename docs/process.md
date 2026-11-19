@@ -243,6 +243,18 @@ A block is done when:
 Issue type, milestone and status are not duplicated as labels. Dependabot labels its pull
 requests `area: ci` (`.github/dependabot.yml`); they need no issue.
 
+## The review at the close of a milestone
+
+Before the closing record of a milestone, the whole repository is reviewed:
+
+- the documents against each other and against the code;
+- the alignment with upstream and with the pinned specification;
+- the integrity of the proofs;
+- the clarity of the guide for its reader, and the evidence for certification;
+- the commands the guide gives for reproducing the evidence, run as written on a clean clone, on the proving machine, with their outputs compared with the text.
+
+The author triages the findings: each is fixed in a pull request of its own before the closing record, recorded as an issue, or answered with the reason.
+
 ## Releases
 
 A release is tagged `vX.Y.Z` from `main` when its milestone's criterion is met, and published

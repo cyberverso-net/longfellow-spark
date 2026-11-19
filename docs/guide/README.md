@@ -14,7 +14,7 @@ The route goes from the claim down the chain of evidence: first what is certifie
 
 Reading time: about four hours, estimated from its length (about 23,000 words); the author's measured time will replace this estimate at the close of the milestone.
 
-1. The repository's [README](../../README.md), its first screen; then [A11.1](00-primer-cryptography.md#a111-the-idea-in-plain-words), the idea in plain words; optionally the [system map](system-map.md), the same flow with the units; [A1](00-primer-cryptography.md#a1-the-object-certified-and-what-certifying-it-means), the object certified and what certifying it means; then [A11](00-primer-cryptography.md#a11-longfellow-all-together) in full, where [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee) states how strong the guarantee is and the four things that limit it.
+1. The repository's [README](../../README.md), from the top to the end of "What you can rely on"; then [A11.1](00-primer-cryptography.md#a111-the-idea-in-plain-words), the idea in plain words; optionally the [system map](system-map.md), the same flow with the units; [A1](00-primer-cryptography.md#a1-the-object-certified-and-what-certifying-it-means), the object certified and what certifying it means; then [A11](00-primer-cryptography.md#a11-longfellow-all-together) in full, where [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee) states how strong the guarantee is and the four things that limit it.
 2. [A12](00-primer-cryptography.md#a12-who-attacks-what), who attacks what.
 3. The [trust model](trust-model.md), "In short".
 4. [B3](00-primer-spark.md#b3-contracts), [B4](00-primer-spark.md#b4-ghost-code-assertion-levels-and-builds), [B6](00-primer-spark.md#b6-what-a-verification-condition-says) and [B7](00-primer-spark.md#b7-proved-tested-trusted): enough SPARK to read a contract, a table of verification conditions and a row of the trusted base register; then [B10](00-primer-spark.md#b10-a-worked-evaluation), a worked evaluation.
@@ -76,7 +76,7 @@ Requirements: [Alire](https://alire.ada.dev) with a GNAT toolchain selected (`al
 
 ```bash
 alr build                                                     # the library
-alr exec -- gnatprove -P longfellow_spark.gpr
+make prove                                                    # the whole proof, on every core
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p   # the test harness, assertions on
 make test                                                     # the fourteen harnesses, concurrently
 make cli                                                      # the release build: interoperability harness, command-line verifier and prover
