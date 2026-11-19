@@ -46,8 +46,12 @@
 --  row V1, ADR 0029); the hash as a random oracle in the soundness
 --  argument (S2).
 --
---  Constant-time discipline (ADR 0006): NOT APPLICABLE, by ADR 0037:
---  the commitment's opened columns are public data (register row S4).
+--  Constant-time discipline (ADR 0006): by use. In the verifier, NOT
+--  APPLICABLE, by ADR 0037: the opened columns and the proof are
+--  public data (register row S4). In the prover, Build runs over the
+--  digests of the secret columns and nonces: its loops depend only on
+--  N, and each node is Hash_Pair over 64 bytes (ADR 0051). Open reads
+--  the heap at positions that depend only on the public indices.
 
 pragma SPARK_Mode (On);
 

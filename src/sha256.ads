@@ -1,14 +1,15 @@
---  Sha256: the SHA-256 hash of FIPS 180-4, as the incremental
+--  Sha256: the SHA-256 hash of FIPS 180-4. Its users: the incremental
 --  accumulator of the Fiat-Shamir transcript (draft Section 3.1: the
---  seed of the generator is SHA-256 of everything absorbed so far).
+--  seed of the generator is SHA-256 of everything absorbed so far), the
+--  Merkle tree and its leaves (Section 4.1), the identifiers of the
+--  circuits, and the digests of the mDoc layer.
 --
 --  Documentation: docs/guide/04-transcript.md, Sections 3.1 and 4.2.
 --  Decisions implemented here: ADR 0029 (written in SPARK, Silver,
 --  functional correctness by NIST vectors, constant-time exemption);
 --  frame: ADR 0002, 0003, 0020. Index: docs/adr/README.md. The ghost
---  model of the absorbed bytes (ADR 0031) lives in Transcript, the
---  single caller of Update, because GNAT 16 has no ghost record
---  components.
+--  model of the bytes Transcript absorbs (ADR 0031) lives in
+--  Transcript, because GNAT 16 has no ghost record components.
 --
 --  Proof status (Silver = absence of run-time errors, Gold = proved
 --  functional contracts).
@@ -38,9 +39,11 @@
 --  Hash_Leaves), which are secret until the proof is written; ADR 0051
 --  admits that use because the compression function has
 --  data-independent control flow and memory access, and each leaf is
---  hashed over a fixed length. The trace of the credential's hash, in
---  the child Sha256.Trace, is admitted by ADR 0086 on the same ground,
---  over the circuit's maximum number of blocks. The parse of the
+--  hashed over a fixed length; it also builds its Merkle tree over
+--  their digests (Merkle.Build), each node over 64 bytes. The trace
+--  of the credential's hash, in the child Sha256.Trace, is admitted by
+--  ADR 0086 on the same ground, over the circuit's maximum number of
+--  blocks. The parse of the
 --  credential hashes the signed MSO with this package
 --  (Mdoc_Parse.Issuer_Digest); ADR 0086 places the parse outside the
 --  discipline. No other use on secret data is admitted without a new
