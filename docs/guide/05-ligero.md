@@ -170,7 +170,15 @@ Structural Gold says nothing about the interpolation property, which the vectors
 
 ### 4.2 Silver with proved shape on the two verifiers; what soundness is and is not
 
-`Ligero_Verifier.Verify` and `Zk_Verifier.Verify` are Silver, no run-time error and termination except through `Choose` and the P-256 sampler (declared, chapter 4), with the postconditions on their status of Section 3.7. `Zk_Verifier.Verify` is the composition ([ADR 0085](../adr/0085-prover-and-verifier-in-two-phases.md)) of `Receive` (the proof read at an offset of a buffer, its root written to the transcript, the record kept on the heap with the shape it was read under) and `Verify_Received` (the statement, the replay, the bound quads, the core, the Ligero verifier, the record freed), on a fresh transcript; the mDoc verifier of chapter 9 receives two proofs before it verifies either. Soundness, that a prover without a satisfying witness is accepted with probability at most the paper's bound, and zero knowledge are theorems about the protocol, not contracts of a subprogram, and no proof here states them ([ADR 0035](../adr/0035-stage-5-scope-ligero-and-the-complete-verifier.md)); what the proofs give is that the verifier computes, without error, exactly the checks upstream's code computes, and what the vectors give is that it agrees with upstream on the published proofs and on every intermediate value of the recordings.
+`Ligero_Verifier.Verify` and `Zk_Verifier.Verify` are Silver, no run-time error and termination except through `Choose` and the P-256 sampler (declared, chapter 4), with the postconditions on their status of Section 3.7. `Zk_Verifier.Verify` is the composition ([ADR 0085](../adr/0085-prover-and-verifier-in-two-phases.md)) of `Receive` (the proof read at an offset of a buffer, its root written to the transcript, the record kept on the heap with the shape it was read under) and `Verify_Received` (the statement, the replay, the bound quads, the core, the Ligero verifier, the record freed), on a fresh transcript; the mDoc verifier of chapter 9 receives two proofs before it verifies either. Soundness, that a prover without a satisfying witness is accepted with probability at most the paper's bound, and zero knowledge are theorems about the protocol, not contracts of a subprogram, and no proof here states them ([ADR 0035](../adr/0035-stage-5-scope-ligero-and-the-complete-verifier.md)).
+
+What the proofs give:
+
+- the verifier runs without a run-time error, on every input;
+- its status obeys the postconditions of Section 3.7;
+- the parts of Section 4.1 meet their functional contracts: the three tests compute the combinations of their references at the opened columns, the Merkle check is that of the heap.
+
+What the proofs do not give is that the verifier computes exactly the checks upstream's code computes. The constraints the core emits (`Verifier_Core`, chapter 3) and the constraint vector built from them (`Build_A_Full`) are Silver: proved free of run-time errors and to emit indices in range, not proved to be upstream's. Their agreement with upstream rests on reading and on the recordings (register V5). What the vectors give is that the verifier agrees with upstream on the published proofs and on every intermediate value of the recordings.
 
 ### 4.3 The verification conditions
 
@@ -300,7 +308,7 @@ No erratum beyond those of chapters 3 and 4. Two notes for the editors: Section 
 - That the recordings of `tests/vectors/upstream/` are faithful to d5e6be7: produced from a pristine checkout with the kept instrumentation tests ([ADR 0040](../adr/0040-ligero-vectors-and-upstream-instrumentation.md), R5).
 - That `Build_A_Full`, Silver, builds the constraint vector of the reference beyond the recordings (V5).
 - That the Lagrange tables interpolate: `Evaluate` is proved to be the Lagrange matrix at the queried column, and the interpolation property is tested (Section 5.2, V12).
-- The constant-time exemption of every unit of this chapter: public data only ([ADR 0037](../adr/0037-checked-inv-and-public-data-scope.md), S4).
+- The constant-time exemption of the units of this chapter in the verifier: public data only ([ADR 0037](../adr/0037-checked-inv-and-public-data-scope.md), S4). The prover also hashes its secret columns and nonces and builds its tree with `Merkle.Build`; that use is the prover's, over fixed-length data (chapter 7 Section 3.8, ADR 0051).
 - Memory: the working sets are on the heap; a failed allocation is a `Storage_Error`, outside the proofs (P1).
 - The compiler and the builder (T1), GNATprove (T2), the SMT solvers (T3); the release build without run-time checks (T7); the contracts at `Proof_Only`, never compiled (T8).
 
