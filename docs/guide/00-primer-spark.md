@@ -739,7 +739,7 @@ make prove                                   # the whole proof, on every core
 make check                                   # everything, in order
 ```
 
-`make prove` runs `gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on`: `-j0` uses every core, and any unproved check is an error. Without `-j0` GNATprove uses one core, and the whole proof does not end in three hours on the proving machine. There, with 24 cores, `make check`, the proof included, took 183 minutes on 18 November 2026.
+`make prove` runs `gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on`: `-j0` uses every core, and any unproved check is an error. Without `-j0` GNATprove uses one core, and the whole proof does not end in three hours on the proving machine. There, with 12 cores, `make check`, the proof included, took 183 minutes on 18 November 2026.
 
 ### B9.2 The commands
 

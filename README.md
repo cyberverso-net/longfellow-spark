@@ -72,7 +72,7 @@ The prover settings are in `longfellow_spark.gpr` (ADR 0020): CVC5, Z3 and Alt-E
 5. the vector generators, compared with the committed files;
 6. a lint of the tracked files, of the relative links of the documentation and of the guide's code maps.
 
-`scripts/check.sh` defines these steps. `make build`, `make prove`, `make test`, `make cli`, `make vectors` and `make lint` run them one at a time. `make prove` gives GNATprove `-j0`, every core; without it the proof runs on one core and did not end within three hours on the proving machine. On the proving machine, 24 cores, `make check` took 183 minutes on 18 November 2026.
+`scripts/check.sh` defines these steps. `make build`, `make prove`, `make test`, `make cli`, `make vectors` and `make lint` run them one at a time. `make prove` gives GNATprove `-j0`, every core; without it the proof runs on one core and did not end within three hours on the proving machine. On the proving machine, 12 cores, `make check` took 183 minutes on 18 November 2026.
 
 The project's proving machine, a virtual machine on Google Cloud, runs the same check on demand and posts the status `prove` ([ADR 0060](docs/adr/0060-proving-machine-on-google-cloud.md), ADR 0062); [the development process](docs/process.md), "The proving machine", describes `scripts/remote-check.sh` and its modes.
 
