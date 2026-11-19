@@ -175,7 +175,7 @@ A `Dynamic_Predicate` is a Boolean condition attached to a type: every value of 
 
 ### 3.3 Lemmas
 
-A *lemma* in SPARK is a ghost procedure whose postcondition states a fact and whose body proves it, usually by a sequence of `pragma Assert` ([B3.4](00-primer-spark.md#b34-lemmas-theorems-the-provers-use)). Calling the lemma makes the fact available at the call site. The project accepts no lemma with a null body: that would be an axiom ([ADR 0014](../adr/0014-p256-functional-specification-and-ghost-model.md)). The package has these:
+A *lemma* in SPARK is a ghost procedure whose postcondition states a fact and whose body proves it, usually by a sequence of `pragma Assert` ([B3.4](00-primer-spark.md#b34-lemmas-theorems-the-provers-use)). Calling the lemma makes the fact available at the call site. A lemma whose body is `null` is not an axiom: its postcondition is still a verification condition, which the provers must prove from the precondition and the definitions in scope. `Lemma_Conv_Bounds` below is one, proved. What the project does not accept is a fact left unproved: no `pragma Assume`, and no postcondition the provers do not discharge ([ADR 0014](../adr/0014-p256-functional-specification-and-ghost-model.md), note of 19 November 2026). The package has these:
 
 - `Lemma_To_Int_Bounds` (and `Lemma_Partial_Bounds`, by recursion on N): 0 <= `To_Int (L)` < 2^(64 Length). A recursive lemma carries a `Subprogram_Variant` like a recursive function.
 - `Lemma_Split`: a 128-bit value equals its low half plus 2^64 times its high half. Proved from `X / 2 ** 64` and `X mod 2 ** 64`, which the provers connect both to the shift and mask forms and to the integer model.
