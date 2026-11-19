@@ -38,7 +38,7 @@ The review of the whole repository (#180) read every page against the code and a
 
 ### What the milestone changed in the statements of assurance
 
-The milestone added no proof and changed no contract. What it changed is what the documents declare, where the review of the code found them silent or saying more than the contracts:
+The milestone added no proof and changed no contract; the one contract change of the release, #165, belongs to the certification block (Verification impact). What it changed is what the documents declare, where the review of the code found them silent or saying more than the contracts:
 
 - **The register's new rows.** V8 to V12: `Subfield_Coords` inverts `Inject`, `Bindeq` agrees with `Eq`, the Lagrange basis interpolates, the three Lagrange denominator inverses are inverses, the Ligero verifier's Lagrange tables interpolate; each was tested and stated in a chapter, without a row. V13: the prover's tableau and its Ligero proof as a whole. R13: the bound of 65,000 bytes on the session transcript. R14: the layouts of the two private witnesses of the mDoc circuits.
 - **A third exception to the rule that the contract parts kept in every build are on public data,** found by an inventory of every call: the private inputs of the witness-file path of `longfellow_prove_mdoc`, which `P256_Field.From_Bytes` decodes.
@@ -70,6 +70,7 @@ What the milestone leaves open is recorded as issues:
 ## Verification impact
 
 - None. The milestone changed no contract, and under `src/` and `cli/src/` nothing but comments: the package headers, those of `Sha256` and `Merkle` included. The test harnesses (their counts by section) and the scripts (the check of the links) changed, and the gate runs them. The gate of the release commit proves from scratch.
+- The release also carries #165, of the certification block, merged on 12 November: three refusals of the witness builder (`Validity_Form_Unsupported`, `Device_Key_Form_Unsupported`, `Random_Form_Unsupported`), with the postconditions of `Mdoc_Prover.Prove_Mdoc` extended to them, proved at its gate.
 - The gate of the release commit NNNNNNN: 39,245 checks, all proved; most steps 463,202.
 
 ## References
