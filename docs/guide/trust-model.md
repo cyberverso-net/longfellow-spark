@@ -1,12 +1,12 @@
 # Trust model
 
-Every claim this project makes about its code falls into one of three groups ([ADR 0003](../adr/0003-proof-policy-and-trust-model.md)):
+Every claim this project makes about its code falls into one of four groups. [ADR 0003](../adr/0003-proof-policy-and-trust-model.md) sets the first three:
 
 - **Proved.** GNATprove has shown it for every possible input.
 - **Tested.** It holds on the committed test vectors, which come from sources outside this repository.
 - **Trusted.** It is assumed. We list it here so that nothing is assumed silently.
 
-A fourth group covers what SPARK cannot express at all, such as soundness or constant time, and says what stands in for a proof there.
+The fourth, **outside the proofs**, holds what SPARK cannot express at all, such as soundness or constant time, and says what stands in for a proof there. It is a group of its own because such a property is neither proved, nor tested on vectors, nor simply assumed: soundness, for example, rests on the protocol's theorems and on the code's fidelity to the specification (register row S1). The primer calls the four groups the four kinds of claim ([A1.4](00-primer-cryptography.md#a14-what-certifying-it-means)).
 
 The [verification approach](verification-approach.md) explains why the line falls where it does. The [trusted base register](trusted-base.md) lists the trusted items one per row, each with an identifier, what depends on it and what would discharge it. Each package header gives the same information for its own subprograms. If a header and this page disagree, the header is the one to fix.
 
@@ -252,7 +252,7 @@ Each item below has a row in the [trusted base register](trusted-base.md), named
 - That `Bindeq` agrees with `Eq` (V9), that the Lagrange basis of the sumcheck interpolates (V10), and that the three Lagrange denominator inverses of each field are the inverses (V11).
 - That the Lagrange tables of the Ligero verifier interpolate (V12).
 - That the rows of the prover's tableau compose into the tableau of the specification, and that the polynomials of its Ligero proof are the reference's sums (V13; ADR 0052).
-- That the absorption into the transcript is complete beyond the two Appendix B.3 proofs. The sequence of calls in `Replay_Challenges` is the checklist (S3).
+- Full absorption into the transcript beyond the two Appendix B.3 proofs. The sequence of calls in `Replay_Challenges` is the checklist (S3).
 
 **The machine.**
 
@@ -263,14 +263,14 @@ Each item below has a row in the [trusted base register](trusted-base.md), named
 ## Outside the proofs, and what covers it
 
 - **Soundness and zero knowledge of the protocol.** These are probabilistic properties, not contracts of a subprogram. The implementation follows the pinned specification step by step and cites each section, so that it is an instance of the analysed protocol and not a variant (S1).
-- **Completeness of the Fiat-Shamir transcript** (S3). The order in which `Replay_Challenges` absorbs values was compared with upstream's code by reading, and is tested on the Appendix B.3 proofs. On the prover side, the byte identity with the upstream proofs tests every draw and every absorption. For the mDoc layer, the order of the two roots, the draw of av and the two statements on one transcript was compared with upstream's prover and verifier by reading, and is tested by the acceptance of upstream's example proofs and by upstream's acceptance of this project's proofs (chapter 9).
+- **Full absorption of the Fiat-Shamir transcript** (S3). The order in which `Replay_Challenges` absorbs values was compared with upstream's code by reading, and is tested on the Appendix B.3 proofs. On the prover side, the byte identity with the upstream proofs tests every draw and every absorption. For the mDoc layer, the order of the two roots, the draw of av and the two statements on one transcript was compared with upstream's prover and verifier by reading, and is tested by the acceptance of upstream's example proofs and by upstream's acceptance of this project's proofs (chapter 9).
 - **What the relying party checks outside the proof.** The trust in the issuer's key, the freshness of the nonce in the session transcript and the choice of the date are the relying party's; the layer binds what it is given (chapter 9 Section 6).
 - **Constant time** (S4). It is a coding discipline, documented in each package header. The guarantee holds only for builds with assertions disabled, because enabled contracts and ghost code branch on secret values (ADR 0006). Its scope:
   - The contract parts at the level `Runtime` stay on in every build. Each is on a public datum, with three exceptions, all in `P256_Field.From_Bytes`, whose `Runtime` postcondition can reveal by its time at most whether the value decoded is canonical ([chapter 4 Section 3.2, "Assertion levels"](04-transcript.md#assertion-levels-and-the-checks-kept-in-every-build), with the inventory of every call):
     1. the prover's random draws (`Sampling`), on the supported profile, where the rejection loop branches on that anyway and ADR 0051 declares the sampling's time a function of the randomness, not of the witness;
     2. the private inputs of the reference program `longfellow_prove`, outside the supported profile, which the procedure's result reveals anyway;
     3. the private inputs of the signature witness file that `longfellow_prove_mdoc` reads on its witness-file path (`--hash-witness` and `--sig-witness`; `Sig_Private`), on its reference path outside the supported profile, which the procedure's result reveals anyway.
-  - It does not apply to `Transcript`, `Aes256` and the units of chapter 5 in the verifier, which handle only the public content of a proof (ADR 0029, 0037).
+  - It does not apply to `Transcript`, `Aes256` and the units of chapter 5 in the verifier, which handle only the public content of a proof (ADR 0029, 0037). The prover also builds its Merkle tree with `Merkle.Build`, over the digests of its secret columns and nonces: that use is the prover's, over fixed-length data ([chapter 5 Section 6](05-ligero.md#6-what-stays-trusted-and-the-limits), chapter 7 Section 3.8, ADR 0051).
   - `Sha256` depends on its use (its header, [chapter 4 Section 3.1](04-transcript.md#31-bytes-sha256-and-aes256-byte-arrays-rotations-and-tables)). On public data in the transcript and the verifier. On secrets in the prover, which hashes the nonces and the columns of its tableau, each leaf over a fixed length (ADR 0051), and in the trace of the credential's hash, over the circuit's maximum number of blocks (ADR 0086): both rest on a compression function whose control flow and memory accesses do not depend on the data. The parse hashes the signed MSO, and is outside the discipline (next point).
   - Nor does it apply to the parse of the credential (`Cbor_Parse`, `Mdoc_Parse`) and the padding of a message into its blocks (`Sha256.Trace.Pad_Message`), declared outside it by ADR 0086: their time depends on the structure of the holder's credential (its lengths, the positions of its fields, the number of its items), the UTF-8 check reads the bytes of its text strings, and the lookup of the requested attribute (`Mdoc_Parse.Find_Item`) compares with the request, byte by byte and to the end, the identifier of every item of the same length, and returns at the first that matches, so its time depends on the lengths of the identifiers and on the position of the requested item; not on the signatures, the digests or the coordinates, which the parse copies by length.
   - The discipline applies to every operation on a value once it is extracted: the SHA-256 trace over the circuit's maximum number of blocks, the encodings of the witness, the two fields, the curve arithmetic of the ECDSA witness.

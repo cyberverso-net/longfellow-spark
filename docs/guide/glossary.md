@@ -28,13 +28,13 @@ Aliases: "dishonest prover" (chapter 9).
 
 ### Completeness
 
-Three senses. (1) **Completeness of the prover**: every proof the honest prover writes for a true statement is accepted. Tested, not proved (register row V6); soundness does not depend on it. (2) **Completeness of the Fiat-Shamir transcript**: every public value is absorbed before each challenge, or a prover could choose it after seeing the challenge. Outside the proofs, compared with upstream by reading (register row S3). (3) **Completeness conditions on issuers**, the rows of the conditions for certifying the circuit marked "completeness": a document that breaks one cannot be proved. They limit which honest holders can prove, not what a cheating prover can. Upstream's Lean also states the **completeness of the signature circuit** (the Lean correspondence page): a valid signature satisfies the circuit. ([B7.2](00-primer-spark.md#b72-tested), [B7.4](00-primer-spark.md#b74-outside-the-proofs), [chapter 9 Section 6](09-mdoc.md#6-what-stays-trusted-and-the-limits))
+Two senses, for the prover and the protocol. (1) **Completeness of the prover**: every proof the honest prover writes for a true statement is accepted. Tested, not proved (register row V6); soundness does not depend on it. (2) **Completeness conditions**, the rows of the conditions for certifying the circuit of kind Completeness: a document, a key or a session that breaks one cannot be proved. They limit which honest holders can prove, not what a cheating prover can. Upstream's Lean also states the **completeness of the signature circuit** (the Lean correspondence page): a valid signature satisfies the circuit. ([B7.2](00-primer-spark.md#b72-tested), [chapter 9 Section 6](09-mdoc.md#6-what-stays-trusted-and-the-limits))
 
-See: [Soundness](#soundness).
+See: [Soundness](#soundness). Not to be confused with [full absorption](#full-absorption), the property of the transcript once called its completeness.
 
 ### Conditions for certifying the circuit
 
-The table of chapter 9 Section 6: the assumptions on the issuer, the relying party and the circuit under which the version 7 pair's guarantee holds, each with what breaks if it fails. ([A1.5](00-primer-cryptography.md#a15-what-stays-outside), [chapter 9 Section 6](09-mdoc.md#6-what-stays-trusted-and-the-limits))
+The table of chapter 9 Section 6: the assumptions on the issuer, the relying party, the device and the circuit under which the version 7 pair's guarantee holds, each with its kind, soundness or completeness, and what breaks if it fails. ([A1.5](00-primer-cryptography.md#a15-what-stays-outside), [chapter 9 Section 6](09-mdoc.md#6-what-stays-trusted-and-the-limits))
 
 ### Constant time
 
@@ -53,6 +53,10 @@ This project's prover working from a credential: its witness builder refuses, be
 In upstream's zero-knowledge theorem, a proof produced without the secret by a program that receives only the public statement and the zero pattern; the Lean correspondence page calls that program the simulator. No one making at most 2^115 queries to the Merkle tree's hash can tell it from a real proof, except with probability 2^-127. ([A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee), [A12.2](00-primer-cryptography.md#a122-the-curious-verifier))
 
 See: [Zero pattern](#zero-pattern).
+
+### Negligible
+
+A probability so small that it can be ignored in practice, below any bound that matters for the system's use; for the version 7 row, about 2^-116 per attempt of a cheating prover. ([A1.1](00-primer-cryptography.md#a11-the-situation), [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee))
 
 ### Outside the proofs
 
@@ -217,6 +221,12 @@ Aliases: "TLV codec" (chapter 4: the encoding of the frames).
 ### Frozen Heart
 
 The name of a class of failures of Fiat-Shamir in other systems that forgot to hash the public inputs. ([A9.3](00-primer-cryptography.md#a93-everything-must-go-in-and-in-order))
+
+### Full absorption
+
+The property of the Fiat-Shamir transcript that every public value is absorbed before each challenge that depends on it, or a prover could choose the value after seeing the challenge (the [Frozen Heart](#frozen-heart) class). Outside the proofs, compared with upstream by reading and tested by the byte identity with upstream's proofs (register row S3). ([A9.3](00-primer-cryptography.md#a93-everything-must-go-in-and-in-order), [B7.4](00-primer-spark.md#b74-outside-the-proofs))
+
+Aliases: "completeness of the transcript", "completeness of the Fiat-Shamir transcript", "transcript completeness" (earlier texts).
 
 ### Hand
 
@@ -693,6 +703,12 @@ A different function: SPARKlib's equality of functional sequences, used by the t
 ### Loop invariant
 
 A property stated inside a loop and proved true each time the loop passes it; afterwards, the main thing the provers know about the loop. ([B5.1](00-primer-spark.md#b51-loop-invariants))
+
+### Ownership checks
+
+SPARK's rules for memory on the heap: each allocation has one owner at a time, so no two names write the same memory, and GNATprove proves that no pointer is followed when it points nowhere (a null dereference), none after its memory is freed, and that every allocation is freed or handed back on every path (no memory leak). ([B2](00-primer-spark.md#b2-spark-and-what-it-rules-out), [chapter 6 Section 3](06-circuits.md#3-the-adaspark-implementation))
+
+Aliases: "ownership", "null dereferences" and "memory leaks" (the rows of the tables of verification conditions).
 
 ### Package
 

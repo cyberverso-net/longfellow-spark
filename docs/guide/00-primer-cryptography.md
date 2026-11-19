@@ -39,7 +39,7 @@ Showing the signed credential would answer the question, but it would reveal eve
 
 > the prover holds a credential, signed under the issuer's public key the relying party trusts, bound to a device key that has just signed this session, valid at the date the relying party gave, that carries the requested attribute with the requested value.
 
-Precisely: except with negligible probability, such a credential can be recovered from what the prover committed ([A11.4](#a114-how-strong-is-the-guarantee)). The relying party learns nothing else about the credential, apart from one stated exception ([A11.4](#a114-how-strong-is-the-guarantee)); "nothing else" is zero knowledge, which [A1.4](#a14-what-certifying-it-means) places among the claims.
+Precisely: except with [negligible](glossary.md#negligible) probability, a chance so small it can be ignored in practice ([A11.4](#a114-how-strong-is-the-guarantee) gives the bound), such a credential can be recovered from what the prover committed ([A11.4](#a114-how-strong-is-the-guarantee)). The relying party learns nothing else about the credential, apart from one stated exception ([A11.4](#a114-how-strong-is-the-guarantee)); "nothing else" is zero knowledge, which [A1.4](#a14-what-certifying-it-means) places among the claims.
 
 ### A1.2 The object certified
 
@@ -52,14 +52,14 @@ The object is a reimplementation in Ada/SPARK (a programming language and its pr
 | `8d079211…` | 7 | 1 | upstream's Lean certificate of soundness at 116 bits, with the limits of [A11.4](#a114-how-strong-is-the-guarantee) |
 | `137e5a75…` | 6 | 1 | the same code and proofs of this project; no security level is claimed |
 
-The two rows run the same code of this project, with the same proofs and tests. What differs is the configuration of the circuits ([A8](#a8-reed-solomon-codes-and-ligero)): version 7 has the nominal rate 1/7 and opens 132 columns, version 6 the rate 1/4 and 128 columns ([chapter 9 Section 1.2](09-mdoc.md#12-the-production-circuits)). Upstream's theorem is stated for the version 7 configuration, and no theorem covers the version 6 one, kept as the second archive upstream ships at the pin. So the difference between the rows is what may be claimed, not how the code is checked.
+The two rows run the same code of this project, with the same proofs and tests. What differs is the configuration of the circuits ([A8](#a8-reed-solomon-codes-and-ligero)): version 7 has the nominal [rate](glossary.md#rate) 1/7 (the share of an encoded row that holds data, the rest being redundancy) and opens 132 [columns](glossary.md#opened-columns) (positions of the encoded rows that the verifier asks to see), version 6 the rate 1/4 and 128 columns ([chapter 9 Section 1.2](09-mdoc.md#12-the-production-circuits)). Upstream's theorem is stated for the version 7 configuration, and no theorem covers the version 6 one, kept as the second archive upstream ships at the pin. So the difference between the rows is what may be claimed, not how the code is checked.
 
 Anything else is refused before any work.
 
 **The two circuits of a row.** A circuit is a fixed arithmetic description of the check, published as a file ([A6](#a6-circuits)).
 
 - **The hash circuit**, over a field of 2^128 elements ([A2](#a2-finite-fields)), checks the content of the credential: its SHA-256 digests, the attribute and the dates.
-- **The signature circuit**, over the base field of the curve P-256 (the integers modulo a fixed prime of 256 bits, in which the coordinates of the curve's points live; [A2](#a2-finite-fields)), checks the two ECDSA signatures ([A10](#a10-signatures-cbor-and-the-mdoc)).
+- **The signature circuit**, over the base field of the curve P-256 (the integers modulo a fixed prime of 256 bits, in which the coordinates of the curve's points live; [A2](#a2-finite-fields)), checks the two [ECDSA](glossary.md#ecdsa) signatures, the standard signature scheme on that curve ([A10](#a10-signatures-cbor-and-the-mdoc)).
 
 Upstream's generator produces both files, and this project reads them as data. It does not produce them, and today it does not prove what they compute. In the trust model of [A1.4](#a14-what-certifying-it-means) that row is "trusted" ([A1.5](#a15-what-stays-outside)).
 
@@ -108,7 +108,7 @@ In the figure, red boxes are secret, part of the witness; blue boxes are public,
 
 ### A1.4 What certifying it means
 
-An evaluator certifies a claim by following its evidence. This project sorts every claim into four kinds, and the trust model lists each claim under one of them (`docs/guide/trust-model.md`).
+An evaluator certifies a claim by following its evidence. This project sorts every claim into four kinds: the three of its proof policy (ADR 0003), proved, tested and trusted, and a fourth for what no contract can state. The trust model lists each claim under one of them (`docs/guide/trust-model.md`).
 
 - **Proved.** A machine-checked proof shows it for every possible input, not only for the inputs tried. Proofs come in steps of a ladder, each including the one below ([B7](00-primer-spark.md#b7-proved-tested-trusted)).
   - **Silver**, the step every SPARK unit of this project reaches (the command-line programs and the random source are outside SPARK, and the trust model lists them): no run-time error can occur, such as an overflow or an index out of range, for any input that meets the conditions the unit states for its callers, for example that a buffer is long enough.
@@ -594,7 +594,7 @@ What the prover can do is try: change something, recompute, look at the new chal
 
 ### A9.3 Everything must go in, and in order
 
-Fiat-Shamir is only as sound as its transcript is complete: a value not hashed before a challenge can be chosen after seeing it. This happened in other systems that forgot to hash the public inputs, under the name **Frozen Heart**.
+Fiat-Shamir is only as sound as its transcript is full: a value not hashed before a challenge can be chosen after seeing it. That every public value goes in is called here **full absorption**. This happened in other systems that forgot to hash the public inputs, under the name **Frozen Heart**.
 
 Longfellow's transcript takes, in a fixed order:
 
@@ -699,7 +699,7 @@ Longfellow does it in four moves.
 
 1. **Write the check as a circuit** ([A6](#a6-circuits)): a public, fixed list of additions and multiplications over a field (a set of numbers with the four operations, [A2](#a2-finite-fields)), whose outputs are zero, and whose internal assertions hold, exactly when the check passes.
 2. **Lock the secret in a box.** The prover puts the circuit's private inputs (the secret and helper values such as the steps of each SHA-256) and random padding into a commitment ([A5](#a5-commitments-and-the-four-kinds-of-randomness)), the root of a Merkle tree ([A4](#a4-hashes-and-merkle-trees)). The prover can no longer change what is inside, and the verifier cannot see inside.
-3. **Show the circuit accepts, without opening the box.** The prover runs the sumcheck ([A7](#a7-the-sumcheck)) layer by layer, from the outputs down to the inputs. The wires of the layers are computed by the prover and never committed. Every message is padded with random values from the box, so it reveals nothing. At the end the verifier holds no verdict yet, but linear and quadratic equations about the contents of the box.
+3. **Show the circuit accepts, without opening the box.** The prover runs the [sumcheck](glossary.md#sumcheck), a protocol that reduces a claim about a whole layer of the circuit to a claim about a few values ([A7](#a7-the-sumcheck)), layer by layer, from the outputs down to the inputs. The [wires](glossary.md#wire) of the layers, the circuit's intermediate values, are computed by the prover and never committed. Every message is padded with random values from the box, so it reveals nothing. At the end the verifier holds no verdict yet, but linear and quadratic equations about the contents of the box.
 4. **Show the equations hold, still without opening the box.** Ligero ([A8](#a8-reed-solomon-codes-and-ligero)) proves them. The verifier sees a few random columns of an encoded form of the box: too few to learn anything, enough to catch, with overwhelming probability, contents that violate an equation.
 
 Fiat-Shamir ([A9](#a9-fiat-shamir)) turns this conversation into one string of bytes: every challenge the verifier would choose is replaced by a hash of everything written before it, so the verifier checks the proof without any dialogue. The proof is still good for one session only: the first thing hashed is the session transcript with the relying party's fresh nonce, so every challenge depends on it, and a proof made for one session fails in any other.
@@ -754,20 +754,20 @@ The final check is the one the verifier of the proof of age also ends with: it a
 
 ### A11.4 How strong is the guarantee
 
-**Soundness**, that a false statement is accepted only with negligible probability, is a theorem of upstream, proved in Lean ([B8](00-primer-spark.md#b8-lean-and-spark-two-kinds-of-proof)). A cheating prover cannot choose the challenges, but it can recompute the hashes until one is favourable, each recomputation an attempt ([A9.2](#a92-why-the-challenges-stay-unpredictable)). For the version 7 row, upstream proves that a prover who makes N attempts at the transcript's hash, and tA, a single symbol, attempts at the Merkle tree's hash, gets a false statement accepted with probability at most
+**Soundness**, that a false statement is accepted only with negligible probability, is a theorem of upstream, proved in Lean ([B8](00-primer-spark.md#b8-lean-and-spark-two-kinds-of-proof)). A cheating prover cannot choose the challenges, but it can recompute the hashes until one is favourable, each recomputation an attempt ([A9.2](#a92-why-the-challenges-stay-unpredictable)). For the version 7 row, upstream proves that a prover who makes N attempts at the transcript's hash, and tA attempts at the Merkle tree's hash (tA is one symbol, upstream's name for that count, not t times A), gets a false statement accepted with probability at most
 
 > (1 + N + tA) / 2^116.
 
-This is what "116 bits of security" means here: even 2^60 attempts leave a chance of about one in 2^56. It is a statement about a model of the version 7 verifier, under upstream's assumptions, chiefly that the hash functions behave as random oracles ([A4.1](#a41-what-a-hash-function-promises)).
+This is what "116 bits of security" means here: even 2^60 attempts leave a chance of about one in 2^56. It is a statement about a model of the version 7 verifier, under upstream's assumptions, chiefly that the hash functions behave as [random oracles](glossary.md#random-oracle), ideal functions that answer every new question with a fresh random value ([A4.1](#a41-what-a-hash-function-promises)).
 
-The theorem is stated as **extraction**. Its procedure takes what the prover committed, decodes each committed row to a nearby codeword of the code ([A8.1](#a81-reed-solomon-codes)), reads a witness from those codewords and checks it against the statement; the theorem bounds the probability that a proof is accepted while this fails. That is what the proof of age needs: mere existence would say nothing, since for any key and any message a valid ECDSA signature exists, so "a credential with a device signature on this session exists" is always true. What matters is that the signatures were in the data the prover committed, and the extraction says so. Its limit: upstream proves no bound on the procedure's running time, so the textbook notion of "the prover knows a credential" needs more than the theorem gives.
+The theorem is stated as **extraction**. Its procedure takes what the prover committed, decodes each committed row to a nearby [codeword](glossary.md#codeword), a row the code could have produced ([A8.1](#a81-reed-solomon-codes)), reads a witness from those codewords and checks it against the statement; the theorem bounds the probability that a proof is accepted while this fails. That is what the proof of age needs: mere existence would say nothing, since for any key and any message a valid ECDSA signature exists, so "a credential with a device signature on this session exists" is always true. What matters is that the signatures were in the data the prover committed, and the extraction says so. Its limit: upstream proves no bound on the procedure's running time, so the textbook notion of "the prover knows a credential" needs more than the theorem gives.
 
 Four things limit the theorem:
 
 - It does not apply to the version 6 row: no theorem covers its configuration, and this project claims no security level for it ([A1.2](#a12-the-object-certified)).
 - It is about a model. The link between upstream's model and this project's code is by reading, row by row, on the Lean correspondence page. It is not a machine-checked link.
-- Some of its numerical steps use a Lean feature, `native_decide`, which trusts the compiler of Lean as well as its kernel. [B8](00-primer-spark.md#b8-lean-and-spark-two-kinds-of-proof) explains what that adds to the trusted base.
-- It is about the protocol, taking the circuits as given. What the circuits compute is trusted ([A1.5](#a15-what-stays-outside)), and upstream's separate theorems on its ECDSA circuit hold only vacuously at the commit read ([B8.6](00-primer-spark.md#b86-the-rule-on-native_decide-and-upstreams-own-evidence)).
+- Some of its numerical steps use a Lean feature, `native_decide`, which settles a computation by compiling and running it instead of checking each step, and so trusts the compiler of Lean as well as its kernel, the small program that checks every proof. [B8](00-primer-spark.md#b8-lean-and-spark-two-kinds-of-proof) explains what that adds to the trusted base.
+- It is about the protocol, taking the circuits as given. What the circuits compute is trusted ([A1.5](#a15-what-stays-outside)), and upstream's separate theorems on its ECDSA circuit hold only vacuously at the commit read: their premise is false for every real key, so they are true but say nothing about one, and they are no evidence ([B8.6](00-primer-spark.md#b86-the-rule-on-native_decide-and-upstreams-own-evidence)).
 
 **Zero knowledge**, that the proof reveals nothing beyond the statement, is also a theorem of upstream for the version 7 configuration: with 256-bit leaf nonces, the proof can be imitated by someone who does not know the secret, so that no one making at most 2^115 queries to the Merkle tree's hash can tell the imitation from a real proof, except with probability 2^-127. It carries one stated exception, in upstream's own terms: the imitation is told which of the six tagged halves are zero. A zero half gives a zero tag whatever the pad ([chapter 9 Section 1.3](09-mdoc.md#13-the-tags-that-bind-the-two-proofs)). For a real credential no half is zero in practice, but the exception is part of the theorem as stated. The theorem also assumes that the prover's randomness, its pads and blinding values, is fresh, secret and uniform for each proof ([A12.2](#a122-the-curious-verifier)).
 
@@ -834,7 +834,7 @@ Its scope is stated, not implied:
   - the prover's random draws ([A9.4](#a94-how-the-transcript-makes-challenges)), on the supported profile;
   - outside it, the private inputs of the reference program `longfellow_prove`;
   - outside it, the signature witness that `longfellow_prove_mdoc` reads on its witness-file path (`--hash-witness` and `--sig-witness`).
-- **Declared decisions on admission.** Nine decisions whether to make a proof at all branch on values derived from the witness, and each is declared by its status. The prover checks that the witness satisfies the circuit and that its inputs lie in the right subfield. Before that, the witness builder refuses a credential the circuits would mishandle, with seven statuses ([A1.6](#a16-the-honest-prover-and-any-prover)). Three things tell the holder's side about a refusal, and they differ:
+- **Declared decisions on admission.** Nine decisions whether to make a proof at all branch on values derived from the witness, and each is declared by its status. The prover checks that the witness satisfies the circuit and that its inputs lie in the right [subfield](glossary.md#subfield-gf216) (the smaller field of 2^16 elements inside GF(2^128), whose values travel in two bytes). Before that, the witness builder refuses a credential the circuits would mishandle, with seven statuses ([A1.6](#a16-the-honest-prover-and-any-prover)). Three things tell the holder's side about a refusal, and they differ:
   - the refusal, no proof, says that the credential is refused;
   - the status, returned to the holder's own program, says by which check;
   - the time says the same check, and for the dates one fact more. Three of the builder's checks decide on a mask gathered over the bytes: the validity dates, the form of the device key, the canonical signatures. Each date has its own mask, and the second is checked only when the first conforms, so the time also says which date failed. The other checks branch directly on a byte or a length. An issue, #195, is to gather one mask first, over both dates as well.
