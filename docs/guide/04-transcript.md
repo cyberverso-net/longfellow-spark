@@ -255,7 +255,7 @@ Section 3.4.3 and the description of B.3.2 call P-256 a "scalar field"; the prim
 - That `Sha256` and `Aes256` compute SHA-256 and AES-256 on inputs the vectors do not cover ([ADR 0029](../adr/0029-sha256-and-aes256-in-spark.md), register row V1).
 - Termination of `Nat`, `Choose` and the P-256 sampler, and of everything that calls them in the P-256 instance: a probabilistic property, at most one half per attempt for `nat` and below 2^-32 for P-256, declared with `Always_Terminates` and not proved ([ADR 0030](../adr/0030-literal-rejection-sampling.md), V4).
 - SPARKlib's functional sequences as a model, with the same standing as `Big_Integers` in chapter 2: their contracts are AdaCore's and are used as given ([ADR 0031](../adr/0031-transcript-gold-perimeter.md), T5).
-- The completeness of the absorption beyond what the two B.3 proofs exercise: the sequence of calls in `Replay_Challenges` is the checklist, compared with upstream by reading; a public element the protocol should absorb and upstream also omits would pass every test here (S3).
+- Full absorption beyond what the two B.3 proofs exercise: the sequence of calls in `Replay_Challenges` is the checklist, compared with upstream by reading; a public element the protocol should absorb and upstream also omits would pass every test here (S3).
 - The ideal objects of the security argument: each challenge an ideal coin, the transcript a random oracle (S2).
 - The constant-time exemption of the transcript, the hash and the cipher: justified by the data being public, and void if a future use ever gives them a secret (ADR 0029, S4).
 - That the specification's vectors were produced by the protocol it describes (R1), and that the recordings of chapter 3 are faithful (R5).

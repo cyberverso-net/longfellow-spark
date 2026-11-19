@@ -501,6 +501,15 @@ in 177 minutes of `make check` on the proving machine ([B6.5](#b65-partitions-an
 
 The counts measure work, not assurance. What matters is that *Unproved* and *Justified* are empty, and what the contracts state ([B3.6](#b36-what-a-contract-does-not-say)).
 
+**The chapters' tables** give the same counts in another layout, recomputed from GNATprove's files by `scripts/vc-count.py`:
+
+- one column per unit, where the summary has one line for the partition;
+- finer rows: the summary's *Run-time Checks* split into range, overflow, index and the other kinds, its *Functional Contracts* into preconditions and postconditions;
+- one column "Discharged by", flow analysis or the provers, in place of *Flow* and *Provers*;
+- no columns *Justified* and *Unproved*: the last row says instead "none justified, none unproved, no `pragma Assume`", which `vc-count.py` checks.
+
+A chapter's table may give only some of the units of a partition; `vc-count.py` checks that the units of the partition add up to its summary, and every unit of the proof partitions is in the table of exactly one chapter.
+
 ### B6.5 Partitions, and the whole
 
 The project is proved in **partitions**: groups of units proved in one run of GNATprove (`scripts/prove-partitions.txt`). Every non-generic unit under `src/` belongs to exactly one, and a script checks it.
@@ -550,7 +559,7 @@ The words that matter are Silver and Gold, and "Gold" needs care. Gold says that
 - **Structural Gold** (chapters 3, 4 and 5, Section 4.1 of each). The code is proved equal, for all inputs, to a ghost reference that transcribes a formula of the specification or of upstream's reference, in a fixed order of operations ([B4.1](#b41-ghost-code-the-specification-inside-the-program)). Algebraic truths about the formula, such as two ways of writing it agreeing, are tested, as is the reference itself ([B3.6](#b36-what-a-contract-does-not-say)).
 - **Gold by definition** (chapters 3 and 9). The function is itself the transcription of a formula, written as one expression ([B4.1](#b41-ghost-code-the-specification-inside-the-program)). There is nothing to prove beyond the transcription, which a reader checks against the specification by reading.
 - **Gold by composition** (the header of `GF2_128`, `Square`). The unit is a thin wrapper over another that is Gold, and its contract follows from that one's.
-- **Silver with proved shape** (chapter 5 Section 4.2, the two verifiers). Silver, with some facts about the result proved as well (its status, its length, where its parts are), not every value; the header says which.
+- **Silver with proved shape** (chapter 5 Section 4.2, the two verifiers). Silver, with some facts about the result proved as well (its status, its length, where its parts are), not every value; the header says which. Example: `Zk_Verifier.Verify`, which the mDoc verifier runs for each circuit. Its postcondition proves that the status is `Public_Input_Length` exactly when the public inputs are not as many as the circuit's, and that the two length statuses of the Ligero verifier cannot occur. It does not prove that an accepted proof is valid: that is the protocol's theorem (`src/zk_verifier.ads`, its header).
 
 ### B7.2 Tested
 
@@ -591,7 +600,7 @@ Each row says what is assumed, what depends on it, where it is stated, and what 
 Some properties cannot be the contract of any one subprogram. The trust model's last section lists four, each with what stands in for a proof:
 
 - **Soundness and zero knowledge**, which are about every possible prover and verifier, not about one program: upstream's theorems ([A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee); row S1).
-- **The completeness of the Fiat-Shamir transcript**: every public value is absorbed before each challenge, or a prover could choose it after seeing the challenge ([A9](00-primer-cryptography.md#a9-fiat-shamir); row S3). It is compared with upstream's code by reading, and tested by the interoperability above.
+- **Full absorption of the Fiat-Shamir transcript**: every public value is absorbed before each challenge, or a prover could choose it after seeing the challenge ([A9](00-primer-cryptography.md#a9-fiat-shamir); row S3). It is compared with upstream's code by reading, and tested by the interoperability above.
 - **What the relying party checks outside the proof**: trust in the issuer's key, the freshness of the nonce, the date ([A1.5](00-primer-cryptography.md#a15-what-stays-outside)). These lead to the conditions for certifying the circuit, chapter 9 Section 6, which a certifier must accept or refuse.
 - **Constant time**, which is about time: a coding discipline ([A12.3](00-primer-cryptography.md#a123-the-observer-of-timing); row S4).
 
