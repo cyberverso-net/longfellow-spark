@@ -51,7 +51,7 @@ Where it is in the code:
 | D2.1 | [`Packed_Circuits`](../../src/packed_circuits.ads), [`Circuit_Reader`](../../src/circuit_reader.ads) | `Read_Packed`, `Expand` (ghost) | proved on the expansion: well formed, every assertion on wires of its own (`Isolated`, `Dead_End`), the identifier; partition `circuits` | `circuit_kat` | Section 6.3; ADR 0080 | `core_proto` LFC2 reader |
 | D2.2, D2.3, D2.4 | [`Packed_Eval`](../../src/packed_eval.ads), [`Sumcheck_Algebra`](../../src/sumcheck_algebra.ads) | `Eval_Circuit` | Gold on the expansion against the references `Layer_Holds` and `Layer_Z`; partitions `packed_hquad`, `sumcheck` | `prover_kat`, `sumcheck_kat` | Sections 6.3.2, 6.3.3; ADR 0072 | `runtime_sumcheck::eval_circuit` |
 
-Chapter 3 defined a circuit as data: layers, each a list of terms (g, h0, h1, k) with k an element, meaning Q[g, h0, h1] = k in the quad representation of Section 6.3.2 of the specification (k = 0 marks an assertion, Section 6.3.3), and the counts `noutput`, `ninput`, `npublic`. The verifier needs nothing else of a circuit's meaning, but it needs its shape to be right. `Well_Formed` of `Sumcheck_Algebra` says:
+Chapter 3 defined a circuit as data: layers, each a list of terms (g, h0, h1, k) with k an element, meaning Q[g, h0, h1] = k, with h0 the left hand l and h1 the right hand r, in the quad representation of Section 6.3.2 of the specification (k = 0 marks an assertion, Section 6.3.3), and the counts `noutput`, `ninput`, `npublic`. The verifier needs nothing else of a circuit's meaning, but it needs its shape to be right. `Well_Formed` of `Sumcheck_Algebra` says:
 
 - every term names an output wire below its layer's output width and input wires below its input width;
 - `nw <= 2^logw`;

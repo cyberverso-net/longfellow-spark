@@ -736,9 +736,11 @@ flowchart TB
   end
   subgraph verifier [Verifier]
     P --> R["read both proofs; both roots into the transcript; draw av"]
-    R --> B["rebuild the public inputs and e2 from its own data"]
-    B --> V["verify the hash proof, then the signature proof"]
-    V --> D{"both accepted?"}
+    R --> B1["rebuild the hash circuit's public inputs from its own data"]
+    B1 --> V1["verify the hash proof"]
+    V1 --> B2["compute e2, rebuild the signature circuit's public inputs"]
+    B2 --> V2["verify the signature proof"]
+    V2 --> D{"both accepted?"}
   end
 ```
 

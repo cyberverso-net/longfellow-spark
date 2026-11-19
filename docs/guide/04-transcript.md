@@ -36,7 +36,15 @@ Three frames, each a tag byte followed by its payload: a byte array is `0x00`, t
 
 ### 2.2 FsPrf: AES-256 in counter mode
 
-Block i of the keystream is AES-256 under the seed of the 16-byte little-endian encoding of i, from 0. Upstream's code refuses to go past 2^40 blocks with an assertion; this implementation sets a sticky `Exhausted` flag instead and returns zero bytes from then on, so that a replay reports the condition as a status rather than failing ([ADR 0028](../adr/0028-stage-4-scope-and-challenge-replay.md)). No proof reaches it: a draw takes at most three blocks and the longest run of draws between two writes is the eighty of `begin_circuit`.
+Block i of the keystream is AES-256 under the seed of the 16-byte little-endian encoding of i, from 0. Upstream's code refuses to go past 2^40 blocks with an assertion; this implementation sets a sticky `Exhausted` flag instead and returns zero bytes from then on, so that a replay reports the condition as a status rather than failing ([ADR 0028](../adr/0028-stage-4-scope-and-challenge-replay.md)).
+
+How far a proof is from that bound:
+
+- **The count restarts at every write.** A write discards the generator, and the next draw seeds a new one from block 0. Only a run of draws between two writes counts.
+- **A draw is one or more attempts, each of fresh bytes.** An element of GF(2^128) is one attempt of 16 bytes, one block, always accepted. An element of P-256 is 32 bytes per attempt, two blocks, refused when at or above p, a chance of about 2^-32. `nat (n)` reads the byte length of n per attempt, refused with a chance of at most one half (exactly one half when n is a power of two, Section 2.3). The number of attempts is not bounded ([ADR 0030](../adr/0030-literal-rejection-sampling.md)).
+- **The longest run on the supported profile** is the 333 challenges of the Ligero verifier on the version 7 hash circuit, 333 blocks: u_ldt 263, alphal 18, alphaq 51 and u_quad 1 (chapter 5 Section 2.4). They follow from its geometry: rate inverse 7, 132 queries, 4,151 columns, 85,349 committed witnesses and 17 layers. On the signature circuit the same run is 102 elements of P-256, about 204 blocks. The longest run of the sumcheck is the 80 draws of `begin_circuit`.
+
+So reaching 2^40 blocks would take some 2^40 attempts refused in a row, each refused with a chance of at most one half: out of reach in practice. Exhaustion is nevertheless a handled case: the verifier returns `Exhausted`, and no assertion fails.
 
 ### 2.3 nat and choose, step by step
 
