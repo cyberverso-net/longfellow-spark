@@ -30,11 +30,12 @@ flowchart TB
     VS1["VS1 read the circuits<br/>Pinned_Circuits.Read_Packed"]
     TR1["the transcript starts with the session transcript"]
     VS2["VS2 read both proofs; both roots into the transcript<br/>Zk_Verifier.Receive, Mdoc_Proof.Read_Tags"]
-    VS3["VS3 av, e2, the public inputs<br/>Device_Auth.Digest, Mdoc_Inputs.Hash_Inputs, Mdoc_Inputs.Sig_Inputs"]
+    VS3__H["VS3, first part: av, the hash circuit's public inputs<br/>Mdoc_Inputs.Hash_Inputs"]
+    VS3__S["VS3, second part: e2, refused at or above p, the signature circuit's public inputs<br/>Device_Auth.Digest, Mdoc_Inputs.Sig_Inputs"]
     VS4__VS5__VS6__VS7__H["VS4 to VS7 hash circuit: replay, bound quads, equations, Ligero checks<br/>Zk_Verifier.Verify_Received"]
     VS4__VS5__VS6__VS7__S["VS4 to VS7 signature circuit<br/>Zk_Verifier.Verify_Received"]
     VS8["VS8 accept or reject<br/>Mdoc_Verifier.Verify_Profile"]
-    VS1 --> TR1 --> VS2 --> VS3 --> VS4__VS5__VS6__VS7__H --> VS4__VS5__VS6__VS7__S --> VS8
+    VS1 --> TR1 --> VS2 --> VS3__H --> VS4__VS5__VS6__VS7__H --> VS3__S --> VS4__VS5__VS6__VS7__S --> VS8
   end
   CIRC --> PS1
   CIRC --> VS1
@@ -42,11 +43,12 @@ flowchart TB
   RP --> PS3
   RP --> TR0
   RP --> TR1
-  RP --> VS3
+  RP --> VS3__H
+  RP --> VS3__S
   PS7__PS8__PS9__PS10__PS11__S -- "the proof: six tags, the hash proof, the signature proof" --> VS2
 ```
 
-*D1. What it simplifies: the steps PS4 and PS5, and PS7 to PS11, are drawn once per circuit and listed in full in D6 and D7 ([performance page](performance.md)); the checks that refuse an input before any work (the supported profile, the witness builder's statuses, the lengths) are not drawn, nor the refusal of a digest e2 at or above p, which the prover makes at PS6, after the commitments, and the verifier at VS3 ([chapter 9, Section 6](09-mdoc.md#6-what-stays-trusted-and-the-limits), the row "e2 below p"); on the path from the witness files, PS2 does not run and PS3 reads the private inputs from the files. The protocol is Section 5 of draft-irtf-cfrg-longfellow-00 for each circuit; the binding of the two circuits by the tags is upstream's `applications/mdoc_zk` ([chapter 9, Section 1.3](09-mdoc.md#13-the-tags-that-bind-the-two-proofs)). The units named are the generic units; the programs use their instances over GF(2^128) for the hash circuit and over the base field of P-256 for the signature circuit.*
+*D1. What it simplifies: the steps PS4 and PS5, and PS7 to PS11, are drawn once per circuit and listed in full in D6 and D7 ([performance page](performance.md)). VS3 is one step drawn in two parts, in the order the verifier runs them: av and the hash circuit's public inputs before the hash proof is verified, then e2, with its refusal, and the signature circuit's public inputs after it (`Mdoc_Verifier.Verify`). Also simplified: the checks that refuse an input before any work (the supported profile, the witness builder's statuses, the lengths) are not drawn; the refusal of a digest e2 at or above p is made by the prover at PS6, after the commitments, and by the verifier in the second part of VS3, after the hash proof is accepted ([chapter 9, Section 6](09-mdoc.md#6-what-stays-trusted-and-the-limits), the row "e2 below p"); on the path from the witness files, PS2 does not run and PS3 reads the private inputs from the files. The protocol is Section 5 of draft-irtf-cfrg-longfellow-00 for each circuit; the binding of the two circuits by the tags is upstream's `applications/mdoc_zk` ([chapter 9, Section 1.3](09-mdoc.md#13-the-tags-that-bind-the-two-proofs)). The units named are the generic units; the programs use their instances over GF(2^128) for the hash circuit and over the base field of P-256 for the signature circuit.*
 
 ### Where it is in the code
 
