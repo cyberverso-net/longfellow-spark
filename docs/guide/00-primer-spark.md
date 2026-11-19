@@ -517,7 +517,7 @@ The project is proved in **partitions**: groups of units proved in one run of GN
 - `make prove` proves all of them.
 - `make prove-partition PARTITION=<name>` proves one.
 
-The figure that matters is the total of the full run, which the gate on the proving machine produces for each change ([B9](#b9-reproducing-the-evidence)). For a commit whose proof inputs are unchanged, the gate reuses the proof of an earlier commit with the same inputs, and says so in its status. That is the case of d3bbd32: it carries no status of its own, and its proof inputs (digest `be44efe9bc9d`) are those of d8a3f57, whose full run is the total above; `scripts/remote-check.sh --digest` shows the digest of any commit and a commit with the same inputs that the gate has passed.
+The figure that matters is the total of the full run, which the gate on the proving machine produces for each change ([B9](#b9-reproducing-the-evidence)). For a commit whose proof inputs are unchanged, the gate reuses the proof of an earlier commit with the same inputs, and says so in its status. A commit the gate never ran on can be checked the same way. d3bbd32 is one: it carries no status of its own, and its proof inputs (digest `be44efe9bc9d`) are those of d8a3f57, whose full run is the total above; `scripts/remote-check.sh --digest` shows the digest of any commit and a commit with the same inputs that the gate has passed. The proof inputs are every file GNATprove reads: the project file and the source directories it names, `alire.toml`, the partition list, the configuration pragma files, and the gnatprove command lines of `scripts/check.sh` and the Makefile ([the development process](../process.md), "The proving machine"). The digest is computed from a checkout alone, without the proving machine or an account: anyone can recompute it and compare it with the one the status `prove` names.
 
 ### B6.6 What "proved" means, and what it does not
 
@@ -744,9 +744,11 @@ Python 3 is needed to regenerate the test vectors, and by some steps of `make cl
 
 ```bash
 alr build                                    # the library
-alr exec -- gnatprove -P longfellow_spark.gpr
+make prove                                   # the whole proof, on every core
 make check                                   # everything, in order
 ```
+
+`make prove` runs `gnatprove -P longfellow_spark.gpr -j0 --checks-as-errors=on`: `-j0` uses every core, and any unproved check is an error. Without `-j0` GNATprove uses one core, and the whole proof does not end in three hours on the proving machine. There, with 12 cores, `make check`, the proof included, took 183 minutes on 18 November 2026.
 
 ### B9.2 The commands
 
@@ -863,17 +865,22 @@ max steps used for successful proof: 463202
 What to look at:
 
 - **The columns** of the summary ([B6.4](#b64-reading-the-summary-table)). *Unproved* and *Justified* are empty: every check of the partition is proved, by flow analysis, trivially or by a solver.
-- **The check itself.** The command's output lists every check with its place. The postcondition of `Mul` is at line 187 of `gf2_128.ads`, so one search finds it:
+- **The check itself.** The command's output lists every check with its place, as file, line and column. Find the line of `Mul`'s postcondition by its text, then the check at that line:
 
   ```bash
-  grep -n -B1 'gf2_128.ads:187:' prove.log
+  L=$(grep -n "Post .*Mul'Result" src/gf2_128.ads | cut -d: -f1)
+  grep -n -B1 "gf2_128.ads:$L:" prove.log
   ```
+
+  At d3bbd32 the postcondition was at line 187, and the search printed:
 
   ```
    info: postcondition proved
   --> gf2_128.ads:187:31
   ```
-- **The subprogram.** `obj/development/gnatprove/gnatprove.out` has one line per subprogram, with its count of checks. For `Mul`:
+
+  The line moves when the comments above it change (it is 197 from #190 on); the search by text finds it at any commit.
+- **The subprogram.** `obj/development/gnatprove/gnatprove.out` has one line per subprogram, with its count of checks. For `Mul`, `grep -n 'GF2_128.Mul at' obj/development/gnatprove/gnatprove.out` printed, at d3bbd32:
 
   ```
     GF2_128.Mul at gf2_128.ads:184 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (1 checks)
@@ -897,17 +904,26 @@ alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
 tests/bin/gf2_128_kat
 ```
 
-On the proving machine, at d3bbd32, it printed:
+On the proving machine, on 18 November 2026, from a clean clone at 854fa0c, it printed:
 
 ```
 GF2_128 known-answer tests: tests/vectors/gf2_128_mul.txt
 GF2_128 known-answer tests: tests/vectors/gf2_128_square.txt
 GF2_128 known-answer tests: tests/vectors/gf2_128_inv.txt
 GF2_128 known-answer tests: tests/vectors/gf2_128_bytes.txt
+checks by section:
+  tests/vectors/gf2_128_mul.txt: passed 105, failed 0
+  tests/vectors/gf2_128_square.txt: passed 48, failed 0
+  tests/vectors/gf2_128_inv.txt: passed 56, failed 0
+  tests/vectors/gf2_128_bytes.txt: passed 637, failed 0
+    bytes: passed 25, failed 0
+    mask: passed 16, failed 0
+    coords: passed 596, failed 0
+  200000 random products against Mul_Serial: passed 1, failed 0
 passed 847, failed 0
 ```
 
-The four files hold 105 products, 48 squares, 56 inverses and 637 cases of the encodings (25 of the byte encoding, 16 masks and 596 cases of the projection to the subfield). The harness also compares `Mul` with an older, simpler multiplication kept for the purpose, `Mul_Serial`, on random elements, counted as one more check: 846 cases plus 1 make 847.
+The sections are the four files: 105 products, 48 squares, 56 inverses and 637 cases of the encodings (25 of the byte encoding, 16 masks and 596 cases of the projection to the subfield). The last section compares `Mul` with an older, simpler multiplication kept for the purpose, `Mul_Serial`, on 200,000 random products, counted as one check: 846 cases plus 1 make 847.
 
 The harness does not run `Mul_Ref`: its postcondition is at `Proof_Only`, so it is never compiled (the header of `tests/src/gf2_128_kat.adb` says so). What it checks is the compiled `Mul`. The inference is in three steps:
 
@@ -956,7 +972,7 @@ The vectors run on the test build; the release build compiles the same source wi
 **What a certification report would cite:**
 
 - the claim, as stated at the top of this section;
-- the header of `src/gf2_128.ads`, its line on `Mul`, and the contract at line 184;
+- the header of `src/gf2_128.ads`, its line on `Mul`, and the postcondition of `Mul` (line 187 at d3bbd32, found by its text as in step 4);
 - the partition `primitives` at commit d3bbd32, 12 November 2026: 2,015 checks, none unproved;
 - the harness `tests/bin/gf2_128_kat`: passed 847, failed 0;
 - the vector file `tests/vectors/gf2_128_mul.txt`, Section A;

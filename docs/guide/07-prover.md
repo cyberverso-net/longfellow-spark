@@ -86,7 +86,7 @@ After the sumcheck, the transcript holds the root, the statement and every padde
 
 The prover answers with four polynomials, each a combination of rows of the tableau on their systematic columns:
 
-- y_ldt, the LDT row plus u_ldt times every other row, on BLOCK columns;
+- y_ldt, the LDT row (row 0) plus u_ldt[i] times row 3 + i, for each of the NQW witness and quadratic rows, on BLOCK columns: y_ldt = T[ILDT] + sum u_ldt[i] T[IW + i], as in chapter 5 Section 1.3 and upstream's `prove_compute_y_ldt`; the linear and quadratic blinding rows 1 and 2 are not in it;
 - y_dot, the linear row plus, row by row, the row times the encoding of that row's slice of a_full, on DBLOCK columns, where a_full is the vector over all slots that collects the alphal-weighted coefficients of A and the alphaq terms of the triples (the same `Build_A_Full` the verifier uses);
 - y_quad, the quadratic row plus u_quad times (z - x y) over the three rows of each triple, on DBLOCK columns.
 

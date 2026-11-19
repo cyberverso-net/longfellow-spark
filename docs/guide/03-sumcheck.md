@@ -20,7 +20,7 @@ A circuit has NL layers (Section 6.3.1). Layer j computes the wires V[j] from th
 
     V[j][g] = SUM_{l, r} Q[j][g, l, r] V[j + 1][l] V[j + 1][r]
 
-so every wire is a quadratic form of the previous layer's wires. The layer also carries *assertions* (Section 6.3.3; upstream calls them Z terms): terms with coefficient 0, which state that a product of two input wires is zero. In the data this is one list of 4-tuples (g, h0, h1, k) per layer: k /= 0 is Q[g, h1, h0] = k; k = 0 asserts w[h1] w[h0] = 0.
+so every wire is a quadratic form of the previous layer's wires. The layer also carries *assertions* (Section 6.3.3; upstream calls them Z terms): terms with coefficient 0, which state that a product of two input wires is zero. In the data this is one list of 4-tuples (g, h0, h1, k) per layer, the specification's (g, l, r, v): h0 is the left hand l, h1 the right hand r. k /= 0 is Q[g, h0, h1] = k; k = 0 asserts w[h0] w[h1] = 0. In each round of the sumcheck, hand 0 (h0) is bound before hand 1 (h1), as in upstream's `quad.h` and the specification's `sumcheck_prove_layer`.
 
 Upstream's code and the specification use `NW` differently (ADR 0022): for layer j this chapter writes nw_in (j) for the number of input wires (upstream's `layers[j].nw`, the specification's NW[j + 1]) and nw_out (j) for the number of output wires (nw_in (j - 1), or noutput for j = 0); logw (j) is the number of bits of an input wire index, hence of sumcheck rounds.
 
