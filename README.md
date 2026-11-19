@@ -7,7 +7,7 @@ It follows **IETF draft-irtf-cfrg-longfellow-00 (22 October 2026)**, the CFRG ve
 What the system does, and why its proofs matter:
 
 - A holder proves one fact about a signed credential, for example that they are over 18.
-- The relying party learns that fact. By upstream's zero-knowledge theorem it learns nothing else of the credential but which of six hidden values are zero, and for a real credential none is in practice ([the primer, A11.4](docs/guide/00-primer-cryptography.md#a114-how-strong-is-the-guarantee)).
+- The relying party learns that fact. By upstream's zero-knowledge theorem it learns nothing else of the credential but [which of six hidden values are zero](docs/guide/00-primer-cryptography.md#a114-how-strong-is-the-guarantee): the halves of the three secret values the two circuits share, and for a real credential none is zero in practice.
 - The code runs on inputs an adversary chooses: the proofs, the circuits and the credential. A crash, a read out of bounds or a wrong field operation would be a flaw, whatever the cryptography guarantees.
 - This project proves that its SPARK code has no run-time error, for any input that meets the preconditions of its units.
 - It proves that its fields and the formulas of its building blocks are those of their references.
@@ -43,7 +43,7 @@ No check is justified away and no `pragma Assume` is used.
 
 ## Documentation
 
-The repository is meant to be read. [docs/guide/](docs/guide/README.md) has one chapter per stage. Each chapter covers the mathematics, the algorithm and the SPARK code, explained for a reader new to SPARK, then says what is proved, tested and trusted. Start with [the verification approach](docs/guide/verification-approach.md).
+The repository is meant to be read. [docs/guide/](docs/guide/README.md) has one chapter per stage. Each chapter covers the mathematics, the algorithm and the SPARK code, explained for a reader new to SPARK, then says what is proved, tested and trusted. Start with the guide's [short reading path](docs/guide/README.md#the-short-path-for-a-first-assessment), written for an evaluator.
 
 Every non-trivial decision has a record in [docs/adr/](docs/adr/README.md).
 
@@ -55,7 +55,7 @@ You need [Alire](https://alire.ada.dev). The compiler, the builder and the prove
 
 ```bash
 alr build                                    # the library
-alr exec -- gnatprove -P longfellow_spark.gpr
+make prove                                   # the whole proof, on every core
 make check                                   # everything, in order
 ```
 
@@ -72,7 +72,7 @@ The prover settings are in `longfellow_spark.gpr` (ADR 0020): CVC5, Z3 and Alt-E
 5. the vector generators, compared with the committed files;
 6. a lint of the tracked files, of the relative links of the documentation and of the guide's code maps.
 
-`scripts/check.sh` defines these steps. `make build`, `make prove`, `make test`, `make cli`, `make vectors` and `make lint` run them one at a time. The full proof takes about an hour on a laptop.
+`scripts/check.sh` defines these steps. `make build`, `make prove`, `make test`, `make cli`, `make vectors` and `make lint` run them one at a time. `make prove` gives GNATprove `-j0`, every core; without it the proof runs on one core and did not end within three hours on the proving machine. On the proving machine, 24 cores, `make check` took 183 minutes on 18 November 2026.
 
 The project's proving machine, a virtual machine on Google Cloud, runs the same check on demand and posts the status `prove` ([ADR 0060](docs/adr/0060-proving-machine-on-google-cloud.md), ADR 0062); [the development process](docs/process.md), "The proving machine", describes `scripts/remote-check.sh` and its modes.
 
