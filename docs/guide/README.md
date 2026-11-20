@@ -12,7 +12,7 @@ The route goes from the claim down the chain of evidence: first what is certifie
 
 ### The short path, for a first assessment
 
-Length: about 31,500 words, 30,000 without the optional system map. The reading time, as the author measures it, is given here at the close of the milestone.
+Reading time: about 3 hours 20 minutes, measured by the author, who knows the material. A reader new to it should allow five to six hours. The path is about 31,500 words, 30,000 without the optional system map.
 
 1. The repository's [README](../../README.md), from the top to the end of "What you can rely on"; then [A11.1](00-primer-cryptography.md#a111-the-idea-in-plain-words), the idea in plain words; [A1](00-primer-cryptography.md#a1-the-object-certified-and-what-certifying-it-means), the object certified and what certifying it means; optionally the [system map](system-map.md), the same flow with the units, whose column "Assurance" uses the terms of A1.4; then [A11](00-primer-cryptography.md#a11-longfellow-all-together) in full, where [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee) states how strong the guarantee is and the four things that limit it.
 2. [A12](00-primer-cryptography.md#a12-who-attacks-what), who attacks what.

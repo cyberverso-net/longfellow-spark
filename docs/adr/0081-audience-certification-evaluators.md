@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-30, at the merge of pull request #54; proposed 2026-10-30, during the memory milestone of Phase D).
+Accepted (2026-10-30, at the merge of pull request #54; proposed 2026-10-30, during the memory milestone of Phase D). The guide milestone this record set closed 2026-11-19 by [ADR 0092](0092-guide-milestone-closed.md): the criterion is met, and the short path for a first assessment states the author's measured reading time.
 
 ## Date
 

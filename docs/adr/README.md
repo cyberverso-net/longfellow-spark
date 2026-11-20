@@ -94,4 +94,5 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0089](0089-the-supported-mdoc-profile.md) | The supported mDoc profile: its invariants, its two rows, the claim of each row and one entry point per role | Accepted | 2026-11-10 |
 | [0090](0090-mdoc-milestone-closed-phase-d-complete.md) | The mDoc milestone closed: Phase D complete | Accepted | 2026-11-11 |
 | [0088](0088-proof-inputs-and-the-reuse-of-a-proof.md) | The proof inputs and the reuse of a proof: the gate proves again only what changed the proof's inputs | Accepted | 2026-11-09 |
-| [0091](0091-certified-circuits-milestone.md) | Certified circuits: a proved checker for the registered circuits, with two proof backends | Proposed | 2026-11-12 |
+| [0091](0091-certified-circuits-milestone.md) | Certified circuits: a proved checker for the registered circuits, with two proof backends | Accepted | 2026-11-12 |
+| [0092](0092-guide-milestone-closed.md) | The guide for the evaluator closed | Accepted | 2026-11-19 |

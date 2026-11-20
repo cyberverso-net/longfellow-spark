@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-11-12, with #89, from the feasibility study of #88). Amends [ADR 0082](0082-order-after-the-memory-milestone.md): the milestone comes after the guide for the evaluator and before the certification block.
+Accepted (2026-11-19, at the merge of pull request #204, the close of the guide milestone; proposed 2026-11-12, with #89, from the feasibility study of #88). Amends [ADR 0082](0082-order-after-the-memory-milestone.md): the milestone comes after the guide for the evaluator and before the certification block.
 
 ## Date
 
@@ -36,7 +36,7 @@ The boundaries of the gadgets do not survive in the terms. A check that reads ra
 
 **The target.** The version 7 one-attribute pair `8d079211…`, the pair upstream's Lean certificates cover. The perimeter is the EU age-verification profile: one namespace, one attribute.
 
-**The theorem.** If the checker accepts the circuit C with the certificate K, then for every public input x and witness w, `Eval_Circuit (C, x, w) = Ok` implies `Relation (x, w)`, the relation of the specification. A wrong or hostile certificate makes the checker refuse; it never accepts by mistake, because the implication is proved for every C and K. Completeness, that every valid credential is accepted, stays tested.
+**The theorem.** If the checker accepts the circuit C with the certificate K, then for every public input x and witness w, `Eval_Circuit (C, x, w) = Ok` implies `Relation (x, w)`, the relation of the specification. A wrong or hostile certificate makes the checker refuse; it never accepts by mistake, because the implication is proved for every C and K. The theorem proves one direction: a circuit that accepts its inputs implies the stated relation on them. Completeness, that every valid credential is accepted, stays tested (register row V6).
 
 **The pieces.**
 
@@ -122,6 +122,12 @@ G3 rests on the order of α in the circuit's field. The milestone proves it in L
 - **Block 6 starts after block 3**, in parallel with blocks 4 and 5. The checker core of block 3 is their common interface, and block 6 does not change it without a review.
 - **Block 5** replaces upstream's "at least 96 bits of static security" (`mdoc_hash.h` 500 to 506 at 0d92f80c) with this project's own count of second occurrences, and provides the lint for issuers the conditions table announces.
 
+**The risks.**
+
+- The order of α (G3) may not close by `decide` in time: the fallback is stated above.
+- The reuse of upstream's ECDSA model (G11) depends on upstream's fix: the condition is stated above.
+- The Lean lemmas are a new kind of work for the project. How far it reaches on the algebra of the gadgets is not known in advance: the first block that writes them, block 2, measures it, and the estimate of the blocks is revised from that measurement.
+
 **The place in the order.** After the guide for the evaluator, whose primer the checker's chapters build on, and before the certification block (ADR 0082, amended).
 
 **The exit criterion.** Both circuits of the version 7 one-attribute pair are accepted by the checker, in `verify` and on the proving machine. The theorems are Gold, and the chapters are written for the audience of [ADR 0081](0081-audience-certification-evaluators.md). The trust model row on the circuits' semantics then reads: proved, under the specification of the relation and its conditions.
@@ -134,6 +140,7 @@ G3 rests on the order of α in the circuit's field. The milestone proves it in L
 - **A matcher that reconstructs the map from the terms.** Not needed: the instrumented generator maps every wire.
 - **Everything in SPARK.** Rejected: the solvers do not reach the algebra of the gadgets (orders of elements, Karatsuba, the curve formulas); the lemmas would be trusted, not proved.
 - **Everything in Lean.** Rejected: the registered bytes would be read by code outside the SPARK evidence of this project, and the checker would not be the executable this project ships and proves free of run-time errors.
+- **The existing frameworks for the formal verification of arithmetic circuits** (the ACL2 libraries for R1CS and PFCS, Clean and the other Lean frameworks, Garden in Rocq). Rejected: they verify circuits written in their own language, or systems of equations a reader can follow, and their public examples stop at one component such as a hash function; none treats layered circuits of the sumcheck kind. The object here is a compiled and optimised file of 7.76 million terms in which the gadgets are no longer visible. Reference: Y. Hirai, "Comparison of formal verification frameworks for arithmetic circuits", ZK/SEC Quarterly, 19 November 2025.
 - **Leaving the row trusted.** Rejected: it is the one row an evaluator cannot otherwise get past, and the feasibility study shows it can be closed in a measured time.
 
 ## Consequences
