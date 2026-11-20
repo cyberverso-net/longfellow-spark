@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-19, at the merge of pull request #NNN; proposed 2026-11-19, close of the guide milestone).
+Accepted (2026-11-19, at the merge of pull request #204; proposed 2026-11-19, close of the guide milestone).
 
 ## Date
 
@@ -71,7 +71,8 @@ What the milestone leaves open is recorded as issues:
 
 - None. The milestone changed no contract, and under `src/` and `cli/src/` nothing but comments: the package headers, those of `Sha256` and `Merkle` included. The test harnesses (their counts by section) and the scripts (the check of the links) changed, and the gate runs them. The gate of the release commit proves from scratch.
 - The release also carries #165, of the certification block, merged on 12 November: three refusals of the witness builder (`Validity_Form_Unsupported`, `Device_Key_Form_Unsupported`, `Random_Form_Unsupported`), with the postconditions of `Mdoc_Prover.Prove_Mdoc` extended to them, proved at its gate.
-- The gate of the release commit NNNNNNN: 39,245 checks, all proved; most steps 463,202.
+- The gate of 40a502a, proved from scratch in 175 minutes: 39,245 checks, all proved, none justified, none unproved; most steps 463,202. The release commit, which writes these counts, has the same proof inputs (ADR 0088), and its gate reuses that proof.
+- The list of the fragilities (register Section 8) recomputed from that gate, as the rules of #92 ask at the close of a milestone: the same seven checks, with the same steps.
 
 ## References
 

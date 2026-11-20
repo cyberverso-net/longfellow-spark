@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-19, at the merge of pull request #NNN, the close of the guide milestone; proposed 2026-11-12, with #89, from the feasibility study of #88). Amends [ADR 0082](0082-order-after-the-memory-milestone.md): the milestone comes after the guide for the evaluator and before the certification block.
+Accepted (2026-11-19, at the merge of pull request #204, the close of the guide milestone; proposed 2026-11-12, with #89, from the feasibility study of #88). Amends [ADR 0082](0082-order-after-the-memory-milestone.md): the milestone comes after the guide for the evaluator and before the certification block.
 
 ## Date
 
