@@ -269,7 +269,7 @@ fi
 #  proof does not read; any other makes the listing fail. Fails, with
 #  the reason on stderr, when the project file uses an attribute or a
 #  form the list does not cover: then the proof runs.
-KNOWN_OTHER_GPR="cli/longfellow_verify.gpr tests/longfellow_spark_tests.gpr"
+KNOWN_OTHER_GPR="cli/longfellow_verify.gpr tests/longfellow_spark_tests.gpr tests/relation/relation_cases.gpr"
 
 #  The Source_Dirs of the project file on stdin, one per line without
 #  the trailing slash. Every entry must be a string literal without a

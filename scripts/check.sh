@@ -311,6 +311,16 @@ do_cli() {
    else
       scripts/mdoc-cases.sh
    fi
+   header "cli: the relation of the hash circuit against its evaluator, case by case (relation_cases; skipped on GitHub Actions)"
+   if [ "${GITHUB_ACTIONS:-}" = true ]; then
+      echo "cli: relation_cases skipped on GitHub Actions, with mdoc-cases;" \
+         "the step runs on the proving machine (docs/process.md)"
+   else
+      alr -n exec -- gprbuild -P tests/relation/relation_cases.gpr -p -s
+      tests/relation/bin/relation_cases \
+         tests/vectors/upstream/mdoc/8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121_hash.lfc2 \
+         tests/vectors/relation_cases.txt tests/vectors/upstream/mdoc/testcases
+   fi
    header "cli: the cross-check with upstream's verifier (cross-check-upstream.sh; skipped without LONGFELLOW_UPSTREAM)"
    scripts/cross-check-upstream.sh
 }

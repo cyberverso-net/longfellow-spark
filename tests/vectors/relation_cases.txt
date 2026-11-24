@@ -1,0 +1,62 @@
+#  The cases of tests/relation/relation_cases (Mdoc_Relation.Hash, ADR
+#  0091): every test document of upstream at version 7, with the
+#  request of scripts/mdoc-cases.sh, and whether the relation must hold
+#  on the honest witness ("holds") or be false ("false": the request
+#  contradicts the document). "mutate" applies the thirteen clause
+#  mutations; "reference" adds the neutral and synthetic cases.
+#  Three documents are mutated: the reference test case of chapter 9,
+#  a short MSO and the longest.
+#
+#  "rename=<identifier>" rewrites the requested item under a new
+#  identifier, with its value digest in the MSO (relation_cases,
+#  Renamed): the identifiers of 23, 24 and 30 characters, the last
+#  family_name_national_character of ISO/IEC 18013-5. At version 7 the
+#  public length assumes a one-byte head, so from 24 characters the
+#  honest witness must fail the clause Item.
+#
+#  "padding" adds the synthetic case of a digest whose window runs
+#  into the SHA-256 padding; the document's map must end with bytes no
+#  window reads (MT_PROD_AGE_OVER_18_MDOC_12 ends with expectedUpdate).
+#
+#  name attribute:cbor-hex holds|false [mutate] [reference] [padding] [rename=id]
+AADHAAR_AGE_ABOVE18_MDOC_25 age_above18:63596573 holds
+AGE_BIRTH_YEAR_MDOC_8 age_birth_year:1907b0 holds
+AGE_OVER_18_WEBSITE_MDOC_5 age_over_18:f5 holds mutate
+AZ_PROD_AGE_OVER_18_MDOC_13 age_over_18:f5 holds
+BIRTHDATE_1968_04_27_ISSUE_DATE_2025_07_21T04_00_00Z_MDOC_8 age_birth_year:1907b0 holds
+BIRTHDATE_1971_09_01_MDOC_3 birth_date:d903ec6a313937312d30392d3031 holds
+BIRTHDATE_1998_09_04_IDPASS_MDOC_4 birth_date:d903ec6a313939382d30392d3034 holds
+CASE_18PLUS__BIRTHDATE_1971_09_01_MDOC_3 age_over_18:f5 holds
+CASE_18PLUS__FAMILYNAME_MUSTERMANN_MDOC_3 age_over_18:f5 holds
+DHS_COMPLIANCE_MDOC_10 DHS_compliance:6146 holds
+EUAV_AGE_OVER_18_MDOC_15 age_over_18:f5 holds
+EUAV_AGE_OVER_18_MDOC_16 age_over_18:f5 holds
+EUAV_AGE_OVER_18_MDOC_17 age_over_18:f5 holds
+EUAV_AGE_OVER_18_MDOC_18 age_over_18:f5 holds
+EUAV_AGE_OVER_18_MDOC_19 age_over_18:f5 holds
+EUAV_AGE_OVER_18_MDOC_20 age_over_18:f5 holds
+EUAV_AGE_OVER_18_MDOC_21 age_over_18:f5 holds
+EUAV_AGE_OVER_18_MDOC_22 age_over_18:f5 holds
+EUAV_AGE_OVER_18_MDOC_23 age_over_18:f5 holds
+EUAV_AGE_OVER_18_MDOC_24 age_over_18:f5 holds
+FAIL_BIRTHDATE_0971_09_01_MDOC_3 birth_date:d903ec6a303937312d30392d3031 false
+FAIL_BIRTHDATE_1871_09_01_MDOC_3 birth_date:d903ec6a313837312d30392d3031 false
+FAIL_BIRTHDATE_1971_09_01_EXTRA_0_MDOC_3 birth_date:d903ec6b313937312d30392d303130 false
+FAIL_NOT_OVER_18_MDOC_0 age_over_18:f4 false
+FAIL_NOT_OVER_18_MDOC_1 age_over_18:f4 false
+FAIL_NOT_OVER_18_MDOC_2 age_over_18:f4 false
+FAMILYNAME_MUSTERMANN_MDOC_3 family_name:6a4d75737465726d616e6e holds mutate reference
+HEIGHT175_ISSUE_DATE_2024_03_15_MDOC_3 height:18af holds
+HEIGHT_175_MDOC_3 height:18af holds
+MT_PROD_AGE_OVER_18_MDOC_12 age_over_18:f5 holds mutate padding
+MT_PROD_AGE_OVER_18_MDOC_14 age_over_18:f5 holds
+NOT_OVER_18_LARGE_MDOC_6 age_over_18:f4 holds
+PLUS_18_MDOC_0 age_over_18:f5 holds
+PLUS_18_MDOC_1 age_over_18:f5 holds
+PLUS_18_MDOC_2 age_over_18:f5 holds
+PLUS_18_MDOC_9 age_over_18:f5 holds
+SPARKASSE_AGE_MDOC_11 age_over_18:f5 holds
+TEST_DATA age_over_18:f5 holds
+FAMILYNAME_MUSTERMANN_MDOC_3 family_name:6a4d75737465726d616e6e holds rename=family_name_national_ch
+FAMILYNAME_MUSTERMANN_MDOC_3 family_name:6a4d75737465726d616e6e false rename=family_name_national_cha
+FAMILYNAME_MUSTERMANN_MDOC_3 family_name:6a4d75737465726d616e6e false rename=family_name_national_character

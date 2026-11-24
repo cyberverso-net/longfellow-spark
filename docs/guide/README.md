@@ -63,6 +63,7 @@ The other sections of the primer, [B1](00-primer-spark.md#b1-ada-in-two-pages), 
 | [Chapter 7, the prover](07-prover.md) | the prover, its randomness and the byte identity with upstream's proofs |
 | [Chapter 8, the additive FFT](08-additive-fft.md) | the encoding of the prover's rows |
 | [Chapter 9, the mDoc layer](09-mdoc.md) | the proof of age: two circuits, the tags, the witness from the credential, the supported profile, the conditions for certifying the circuit |
+| [Chapter 10, certified circuits](10-certified-circuits.md) | the relation of the version 7 hash circuit, its hypotheses and its test against the registered circuit; the checker of the later blocks |
 | [Trust model](trust-model.md) | every claim, sorted into proved, tested, trusted and outside the proofs |
 | [Trusted base register](trusted-base.md) | every trusted item, one row each |
 | [Lean correspondence page](lean-correspondence.md) | upstream's Lean model against this project's units |

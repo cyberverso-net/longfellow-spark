@@ -22,10 +22,17 @@
 --  functional contracts).
 --
 --    Compress_Traced : Silver; the arithmetic is modular, nothing can
---                      fail. That it is FIPS 180-4 is tested through
---                      the parent (tests/vectors/sha256.txt) and the
---                      trace against a Python transcription on
---                      upstream's test documents (mdoc_parse_kat).
+--                      fail. Gold on its final state: it is Compress
+--                      of the state and the block. That it is FIPS
+--                      180-4 is tested through the parent
+--                      (tests/vectors/sha256.txt) and the trace against
+--                      a Python transcription on upstream's test
+--                      documents (mdoc_parse_kat).
+--    Compress        : ghost, Gold against Compress_Spec, the steps of
+--                      Section 6.2.2 written as functions at the level
+--                      Proof_Only. That Compress_Spec is FIPS 180-4 is
+--                      a reading of the section, tested through
+--                      Compress_Traced (register row V1).
 --    Pad_Message     : Gold on the layout of the padded buffer: the
 --                      message, the byte 16#80#, zeros, the bit length
 --                      big-endian at the end of block N_Blocks, zeros
@@ -44,6 +51,8 @@
 --  tested, not proved (V1).
 
 pragma SPARK_Mode (On);
+
+with Proof_Levels;
 
 package Sha256.Trace is
 
@@ -70,7 +79,51 @@ package Sha256.Trace is
    with
      Global => null,
      Pre    => First >= Data'First and then Data'Last >= First
-               and then Data'Last - First >= 63;
+               and then Data'Last - First >= 63,
+     Post   => H = Compress (H'Old, Data (First .. First + 63));
+
+   --  FIPS 180-4 Section 6.2.2 as functions, for the proof only: word I
+   --  of the message schedule of Block (step 1), the eight working
+   --  variables a to h after I rounds from H, as a State (steps 2 and
+   --  3), and the compression (step 4). At the level Proof_Only they
+   --  are never compiled: the schedule's recursion would take
+   --  exponential time if it were executed.
+   subtype Round_Count is Natural range 0 .. 64;
+
+   --  Word I of the block, big-endian: the first sixteen words of the
+   --  schedule.
+   function Block_Word (Block : Bytes_64; I : Natural) return Unsigned_32
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    => I <= 15;
+
+   function Schedule_Word (Block : Bytes_64; I : Natural) return Unsigned_32
+   with
+     Ghost              => Proof_Only,
+     Global             => null,
+     Pre                => I <= 63,
+     Subprogram_Variant => (Decreases => I);
+
+   function Rounds (H : State; Block : Bytes_64; I : Round_Count) return State
+   with
+     Ghost              => Proof_Only,
+     Global             => null,
+     Subprogram_Variant => (Decreases => I);
+
+   function Compress_Spec (H : State; Block : Bytes_64) return State with
+     Ghost  => Proof_Only,
+     Global => null;
+
+   --  FIPS 180-4 Section 6.2.2: the compression of one block as a
+   --  function, the vocabulary of the relations of Mdoc_Relation (ADR
+   --  0091). The same statements as Compress_Traced, over the same
+   --  round functions and constants, without the trace. Ghost: the
+   --  library never calls it.
+   function Compress (H : State; Block : Bytes_64) return State with
+     Ghost,
+     Global => null,
+     Post   => (Proof_Only => Compress'Result = Compress_Spec (H, Block));
 
    Max_Blocks : constant := 40;
    subtype Block_Count is Positive range 1 .. Max_Blocks;
@@ -111,5 +164,43 @@ package Sha256.Trace is
                                                       56 - 8 * I) and 16#FF#))
                and then (for all I in 64 * N_Blocks .. Padded'Last =>
                            Padded (I) = 0);
+
+private
+
+   function Block_Word (Block : Bytes_64; I : Natural) return Unsigned_32 is
+     (Shift_Left (Unsigned_32 (Block (4 * I)), 24)
+      or Shift_Left (Unsigned_32 (Block (4 * I + 1)), 16)
+      or Shift_Left (Unsigned_32 (Block (4 * I + 2)), 8)
+      or Unsigned_32 (Block (4 * I + 3)));
+
+   function Schedule_Word (Block : Bytes_64; I : Natural) return Unsigned_32
+   is
+     (if I < 16 then Block_Word (Block, I)
+      else
+        Small_1 (Schedule_Word (Block, I - 2)) + Schedule_Word (Block, I - 7)
+        + Small_0 (Schedule_Word (Block, I - 15))
+        + Schedule_Word (Block, I - 16));
+
+   --  Round R of step 3 on the working variables S (a to h as S (0) to
+   --  S (7)).
+   function Round_Step (S : State; Block : Bytes_64; R : Natural) return State
+   is
+     (declare
+        T1 : constant Unsigned_32 :=
+          S (7) + Sigma_1 (S (4)) + Ch (S (4), S (5), S (6))
+          + K (Round_Index (R)) + Schedule_Word (Block, R);
+        T2 : constant Unsigned_32 :=
+          Sigma_0 (S (0)) + Maj (S (0), S (1), S (2));
+      begin
+        [T1 + T2, S (0), S (1), S (2), S (3) + T1, S (4), S (5), S (6)])
+   with Ghost => Proof_Only, Global => null, Pre => R <= 63;
+
+   function Rounds (H : State; Block : Bytes_64; I : Round_Count) return State
+   is
+     (if I = 0 then H
+      else Round_Step (Rounds (H, Block, I - 1), Block, I - 1));
+
+   function Compress_Spec (H : State; Block : Bytes_64) return State is
+     ([for J in Word_Index => H (J) + Rounds (H, Block, 64) (J)]);
 
 end Sha256.Trace;

@@ -4,6 +4,8 @@
 
 Accepted (2026-11-19, at the merge of pull request #204, the close of the guide milestone; proposed 2026-11-12, with #89, from the feasibility study of #88). Amends [ADR 0082](0082-order-after-the-memory-milestone.md): the milestone comes after the guide for the evaluator and before the certification block.
 
+Note of 20 November 2026, block 1 (#168), on Decision point 1 and the Consequences on the conditions table. The checker's theorem has no hypothesis: an evaluation of the circuit that accepts implies the relation. The conditions are not hypotheses of that theorem. A condition of kind soundness is a named hypothesis of the relation's meaning (`H_` for the issuer, the relying party or SHA-256, `Fact_` for a fact about the circuit, `Limit_` for a known limit), stated outside the relation in `Mdoc_Relation.Hash.Conditions`; a condition of kind completeness is a constraint inside a clause, written as the circuit checks it. The hypotheses are predicates over the outputs of this project's parse, named as the model (register row R12); whether a second theorem proves the meaning against a model of the MSO is decided at block 5. Writing the relation added four conditions, accepted at the author's review of 24 November 2026: `H_Sha256` and `H_Digest_Preimage` (register rows S5 and S6), SHA-256 for the value digests, and identifiers below 24 characters at version 7. Chapter 10 Section 1.
+
 ## Date
 
 2026-11-12
