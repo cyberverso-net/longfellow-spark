@@ -18,7 +18,12 @@
 #  into the SHA-256 padding; the document's map must end with bytes no
 #  window reads (MT_PROD_AGE_OVER_18_MDOC_12 ends with expectedUpdate).
 #
-#  name attribute:cbor-hex holds|false [mutate] [reference] [padding] [rename=id]
+#  "count" adds the block counts 0, 41 and 255 to the honest witness:
+#  the circuit does not assert nb <= 40, so it must refuse them by
+#  another assertion, and the relation must be false; the harness
+#  prints which assertions of the circuit fail (Locate).
+#
+#  name attribute:cbor-hex holds|false [mutate] [reference] [padding] [count] [rename=id]
 AADHAAR_AGE_ABOVE18_MDOC_25 age_above18:63596573 holds
 AGE_BIRTH_YEAR_MDOC_8 age_birth_year:1907b0 holds
 AGE_OVER_18_WEBSITE_MDOC_5 age_over_18:f5 holds mutate
@@ -45,7 +50,7 @@ FAIL_BIRTHDATE_1971_09_01_EXTRA_0_MDOC_3 birth_date:d903ec6b313937312d30392d3031
 FAIL_NOT_OVER_18_MDOC_0 age_over_18:f4 false
 FAIL_NOT_OVER_18_MDOC_1 age_over_18:f4 false
 FAIL_NOT_OVER_18_MDOC_2 age_over_18:f4 false
-FAMILYNAME_MUSTERMANN_MDOC_3 family_name:6a4d75737465726d616e6e holds mutate reference
+FAMILYNAME_MUSTERMANN_MDOC_3 family_name:6a4d75737465726d616e6e holds mutate reference count
 HEIGHT175_ISSUE_DATE_2024_03_15_MDOC_3 height:18af holds
 HEIGHT_175_MDOC_3 height:18af holds
 MT_PROD_AGE_OVER_18_MDOC_12 age_over_18:f5 holds mutate padding

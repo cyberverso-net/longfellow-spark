@@ -61,6 +61,7 @@ with Mdoc_Inputs;
 with Mdoc_Mac;
 with Circuit_Status;
 with Circuit_Reader_GF2_128;
+with Packed_Circuits_GF2_128;
 with Packed_Eval_GF2_128;
 with Sumcheck_Algebra_GF2_128;
 with Mdoc_Relation.Hash;
@@ -423,6 +424,67 @@ procedure Relation_Cases is
       return Ok;
    end Circuit_Accepts;
 
+   --  Where the circuit refuses: every Z assertion of every layer that
+   --  fails (layer, the two input wires), and every output of layer 0
+   --  that is not zero. The wires are those of the layer's input
+   --  segment, so that a map of the wires (the generator's, outside
+   --  this project) names the gadget of each. At most Shown lines each;
+   --  the counts are complete.
+   procedure Locate (Label : String; X : X_Array; W : W_Array) is
+      package PCG renames Packed_Circuits_GF2_128;
+      procedure Free is new Ada.Unchecked_Deallocation (All_Array, All_Access);
+      Shown  : constant := 8;
+      All_In : All_Access := new All_Array;
+      Segs   : SA.Seg_Array_Access;
+      Ok     : Boolean;
+      Total  : Natural := 0;
+      Lines  : Natural := 0;
+   begin
+      All_In (0 .. Public_Count - 1) := X;
+      All_In (Public_Count .. All_In'Last) := W;
+      SA.Allocate_Segs (PE.Shape_Of (Circuit.all), Segs);
+      PE.Eval_Circuit (Circuit.all, All_In.all, Segs.all, Ok);
+      for J in 0 .. Circuit.Last_Layer loop
+         declare
+            C     : PCG.Cursor := PCG.Start (Circuit.all, J);
+            Tm    : SA.Term;
+            In_J  : SA.Element_Array renames Segs (J + 1).all;
+            Count : Natural := 0;
+         begin
+            for K in 1 .. PCG.Layer_Len (Circuit.all, J) loop
+               Tm := PCG.Term_Of (Circuit.all, C);
+               if Tm.K = SA.Zero
+                 and then GF2_128.Mul (In_J (Tm.H1), In_J (Tm.H0)) /= SA.Zero
+               then
+                  Count := Count + 1;
+                  if Lines < Shown then
+                     Lines := Lines + 1;
+                     Put_Line ("locate " & Label & ": z layer" & J'Image
+                               & " h0" & Tm.H0'Image & " h1" & Tm.H1'Image);
+                  end if;
+               end if;
+               C := PCG.Step (Circuit.all, C);
+            end loop;
+            if Count > 0 then
+               Put_Line ("locate " & Label & ": layer" & J'Image & ","
+                         & Count'Image & " Z assertions fail");
+            end if;
+            Total := Total + Count;
+         end;
+      end loop;
+      for G in Segs (0)'Range loop
+         if Segs (0) (G) /= SA.Zero then
+            Put_Line ("locate " & Label & ": output" & G'Image & " not zero");
+            Total := Total + 1;
+         end if;
+      end loop;
+      Put_Line ("locate " & Label & ":" & Total'Image
+                & " failing assertions and outputs, circuit "
+                & (if Ok then "accepts" else "refuses"));
+      SA.Release_Segs (Segs);
+      Free (All_In);
+   end Locate;
+
    --  The ghost predicates, read through an assertion: with -gnata a
    --  false assertion raises Assertion_Error, which these turn into
    --  False. The preconditions hold on every case (the shapes are
@@ -707,11 +769,14 @@ procedure Relation_Cases is
       end;
    end Renamed;
 
+   Count_Values : constant array (1 .. 3) of Unsigned_8 := [0, 41, 255];
+
    procedure Run_Document
      (Dir, Doc_Name, Attr : String;
       Positive_Case, Mutate, Reference : Boolean;
       Rename : String := "";
-      Padding : Boolean := False)
+      Padding : Boolean := False;
+      Count : Boolean := False)
    is
       --  The case's name in the report: the document, and the new
       --  identifier of a rewritten one.
@@ -1053,6 +1118,25 @@ procedure Relation_Cases is
          end if;
       end;
 
+      --  "count": the block count outside 1 to 40 (nb is eight bits,
+      --  and the circuit does not assert nb <= 40). The rest of the
+      --  honest witness is kept: the relation is false (it implies nb in
+      --  1 to 40, Lemma_Count_In_Range), and the circuit must refuse.
+      --  Locate says which of its assertions fail.
+      if Count then
+         for Nb_New of Count_Values loop
+            X.all := X0.all;
+            W.all := W0.all;
+            Put_Byte (W.all, W_Count, Nb_New);
+            declare
+               L : constant String := "count nb =" & Nb_New'Image & " " & Name;
+            begin
+               Check (L, X.all, W.all, Fails);
+               Locate (L, X.all, W.all);
+            end;
+         end loop;
+      end if;
+
       Free (Doc);
       Free (Tr);
       Free (X0);
@@ -1116,6 +1200,7 @@ begin
                   Mutate        => Index (Rest, "mutate") > 0,
                   Reference     => Index (Rest, "reference") > 0,
                   Padding       => Index (Rest, "padding") > 0,
+                  Count         => Index (Rest, "count") > 0,
                   Rename        =>
                     (if R_At = 0 then "" else Rest (R_At + 7 .. R_To)));
             end;

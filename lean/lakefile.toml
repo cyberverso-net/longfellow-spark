@@ -1,0 +1,27 @@
+# The Lean development of longfellow-spark (ADR 0091): the algebra of the
+# gadget lemmas the SPARK checker cites. Lean and Mathlib at the versions
+# of upstream's formal/ (Lean 4.31.0, Mathlib v4.31.0, rev fabf563a in
+# lake-manifest.json).
+name = "longfellow_spark_lean"
+version = "0.1.0"
+defaultTargets = ["Upstream", "LongfellowSpark"]
+
+[leanOptions]
+autoImplicit = false
+relaxedAutoImplicit = false
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+git = "https://github.com/leanprover-community/mathlib4"
+rev = "v4.31.0"
+
+# Declarations ported from upstream's formal/, statements unchanged, each
+# file with its provenance.
+[[lean_lib]]
+name = "Upstream"
+
+# This project's lemmas.
+[[lean_lib]]
+name = "LongfellowSpark"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
