@@ -710,7 +710,8 @@ procedure Relation_Cases is
    procedure Run_Document
      (Dir, Doc_Name, Attr : String;
       Positive_Case, Mutate, Reference : Boolean;
-      Rename : String := "")
+      Rename : String := "";
+      Padding : Boolean := False)
    is
       --  The case's name in the report: the document, and the new
       --  identifier of a rewritten one.
@@ -1000,6 +1001,56 @@ procedure Relation_Cases is
                     & ": H_Types_In_Item is false",
                     not Types_Hold (Item_Bytes (W.all), It));
          end if;
+
+         if Padding then
+            --  H_Matching_By_Content: a digest whose window runs into
+            --  the SHA-256 padding. The map's last 33 bytes become 58 20
+            --  and the first 31 bytes of the digest of an item whose
+            --  digest ends with 16#80#, the padding's first byte: found
+            --  by trial over two bytes of random. The last 33 bytes
+            --  must be clear of every window the honest witness reads.
+            declare
+               K     : constant Natural := Map_Len - 33;
+               R     : constant Natural := Random_Start (W0.all) + 9;
+               D     : Bytes_32;
+               T     : Natural := 0;
+
+               function Clear (Start, Len : Natural) return Boolean is
+                 (K + 33 <= Start or else K >= Start + Len);
+            begin
+               if not (Clear (DI, 34) and then Clear (DK, 100)
+                       and then Clear (VF, 32) and then Clear (VU, 33)
+                       and then Clear (VD, 13))
+               then
+                  Report ("synthetic digest across the padding " & Name
+                          & ": the map's end is read by a window", False);
+               else
+                  X.all := X0.all;
+                  W.all := W0.all;
+                  loop
+                     Put_Byte (W.all, W_Item + 8 * R, Unsigned_8 (T mod 256));
+                     Put_Byte (W.all, W_Item + 8 * (R + 1),
+                               Unsigned_8 (T / 256));
+                     D := Item_Digest (W.all);
+                     exit when D (31) = 16#80# or else T = 65_535;
+                     T := T + 1;
+                  end loop;
+                  Put_Message (W.all, 7 + K, 16#58#);
+                  Put_Message (W.all, 7 + K + 1, 16#20#);
+                  for J in 0 .. 30 loop
+                     Put_Message (W.all, 7 + K + 2 + J, D (J));
+                  end loop;
+                  Put_Index (W.all, W_Digest_Index, K);
+                  Retrace (W.all);
+                  Retag (X.all, W.all, Ap, Av);
+                  Check ("synthetic digest across the padding " & Name,
+                         X.all, W.all, Synthetic);
+                  Report ("synthetic digest across the padding " & Name
+                          & ": H_Matching_By_Content is false",
+                          not Matching_Holds (Map_Of (W.all), P, It, D));
+               end if;
+            end;
+         end if;
       end;
 
       Free (Doc);
@@ -1064,6 +1115,7 @@ begin
                   Positive_Case => Want = "holds",
                   Mutate        => Index (Rest, "mutate") > 0,
                   Reference     => Index (Rest, "reference") > 0,
+                  Padding       => Index (Rest, "padding") > 0,
                   Rename        =>
                     (if R_At = 0 then "" else Rest (R_At + 7 .. R_To)));
             end;

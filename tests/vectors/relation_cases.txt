@@ -14,7 +14,11 @@
 #  public length assumes a one-byte head, so from 24 characters the
 #  honest witness must fail the clause Item.
 #
-#  name attribute:cbor-hex holds|false [mutate] [reference] [rename=id]
+#  "padding" adds the synthetic case of a digest whose window runs
+#  into the SHA-256 padding; the document's map must end with bytes no
+#  window reads (MT_PROD_AGE_OVER_18_MDOC_12 ends with expectedUpdate).
+#
+#  name attribute:cbor-hex holds|false [mutate] [reference] [padding] [rename=id]
 AADHAAR_AGE_ABOVE18_MDOC_25 age_above18:63596573 holds
 AGE_BIRTH_YEAR_MDOC_8 age_birth_year:1907b0 holds
 AGE_OVER_18_WEBSITE_MDOC_5 age_over_18:f5 holds mutate
@@ -44,7 +48,7 @@ FAIL_NOT_OVER_18_MDOC_2 age_over_18:f4 false
 FAMILYNAME_MUSTERMANN_MDOC_3 family_name:6a4d75737465726d616e6e holds mutate reference
 HEIGHT175_ISSUE_DATE_2024_03_15_MDOC_3 height:18af holds
 HEIGHT_175_MDOC_3 height:18af holds
-MT_PROD_AGE_OVER_18_MDOC_12 age_over_18:f5 holds mutate
+MT_PROD_AGE_OVER_18_MDOC_12 age_over_18:f5 holds mutate padding
 MT_PROD_AGE_OVER_18_MDOC_14 age_over_18:f5 holds
 NOT_OVER_18_LARGE_MDOC_6 age_over_18:f4 holds
 PLUS_18_MDOC_0 age_over_18:f5 holds

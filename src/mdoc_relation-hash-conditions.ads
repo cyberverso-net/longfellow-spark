@@ -69,10 +69,12 @@
 --  message, at the index the prover chooses. Such a string can occur
 --  outside valueDigests, and two cases differ by who wrote it:
 --
---    - Bytes the issuer chose: the other entries of the MSO, and two
---      random bytes of a digest, which are 58 20 once in 65,536. They
---      are the matter of H_Matching_By_Content, whose row of the
---      conditions table already names "a digest outside valueDigests".
+--    - Bytes the issuer chose: the other entries of the MSO, two
+--      random bytes of a digest, which are 58 20 once in 65,536, and a
+--      head 58 20 in the map's last 33 bytes, whose window runs into
+--      the padding. They are the matter of H_Matching_By_Content, whose
+--      row of the conditions table already names "a digest outside
+--      valueDigests".
 --    - The device key's coordinates x and y, which have that head: the
 --      holder chose the key before issuance, and the issuer signs it.
 --      To use a coordinate as a value digest, a prover needs either
@@ -142,6 +144,19 @@ package Mdoc_Relation.Hash.Conditions is
      ([for I in 0 .. 33 => (if I < 2 then Digest_Head (I) else D (I - 2))])
    with Global => null;
 
+   --  No byte string head 58 20 starts in the map's last 33 bytes. Its
+   --  32 bytes would run past the map's end into the SHA-256 padding,
+   --  whose first byte is 16#80#: the issuer chose the bytes before it,
+   --  and an item whose digest ends with the padding's bytes is found
+   --  by trial (one in 256 for the last byte alone). Only_At cannot see
+   --  such an occurrence, since it wants the whole pattern in the map.
+   function No_Digest_Head_At_End (Map : Byte_Array) return Boolean is
+     (for all K in 0 .. Map'Length - 1 =>
+        (if K + 34 > Map'Length and then K + 1 < Map'Length
+         then not (Map (K) = Digest_Head (0)
+                   and then Map (K + 1) = Digest_Head (1))))
+   with Global => null, Pre => Map_Ok (Map);
+
    ----------------------------------------------------------------------
    --  H_Matching_By_Content (soundness, issuer)
    ----------------------------------------------------------------------
@@ -152,8 +167,10 @@ package Mdoc_Relation.Hash.Conditions is
    --  with its COSE_Key up to x's head, valueDigests, and 58 20 with the
    --  requested item's digest D at that item's entry of valueDigests.
    --  With the relation, it makes every index of the witness the
-   --  parse's offset. An occurrence that runs past the map's end into
-   --  the padding is Fact_Padding's, not this hypothesis's.
+   --  parse's offset. An occurrence of a key that runs past the map's
+   --  end into the padding is excluded by Fact_Padding, a fact of the
+   --  circuit; one of the digest's head is not, since a digest can hold
+   --  the padding's bytes, and is excluded here (No_Digest_Head_At_End).
    function H_Matching_By_Content
      (Map : Byte_Array;
       P   : Mdoc_Parse.Parsed_Mdoc;
@@ -164,7 +181,8 @@ package Mdoc_Relation.Hash.Conditions is
       and then Only_At (Map, Valid_Until_Key, P.Valid_Until_Offset)
       and then Only_At (Map, Device_Key_Key, P.Device_Key_Info_Offset)
       and then Only_At (Map, Value_Digests_Key, P.Value_Digests_Offset)
-      and then Only_At (Map, Digest_Pattern (D), It.Digest_Offset))
+      and then Only_At (Map, Digest_Pattern (D), It.Digest_Offset)
+      and then No_Digest_Head_At_End (Map))
    with Global => null, Pre => Map_Ok (Map);
 
    ----------------------------------------------------------------------
@@ -250,9 +268,10 @@ package Mdoc_Relation.Hash.Conditions is
    --  byte of the window lies before N. The keys of validFrom,
    --  validUntil, deviceKeyInfo and valueDigests, and the key of y at
    --  65 bytes into the device key's window. Not the digest's 58 20
-   --  and 32 bytes: the digest may hold any byte, and a window that
-   --  reaches into the padding holds bytes no one chose, a preimage
-   --  (H_Digest_Preimage).
+   --  and 32 bytes: the digest may hold any byte, the padding's
+   --  included, so a window that starts in the map and runs into the
+   --  padding can match; H_Matching_By_Content excludes it on the
+   --  issuer's side (No_Digest_Head_At_End).
    procedure Fact_Padding
      (V : Private_Part; N : Message_Length; K : Index_12)
    with

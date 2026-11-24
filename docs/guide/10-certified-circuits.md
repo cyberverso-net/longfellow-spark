@@ -166,7 +166,7 @@ The checker's theorem needs no hypothesis: an evaluation of the circuit that acc
 |---|---|---|
 | `H_Sha256` | SHA-256 | No one can find blocks other than the issuer's padded MSO whose chain from SHA-256's initial value gives e, nor two blocks other than an item the issuer hashed whose chain gives one of its value digests. Second-preimage resistance of the iterated compression. |
 | `H_Digest_Preimage` | SHA-256 and P-256 | The value digest the circuit compares is one the issuer computed. The clause `Value_Digest` takes any `58 20` and its 32 bytes in the signed message. The device key's x and y have that head, and the holder chose the key before issuance: using one as a digest needs two blocks whose chain is that coordinate, a preimage of SHA-256, or a key whose coordinate is a chosen digest and whose private key is known, a discrete logarithm on P-256. Other strings the issuer wrote are `H_Matching_By_Content`'s. |
-| `H_Matching_By_Content` | Issuer | Each pattern the clauses search for occurs in the MSO only where its structure puts it: the keys of `validFrom` and `validUntil` with their tag and head, `deviceKeyInfo` with its COSE_Key, `valueDigests`, and `58 20` with the requested item's digest only at that item's entry. With the relation, it makes every index of the witness the parse's offset. |
+| `H_Matching_By_Content` | Issuer | Each pattern the clauses search for occurs in the MSO only where its structure puts it: the keys of `validFrom` and `validUntil` with their tag and head, `deviceKeyInfo` with its COSE_Key, `valueDigests`, and `58 20` with the requested item's digest only at that item's entry; and no head `58 20` in the MSO's last 33 bytes, whose 32 bytes would run into the SHA-256 padding. With the relation, it makes every index of the witness the parse's offset. |
 | `H_Types_In_Item` | Issuer | In the item, `digestID` is an unsigned integer and `random` a byte string: the major types of their heads, which the circuit does not read. |
 | `H_Namespace` | Issuer, scheme | An identifier has one meaning in every namespace of the MSO (block 5). |
 | `H_Now_Form` | Relying party | `now` is the current time in the canonical form. |
@@ -197,13 +197,15 @@ The clauses note, one by one, what the circuit leaves out. Gathered here, each w
 | The constant one | none, a precondition | the evaluator's and the verifier's convention |
 | The protected header and the external data | none: constants of the preimage | the row "ES256 on P-256 only" (completeness) |
 
-### 1.8 Why the hypotheses exist: two worked examples
+### 1.8 Why the hypotheses exist: three worked examples
 
-Two witnesses made by the harness of Section 3 from the reference test case (FAMILYNAME_MUSTERMANN_MDOC_3). In both, the circuit accepts and the relation holds: they agree, as they must. Yet both prove something false of the credential. Only a hypothesis, evaluated on the same witness, says so.
+Three witnesses made by the harness of Section 3, the first two from the reference test case (FAMILYNAME_MUSTERMANN_MDOC_3). In each, the circuit accepts and the relation holds: they agree, as they must. Yet each proves something false of the credential, or of an item the issuer did not list. Only a hypothesis, evaluated on the same witness, says so.
 
 **A second `validUntil`.** The MSO holds the value digests of the other items, 32 bytes each, which the issuer computed. Suppose one of them happened to read as the key of `validUntil` followed by a date in 9999; the chance is negligible, and the harness writes those bytes in to make the case. The prover sets the witness's index of `validUntil` to that place and the relying party's `now` to 2099, past the credential's real `validUntil`. The circuit accepts: every pattern it searches for is where the index says. The relation holds: it states what the circuit checks. The statement "the credential is valid in 2099" is false. `H_Matching_By_Content` is false on this witness, since the key of `validUntil` occurs twice in the MSO, and it is the hypothesis that excludes the case.
 
 **`random` as a text string.** In the requested item, the head of `random` is changed from a byte string of 16 bytes (16#50#) to a text string of the same length (16#70#), and the item's digest recomputed. The layout is unchanged, so every key the circuit checks is where it was, and the circuit accepts. The attribute is still the one compared, so what is proved is not wrong in itself. What fails is that the item is not one a conforming issuer writes. `H_Types_In_Item` is false on this witness: the circuit does not read the major type, and the hypothesis is the condition that issuers write well-typed items.
+
+**A digest that runs into the padding.** The signed message ends with the MSO, and SHA-256's padding follows it, starting with the byte 16#80#. Suppose the MSO ends with a byte string the issuer chose whose last 33 bytes are `58 20` and 31 bytes. The clause `Value_Digest` reads 32 bytes after `58 20`, so its last byte is the padding's 16#80#. An issuer that wants to sign an item without listing it in `valueDigests` finds, by trial, a version of the item whose digest ends with 16#80# (one try in 256 succeeds on average) and writes the first 31 bytes of that digest at the MSO's end. The harness builds the case on MT_PROD_AGE_OVER_18_MDOC_12, whose MSO ends with `expectedUpdate`, a field the circuit does not read: it varies two bytes of the item's `random` until the digest ends with 16#80#, writes `58 20` and the digest's first 31 bytes over the MSO's last 33 bytes, and points the witness's digest index there. The circuit accepts and the relation holds. This needs no preimage and no discrete logarithm, only the issuer's bytes: `H_Matching_By_Content` excludes it with its last part (no head `58 20` in the MSO's last 33 bytes) and is false on this witness. `Fact_Padding` cannot exclude it, since a digest may end with the padding's bytes; it excludes the keys only.
 
 ### 1.9 The witness builder and the relation
 
@@ -231,7 +233,7 @@ The specification is proved in the partition `relation`: `Mdoc_Relation`, `Mdoc_
 
 - **Silver for the whole specification:** no run-time error in the decoding, the clauses and the predicates, for any X and W of the right lengths; every recursive function terminates.
 - **`Sha256.Trace`:** `Compress` equals `Compress_Spec`, the recursive specification of FIPS 180-4's schedule and rounds; `Compress_Traced` ends in the state `Compress` gives (Gold).
-- **The lemmas** (Gold): `Lemma_Byte_At` (Section 1.2), `Lemma_Count_In_Range` and `Lemma_Item_No_Wrap` (Section 1.4), and `Fact_Padding`: when the preimage from the message's end on is SHA-256's padding, a pattern of the clauses (the four keys and the key of y in the device key) can match only inside the message. The digest's `58 20` and 32 bytes are not among them: the digest may hold any byte, and a window reaching into the padding holds bytes no one chose, a preimage (`H_Digest_Preimage`).
+- **The lemmas** (Gold): `Lemma_Byte_At` (Section 1.2), `Lemma_Count_In_Range` and `Lemma_Item_No_Wrap` (Section 1.4), and `Fact_Padding`: when the preimage from the message's end on is SHA-256's padding, a pattern of the clauses (the four keys and the key of y in the device key) can match only inside the message. The digest's `58 20` and 32 bytes are not among them: a digest may hold any byte, the padding's included, so a window that starts in the MSO and runs into the padding can match. `H_Matching_By_Content` excludes it on the issuer's side (Section 1.8, the third example).
 - **`Counts_Agree`:** the shape the relation reads is the count of `Mdoc_Inputs` and `Mdoc_Witness`.
 
 What the proofs do not say: that the clauses are the generator's (by reading, Section 1.10, until the checker proves the circuit implies them); that the hypotheses hold (they are hypotheses); that `Decode_Public` inverts the encoder (tested, Section 3).
@@ -247,22 +249,22 @@ How to read the table: [B6.4](00-primer-spark.md#b64-reading-the-summary-table).
 
 | Check | `Mdoc_Relation` | `Mdoc_Relation.Hash` | `Mdoc_Relation.Hash.Conditions` | `Sha256.Trace` | Discharged by |
 |---|---|---|---|---|---|
-| Data dependencies (`Global`) | 0 | 59 | 14 | 10 | flow analysis |
+| Data dependencies (`Global`) | 0 | 59 | 15 | 10 | flow analysis |
 | Initialisation | 0 | 0 | 0 | 24 | flow analysis |
-| Termination | 0 | 56 | 10 | 8 | flow analysis |
-| Range checks | 0 | 25 | 28 | 23 | provers |
+| Termination | 0 | 56 | 11 | 8 | flow analysis |
+| Range checks | 0 | 25 | 31 | 23 | provers |
 | Division checks (`/`, `mod`) | 0 | 15 | 15 | 1 | provers |
-| Overflow checks | 0 | 59 | 11 | 29 | provers |
-| Index checks | 0 | 46 | 11 | 31 | provers |
+| Overflow checks | 0 | 59 | 14 | 29 | provers |
+| Index checks | 0 | 46 | 13 | 31 | provers |
 | Length checks | 0 | 0 | 0 | 3 | provers |
-| Preconditions of the calls | 0 | 59 | 31 | 27 | provers |
+| Preconditions of the calls | 0 | 59 | 32 | 27 | provers |
 | Assertions | 0 | 53 | 11 | 13 | provers |
 | Loop invariants (base case and preservation) | 0 | 0 | 0 | 26 | provers |
 | Postconditions | 0 | 4 | 4 | 3 | provers |
 | Variants of the recursive functions | 0 | 1 | 0 | 5 | provers |
-| **Total** | **0** | **377** | **135** | **203** | all proved: none justified, none unproved, no `pragma Assume` |
+| **Total** | **0** | **377** | **146** | **203** | all proved: none justified, none unproved, no `pragma Assume` |
 
-In all, 715 checks, 534 discharged by the provers; the highest step count of a successful proof is 97,753, within the budget. `Mdoc_Relation` is the parent package, ghost, with no check. The flow analysis prints no warning for the partition.
+In all, 726 checks, 543 discharged by the provers; the highest step count of a successful proof is 97,753, within the budget. `Mdoc_Relation` is the parent package, ghost, with no check. The flow analysis prints no warning for the partition.
 
 ## 3. What is only tested
 
@@ -273,11 +275,11 @@ The cases:
 - **Honest:** every test document of upstream at version 7, with the request of `scripts/mdoc-cases.sh`, and the witness this project's builder makes.
 - **Mutations:** thirteen on each of three documents (the reference test case, a short MSO and the longest), each aimed at one clause. After each, the harness recomputes the SHA-256 traces, e and the tags, so the circuit's verdict depends on the clause aimed at alone.
 - **Neutral:** changes to what the circuit does not read (the positions `attr_ei_` and `attr_ev_`, the pads and av together with the tags, byte 3 of the item, the map's size after `valueDigests`): both must accept.
-- **Synthetic:** the two cases of Section 1.8, and the documents rewritten under a new identifier of 23, 24 and 30 characters (below).
+- **Synthetic:** the three cases of Section 1.8, and the documents rewritten under a new identifier of 23, 24 and 30 characters (below).
 
 A case fails if the circuit accepts and the relation is false, or if the verdict is not the one expected. On the honest positive cases, the harness also evaluates `H_Matching_By_Content` and `H_Types_In_Item`, runs the lemmas, `Fact_Padding` at every index from 0 to 4,095 and `Lemma_Byte_At` on the identifier's 32 bytes, with their preconditions and assertions checked, and checks that `Decode_Public` of the public inputs is the request they encode.
 
-The result, run on the proving machine on 20 November 2026: **87 cases, none failed; none where the circuit accepts and the relation is false; none where the circuit refuses and the relation holds.**
+The result, run on the proving machine on 24 November 2026: **88 cases, none failed; none where the circuit accepts and the relation is false; none where the circuit refuses and the relation holds.**
 
 | Cases | Number | Verdict |
 |---|---|---|
@@ -285,7 +287,7 @@ The result, run on the proving machine on 20 November 2026: **87 cases, none fai
 | Honest, negative (the six `FAIL_` documents, the identifiers of 24 and 30 characters) | 8 | circuit refuses, relation false at `Item` |
 | Mutations | 39 | circuit refuses, relation false at the clause aimed at |
 | Neutral | 5 | circuit accepts, relation holds |
-| Synthetic, Section 1.8 | 2 | circuit accepts, relation holds, the hypothesis false |
+| Synthetic, Section 1.8 | 3 | circuit accepts, relation holds, the hypothesis false |
 
 **The identifiers of 24 characters or more.** At version 7 the public length of the identifier's entry is `1 + 17 + 1 + id_len`, as upstream's encoder pushes it (`mdoc_witness.h` 501 at 0d92f80c): it assumes the identifier's CBOR head is one byte. From 24 characters the head is two bytes, the entry is one byte longer than the length compared, and the clause `Item` fails on the honest witness. The harness rewrites the requested item of the reference test case under a new identifier, with its value digest in the MSO replaced; the issuer's signature no longer verifies, which the hash circuit does not read. With `family_name_national_ch` (23 characters) the circuit accepts; with `family_name_national_cha` (24) and `family_name_national_character` (30) it refuses, and the relation is false at `Item`. `Decode_Public` is the request in all three. Above 30 characters the encoder refuses the request (`Mdoc_Inputs.Fits`).
 
