@@ -207,17 +207,17 @@ Two witnesses made by the harness of Section 3 from the reference test case (FAM
 
 ### 1.9 The witness builder and the relation
 
-The relation says what the circuit accepts. The witness builder decides what this project's prover will try. They agree in one direction: every witness the builder builds satisfies the relation, tested on every document (Section 3). The converse does not hold, on purpose: the builder refuses at least everything no witness satisfies, and some documents the relation admits.
+The relation says what the circuit accepts. The witness builder decides what this project's prover will try. They agree in one direction, on the requests the document holds: when the document holds the requested attribute with the requested value, in the forms the builder admits, the witness it builds satisfies the relation, tested on every positive case of Section 3. The builder is not a check of the request: it locates the item by its identifier and does not compare the value, so for a value the document does not hold (the `FAIL_` documents) it builds a witness, and the relation is false on it; the prover then finds the circuit not satisfied (`Not_Satisfied`) and makes no proof. The same holds for the two completeness rows the builder does not yet refuse, below. On the other side, the builder refuses some documents the relation admits, on purpose.
 
 | The builder's status | The relation | Agreement |
 |---|---|---|
-| `Attribute_Not_Found` | no item with the identifier and value: no witness exists | the same |
+| `Attribute_Not_Found` | no item with the identifier: no witness exists | the same; a value the item does not hold is not refused here, but by the prover's `Not_Satisfied` |
 | `Attribute_Too_Long` | the item must fit two SHA-256 blocks, 119 bytes at most | the same limit |
 | `Validity_Form_Unsupported` | the dates compared byte for byte; a lower-case `t` satisfies it | the builder is narrower: it closes `Limit_Date_Separators` for this project's prover |
 | `Device_Key_Form_Unsupported` | the clause `Device_Key`, its exact bytes | the same |
 | `Random_Form_Unsupported` | the clause `Item` does not read the type of `random` | the builder is narrower: `H_Types_In_Item` stays a hypothesis on the issuer |
 
-Two completeness rows are refused only by the circuit today: `digestAlgorithm` other than SHA-256, and an identifier of 24 to 30 characters. Issue #195 is to refuse both in the builder, before any work.
+Two completeness rows are refused only by the circuit today: `digestAlgorithm` other than SHA-256, and an identifier of 24 to 30 characters. For both, the builder builds a witness on which the relation is false (tested for the identifiers, Section 3). Issue #195 is to refuse both in the builder, before any work.
 
 ### 1.10 The author's review
 
