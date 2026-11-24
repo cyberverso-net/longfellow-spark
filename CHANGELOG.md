@@ -14,6 +14,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Changed
 
+- The scope of the last part of `H_Matching_By_Content`, no head `58 20` in the MSO's last 33 bytes (#207): chapter 9 Section 6 and chapter 10 Section 1.8 say it is sufficient, not necessary. An honest MSO fails it by chance when the pair occurs in its last value digest (31 in 65,536, about one document in 2,100, when `valueDigests` ends the map) or in the end of the device key (about one in 8,200); never when its last 33 bytes are the text of dates, a docType or an algorithm name, as in 37 of the 38 test documents. Such a document is not open to attack, since an item with the digest after the pair is a preimage of SHA-256, but the meaning stated by the relation leaves it out.
 - The register: S5 and S6 added; R2 names the relation and its test; R8 and R14 say that their layouts are the relation's decodings, the public one tested to invert the encoder. The trust model lists the two premises. ADR 0091 gains a note on its Status line: the checker's theorem has no hypothesis, a soundness condition is a hypothesis of the relation's meaning and a completeness condition a constraint inside a clause.
 
 ## [0.6.0] - 2026-11-19
