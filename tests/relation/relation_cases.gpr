@@ -1,0 +1,38 @@
+--  The harness relation_cases (Mdoc_Relation.Hash, ADR 0091): the
+--  relation of the hash circuit against the registered circuit's
+--  evaluator, case by case. Test code, outside the proof perimeter.
+--
+--  Its own project, not the test project's: the test project's flags
+--  (-O0 -gnatVa) make one evaluation of the circuit take about 21
+--  minutes, these about 0.7 s. -gnata compiles and executes the ghost
+--  relation and every contract of the library outside the level
+--  Proof_Only, which is never compiled. NOT the constant-time build:
+--  never measure or deploy what this project produces.
+--
+--  Build:  alr exec -- gprbuild -P tests/relation/relation_cases.gpr -p
+--  Run:    tests/relation/bin/relation_cases <hash circuit> <cases file>
+--          <testcases directory>   (scripts/check.sh cli runs it)
+
+with "sparklib";
+
+project Relation_Cases is
+
+   for Source_Dirs use (".", "../../src");
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   for Create_Missing_Dirs use "True";
+   for Main use ("relation_cases.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-gnat2022",
+         "-gnata",     --  Assertions and ghost code on
+         "-O2",
+         "-gnatW8");
+   end Compiler;
+
+   package Binder is
+      for Default_Switches ("Ada") use ("-Es");
+   end Binder;
+
+end Relation_Cases;

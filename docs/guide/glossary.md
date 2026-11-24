@@ -34,7 +34,7 @@ See: [Soundness](#soundness). Not to be confused with [full absorption](#full-ab
 
 ### Conditions for certifying the circuit
 
-The table of chapter 9 Section 6: the assumptions on the issuer, the relying party, the device and the circuit under which the version 7 pair's guarantee holds, each with its kind, soundness or completeness, and what breaks if it fails. ([A1.5](00-primer-cryptography.md#a15-what-stays-outside), [chapter 9 Section 6](09-mdoc.md#6-what-stays-trusted-and-the-limits))
+The table of chapter 9 Section 6: the assumptions on the issuer, the relying party, the device and the circuit under which the version 7 pair's guarantee holds, each with its kind, soundness or completeness, and what breaks if it fails. In the specification of a relation, a soundness row is a hypothesis of the relation and a completeness row a constraint inside a clause; chapter 10 gives each row its name. ([A1.5](00-primer-cryptography.md#a15-what-stays-outside), [chapter 9 Section 6](09-mdoc.md#6-what-stays-trusted-and-the-limits), [chapter 10](10-certified-circuits.md#the-conditions-and-their-names-in-the-specification))
 
 ### Constant time
 
@@ -47,6 +47,12 @@ The form of upstream's soundness theorem: except with negligible probability, a 
 ### Honest prover
 
 This project's prover working from a credential: its witness builder refuses, before any work, a credential the circuits would mishandle, with the exceptions the conditions table of chapter 9 Section 6 marks "The circuits refuse the proof". Its checks protect the holder, not a verifier. ([A1.6](00-primer-cryptography.md#a16-the-honest-prover-and-any-prover))
+
+### Hypothesis of the relation
+
+A condition outside the relation that an evaluator adds to read the relation as a statement about a credential; the checker's theorem does not need it. The prefix says its kind: `H_` a hypothesis on the issuer, the relying party or SHA-256 (`H_Sha256`, `H_Digest_Preimage`, `H_Matching_By_Content`, `H_Types_In_Item`, `H_Namespace`, `H_Now_Form`); `Fact_` a fact about the circuit, proved here or by the checker (`Fact_Padding`, `Fact_Wrapper_Lengths`); `Limit_` a known limit of the circuit, stated, not assumed (`Limit_Date_Separators`). Each soundness row of the conditions for certifying the circuit is one. ([chapter 10 Section 1.6](10-certified-circuits.md#16-the-hypotheses))
+
+See: [Relation](#relation), [Conditions for certifying the circuit](#conditions-for-certifying-the-circuit).
 
 ### Imitation
 
@@ -91,6 +97,12 @@ See: [Cheating prover](#cheating-prover), [Honest prover](#honest-prover).
 Four senses. (1) A **ghost reference**: a simple ghost function that transcribes a formula of the specification, against which the code is proved. (2) **Upstream's code at the pin**, its Rust reference implementation (`docs/specs/rust`) and its production code, which chapters 3, 4, 5 and 7 call "the reference"; the Lean correspondence page uses the word for upstream's Lean sources. (3) The **references of the test vectors**, the independent scripts that compute expected answers. (4) **Reference work**, outside the claims of the supported profile: the reference program `longfellow_prove`, which proves one circuit from a JSON file, and the reference path of `longfellow_prove_mdoc`, which takes upstream's witness files (`--hash-witness`) and skips the witness builder. ([B4.1](00-primer-spark.md#b41-ghost-code-the-specification-inside-the-program), [B7.2](00-primer-spark.md#b72-tested), [chapter 7 Section 3.7](07-prover.md#37-zk_prover-prover_status-longfellow_prove), [A1.2](00-primer-cryptography.md#a12-the-object-certified))
 
 Aliases: "the reference" (chapters 3, 4, 5, 7 for sense 2; chapter 1 for sense 1, `Mul_Ref` and `Mul_Serial`); "Rust reference" (chapters 1, 2).
+
+### Relation
+
+What a circuit is proved to imply on its public inputs and its witness, stated in SPARK: for the version 7 hash circuit, `Hash_Relation (X, W)`, the decoding of the inputs and one clause per check of the generator. The checker of the certified circuits milestone proves that the circuit accepts only if the relation holds; the converse, completeness, is tested. Not the statement: the relation speaks of bytes at offsets the prover chose, and the hypotheses of the relation make it a statement about a credential. ([chapter 10 Section 1](10-certified-circuits.md#1-the-relation-of-the-version-7-hash-circuit))
+
+See: [Statement](#statement), [Hypothesis of the relation](#hypothesis-of-the-relation).
 
 ### Soundness
 
