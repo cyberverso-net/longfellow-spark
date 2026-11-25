@@ -150,6 +150,16 @@ The argument. Each entry starts with its key, whose first byte is not zero, and 
 
 `Lemma_Count_In_Range` proves another fact the circuit leaves implicit: nb is between 1 and 40 whenever the relation holds. The circuit computes the comparison nb ≤ 40 and discards it (`mdoc_hash.h` 186). A count outside gives a signed length of zero, and the clause `Value_Digests` needs an index below it.
 
+The circuit does not need that comparison either. For a count outside 1 to 40, no selector of the mux in `assert_hash` is one, so the packed value it unpacks is 0 (`flatsha256_circuit.h` 236 to 262). The plucker then refuses it: its four polynomials give, at 0, their constant terms, and none of the four is 0 or 1, so the assertion that each output is a bit fails (`BitPlucker`, Section 2). The relation's `Signed_Digest` states a zero digest there, which no witness the circuit accepts reaches. The registered circuit, on the reference test case with only the count changed (`relation_cases`, the option `count`):
+
+| nb | Circuit | Relation | The assertions that fail |
+|---|---|---|---|
+| 0 | refuses | false | 256 bit assertions of the plucker, 256 comparisons of `assert_hash` with e, 5 of `check_index`, 1,756 of `assert_zero_padding` |
+| 41 | refuses | false | 256 of the plucker, 256 of `assert_hash`, 5 of `check_index` |
+| 255 | refuses | false | as for 41 |
+
+nb is eight bits the circuit asserts, so no other value is possible. The 256 failures of the plucker alone refuse every such witness, whatever its other wires hold.
+
 ### 1.5 The public interface
 
 Every clause reads the public part through `Decode_Public`. The claim the relation makes is therefore about an X that the verifier built with `Mdoc_Inputs.Hash_Inputs`, the same code as upstream's encoder. A verifier that passed other lengths would change what is compared: an identifier's length of 18 would make the clause `Item` compare the key `elementIdentifier` alone.
@@ -184,7 +194,7 @@ The clauses note, one by one, what the circuit leaves out. Gathered here, each w
 | The padding of the signed message: 16#80#, the zeros, and whether the length is the message's | `Chain`, `Length` | `H_Sha256`; `Fact_Padding` for the patterns |
 | The padding of the item, and its length beyond "whole bytes below 4,096" | `Value_Digest`, `Item` | `H_Sha256`; the third premise of `Lemma_Item_No_Wrap` |
 | The two bytes of the payload's length and the five of the MSO's tag-24 head, skipped | the windows into the MSO | `Fact_Wrapper_Lengths` |
-| The comparison nb ≤ 40, computed and discarded | `Zero_Tail` | `Lemma_Count_In_Range` |
+| The comparison nb ≤ 40, computed and discarded | `Zero_Tail` | `Lemma_Count_In_Range`; in the circuit, the plucker of `assert_hash` refuses such a count (Section 1.4) |
 | Byte 3 of the item, the length of its byte string | `Item` | `H_Sha256`: the item is then the issuer's |
 | The size of the map after `valueDigests` | `Value_Digests` | nothing needed: the clause uses only the key |
 | The link between the digest's index and the map of `valueDigests` | `Value_Digest` | `H_Matching_By_Content` (the issuer's own bytes) and `H_Digest_Preimage` (the device key's coordinates) |

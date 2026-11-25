@@ -337,8 +337,15 @@ package Mdoc_Relation.Hash is
    with Global => null;
 
    --  The state the circuit compares with e: the state after block nb
-   --  when nb is 1 to 40; the sum of no state, zero, otherwise
-   --  (assert_hash, flatsha256_circuit.h 236 to 262).
+   --  when nb is 1 to 40 (assert_hash, flatsha256_circuit.h 236 to
+   --  262). Outside 1 to 40 no selector of assert_hash's mux is one, so
+   --  the packed value it unpacks is 0; the circuit then refuses at the
+   --  unpacking, before any comparison, because the constant term of
+   --  each of the four plucking polynomials, their value at 0, is
+   --  neither 0 nor 1 (Gadgets.Bits; chapter 10, Section 1.4). The
+   --  relation states a zero digest there, which no witness the circuit
+   --  accepts reaches, and is false for such an nb all the same
+   --  (Lemma_Count_In_Range).
    function Signed_Digest (V : Private_Part) return Bytes_32 is
      (if V.Count in 1 .. Max_Blocks
       then Digest_Of (State_After (V, Natural (V.Count)))
@@ -624,7 +631,8 @@ package Mdoc_Relation.Hash is
    --  Every block from block nb on is zero (assert_zero_padding,
    --  flatsha256_circuit.h 267 to 278). The comparison nb <= 40 at
    --  mdoc_hash.h 186 computes a bit and asserts nothing; a count above
-   --  40 is refused by Index_Bound, its length being zero.
+   --  40 is refused by Index_Bound, its length being zero, and by the
+   --  circuit at the plucker of assert_hash (Signed_Digest).
    function Zero_Tail (V : Private_Part) return Boolean is
      (for all B in Block_Index =>
         (if Natural (V.Count) <= B then
@@ -817,8 +825,10 @@ package Mdoc_Relation.Hash is
 
    --  The count is in 1 to 40 whenever the relation holds: a count
    --  outside gives a signed length of zero, and no index is below it.
-   --  So the comparison the circuit discards (mdoc_hash.h 186) needs no
-   --  fact of the checker.
+   --  So the relation needs no comparison nb <= 40 (mdoc_hash.h 186,
+   --  discarded). The circuit needs none either: it refuses such a
+   --  count at the plucker of assert_hash (Signed_Digest), a fact of
+   --  the plucking polynomials the checker reads in the circuit.
    procedure Lemma_Count_In_Range (X, W : SAH.Element_Array) with
      Global => null,
      Pre    => Shape_Ok (X, W) and then X (X_One) = GF2_128.One
