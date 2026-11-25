@@ -6,7 +6,9 @@ v of the plucking polynomials is asserted with `v - v ^ 2`). In any field,
 
 Cited by the SPARK unit `Gadgets.Bits` (chapter 10, Section 2).
 -/
-import Mathlib
+import Mathlib.RingTheory.SimpleRing.Principal
+import Mathlib.Tactic.LinearCombination.Lemmas
+import Mathlib.Tactic.LinearCombination
 
 namespace LongfellowSpark.Plucker
 

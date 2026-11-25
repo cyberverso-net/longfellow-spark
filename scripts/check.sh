@@ -145,7 +145,7 @@ do_partitions_check() {
 do_test() {
    header "test: build the harnesses (assertions on)"
    alr -n exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
-   local harnesses="gf2_128_kat p256_kat q256_kat ecdsa_kat mdoc_parse_kat mdoc_witness_kat sumcheck_kat transcript_kat ligero_kat circuit_kat writer_kat prover_kat fft_kat mdoc_kat"
+   local harnesses="gf2_128_kat p256_kat q256_kat ecdsa_kat mdoc_parse_kat mdoc_witness_kat sumcheck_kat transcript_kat ligero_kat circuit_kat writer_kat prover_kat fft_kat mdoc_kat gadgets_kat"
    local logs status=0 h code
    logs="$(mktemp -d)"
    header "test: $harnesses, concurrently"
@@ -168,6 +168,33 @@ do_test() {
    if [ "$status" -ne 0 ]; then
       exit "$status"
    fi
+}
+
+#  The Lean proofs the SPARK proof cites (lean/; ADR 0091, chapter 10
+#  Section 2): Mathlib's compiled files from its cache, the build of
+#  the project's proofs (warnings are errors in LongfellowSpark), the
+#  axiom check of the cited theorems, and the vectors of the model,
+#  which must be the committed file the tests read. lean/.lake is kept
+#  between runs (it is ignored by git). It runs on the proving machine,
+#  where elan is installed, and in the job lean of the GitHub workflow.
+do_lean() {
+   header "lean: the Lean proofs of lean/, their axioms and the model's vectors"
+   #  On GitHub Actions only the job lean of the workflow runs it
+   #  (LONGFELLOW_LEAN=1); the job verify skips it.
+   if [ -n "${GITHUB_ACTIONS:-}" ] && [ -z "${LONGFELLOW_LEAN:-}" ]; then
+      echo "lean: skipped in this job; the job lean runs it, and the gate on the proving machine"
+      return 0
+   fi
+   if ! command -v lake > /dev/null 2>&1 && [ -x "$HOME/.elan/bin/lake" ]; then
+      PATH="$HOME/.elan/bin:$PATH"
+   fi
+   command -v lake > /dev/null 2>&1 || { echo "lean: lake not found (install elan)" >&2; exit 1; }
+   ( cd lean && lake exe cache get && lake build && lake env lean scripts/Axioms.lean )
+   ( cd lean && lake env lean scripts/Vectors.lean ) | diff - tests/vectors/lean_gf2_128.txt || {
+      echo "lean: tests/vectors/lean_gf2_128.txt is not the output of lean/scripts/Vectors.lean" >&2
+      exit 1
+   }
+   echo "lean: built, axioms checked, vectors current"
 }
 
 #  The release build (ADR 0046, 0048): the command-line verifier and
@@ -386,6 +413,11 @@ do_lint() {
    #  add up to their summary.
    header "lint: the counts of verification conditions (vc-count-test.py)"
    python3 -I scripts/vc-count-test.py
+   #  Every body of src/ outside SPARK is an assumption of the proof and
+   #  has its row in the register of the trusted base.
+   header "lint: the code outside SPARK and its register rows (check-spark-off.py)"
+   python3 -I scripts/check-spark-off-test.py
+   python3 -I scripts/check-spark-off.py
    header "lint: forbidden content over tracked files"
    #  git grep searches tracked files only, in one process, and exits 0
    #  exactly when something matched. This script is excluded from the
@@ -430,10 +462,12 @@ case "${1:-}" in
    cli)              do_cli ;;
    vectors)          do_vectors ;;
    lint)             do_lint ;;
+   lean)             do_lean ;;
    all)
       do_build
       do_partitions_check
       do_prove
+      do_lean
       do_test
       do_cli
       do_vectors
@@ -450,7 +484,7 @@ case "${1:-}" in
       do_cli
       do_vectors
       do_lint
-      header "all checks but the proof passed; the proof is reused (ADR 0088)"
+      header "all checks but the proofs passed; the SPARK and Lean proofs are reused (ADR 0088)"
       ;;
    *) usage ;;
 esac

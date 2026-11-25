@@ -72,7 +72,10 @@ machine runs on its own clone, restored to the commit and checked clean at it be
 run starts; the copy of upstream for the cross-check is checked the same way at the pin. The
 proving machine's `make check` also runs the cross-check of the mDoc proofs with upstream's
 verifier, which needs cargo and a clone of upstream and is skipped, with a line saying so,
-where they are absent (`scripts/cross-check-upstream.sh`, ADR 0087), and the proof of age
+where they are absent (`scripts/cross-check-upstream.sh`, ADR 0087), the step `lean` (the
+Lean proofs of `lean/` that the SPARK proof cites, built with Mathlib's cached files, their
+axioms checked; skipped, with a line saying so, on GitHub Actions; chapter 10 Section 2.8),
+and the proof of age
 from every one of upstream's 38 test documents (`scripts/mdoc-cases.sh`), which is skipped,
 with a line saying so, on GitHub Actions, whose job would exceed its 30 minutes.
 
@@ -94,6 +97,9 @@ The step lint (`make lint`), in both checks, holds these rules:
 - the script that gives each chapter of the guide its table of verification conditions counts
   small runs right and refuses those whose units do not add up to the summary of GNATprove
   (`scripts/vc-count-test.py`, for `scripts/vc-count.py`);
+- every body of `src/` outside SPARK, which the proof takes as given, has a row in the register
+  of the trusted base that names it (`scripts/check-spark-off.py`, after its tests
+  `scripts/check-spark-off-test.py`);
 - no em-dash in any tracked file;
 - none of the attribution and tooling words that `scripts/check.sh` lists, in any tracked file.
 

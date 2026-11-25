@@ -1,7 +1,9 @@
 -- Ported from upstream's formal/: formal/circuits/ECDSA/PowMod.lean at
 -- commit d803c314, as on upstream's main 1424f50e (19 November 2026),
 -- https://github.com/longfellow-zk/longfellow-zk. The file below is
--- upstream's, unchanged: upstream's file carries no header of its own;
+-- upstream's, unchanged but for one character of a comment: the dash
+-- in the remark on npowRec is a semicolon here, since the lint refuses
+-- that character. Upstream's file carries no header of its own;
 -- the repository is Copyright 2025 Google LLC, under the Apache License,
 -- Version 2.0 (LICENSE at 1424f50e). This project's Lean pin is
 -- 7bf8a6b, where the declarations GeneratorChecks.lean needs do not
@@ -17,7 +19,7 @@ public import Lean.Elab.Tactic.Omega
 /-!
 # Kernel-reducible modular exponentiation
 
-`lucas_primality` needs `a ^ (p - 1)` in `ZMod p`, but `Monoid.npow` is `npowRec` — linear in
+`lucas_primality` needs `a ^ (p - 1)` in `ZMod p`, but `Monoid.npow` is `npowRec`; linear in
 the exponent, so hopeless at 2^256.  Binary exponentiation recursing on `e / 2` would be
 *well-founded*, and well-founded recursion is opaque to kernel reduction (the same trap that
 killed the `List.mergeSort` route earlier in this project).  Recursing structurally on a `fuel`

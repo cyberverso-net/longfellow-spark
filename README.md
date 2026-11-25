@@ -52,7 +52,7 @@ How work is planned, proved and accepted is in [the development process](docs/pr
 
 ## Building and proving
 
-You need [Alire](https://alire.ada.dev). The compiler, the builder and the prover are dependencies of the crate, at the versions pinned in `alire.toml`, so the first `alr build` fetches them. Python 3 is needed only to regenerate the test vectors.
+You need [Alire](https://alire.ada.dev). The compiler, the builder and the prover are dependencies of the crate, at the versions pinned in `alire.toml`, so the first `alr build` fetches them. Python 3 is needed only to regenerate the test vectors. The Lean proofs of `lean/` need [elan](https://github.com/leanprover/elan), which installs the Lean version of `lean/lean-toolchain`; Mathlib comes from its cache (`make lean`).
 
 ```bash
 alr build                                    # the library
@@ -67,13 +67,13 @@ The prover settings are in `longfellow_spark.gpr` (ADR 0020): CVC5, Z3 and Alt-E
 `make check` runs every check of the project, in order:
 
 1. the build and the check that the proof partitions cover the project;
-2. the full proof, with any unproved check treated as an error;
-3. the fourteen test harnesses;
+2. the full proof, with any unproved check treated as an error, then the Lean proofs of `lean/` that the SPARK proof cites, with their axioms checked (on the proving machine);
+3. the fifteen test harnesses;
 4. the release build: the interop harness, the command-line verifier on the upstream proofs, the command-line prover reproducing them, the mDoc round trips and the proof of age from every one of upstream's 38 test documents;
 5. the vector generators, compared with the committed files;
-6. a lint of the tracked files, of the relative links of the documentation and of the guide's code maps.
+6. a lint of the tracked files, of the relative links of the documentation, of the guide's code maps and of the code outside SPARK, each with its row in the register of the trusted base.
 
-`scripts/check.sh` defines these steps. `make build`, `make prove`, `make test`, `make cli`, `make vectors` and `make lint` run them one at a time. `make prove` gives GNATprove `-j0`, every core; without it the proof runs on one core and did not end within three hours on the proving machine. On the proving machine, 12 cores, `make check` took 183 minutes on 18 November 2026.
+`scripts/check.sh` defines these steps. `make build`, `make prove`, `make lean`, `make test`, `make cli`, `make vectors` and `make lint` run them one at a time. `make prove` gives GNATprove `-j0`, every core; without it the proof runs on one core and did not end within three hours on the proving machine. On the proving machine, 12 cores, `make check` took 183 minutes on 18 November 2026.
 
 The project's proving machine, a virtual machine on Google Cloud, runs the same check on demand and posts the status `prove` ([ADR 0060](docs/adr/0060-proving-machine-on-google-cloud.md), ADR 0062); [the development process](docs/process.md), "The proving machine", describes `scripts/remote-check.sh` and its modes.
 
@@ -85,7 +85,7 @@ This is not the constant-time build. Never measure or ship binaries built from `
 
 ```bash
 alr exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
-make test        # the fourteen harnesses, concurrently, in about a minute
+make test        # the fifteen harnesses, concurrently, in about a minute
 ```
 
 Each harness reads its vector files from `tests/vectors/` by default, prints pass and fail counts, and fails if any case fails or none ran. The [trust model](docs/guide/trust-model.md) maps each file to its generator and harness.
@@ -168,7 +168,7 @@ To reproduce the environment on another machine:
 3. Check the versions with `alr exec -- gnat --version` and `alr exec -- gnatprove --version`.
 
 - **`verify`** is a workflow. It runs on every push and pull request, on a hosted Ubuntu runner, and covers everything in `make check` except the proof.
-- **`prove`** is a commit status. `scripts/remote-check.sh` posts it after running `make check` on the proving machine for that exact commit. A commit whose proof inputs (the sources, the project file, the toolchain pins, the prover's switches) equal those of a proved ancestor does not prove again: the machine runs every other check and the status names the proved commit (ADR 0088); the proof from scratch returns at every release, milestone close and once a week on `main`. [The development process](docs/process.md) has the rule.
+- **`prove`** is a commit status. `scripts/remote-check.sh` posts it after running `make check` on the proving machine for that exact commit. A commit whose proof inputs (the sources, the project file, the toolchain pins, the prover's switches, the Lean proofs) equal those of a proved ancestor does not prove again: the machine runs every other check and the status names the proved commit (ADR 0088); the proof from scratch returns at every release, milestone close and once a week on `main`. [The development process](docs/process.md) has the rule.
 
 Work happens on a branch per stage or block, and reaches `main` through a pull request once both checks are green (ADR 0062). A red check is fixed with a new commit on the branch. Before a release, or after a toolchain change, the check is run on `main` as well.
 

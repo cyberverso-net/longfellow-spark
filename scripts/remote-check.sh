@@ -359,6 +359,19 @@ proof_inputs() {  # commit
    done
    echo "gnatprove-lines $( { git show "$c:scripts/check.sh"; git show "$c:Makefile"; } \
       | gnatprove_lines | shasum -a 256 | cut -d' ' -f1)"
+   #  The Lean proofs (ADR 0091): the tree of lean/ and the command
+   #  lines of the step lean, as gnatprove-lines for the SPARK proof. A
+   #  commit before lean/ existed has neither line.
+   if git cat-file -e "$c:lean" 2> /dev/null; then
+      echo "lean/ $(git rev-parse "$c:lean")"
+      echo "lean-lines $(git show "$c:scripts/check.sh" | lean_lines | shasum -a 256 | cut -d' ' -f1)"
+   fi
+}
+
+#  The lake and lean command lines of the text on stdin, joined and
+#  without comments as for gnatprove_lines.
+lean_lines() {
+   sed -e ':a' -e '/\\$/N; s/\\\n//; ta' | grep -v -E '^[[:space:]]*#' | grep -E '\blake\b'
 }
 
 #  The gnatprove command lines of the text on stdin: continuation lines

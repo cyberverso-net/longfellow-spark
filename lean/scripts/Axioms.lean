@@ -8,14 +8,15 @@ upstream's `formal/scripts/Audit.lean`, restricted to the cited lemmas.
 Run with `lake env lean scripts/Axioms.lean` from `lean/`; it fails if a cited
 lemma is missing or depends on any other axiom.
 -/
-import Mathlib
 import LongfellowSpark
 
 open Lean Elab Command
 
 /-- The lemmas the SPARK contracts cite, by name. -/
 def citedLemmas : List Name :=
-  [`LongfellowSpark.Plucker.output_is_bit,
+  [`LongfellowSpark.Model.output_is_bit,
+   `LongfellowSpark.Model.assert_eqmod,
+   `LongfellowSpark.Plucker.output_is_bit,
    `LongfellowSpark.BitAdder.assert_eqmod_words,
    `LongfellowSpark.GF128.alpha_order,
    `LongfellowSpark.GF128.assert_eqmod_words_gf128,

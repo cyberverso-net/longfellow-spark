@@ -20,7 +20,12 @@ the `k` differences is zero if and only if the sum of the `k` words, modulo
 
 Cited by the SPARK unit `Gadgets.Words` (chapter 10, Section 2).
 -/
-import Mathlib
+import Mathlib.Algebra.Order.Ring.Star
+import Mathlib.Data.Int.ConditionallyCompleteOrder
+import Mathlib.Data.Int.Star
+import Mathlib.RingTheory.Henselian
+import Mathlib.RingTheory.RegularLocalRing.Defs
+import Mathlib.RingTheory.SimpleRing.Principal
 
 namespace LongfellowSpark.BitAdder
 

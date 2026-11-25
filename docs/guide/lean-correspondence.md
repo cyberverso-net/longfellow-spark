@@ -85,6 +85,49 @@ For each element of the Lean model, the unit of this project that implements it,
 | Fresh challenges, drawn in protocol order, never re-absorbed | `Transcript`, `Sumcheck_Transcript.Replay_Challenges` | The order is tested byte for byte against Appendix B.2 and the upstream proofs. The ideal sampler stays an assumption, here as upstream (register row S2). |
 | The two-field MAC, a private MAC witness per circuit, tag = (av + share) · message; the key share `av` is the transcript oracle's answer at the two Merkle roots (the conjunct of the end-to-end statement, `v7P256Sha{1,2,3,4}_zk_circuit_tsec_sepMac`) | `Mdoc_Mac.Legacy_Tags` (the six tags, upstream's `push_legacy_macs` of `mac.rs` at d5e6be7), `Mdoc_Prover` and `Mdoc_Verifier`: av drawn from the transcript after both roots, each circuit with its own copy of the pads in its witness (chapter 9 Section 1.3) | Proved: the six products of the tag equation (Gold). By reading and tested: the order of the two commitments before av in both roles (ADR 0085, Silver on the phases; no contract states the absorbed transcript). Tested: the proofs made here are accepted by upstream's verifier and upstream's example proofs by this one (the cross-check, chapter 9 Section 5.1). The correspondence with the model's MAC is by reading, as the rest of this page: upstream's audit records that the older shared-blind argument fails for separate blinds (`SoundnessAudit.separate_blinds_collision`), and the model's statement is the one with separate blinds. |
 
+## This project's own Lean proofs
+
+Besides upstream's development, `lean/` holds a small Lean development of this project's own (chapter 10 Section 2). It proves two facts of the gadgets of the hash circuit that the SPARK solvers cannot reach, because they are facts of the product of GF(2^128): an output of the plucker whose assertion holds is a bit (G1), and the assertion `assert_eqmod` of 1 to 7 words of bits holds exactly when their sum modulo 2^32 is the asserted word (G3). The second rests on the order of x in the field, 2^128 - 1, which the development proves by computation in Lean's kernel.
+
+**A departure from the pin.** The order of x is proved with five declarations of upstream's `formal/lfzk-v2/LfzkV2/Current/GeneratorChecks.lean` and the helpers of `formal/circuits/ECDSA/PowMod.lean` they use, ported into `lean/Upstream/` with their statements unchanged and their provenance in each file. They are taken from upstream's commit 6ef3c750 (15 November 2026), on its main branch at 1424f50e, not from the pin 7bf8a6b, because they do not exist at the pin. The rest of this page keeps the pin.
+
+The SPARK proof cites the two facts through bridges (register rows L3 and L4). A bridge is checked by reading: its contract must state the Lean theorem. To keep that reading short, the Lean theorems are stated over a model of the field over `Nat`, in the same bit-level terms as `GF2_128`, and the step from that model to the field `AdjoinRoot P` of Mathlib is proved in Lean (`LongfellowSpark.GF128.ev`, an injective homomorphism below 2^128). The tables below give the reading, one row per definition.
+
+**The field.**
+
+| SPARK (`src/gf2_128.ads`, `src/gadgets*.ads`) | Lean (`lean/LongfellowSpark/GF128.lean`, `Model.lean`) | The same because |
+|---|---|---|
+| An `Element`: two limbs of 64 bits, bit I of the 128 the coefficient of x^I | A number below 2^128, bit I the coefficient of x^I (`toPoly`) | The same bits in the same order: limb 0 is bits 0 to 63 |
+| `GF2_128.Add`: the limb-wise xor | `^^^` | xor of the same bits |
+| `GF2_128.Mul`, proved equal to `Mul_Ref`: the product of the two polynomials reduced by x^128 = x^7 + x^2 + x + 1 (MSB-first Horner, each step `Xtime`) | `GF128.mul`: the carry-less product (`clmulAux`), then two folds by 0x87 | Two definitions of the product of GF(2)[x] / (x^128 + x^7 + x^2 + x + 1); the vectors of `lean/scripts/Vectors.lean` (`tests/vectors/lean_gf2_128.txt`, regenerated and compared by the step `lean`) agree with `GF2_128.Mul` in `gadgets_kat` |
+| `Zero`, `One`, `Gadgets.X` | `0`, `1`, `2` | The polynomials 0, 1 and x |
+
+**G1, `Gadgets.Bits.Lemma_Output_Is_Bit` and `LongfellowSpark.Model.output_is_bit`.**
+
+| SPARK | Lean |
+|---|---|
+| `Pre => Bit_Assertion (V) = Zero`, with `Bit_Assertion (V) = Add (V, Mul (V, V))` | `h : v ^^^ mul v v = 0` |
+| `V : Element` | `hv : v < 2 ^ 128` |
+| `Post => Is_Bit (V)`, `V = Zero or else V = One` | `v = 0 ∨ v = 1` |
+
+**G3, `Gadgets.Words.Lemma_Assert_Eqmod` and `LongfellowSpark.Model.assert_eqmod`.**
+
+| SPARK | Lean |
+|---|---|
+| `Alpha_2 (I)`: `X` squared I times (`Mul (P, P)`) | `alpha2 i`: `2` squared i times (`mul b b`) |
+| `Shift (I)`: `Mul (Alpha_2 (32), Shift (I - 1))`, `One` for 0 | `shift i`: `mul (alpha2 32) (shift (i - 1))`, `1` for 0 |
+| `Factor (I, B) = Add (One, Mul (B, Add (Alpha_2 (I), One)))` | `factor i b = 1 ^^^ mul b (alpha2 i ^^^ 1)` |
+| `Encode (W)`: `Encode_Upto (W, 32)`, one factor at a time from `One` | `encode bits = prodN 32 (fun i => factor i (bits i))` |
+| `Product_Upto (L, K)`: the K words' elements, one at a time | `prodN k (fun j => encode (words j))` |
+| `Assertion (L, K, A)`: the product over I < K of `Add (Product_Upto (L, K), Mul (Shift (I), Encode (A)))` | `assertion k words abits = prodN k (fun i => prodN k (...) ^^^ mul (shift i) (encode abits))` |
+| `Value (W)`: the sum of `Pow2 (I)` over the bits I equal to `One` | `value bits = ∑ i < 32, if bits i = 1 then 2 ^ i else 0` |
+| `Sum_Upto (L, K)`: the sum of the K values | `sumN k words = ∑ j < k, value (words j)` |
+| `K : Term_Count`, 1 to 7 | `hk : 0 < k`, `hk7 : k ≤ 7` |
+| `Pre => All_Bits (L, K) and then All_Bits (A)` | `hw : ∀ j < k, ∀ i < 32, words j i = 0 ∨ words j i = 1`, `ha : ∀ i < 32, abits i = 0 ∨ abits i = 1` |
+| `Post => (Assertion (L, K, A) = Zero) = (Sum_Upto (L, K) mod 2 ** 32 = Value (A))` | `assertion k words abits = 0 ↔ sumN k words % 2 ^ 32 = value abits` |
+
+Word J of the list `L` is `words j`, bit I of a word is `bits i`; the words past K are not read on either side.
+
 ## What this means for the trust model
 
 The soundness and zero-knowledge theorems are not only trusted: upstream proves them in Lean, for a model of the verifier this project implements. They stay listed as trusted for this project (register row S1), because the link between that model and this code is the matrix above, and most of its rows are "by reading". The [trust model](trust-model.md) says so.

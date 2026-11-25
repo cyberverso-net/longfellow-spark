@@ -668,6 +668,10 @@ The functional contracts a unit declares are proved; what Gold covers is what th
 
 A thin wrapper over a Gold unit, whose contract follows from that one's. ([B7.1](00-primer-spark.md#b71-the-ladder-of-proof))
 
+### Gold over Lean lemmas
+
+A unit whose functional contracts GNATprove proves given one or more named lemmas proved in Lean. Each lemma enters through a bridge: a ghost procedure whose contract states the Lean theorem, with a null body outside SPARK, so that GNATprove takes the contract as given. The Lean proof checks the theorem; a reading checks that the contract states it (register Section 9; chapter 10 Section 2). The units `Gadgets.Bits`, `Gadgets.Words` and `Sha256.Trace.Netlist.Gadget` are Gold over Lean lemmas.
+
 ### Gold by definition
 
 A function that is itself the transcription of a formula, checked by reading. ([B7.1](00-primer-spark.md#b71-the-ladder-of-proof))

@@ -25,7 +25,7 @@ The primality of the nine factors and their product are upstream's
 
 Cited by the SPARK unit `Gadgets.Words` (chapter 10, Section 2).
 -/
-import Mathlib
+import Mathlib.Data.Nat.Bitwise
 import Upstream.GeneratorChecks
 import LongfellowSpark.BitAdder
 
