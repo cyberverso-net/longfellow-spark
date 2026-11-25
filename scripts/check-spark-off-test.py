@@ -3,9 +3,10 @@
 
 Each case writes a small tree (units under src/, a register under
 docs/guide/), runs the checker on it and compares its exit status with
-what is expected: a body outside SPARK that the register names passes,
-one it does not name fails, and so does a unit under pragma
-SPARK_Mode (Off). Run by the lint step of make check; needs only
+what is expected: a body outside SPARK that a row names, qualified, in
+its column Item passes; one named only bare, only as a dependant, or not
+at all fails; the aspect and the pragma are found across line breaks.
+Run by the lint step of make check; needs only
 Python 3.
 """
 
@@ -24,13 +25,27 @@ BODY = ("package body Alpha is\n"
         "end Alpha;\n")
 UNIT_OFF = "pragma SPARK_Mode (Off);\npackage body Beta is\nend Beta;\n"
 
+MULTILINE = ("package body Gamma is\n"
+             "   procedure Lemma (X : Integer) with\n"
+             "     SPARK_Mode =>\n"
+             "       Off\n"
+             "   is\n   begin\n      null;\n   end Lemma;\n"
+             "end Gamma;\n")
+PRAGMA_SPLIT = "pragma\n  SPARK_Mode\n    (Off);\npackage body Delta is\nend Delta;\n"
+
 CASES = [
-    ("named qualified", {"src/alpha.adb": BODY}, "| L1 | `Alpha.Lemma` is proved elsewhere. |\n", 0),
-    ("named bare", {"src/alpha.adb": BODY}, "| T6 | `Lemma` is trusted. |\n", 0),
-    ("not named", {"src/alpha.adb": BODY}, "| L1 | `Gamma.Lemma` is proved elsewhere. |\n", 1),
+    ("named in its Item", {"src/alpha.adb": BODY}, "| L1 | `Alpha.Lemma` is proved elsewhere. | x | y | z |\n", 0),
+    ("named bare only", {"src/alpha.adb": BODY}, "| T6 | `Lemma` is trusted. | x | y | z |\n", 1),
+    ("named only as a dependant", {"src/alpha.adb": BODY},
+     "| L1 | `Gamma.Other` is proved elsewhere. | `Alpha.Lemma` uses it. | y | z |\n", 1),
+    ("not named", {"src/alpha.adb": BODY}, "| L1 | `Gamma.Lemma` is proved elsewhere. | x | y | z |\n", 1),
     ("named outside a row", {"src/alpha.adb": BODY}, "`Alpha.Lemma` in prose.\n", 1),
-    ("unit off, not named", {"src/beta.adb": UNIT_OFF}, "| L1 | `Alpha.Lemma` |\n", 1),
-    ("unit off, named", {"src/beta.adb": UNIT_OFF}, "| L2 | `Beta` |\n", 0),
+    ("aspect across lines, not named", {"src/gamma.adb": MULTILINE}, "| L1 | `Alpha.Lemma` | x |\n", 1),
+    ("aspect across lines, named", {"src/gamma.adb": MULTILINE}, "| L1 | `Gamma.Lemma` | x |\n", 0),
+    ("pragma across lines, not named", {"src/delta.adb": PRAGMA_SPLIT}, "| L1 | `Alpha.Lemma` | x |\n", 1),
+    ("pragma across lines, named", {"src/delta.adb": PRAGMA_SPLIT}, "| L2 | `Delta` | x |\n", 0),
+    ("unit off, not named", {"src/beta.adb": UNIT_OFF}, "| L1 | `Alpha.Lemma` | x |\n", 1),
+    ("unit off, named", {"src/beta.adb": UNIT_OFF}, "| L2 | `Beta` | x |\n", 0),
     ("nothing off", {"src/gamma.adb": "package body Gamma is\nend Gamma;\n"}, "", 0),
 ]
 

@@ -10,9 +10,12 @@ proof, and every one must be listed in the register of the trusted base
   Unit.Subprogram from the unit of its file;
 - a pragma SPARK_Mode (Off) at the start of a unit: the whole unit.
 
-It prints the list, and fails when a row of the register's tables (a
-line that starts with "| ") does not name the subprogram (or the unit)
-in backquotes, qualified (`Unit.Subprogram`) or not (`Subprogram`).
+The aspect and the pragma are found in the text without its comments,
+across line breaks. The script prints the list, and fails when no row
+of the register's tables (a line that starts with "| ") names the
+subprogram, qualified and in backquotes (`Unit.Subprogram`, or `Unit`
+for a whole unit), in its column Item: a name in the other columns, such
+as "What depends on it", does not register an assumption.
 Each failure is printed with its file and line; the exit status is 1
 when there is one.
 
@@ -24,7 +27,7 @@ import re
 import sys
 
 OFF = re.compile(r"SPARK_Mode\s*(=>\s*Off\b|\(\s*Off\s*\))", re.IGNORECASE)
-PRAGMA = re.compile(r"^\s*pragma\s+SPARK_Mode\b", re.IGNORECASE)
+PRAGMA = re.compile(r"\bpragma\s+$", re.IGNORECASE)
 SUBPROGRAM = re.compile(r"^\s*(?:overriding\s+)?(?:procedure|function)\s+([A-Za-z_][\w]*)",
                         re.IGNORECASE)
 UNIT = re.compile(r"^\s*(?:private\s+)?(?:package(?:\s+body)?|procedure|function)\s+([A-Za-z_][\w.]*)",
@@ -37,45 +40,52 @@ def code(line):
 
 
 def off_parts(path):
-    """The (line number, name) of each part of a file outside SPARK."""
+    """The (line number, unit, subprogram) of each part of a file outside
+    SPARK; the subprogram is None for a whole unit."""
     with open(path, encoding="utf-8") as f:
-        lines = f.read().splitlines()
+        lines = [code(line) for line in f.read().splitlines()]
     unit = None
     for text in lines:
-        m = UNIT.match(code(text))
+        m = UNIT.match(text)
         if m:
             unit = m.group(1)
             break
+    text = "\n".join(lines)
     parts = []
-    for i, text in enumerate(lines):
-        c = code(text)
-        if not OFF.search(c):
-            continue
-        if PRAGMA.match(c):
-            parts.append((i + 1, unit, None))
+    for m in OFF.finditer(text):
+        line = text.count("\n", 0, m.start())
+        if PRAGMA.search(text[:m.start()]):
+            parts.append((line + 1, unit, None))
             continue
         name = None
-        for j in range(i, -1, -1):
-            m = SUBPROGRAM.match(code(lines[j]))
-            if m:
-                name = m.group(1)
+        for j in range(line, -1, -1):
+            sm = SUBPROGRAM.match(lines[j])
+            if sm:
+                name = sm.group(1)
                 break
-        parts.append((i + 1, unit, name))
+        parts.append((line + 1, unit, name))
     return parts
 
 
-def register_rows(path):
+def register_items(path):
+    """The column Item of every row of the register's tables."""
+    items = []
     with open(path, encoding="utf-8") as f:
-        return [line for line in f.read().splitlines() if line.startswith("| ")]
+        for line in f.read().splitlines():
+            if line.startswith("| "):
+                cells = line.split("|")
+                if len(cells) > 2:
+                    items.append(cells[2])
+    return items
 
 
-def named(rows, unit, name):
-    keys = ["`%s`" % unit] if name is None else ["`%s.%s`" % (unit, name), "`%s`" % name]
-    return any(k in row for row in rows for k in keys)
+def named(items, unit, name):
+    key = "`%s`" % unit if name is None else "`%s.%s`" % (unit, name)
+    return any(key in item for item in items)
 
 
 def main(root):
-    rows = register_rows(os.path.join(root, "docs", "guide", "trusted-base.md"))
+    rows = register_items(os.path.join(root, "docs", "guide", "trusted-base.md"))
     src = os.path.join(root, "src")
     failures = 0
     found = 0

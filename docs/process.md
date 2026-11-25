@@ -98,7 +98,8 @@ The step lint (`make lint`), in both checks, holds these rules:
   small runs right and refuses those whose units do not add up to the summary of GNATprove
   (`scripts/vc-count-test.py`, for `scripts/vc-count.py`);
 - every body of `src/` outside SPARK, which the proof takes as given, has a row in the register
-  of the trusted base that names it (`scripts/check-spark-off.py`, after its tests
+  of the trusted base whose column Item names it, qualified, the aspect or pragma found across
+  line breaks (`scripts/check-spark-off.py`, after its tests
   `scripts/check-spark-off-test.py`);
 - no em-dash in any tracked file;
 - none of the attribution and tooling words that `scripts/check.sh` lists, in any tracked file.
