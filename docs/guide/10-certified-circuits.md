@@ -315,7 +315,7 @@ A word of the witness is 8 field elements, each carrying 4 bits. The generator's
 
 **What completeness needs.** That an honest witness decodes to the word it was packed from: p_k (P_i) is bit k of i. `Interpolate` computes the coefficients by Lagrange interpolation at the 16 points; that they interpolate is **tested** at the 64 pairs of point and bit (`gadgets_kat`; register row V14). The solvers do not evaluate a polynomial of degree 15 over GF(2^128) symbolically, and soundness does not rest on it.
 
-**A fact of the coefficients.** The constant term of each of the four polynomials is neither 0 nor 1. Its consequence is the answer of Section 1.4: the element 0 decodes to no bits, so a count of blocks outside 1 to 40, for which the mux of `assert_hash` gives 0, is refused by the plucker. It is tested two ways: on `Interpolate`'s coefficients (`gadgets_kat`), and on the registered circuit, whose plucker gives on the element 0 the four constant terms, 64 times each, in the 256 failing assertions of the counts 0, 41 and 255 (`relation_cases`, the option `count`).
+**A fact of the coefficients.** The constant term of each of the four polynomials is neither 0 nor 1. Its consequence is the answer of Section 1.4: the element 0 decodes to no bits, so a count of blocks outside 1 to 40, for which the mux of `assert_hash` gives 0, is refused by the plucker. It is tested two ways: on `Interpolate`'s coefficients (`gadgets_kat`), and on the registered circuit, whose plucker gives on the element 0 the four constant terms, 64 times each, in the 256 failing assertions of the counts 0, 41 and 255 (`relation_cases`, the option `count`, Section 4).
 
 ### 2.4 G3: a sum of words as a product
 
@@ -371,14 +371,15 @@ The outputs of the packed words are bits by G1; the theorem takes "every word of
 
 ### 2.8 The Lean step of the gate
 
-`lean/` is a Lake project: Lean 4.31.0 (`lean-toolchain`), Mathlib v4.31.0 at rev fabf563a (`lake-manifest.json`), two libraries (`Upstream`, the ported declarations, and `LongfellowSpark`, this project's, built with warnings as errors). The step `lean` of `make check` fetches Mathlib's compiled files from its cache, builds the project, checks the axioms of the cited theorems and checks that the committed vectors are the model's output. It runs on the proving machine; `lean/.lake` is kept between runs. The proof fingerprint of `scripts/remote-check.sh` includes the tree of `lean/` and the step's command lines, so that a change to either proves again ([ADR 0088](../adr/0088-proof-inputs-and-the-reuse-of-a-proof.md)).
+`lean/` is a Lake project: Lean 4.31.0 (`lean-toolchain`), Mathlib v4.31.0 at rev fabf563a (`lake-manifest.json`), two libraries (`Upstream`, the ported declarations, and `LongfellowSpark`, this project's, built with warnings as errors). The step `lean` of `make check` fetches Mathlib's compiled files from its cache, builds the project, checks the axioms of the cited theorems, replays every declaration of the environment in the kernel with `leanchecker --fresh` (Mathlib's cached files included), and checks that the committed vectors are the model's output. It runs on the proving machine, where `lean/.lake` is kept between runs, and on GitHub Actions as the job `lean`, a check of the gate of its own. At a release, `make lean-source` builds the same proofs in a copy of `lean/` with Mathlib built from source, without its cache. The proof fingerprint of `scripts/remote-check.sh` includes the tree of `lean/` and the step's command lines, so that a change to either proves again ([ADR 0088](../adr/0088-proof-inputs-and-the-reuse-of-a-proof.md)).
 
-Mathlib's cached files are not checked again by the kernel: register row L2 records it, with the check to run at a release.
+Mathlib's cached files are compiled elsewhere, and importing them does not check them. `leanchecker`, shipped with the pinned toolchain, replays every declaration in the kernel, those of the cached files included: about 5 minutes on the proving machine. Before it was relied on, it was tested once on a module compiled with the kernel's check skipped, holding a theorem `False` whose proof is the number zero: the build accepts it and `#print axioms` reports no axiom, and `leanchecker` refuses it. It does not show that the cached files are what Mathlib's source gives. The source build at each release does not use them (`make lean-source`): it compiles the imported Mathlib modules from source and checks the proofs over those, without comparing them with the cache. Register row L2 says what each of the three ways shows.
 
 To reproduce:
 
 ```
 cd lean && lake exe cache get && lake build && lake env lean scripts/Axioms.lean
+cd lean && lake env leanchecker --fresh LongfellowSpark
 ```
 
 ## 3. What the proofs guarantee
@@ -459,7 +460,7 @@ The cases:
 - **Mutations:** thirteen on each of three documents (the reference test case, a short MSO and the longest), each aimed at one clause. After each, the harness recomputes the SHA-256 traces, e and the tags, so the circuit's verdict depends on the clause aimed at alone.
 - **Neutral:** changes to what the circuit does not read (the positions `attr_ei_` and `attr_ev_`, the pads and av together with the tags, byte 3 of the item, the map's size after `valueDigests`): both must accept.
 - **Synthetic:** the three cases of Section 1.8, and the documents rewritten under a new identifier of 23, 24 and 30 characters (below).
-- **Counts:** the reference test case with only the count of blocks changed, to 0, 41 and 255 (Section 1.4): both must refuse, and the registered plucker must give the four constant terms on the element 0 (Section 2.3).
+- **Counts:** the reference test case with only the count of blocks changed, to 0, 41 and 255 (Section 1.4): both must refuse, and the registered plucker must give the four constant terms on the element 0 (Section 2.3). Below each failing assertion the harness reads the term v * v it finds: 64 reads of each constant term, and 256 others, as many as the failing comparisons of `assert_hash`. The 256 is a count: the harness does not map each read to its assertion.
 
 A case fails if the circuit accepts and the relation is false, or if the verdict is not the one expected. On the honest positive cases, the harness also runs the netlist and G4 on every block (Section 4.1), evaluates `H_Matching_By_Content` and `H_Types_In_Item`, runs the lemmas, `Fact_Padding` at every index from 0 to 4,095 and `Lemma_Byte_At` on the identifier's 32 bytes, with their preconditions and assertions checked, and checks that `Decode_Public` of the public inputs is the request they encode.
 
@@ -472,7 +473,7 @@ The result, run on the proving machine on 25 November 2026: **91 cases, none fai
 | Mutations | 39 | circuit refuses, relation false at the clause aimed at |
 | Neutral | 5 | circuit accepts, relation holds |
 | Synthetic, Section 1.8 | 3 | circuit accepts, relation holds, the hypothesis false |
-| Counts, Section 1.4 | 3 | circuit refuses, relation false; the plucker gives the constant terms on 0, 64 of each |
+| Counts, Section 1.4 | 3 | circuit refuses, relation false; the plucker gives the constant terms on 0, 64 of each; the other squares read are 256 |
 
 **The identifiers of 24 characters or more.** At version 7 the public length of the identifier's entry is `1 + 17 + 1 + id_len`, as upstream's encoder pushes it (`mdoc_witness.h` 501 at 0d92f80c): it assumes the identifier's CBOR head is one byte. From 24 characters the head is two bytes, the entry is one byte longer than the length compared, and the clause `Item` fails on the honest witness. The harness rewrites the requested item of the reference test case under a new identifier, with its value digest in the MSO replaced; the issuer's signature no longer verifies, which the hash circuit does not read. With `family_name_national_ch` (23 characters) the circuit accepts; with `family_name_national_cha` (24) and `family_name_national_character` (30) it refuses, and the relation is false at `Item`. `Decode_Public` is the request in all three. Above 30 characters the encoder refuses the request (`Mdoc_Inputs.Fits`).
 

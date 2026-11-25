@@ -167,12 +167,13 @@ To reproduce the environment on another machine:
 2. Clone the repository and run `alr build`: Alire fetches the pinned compiler, builder and prover.
 3. Check the versions with `alr exec -- gnat --version` and `alr exec -- gnatprove --version`.
 
-- **`verify`** is a workflow. It runs on every push and pull request, on a hosted Ubuntu runner, and covers everything in `make check` except the proof.
+- **`verify`** is a job of the workflow. It runs on every push and pull request, on a hosted Ubuntu runner, and covers everything in `make check` except the SPARK and Lean proofs.
+- **`lean`** is the other job of the workflow: the step `lean` of `make check`, the Lean proofs of `lean/` built from Mathlib's cache, their axioms checked and their declarations replayed by `leanchecker`.
 - **`prove`** is a commit status. `scripts/remote-check.sh` posts it after running `make check` on the proving machine for that exact commit. A commit whose proof inputs (the sources, the project file, the toolchain pins, the prover's switches, the Lean proofs) equal those of a proved ancestor does not prove again: the machine runs every other check and the status names the proved commit (ADR 0088); the proof from scratch returns at every release, milestone close and once a week on `main`. [The development process](docs/process.md) has the rule.
 
-Work happens on a branch per stage or block, and reaches `main` through a pull request once both checks are green (ADR 0062). A red check is fixed with a new commit on the branch. Before a release, or after a toolchain change, the check is run on `main` as well.
+Work happens on a branch per stage or block, and reaches `main` through a pull request once the three checks are green (ADR 0062). A red check is fixed with a new commit on the branch. Before a release, or after a toolchain change, the check is run on `main` as well.
 
-Together the two checks certify what `make check` certifies. Neither says anything about constant time, or about fidelity to the specification beyond the vectors.
+Together the three checks certify what `make check` certifies. None says anything about constant time, or about fidelity to the specification beyond the vectors.
 
 ## About this project
 

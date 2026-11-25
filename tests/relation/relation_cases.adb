@@ -1232,12 +1232,15 @@ procedure Relation_Cases is
                --  The fact of G1 on the registered circuit: the 256
                --  outputs of the unpacking of the 64 zero elements are
                --  the constant terms, 64 of each, none of them a bit.
-               --  The other squares read belong to the 256 failing
-               --  comparisons of assert_hash, not to the plucker; they
-               --  are printed by Locate and not counted here.
+               --  The other squares read are 256, as many as the failing
+               --  comparisons of assert_hash: a count, not a mapping of
+               --  each read to its assertion.
                Report (L & ": the plucker's outputs on 0 are the four"
                        & " constant terms, 64 of each",
                        Hits = [Gadgets.Bits.Pluck_Index => 64]);
+               Report (L & ": the other squares read are 256, as many"
+                       & " as the comparisons of assert_hash (a count)",
+                       Other = 256);
             end;
          end loop;
       end if;
