@@ -20,10 +20,12 @@
 --             compression on the NIST vectors (FIPS 180-4 examples
 --             "abc" and the two blocks of the 448-bit message) and on
 --             random blocks and states.
---    G4     : Sha256.Trace.Netlist.Gadget. On the same blocks every
---             assertion holds on the honest trace; a word of the
---             witness off by one (a schedule word, an e, an a, a word of
---             the new state) makes its own assertion fail.
+--    G4     : Sha256.Trace.Netlist.Gadget. On the three NIST blocks and
+--             one random block every assertion holds on the honest
+--             trace (relation_cases runs it on every block of the test
+--             documents); a word of the witness off by one (a schedule
+--             word, an e, an a, a word of the new state) makes its own
+--             assertion fail.
 --
 --  Run: tests/bin/gadgets_kat [tests/vectors/lean_gf2_128.txt]
 
@@ -358,8 +360,13 @@ procedure Gadgets_KAT is
          end loop;
          Check ("netlist random block",
                 Block_Checks.Check_Netlist (H, Block));
-         Check ("G4 honest random block",
-                Block_Checks.Check_Gadget (H, Block));
+         --  The gadget on the first only: it costs about a second per
+         --  block in the test build, and relation_cases runs it on every
+         --  block of the test documents.
+         if N = 1 then
+            Check ("G4 honest random block",
+                   Block_Checks.Check_Gadget (H, Block));
+         end if;
       end loop;
    end Random_Blocks;
 

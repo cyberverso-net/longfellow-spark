@@ -123,6 +123,12 @@ package body Sha256.Trace.Netlist.Gadget is
          Lemma_Bits_Of (Sigma_0 (V), I);
          Lemma_Xor3 (Bit (V, (I + 2) mod 32), Bit (V, (I + 13) mod 32),
                      Bit (V, (I + 22) mod 32));
+         pragma Assert
+           (Bit (Sigma_0 (V), I)
+            = (Bit (V, (I + 2) mod 32) xor Bit (V, (I + 13) mod 32)
+               xor Bit (V, (I + 22) mod 32)));
+         pragma Assert
+           (Sigma_0_Form (Bits_Of (V)) (I) = Bits_Of (Sigma_0 (V)) (I));
          pragma Loop_Invariant
            (for all J in 0 .. I =>
               Sigma_0_Form (Bits_Of (V)) (J) = Bits_Of (Sigma_0 (V)) (J));
@@ -142,6 +148,12 @@ package body Sha256.Trace.Netlist.Gadget is
          Lemma_Bits_Of (Sigma_1 (V), I);
          Lemma_Xor3 (Bit (V, (I + 6) mod 32), Bit (V, (I + 11) mod 32),
                      Bit (V, (I + 25) mod 32));
+         pragma Assert
+           (Bit (Sigma_1 (V), I)
+            = (Bit (V, (I + 6) mod 32) xor Bit (V, (I + 11) mod 32)
+               xor Bit (V, (I + 25) mod 32)));
+         pragma Assert
+           (Sigma_1_Form (Bits_Of (V)) (I) = Bits_Of (Sigma_1 (V)) (I));
          pragma Loop_Invariant
            (for all J in 0 .. I =>
               Sigma_1_Form (Bits_Of (V)) (J) = Bits_Of (Sigma_1 (V)) (J));
@@ -163,6 +175,12 @@ package body Sha256.Trace.Netlist.Gadget is
          Lemma_Bits_Of (Small_0 (V), I);
          Lemma_Xor3 (Bit (V, (I + 7) mod 32), Bit (V, (I + 18) mod 32),
                      I + 3 < 32 and then Bit (V, I + 3));
+         pragma Assert
+           (Bit (Small_0 (V), I)
+            = (Bit (V, (I + 7) mod 32) xor Bit (V, (I + 18) mod 32)
+               xor (I + 3 < 32 and then Bit (V, I + 3))));
+         pragma Assert
+           (Small_0_Form (Bits_Of (V)) (I) = Bits_Of (Small_0 (V)) (I));
          pragma Loop_Invariant
            (for all J in 0 .. I =>
               Small_0_Form (Bits_Of (V)) (J) = Bits_Of (Small_0 (V)) (J));
@@ -184,6 +202,12 @@ package body Sha256.Trace.Netlist.Gadget is
          Lemma_Bits_Of (Small_1 (V), I);
          Lemma_Xor3 (Bit (V, (I + 17) mod 32), Bit (V, (I + 19) mod 32),
                      I + 10 < 32 and then Bit (V, I + 10));
+         pragma Assert
+           (Bit (Small_1 (V), I)
+            = (Bit (V, (I + 17) mod 32) xor Bit (V, (I + 19) mod 32)
+               xor (I + 10 < 32 and then Bit (V, I + 10))));
+         pragma Assert
+           (Small_1_Form (Bits_Of (V)) (I) = Bits_Of (Small_1 (V)) (I));
          pragma Loop_Invariant
            (for all J in 0 .. I =>
               Small_1_Form (Bits_Of (V)) (J) = Bits_Of (Small_1 (V)) (J));

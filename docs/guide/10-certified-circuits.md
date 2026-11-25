@@ -418,6 +418,35 @@ How to read the table: [B6.4](00-primer-spark.md#b64-reading-the-summary-table).
 
 In all, 726 checks, 543 discharged by the provers; the highest step count of a successful proof is 97,753, within the budget. `Mdoc_Relation` is the parent package, ghost, with no check. The flow analysis prints no warning for the partition.
 
+### 3.1 The netlist and the gadgets
+
+The partition `netlist` holds `Sha256.Trace.Netlist`, `Sha256.Trace.Netlist.Gadget`, `Gadgets`, `Gadgets.Bits` and `Gadgets.Words` (Section 2). For every input that meets the preconditions, GNATprove proves:
+
+- **Silver** for all five: no run-time error, every recursive function terminates;
+- **`Sha256.Trace.Netlist`** (Gold): `Interpret` gives the words FIPS 180-4 names and `Compress_Spec` as its last eight; `Lemma_Holds_Unique`;
+- **`Gadgets`** (Gold): the value of a word and its bits are inverse; the laws of the equality of elements and of the product the other proofs use;
+- **`Gadgets.Bits`, `Gadgets.Words` and `Sha256.Trace.Netlist.Gadget`** (Gold over Lean lemmas): `Lemma_Unpack` and `Lemma_Block`, given the two bridges, whose contracts GNATprove takes as given (Section 2.6). `Interpolate` is Silver.
+
+The verification conditions, from a run on the proving machine on 25 November 2026, the block's final sources, with the same toolchain and prover configuration as above; command `make prove-partition PARTITION=netlist`, then `python3 -I scripts/vc-count.py --partition netlist`:
+
+| Check | `Sha256.Trace.Netlist` | `Sha256.Trace.Netlist.Gadget` | `Gadgets` | `Gadgets.Bits` | `Gadgets.Words` | Discharged by |
+|---|---|---|---|---|---|---|
+| Data dependencies (`Global`) | 11 | 27 | 5 | 1 | 0 | flow analysis |
+| Initialisation | 0 | 0 | 0 | 1 | 0 | flow analysis |
+| Termination | 20 | 26 | 7 | 9 | 11 | flow analysis |
+| Range checks | 58 | 54 | 3 | 5 | 8 | provers |
+| Division checks (`/`, `mod`) | 17 | 62 | 0 | 4 | 0 | provers |
+| Overflow checks | 9 | 8 | 0 | 0 | 0 | provers |
+| Index checks | 17 | 27 | 2 | 3 | 4 | provers |
+| Preconditions of the calls | 48 | 55 | 0 | 1 | 0 | provers |
+| Assertions | 47 | 120 | 8 | 0 | 0 | provers |
+| Loop invariants (base case and preservation) | 12 | 28 | 10 | 2 | 0 | provers |
+| Postconditions | 10 | 27 | 7 | 1 | 0 | provers |
+| Variants of the recursive functions | 1 | 0 | 1 | 2 | 6 | provers |
+| **Total** | **250** | **434** | **43** | **29** | **29** | all proved: none justified, none unproved, no `pragma Assume` |
+
+In all, 785 checks, 667 discharged by the provers; the highest step count of a successful proof is 106,731, within the budget. The two bridges are not checks: their bodies are outside SPARK, and their contracts are assumed (register rows L3 and L4).
+
 ## 4. What is only tested
 
 `tests/relation/relation_cases.adb` evaluates the registered circuit `8d079211…_hash.lfc2` on a witness and evaluates the relation on the same witness, case by case. The relation is ghost code, compiled and executed in this harness with assertions on. The harness has its own project file (`tests/relation/relation_cases.gpr`): the test project's flags make one evaluation of the circuit take about 21 minutes, these about 0.7 seconds. It is not the constant-time build. The cases are in `tests/vectors/relation_cases.txt`, and the `cli` step of `make check` runs them on the proving machine (skipped on GitHub Actions, as the proofs of age from every test document are).
@@ -428,10 +457,11 @@ The cases:
 - **Mutations:** thirteen on each of three documents (the reference test case, a short MSO and the longest), each aimed at one clause. After each, the harness recomputes the SHA-256 traces, e and the tags, so the circuit's verdict depends on the clause aimed at alone.
 - **Neutral:** changes to what the circuit does not read (the positions `attr_ei_` and `attr_ev_`, the pads and av together with the tags, byte 3 of the item, the map's size after `valueDigests`): both must accept.
 - **Synthetic:** the three cases of Section 1.8, and the documents rewritten under a new identifier of 23, 24 and 30 characters (below).
+- **Counts:** the reference test case with only the count of blocks changed, to 0, 41 and 255 (Section 1.4): both must refuse, and the registered plucker must give the four constant terms on the element 0 (Section 2.3).
 
-A case fails if the circuit accepts and the relation is false, or if the verdict is not the one expected. On the honest positive cases, the harness also evaluates `H_Matching_By_Content` and `H_Types_In_Item`, runs the lemmas, `Fact_Padding` at every index from 0 to 4,095 and `Lemma_Byte_At` on the identifier's 32 bytes, with their preconditions and assertions checked, and checks that `Decode_Public` of the public inputs is the request they encode.
+A case fails if the circuit accepts and the relation is false, or if the verdict is not the one expected. On the honest positive cases, the harness also runs the netlist and G4 on every block (Section 4.1), evaluates `H_Matching_By_Content` and `H_Types_In_Item`, runs the lemmas, `Fact_Padding` at every index from 0 to 4,095 and `Lemma_Byte_At` on the identifier's 32 bytes, with their preconditions and assertions checked, and checks that `Decode_Public` of the public inputs is the request they encode.
 
-The result, run on the proving machine on 24 November 2026: **88 cases, none failed; none where the circuit accepts and the relation is false; none where the circuit refuses and the relation holds.**
+The result, run on the proving machine on 25 November 2026: **91 cases, none failed; none where the circuit accepts and the relation is false; none where the circuit refuses and the relation holds.**
 
 | Cases | Number | Verdict |
 |---|---|---|
@@ -440,6 +470,7 @@ The result, run on the proving machine on 24 November 2026: **88 cases, none fai
 | Mutations | 39 | circuit refuses, relation false at the clause aimed at |
 | Neutral | 5 | circuit accepts, relation holds |
 | Synthetic, Section 1.8 | 3 | circuit accepts, relation holds, the hypothesis false |
+| Counts, Section 1.4 | 3 | circuit refuses, relation false; the plucker gives the constant terms on 0, 64 of each |
 
 **The identifiers of 24 characters or more.** At version 7 the public length of the identifier's entry is `1 + 17 + 1 + id_len`, as upstream's encoder pushes it (`mdoc_witness.h` 501 at 0d92f80c): it assumes the identifier's CBOR head is one byte. From 24 characters the head is two bytes, the entry is one byte longer than the length compared, and the clause `Item` fails on the honest witness. The harness rewrites the requested item of the reference test case under a new identifier, with its value digest in the MSO replaced; the issuer's signature no longer verifies, which the hash circuit does not read. With `family_name_national_ch` (23 characters) the circuit accepts; with `family_name_national_cha` (24) and `family_name_national_character` (30) it refuses, and the relation is false at `Item`. `Decode_Public` is the request in all three. Above 30 characters the encoder refuses the request (`Mdoc_Inputs.Fits`).
 
@@ -452,6 +483,19 @@ alr exec -- gprbuild -P tests/relation/relation_cases.gpr -p
 tests/relation/bin/relation_cases tests/vectors/upstream/mdoc/8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121_hash.lfc2 tests/vectors/relation_cases.txt tests/vectors/upstream/mdoc/testcases
 ```
 
+### 4.1 The netlist and the gadgets
+
+`tests/src/gadgets_kat.adb`, in `make test`:
+
+- **The Lean vectors**: the 168 vectors of `tests/vectors/lean_gf2_128.txt` (products, `alpha2`, `shift`), computed by the Lean model, against `GF2_128.Mul` and the constants of `Gadgets.Words`.
+- **G1**: the interpolation at the 64 pairs of point and bit; the constant terms neither 0 nor 1 and equal to p_k (0); packed words decoded to the word they were packed from; an element off the 16 points refused; the bridged statement evaluated on every element tried.
+- **G3**: the bridged statement evaluated for k from 1 to 7, premise and conclusion, on random words with a equal to the sum, off by one and off in the top bit, on sums past 2^32, and on an operand that is not a bit, which fails the premise.
+- **The netlist** against the traced compression on the NIST blocks and random blocks; **G4** on the three NIST blocks and one random block, and four mutated words, each failing its own assertion.
+
+`relation_cases` (Section 4) runs the netlist and G4 on every block of every positive test document, and in the option `count` checks the fact of Section 2.3 on the registered circuit.
+
+The result, on the proving machine on 25 November 2026: `gadgets_kat` 1,330 checks, none failed; `relation_cases` 91 cases, none failed.
+
 ## 5. What stays trusted
 
 - **That the clauses are the generator's checks** (register row R2): by reading, until the checker of the later blocks proves that the registered circuit implies the relation.
@@ -459,4 +503,7 @@ tests/relation/bin/relation_cases tests/vectors/upstream/mdoc/8d079211715200ff06
 - **`H_Sha256` and `H_Digest_Preimage`** (register rows S5 and S6): properties of SHA-256 and of P-256 that no proof here reaches.
 - **The other hypotheses**, on the issuer and the relying party: the conditions table of chapter 9 Section 6 says who must make each hold and how it is checked.
 - **What the parse extracts** (register row R12): the model the hypotheses are written over.
+- **The two bridges** (register rows L3 and L4): the Lean theorems are proved, and that the SPARK contracts state them is checked by reading and by test (Section 2.6).
+- **Lean's kernel and Mathlib** (rows L1 and L2): Mathlib's compiled files come from its cache between releases.
+- **The plucker's interpolation** (row V14): completeness only, tested.
 - **The layouts** of the public inputs and of the hash witness as upstream's code specifies them (rows R8 and R14): the decodings follow them; that the encoder's output decodes to the request is tested.
