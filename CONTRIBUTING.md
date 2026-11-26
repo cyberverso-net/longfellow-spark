@@ -19,7 +19,7 @@ The [README](README.md) explains how to build the library, run the proofs and th
 
 - Branches are named `<type>/<issue>-<short-slug>`, for example `block/57-packed-first-step`, `task/58-prover-memory-profile` or `bug/59-pinned-circuits-checks`.
 - A pull request references its issue (`Closes #57`) and fills in the template.
-- A pull request is merged when the check `verify` and the status `prove` are both green, as the [development process](docs/process.md) describes.
+- A pull request is merged when the checks `verify` and `lean` and the status `prove` are all green, as the [development process](docs/process.md) describes.
 
 ## Security
 

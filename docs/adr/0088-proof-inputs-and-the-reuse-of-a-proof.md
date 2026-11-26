@@ -4,6 +4,8 @@
 
 Accepted (2026-11-09, at the merge of pull request #145; proposed 2026-11-09 with #144). Amends [ADR 0062](0062-proof-on-demand.md): the text-only mode and its list of harmless files are replaced by the rule below. Amends [ADR 0087](0087-cross-check-with-upstream-at-every-gate.md) on one point: the cross-check runs at every gate, proof proved again or reused.
 
+Note of 25 November 2026, #169. The proof inputs include the Lean proofs: the tree of `lean/` and a hash of the `lake` command lines of `scripts/check.sh` (`lean-lines`), as `gnatprove-lines` does for GNATprove. A commit whose `lean/` or Lean step changes is proved again, SPARK and Lean; one whose inputs are unchanged reuses both. A commit before `lean/` existed has neither line.
+
 ## Date
 
 2026-11-09

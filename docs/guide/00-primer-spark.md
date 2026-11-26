@@ -776,9 +776,10 @@ The summary of a proof run is written to `obj/development/gnatprove/gnatprove.ou
 
 Every change is checked on a dedicated machine before it is merged: a virtual machine on Google Cloud, of type c4-standard-24 (12 cores, one thread per core). There, `make check` with the full proof took 177 minutes at the commit of [B6.4](#b64-reading-the-summary-table).
 
-A pull request is ready only when two checks are green:
+A pull request is ready only when three checks are green:
 
 - **`verify`**, on GitHub Actions: the build, the tests, the release programs, the vectors and the lint, without the proof.
+- **`lean`**, on GitHub Actions: the Lean proofs the SPARK proof cites, checked by Lean's kernel ([chapter 10 Section 2.8](10-certified-circuits.md#28-the-lean-step-of-the-gate)).
 - **`prove`**, posted by the proving machine, `make check` in full, the proof included.
 
 When the proof inputs of a change are those of a commit already proved (the sources, the project files, the prover settings), the gate reuses that proof and runs everything else. It says so in its status, naming the commit whose proof it reused. `scripts/remote-check.sh --digest` shows the digest of a commit's proof inputs and a commit with the same inputs that the gate has passed ([B6.5](#b65-partitions-and-the-whole)). A full proof runs from scratch at every release and at the close of each milestone, and ADR 0088 asks for one a week on the main branch.

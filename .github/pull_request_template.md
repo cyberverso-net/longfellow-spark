@@ -15,7 +15,7 @@ Closes #
 ## Definition of Done
 
 - [ ] Every acceptance criterion of the issue is met
-- [ ] `verify` and `prove` are green
+- [ ] `verify`, `lean` and `prove` are green
 - [ ] Every check in the touched units is proved; no justification, no `pragma Assume`
 - [ ] No contract weakened and no assurance level changed, or the maintainer's agreement is recorded
 - [ ] Chapter, records, package headers, trust model and changelog updated and consistent with the code

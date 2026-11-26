@@ -28,3 +28,6 @@ __pycache__/
 
 # the log scripts/remote-check.sh brings back from the proving machine
 /remote-check.log
+
+# The Lake build of lean/ (Mathlib and the oleans), kept on the proving machine between runs
+lean/.lake/

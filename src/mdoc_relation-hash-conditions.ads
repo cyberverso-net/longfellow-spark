@@ -150,6 +150,14 @@ package Mdoc_Relation.Hash.Conditions is
    --  and an item whose digest ends with the padding's bytes is found
    --  by trial (one in 256 for the last byte alone). Only_At cannot see
    --  such an occurrence, since it wants the whole pattern in the map.
+   --  Sufficient, not necessary: it also excludes an honest MSO whose
+   --  tail holds 58 20 by chance, inside a value digest or the device
+   --  key (about 1 in 2,100 documents when valueDigests ends the map;
+   --  never when the tail is the text of dates, a docType or an
+   --  algorithm name, as in 37 of the 38 test documents; the other
+   --  holds 9 bytes of the device key). That MSO is not open to attack:
+   --  the 32 bytes after the pair are fixed when the issuer signs, and
+   --  an item with that digest is a preimage (H_Digest_Preimage).
    function No_Digest_Head_At_End (Map : Byte_Array) return Boolean is
      (for all K in 0 .. Map'Length - 1 =>
         (if K + 34 > Map'Length and then K + 1 < Map'Length

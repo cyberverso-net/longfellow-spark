@@ -3,7 +3,7 @@
 #  definition of done for every commit and every pull request (ADR
 #  0041, ADR 0044).
 
-.PHONY: check check-reuse build prove prove-partition partitions-check test cli vectors lint mdoc-cases
+.PHONY: check check-reuse build prove prove-partition partitions-check test cli vectors lint lean lean-source mdoc-cases
 
 check:
 	scripts/check.sh all
@@ -47,3 +47,13 @@ mdoc-cases:
 
 lint:
 	scripts/check.sh lint
+
+#  The Lean proofs of lean/ and the axiom check of the theorems the
+#  SPARK proof cites (ADR 0091; chapter 10 Section 2).
+lean:
+	scripts/check.sh lean
+
+#  At a release: the same proofs with Mathlib built from source, without
+#  its cache (docs/process.md, "Releases"; register row L2).
+lean-source:
+	scripts/check.sh lean-source

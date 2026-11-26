@@ -14,7 +14,7 @@ set -euo pipefail
 
 usage() {
    echo "usage: scripts/check.sh {build|prove|prove-partition <name>|" \
-        "partitions-check|test|cli|vectors|lint|all|reuse}" >&2
+        "partitions-check|test|cli|vectors|lint|lean|lean-source|all|reuse}" >&2
    exit 2
 }
 
@@ -145,7 +145,7 @@ do_partitions_check() {
 do_test() {
    header "test: build the harnesses (assertions on)"
    alr -n exec -- gprbuild -P tests/longfellow_spark_tests.gpr -p
-   local harnesses="gf2_128_kat p256_kat q256_kat ecdsa_kat mdoc_parse_kat mdoc_witness_kat sumcheck_kat transcript_kat ligero_kat circuit_kat writer_kat prover_kat fft_kat mdoc_kat"
+   local harnesses="gf2_128_kat p256_kat q256_kat ecdsa_kat mdoc_parse_kat mdoc_witness_kat sumcheck_kat transcript_kat ligero_kat circuit_kat writer_kat prover_kat fft_kat mdoc_kat gadgets_kat"
    local logs status=0 h code
    logs="$(mktemp -d)"
    header "test: $harnesses, concurrently"
@@ -168,6 +168,77 @@ do_test() {
    if [ "$status" -ne 0 ]; then
       exit "$status"
    fi
+}
+
+#  The Lean proofs the SPARK proof cites (lean/; ADR 0091, chapter 10
+#  Section 2): Mathlib's compiled files from its cache, the build of
+#  the project's proofs (warnings are errors in LongfellowSpark), the
+#  axiom check of the cited theorems, and the vectors of the model,
+#  which must be the committed file the tests read. lean/.lake is kept
+#  between runs (it is ignored by git). It runs on the proving machine,
+#  where elan is installed, and in the job lean of the GitHub workflow.
+do_lean() {
+   header "lean: the Lean proofs of lean/, their axioms and the model's vectors"
+   #  On GitHub Actions only the job lean of the workflow runs it
+   #  (LONGFELLOW_LEAN=1); the job verify skips it.
+   if [ -n "${GITHUB_ACTIONS:-}" ] && [ -z "${LONGFELLOW_LEAN:-}" ]; then
+      echo "lean: skipped in this job; the job lean runs it, and the gate on the proving machine"
+      return 0
+   fi
+   if ! command -v lake > /dev/null 2>&1 && [ -x "$HOME/.elan/bin/lake" ]; then
+      PATH="$HOME/.elan/bin:$PATH"
+   fi
+   command -v lake > /dev/null 2>&1 || { echo "lean: lake not found (install elan)" >&2; exit 1; }
+   ( cd lean && lake exe cache get && lake build && lake env lean scripts/Axioms.lean )
+   #  The kernel again, on the files the build used: leanchecker, of the
+   #  pinned toolchain, replays every declaration of the environment the
+   #  project's modules import, Mathlib's cached files included, and
+   #  exits non-zero on one it refuses (register row L2).
+   ( cd lean && lake env leanchecker --fresh LongfellowSpark ) || {
+      echo "lean: leanchecker refused a declaration of the environment" >&2
+      exit 1
+   }
+   ( cd lean && lake env lean scripts/Vectors.lean ) | diff - tests/vectors/lean_gf2_128.txt || {
+      echo "lean: tests/vectors/lean_gf2_128.txt is not the output of lean/scripts/Vectors.lean" >&2
+      exit 1
+   }
+   echo "lean: built, axioms checked, replayed by leanchecker, vectors current"
+}
+
+#  At a release (docs/process.md, register row L2): the Lean proofs built
+#  in a copy of lean/ without Mathlib's cache, so that every imported
+#  Mathlib module is elaborated and checked again from its source at the
+#  revision of lean/lake-manifest.json. Lake clones the packages into the
+#  copy; about 10 minutes on the proving machine, and 3 GB of disk.
+do_lean_source() {
+   header "lean-source: the Lean proofs with Mathlib built from source, without its cache"
+   if ! command -v lake > /dev/null 2>&1 && [ -x "$HOME/.elan/bin/lake" ]; then
+      PATH="$HOME/.elan/bin:$PATH"
+   fi
+   command -v lake > /dev/null 2>&1 || { echo "lean-source: lake not found (install elan)" >&2; exit 1; }
+   local d
+   d="$(mktemp -d)"
+   mkdir "$d/lean"
+   ( cd lean && tar --exclude=./.lake -cf - . ) | ( cd "$d/lean" && tar -xf - )
+   #  Neither of Lake's caches: LAKE_NO_CACHE stops the download of
+   #  packages' prebuilt archives, LAKE_ARTIFACT_CACHE=false the reading
+   #  of the shared artefact cache, so every module is compiled here.
+   ( cd "$d/lean" && LAKE_NO_CACHE=1 LAKE_ARTIFACT_CACHE=false lake build \
+        && lake env lean scripts/Axioms.lean ) || {
+      rm -rf "$d"
+      echo "lean-source: the build from source failed" >&2
+      exit 1
+   }
+   #  The evidence that the modules were compiled in the copy: the
+   #  compiled Mathlib modules found there.
+   local n
+   n="$(find "$d/lean/.lake/packages/mathlib/.lake/build/lib/lean" -name '*.olean' 2> /dev/null | wc -l | tr -d ' ')"
+   rm -rf "$d"
+   if [ "$n" -eq 0 ]; then
+      echo "lean-source: no Mathlib module was compiled in the copy" >&2
+      exit 1
+   fi
+   echo "lean-source: Mathlib and the project built from source ($n Mathlib modules compiled in the copy), axioms checked"
 }
 
 #  The release build (ADR 0046, 0048): the command-line verifier and
@@ -386,6 +457,11 @@ do_lint() {
    #  add up to their summary.
    header "lint: the counts of verification conditions (vc-count-test.py)"
    python3 -I scripts/vc-count-test.py
+   #  Every body of src/ outside SPARK is an assumption of the proof and
+   #  has its row in the register of the trusted base.
+   header "lint: the code outside SPARK and its register rows (check-spark-off.py)"
+   python3 -I scripts/check-spark-off-test.py
+   python3 -I scripts/check-spark-off.py
    header "lint: forbidden content over tracked files"
    #  git grep searches tracked files only, in one process, and exits 0
    #  exactly when something matched. This script is excluded from the
@@ -399,8 +475,11 @@ do_lint() {
       echo "lint: not a git work tree, not run here"
       return 0
    fi
-   #  U+2014 (em-dash) anywhere.
-   if git grep -n -I -e $'\xe2\x80\x94' "${scope[@]}"; then
+   #  U+2014 (em-dash) anywhere but in lean/Upstream/: the files ported
+   #  from upstream's formal/ keep upstream's bytes, so that they can be
+   #  compared with it by a hash (their provenance headers say so). The
+   #  other rules below cover lean/Upstream/ too.
+   if git grep -n -I -e $'\xe2\x80\x94' "${scope[@]}" ':!lean/Upstream/'; then
       echo "lint: em-dash found" >&2
       status=1
    fi
@@ -430,10 +509,13 @@ case "${1:-}" in
    cli)              do_cli ;;
    vectors)          do_vectors ;;
    lint)             do_lint ;;
+   lean)             do_lean ;;
+   lean-source)      do_lean_source ;;
    all)
       do_build
       do_partitions_check
       do_prove
+      do_lean
       do_test
       do_cli
       do_vectors
@@ -450,7 +532,7 @@ case "${1:-}" in
       do_cli
       do_vectors
       do_lint
-      header "all checks but the proof passed; the proof is reused (ADR 0088)"
+      header "all checks but the proofs passed; the SPARK and Lean proofs are reused (ADR 0088)"
       ;;
    *) usage ;;
 esac

@@ -17,6 +17,7 @@ The [verification approach](verification-approach.md) explains why the line fall
 - The building blocks of the verifier and the prover are proved against transcriptions of the specification's formulas. That those formulas fit together into a sound protocol is a theorem of the protocol, not something SPARK can prove.
 - The verifier accepts the proofs the upstream prover makes. The prover reproduces upstream's proofs byte for byte. Both facts are tested.
 - The mDoc layer makes, from the credential, an mDoc proof of age in upstream's format that upstream's verifier accepts, and accepts upstream's example proofs. Both facts are tested; the layer's layouts are specified by upstream's code, not by the pinned specification, and are trusted as such. The supported profile is two rows of upstream's table, version 7 and version 6 with one attribute, enforced by one entry point per role (ADR 0089); the 116-bit Lean certificate applies to the version 7 row only.
+- The SHA-256 compression as the hash circuit asserts it is proved over two Lean theorems (Gold over Lean lemmas): those proofs also trust Lean's kernel, Mathlib, and the reading that two bridge contracts state the Lean theorems.
 - The toolchain, the specification, the operating system's random generator and the circuit files are trusted.
 - No check is justified away and no `pragma Assume` is used. Full functional correctness of the whole system (Platinum) is not a goal.
 
@@ -110,6 +111,7 @@ Many of these contracts are stated at the assertion level `Proof_Only`. GNATprov
 
   `longfellow_prove_mdoc` draws them for each proof; the privacy of the bound values claimed here is conditional on them. Drawing them inside the entry point needs a random source in the library; issue #156 tracks it, beside the nonce.
 - `Cbor_Parse.Parse_Exact` is Silver on any bytes within the bound, and Gold on the invariants of its table (`Valid`): every element's range inside the parsed bytes, the head before the content, every child inside its parent, the links forward within the table, the root and only the root without a parent. `Mdoc_Parse.Parse` is Silver on any document and Gold on its ranges and offsets lying inside the document and the MSO (`In_Bounds`); `Sha256.Trace.Pad_Message` is Gold on the layout of the padded buffer.
+- The compression of SHA-256 as the hash circuit writes it ([chapter 10 Section 2](10-certified-circuits.md#2-the-compression-in-the-circuit-the-netlist-and-the-gadgets)): `Sha256.Trace.Netlist` is Gold, its 560 values the words of FIPS 180-4's compression; `Gadgets.Bits`, `Gadgets.Words` and `Sha256.Trace.Netlist.Gadget` are **Gold over Lean lemmas**: when the assertions of one block hold, the decoded words are the netlist's and the new state is the compression of FIPS 180-4. Those proofs are conditional, unlike the units proved entirely in SPARK: they rest on two Lean theorems that GNATprove takes as given through the contracts of two bridges, `Gadgets.Bits.Lemma_Output_Is_Bit` and `Gadgets.Words.Lemma_Assert_Eqmod`, whose bodies are outside SPARK, and on the reading that those contracts state the Lean theorems (below, L1 to L4). `Gadgets.Bits.Interpolate` is Silver, its coefficients tested (V14).
 
 ## What is tested
 
@@ -240,6 +242,12 @@ Each item below has a row in the [trusted base register](trusted-base.md), named
 - The parameters of the test case the witness files and the example proofs were made from (`FAMILYNAME_MUSTERMANN_MDOC_3` of upstream's test cases), recovered by matching the files, not recorded by upstream (R10).
 - The bound of 65,000 bytes on the session transcript, taken from upstream's pull request 223 before its merge (R13; ADR 0058; issue #122).
 
+**The Lean proofs the SPARK proof cites** (chapter 10 Sections 2.6 and 2.8).
+
+- Lean's kernel at the pinned toolchain, which checks the proofs of `lean/` (L1). The step `lean` of every gate checks that each cited theorem depends only on Lean's three standard axioms.
+- Mathlib, whose compiled files come from its cache (L2). `leanchecker` replays every declaration in the kernel at every gate; it does not show that the cached files are what Mathlib's source gives. The source build at each release does not use them: it compiles every imported Mathlib module from its source and checks the proofs over those, without comparing them with the cache.
+- That the contract of each bridge states its Lean theorem, the SPARK definitions being those of the Lean model over `Nat` (L3, L4). Read against the correspondence page of the guide, and reduced by the model's vectors checked against `GF2_128.Mul` and by the bridged statements evaluated on random and adversarial inputs (`gadgets_kat`). The lint of `make check` fails on any body of `src/` outside SPARK without a register row.
+
 **Properties tested but not proved.**
 
 - That `Sha256` and `Aes256` compute SHA-256 and AES-256 beyond the NIST and Appendix B.2 vectors. Both are Silver (V1; ADR 0029).
@@ -253,6 +261,7 @@ Each item below has a row in the [trusted base register](trusted-base.md), named
 - That `Bindeq` agrees with `Eq` (V9), that the Lagrange basis of the sumcheck interpolates (V10), and that the three Lagrange denominator inverses of each field are the inverses (V11).
 - That the Lagrange tables of the Ligero verifier interpolate (V12).
 - That the rows of the prover's tableau compose into the tableau of the specification, and that the polynomials of its Ligero proof are the reference's sums (V13; ADR 0052).
+- That the plucker's interpolation, `Gadgets.Bits.Interpolate`, gives at the point of each nibble its four bits, with constant terms neither 0 nor 1 (V14).
 - Full absorption into the transcript beyond the two Appendix B.3 proofs. The sequence of calls in `Replay_Challenges` is the checklist (S3).
 
 **The machine.**

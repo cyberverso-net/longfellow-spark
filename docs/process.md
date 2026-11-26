@@ -65,14 +65,21 @@ waits on an open issue stays in *Backlog*, whatever else is ready.
 Branches are named `<type>/<issue>-<short-slug>`, for example `block/57-packed-first-step`
 or `task/58-prover-memory-profile`. Pull requests reference their issue with `Closes #57`.
 
-The gate of a pull request is the check `verify` (GitHub Actions: build, partitions, tests,
-command line, vectors, lint) and the status `prove` (`make check` on the proving machine,
-posted by `scripts/remote-check.sh`), both green. The ruleset on `main` requires both. The
+The gate of a pull request is three checks, all green: `verify` (GitHub Actions: build,
+partitions, tests, command line, vectors, lint), `lean` (GitHub Actions: the step `lean`, the
+Lean proofs of `lean/` built from Mathlib's cache, their axioms checked, the environment
+replayed by `leanchecker`, the model's vectors compared) and the status `prove` (`make check`
+on the proving machine, posted by `scripts/remote-check.sh`). The ruleset on `main` requires
+the three. The
 machine runs on its own clone, restored to the commit and checked clean at it before the
 run starts; the copy of upstream for the cross-check is checked the same way at the pin. The
 proving machine's `make check` also runs the cross-check of the mDoc proofs with upstream's
 verifier, which needs cargo and a clone of upstream and is skipped, with a line saying so,
-where they are absent (`scripts/cross-check-upstream.sh`, ADR 0087), and the proof of age
+where they are absent (`scripts/cross-check-upstream.sh`, ADR 0087), the step `lean` (the
+Lean proofs of `lean/` that the SPARK proof cites, built with Mathlib's cached files, their
+axioms checked, the environment replayed by `leanchecker`; skipped, with a line saying so, in
+the job `verify` of GitHub Actions and run by its job `lean`; chapter 10 Section 2.8),
+and the proof of age
 from every one of upstream's 38 test documents (`scripts/mdoc-cases.sh`), which is skipped,
 with a line saying so, on GitHub Actions, whose job would exceed its 30 minutes.
 
@@ -94,7 +101,12 @@ The step lint (`make lint`), in both checks, holds these rules:
 - the script that gives each chapter of the guide its table of verification conditions counts
   small runs right and refuses those whose units do not add up to the summary of GNATprove
   (`scripts/vc-count-test.py`, for `scripts/vc-count.py`);
-- no em-dash in any tracked file;
+- every body of `src/` outside SPARK, which the proof takes as given, has a row in the register
+  of the trusted base whose column Item names it, qualified, the aspect or pragma found across
+  line breaks (`scripts/check-spark-off.py`, after its tests
+  `scripts/check-spark-off-test.py`);
+- no em-dash in any tracked file but the files ported from upstream under `lean/Upstream/`,
+  which keep upstream's bytes;
 - none of the attribution and tooling words that `scripts/check.sh` lists, in any tracked file.
 
 The proof is proved again only when its inputs changed (ADR 0088). `scripts/remote-check.sh`
@@ -203,7 +215,7 @@ recorded in a record of its own.
 A block is done when:
 
 - every acceptance criterion is met;
-- the gate is green: `verify` and `prove`;
+- the gate is green: `verify`, `lean` and `prove`;
 - every check in the units it touches is proved, with no justification and no `pragma Assume`;
 - the measurements it owes are reported in the pull request and, where a record requires it,
   in that record;
@@ -260,6 +272,10 @@ The author triages the findings: each is fixed in a pull request of its own befo
 A release is tagged `vX.Y.Z` from `main` when its milestone's criterion is met, and published
 as a GitHub release whose notes are the changelog section of that version. Before the tag,
 the version in `alire.toml`, which the library is built with, is set to the release's
-number in the same pull request as the changelog section. Until the interface
+number in the same pull request as the changelog section. On the release commit, beside the
+proof from scratch (`scripts/remote-check.sh --full`), the Lean proofs are built once with
+Mathlib from source, without its cache (`scripts/remote-check.sh --tree lean-source` on a
+clean tree of that commit; register row L2); the release's pull request reports its result.
+Until the interface
 of the project is more than the pinned specification, the version numbers mark milestones, not
 API compatibility, as [CHANGELOG.md](../CHANGELOG.md) says.

@@ -13,7 +13,7 @@
 --          tests/bin/transcript_kat, tests/bin/ligero_kat,
 --          tests/bin/circuit_kat, tests/bin/mdoc_kat, tests/bin/q256_kat,
 --          tests/bin/ecdsa_kat, tests/bin/mdoc_parse_kat,
---          tests/bin/mdoc_witness_kat [vector files]
+--          tests/bin/mdoc_witness_kat, tests/bin/gadgets_kat [vector files]
 
 with "sparklib";
 
@@ -28,7 +28,7 @@ project Longfellow_Spark_Tests is
       "transcript_kat.adb", "ligero_kat.adb", "circuit_kat.adb",
       "writer_kat.adb", "prover_kat.adb", "fft_kat.adb", "mdoc_kat.adb",
       "q256_kat.adb", "ecdsa_kat.adb", "mdoc_parse_kat.adb",
-      "mdoc_witness_kat.adb");
+      "mdoc_witness_kat.adb", "gadgets_kat.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use

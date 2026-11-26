@@ -61,10 +61,13 @@ with Mdoc_Inputs;
 with Mdoc_Mac;
 with Circuit_Status;
 with Circuit_Reader_GF2_128;
+with Packed_Circuits_GF2_128;
 with Packed_Eval_GF2_128;
 with Sumcheck_Algebra_GF2_128;
 with Mdoc_Relation.Hash;
 with Mdoc_Relation.Hash.Conditions;
+with Gadgets.Bits;
+with Block_Checks;
 
 procedure Relation_Cases is
 
@@ -423,6 +426,122 @@ procedure Relation_Cases is
       return Ok;
    end Circuit_Accepts;
 
+   --  Where the circuit refuses: every Z assertion of every layer that
+   --  fails (layer, the two input wires), and every output of layer 0
+   --  that is not zero. The wires are those of the layer's input
+   --  segment, so that a map of the wires (the generator's, outside
+   --  this project) names the gadget of each. At most Shown lines each;
+   --  the counts are complete.
+   --  The constant terms of the four plucking polynomials, by
+   --  interpolation (Gadgets.Bits). Neither 0 nor 1: Locate checks that
+   --  the registered circuit's plucker gives them on the element 0.
+   Pluck_C : constant Gadgets.Bits.Coefficients := Gadgets.Bits.Interpolate;
+
+   --  Locate lists the failing assertions. For each failing assertion
+   --  whose wire is v - v * v (a term v * v at the layer below), it also
+   --  reads v, the plucker's output, and counts it against the four
+   --  constant terms: Constant_Hits (K) for C (K, 0), Constant_Other for
+   --  any other value. With the element 0 as the plucker's input, v is
+   --  the constant term of its polynomial in the registered circuit.
+   type Hit_Array is array (Gadgets.Bits.Pluck_Index) of Natural;
+
+   procedure Locate (Label : String; X : X_Array; W : W_Array;
+                     Constant_Hits : out Hit_Array;
+                     Constant_Other : out Natural) is
+      package PCG renames Packed_Circuits_GF2_128;
+      procedure Free is new Ada.Unchecked_Deallocation (All_Array, All_Access);
+      Shown  : constant := 8;
+      All_In : All_Access := new All_Array;
+      Segs   : SA.Seg_Array_Access;
+      Ok     : Boolean;
+      Total  : Natural := 0;
+      Lines  : Natural := 0;
+
+      --  The terms v * v of layer L whose output is wire A: v is read in
+      --  the inputs of layer L.
+      procedure Read_Plucks (L : Natural; A : SA.Wire_Index) is
+         C  : PCG.Cursor := PCG.Start (Circuit.all, L);
+         Tm : SA.Term;
+      begin
+         for K in 1 .. PCG.Layer_Len (Circuit.all, L) loop
+            Tm := PCG.Term_Of (Circuit.all, C);
+            if Tm.G = A and then Tm.H0 = Tm.H1 and then Tm.H0 /= 0 then
+               declare
+                  V     : constant GF2_128.Element := Segs (L + 1) (Tm.H0);
+                  Found : Boolean := False;
+               begin
+                  for P in Gadgets.Bits.Pluck_Index loop
+                     if V = Pluck_C (P, 0) then
+                        Constant_Hits (P) := Constant_Hits (P) + 1;
+                        Found := True;
+                     end if;
+                  end loop;
+                  if not Found then
+                     Constant_Other := Constant_Other + 1;
+                  end if;
+               end;
+            end if;
+            C := PCG.Step (Circuit.all, C);
+         end loop;
+      end Read_Plucks;
+   begin
+      Constant_Hits := [others => 0];
+      Constant_Other := 0;
+      All_In (0 .. Public_Count - 1) := X;
+      All_In (Public_Count .. All_In'Last) := W;
+      SA.Allocate_Segs (PE.Shape_Of (Circuit.all), Segs);
+      PE.Eval_Circuit (Circuit.all, All_In.all, Segs.all, Ok);
+      for J in 0 .. Circuit.Last_Layer loop
+         declare
+            C     : PCG.Cursor := PCG.Start (Circuit.all, J);
+            Tm    : SA.Term;
+            In_J  : SA.Element_Array renames Segs (J + 1).all;
+            Count : Natural := 0;
+         begin
+            for K in 1 .. PCG.Layer_Len (Circuit.all, J) loop
+               Tm := PCG.Term_Of (Circuit.all, C);
+               if Tm.K = SA.Zero
+                 and then GF2_128.Mul (In_J (Tm.H1), In_J (Tm.H0)) /= SA.Zero
+               then
+                  Count := Count + 1;
+                  if J < Circuit.Last_Layer then
+                     Read_Plucks (J + 1, Tm.H0);
+                     if Tm.H1 /= Tm.H0 then
+                        Read_Plucks (J + 1, Tm.H1);
+                     end if;
+                  end if;
+                  if Lines < Shown then
+                     Lines := Lines + 1;
+                     Put_Line ("locate " & Label & ": z layer" & J'Image
+                               & " h0" & Tm.H0'Image & " h1" & Tm.H1'Image);
+                  end if;
+               end if;
+               C := PCG.Step (Circuit.all, C);
+            end loop;
+            if Count > 0 then
+               Put_Line ("locate " & Label & ": layer" & J'Image & ","
+                         & Count'Image & " Z assertions fail");
+            end if;
+            Total := Total + Count;
+         end;
+      end loop;
+      for G in Segs (0)'Range loop
+         if Segs (0) (G) /= SA.Zero then
+            Put_Line ("locate " & Label & ": output" & G'Image & " not zero");
+            Total := Total + 1;
+         end if;
+      end loop;
+      Put_Line ("locate " & Label & ": plucker outputs equal to C (k, 0):"
+                & Constant_Hits (0)'Image & Constant_Hits (1)'Image
+                & Constant_Hits (2)'Image & Constant_Hits (3)'Image
+                & ", other outputs read:" & Constant_Other'Image);
+      Put_Line ("locate " & Label & ":" & Total'Image
+                & " failing assertions and outputs, circuit "
+                & (if Ok then "accepts" else "refuses"));
+      SA.Release_Segs (Segs);
+      Free (All_In);
+   end Locate;
+
    --  The ghost predicates, read through an assertion: with -gnata a
    --  false assertion raises Assertion_Error, which these turn into
    --  False. The preconditions hold on every case (the shapes are
@@ -707,11 +826,48 @@ procedure Relation_Cases is
       end;
    end Renamed;
 
+   Count_Values : constant array (1 .. 3) of Unsigned_8 := [0, 41, 255];
+
+   --  The reference netlist and the gadget G4 on every block the
+   --  honest witness hashes: the nb blocks of the signed message and
+   --  the item's two (Block_Checks; chapter 10, Section 2).
+   procedure Check_Blocks (Name : String; W : W_Array) is
+      Nb  : constant Natural := Natural (Byte_Of (W, W_Count));
+      H   : Sha256.State := Sha256.Initial_State;
+      T   : Sha256.Trace.Block_Trace;
+      Pre : constant Byte_Array (0 .. 64 * Max_Blocks - 1) :=
+        [for Q in 0 .. 64 * Max_Blocks - 1 => Preimage (W, Q)];
+      It  : constant Byte_Array := Item_Bytes (W);
+      Net : Boolean := True;
+      Gad : Boolean := True;
+
+      procedure One (Data : Byte_Array; B : Natural) is
+         Block : constant Bytes_64 := Data (64 * B .. 64 * B + 63);
+      begin
+         Net := Net and then Block_Checks.Check_Netlist (H, Block);
+         Gad := Gad and then Block_Checks.Check_Gadget (H, Block);
+         Sha256.Trace.Compress_Traced (H, Data, 64 * B, T);
+      end One;
+   begin
+      for B in 0 .. Nb - 1 loop
+         One (Pre, B);
+      end loop;
+      H := Sha256.Initial_State;
+      for B in 0 .. 1 loop
+         One (It, B);
+      end loop;
+      Report ("netlist " & Name & ": Interpret is the traced compression"
+              & " on the" & Natural'Image (Nb + 2) & " blocks", Net);
+      Report ("gadget " & Name & ": every assertion holds on the honest"
+              & " trace of the" & Natural'Image (Nb + 2) & " blocks", Gad);
+   end Check_Blocks;
+
    procedure Run_Document
      (Dir, Doc_Name, Attr : String;
       Positive_Case, Mutate, Reference : Boolean;
       Rename : String := "";
-      Padding : Boolean := False)
+      Padding : Boolean := False;
+      Count : Boolean := False)
    is
       --  The case's name in the report: the document, and the new
       --  identifier of a rewritten one.
@@ -800,6 +956,9 @@ procedure Relation_Cases is
       Check ("honest " & Name, X0.all, W0.all,
              (if Positive_Case then Holds else Fails),
              (if Positive_Case then "" else "item"));
+      if Positive_Case then
+         Check_Blocks (Name, W0.all);
+      end if;
 
       declare
          It      : constant Mdoc_Parse.Item :=
@@ -1053,6 +1212,39 @@ procedure Relation_Cases is
          end if;
       end;
 
+      --  "count": the block count outside 1 to 40 (nb is eight bits,
+      --  and the circuit does not assert nb <= 40). The rest of the
+      --  honest witness is kept: the relation is false (it implies nb in
+      --  1 to 40, Lemma_Count_In_Range), and the circuit must refuse.
+      --  Locate says which of its assertions fail.
+      if Count then
+         for Nb_New of Count_Values loop
+            X.all := X0.all;
+            W.all := W0.all;
+            Put_Byte (W.all, W_Count, Nb_New);
+            declare
+               L : constant String := "count nb =" & Nb_New'Image & " " & Name;
+               Hits  : Hit_Array;
+               Other : Natural;
+            begin
+               Check (L, X.all, W.all, Fails);
+               Locate (L, X.all, W.all, Hits, Other);
+               --  The fact of G1 on the registered circuit: the 256
+               --  outputs of the unpacking of the 64 zero elements are
+               --  the constant terms, 64 of each, none of them a bit.
+               --  The other squares read are 256, as many as the failing
+               --  comparisons of assert_hash: a count, not a mapping of
+               --  each read to its assertion.
+               Report (L & ": the plucker's outputs on 0 are the four"
+                       & " constant terms, 64 of each",
+                       Hits = [Gadgets.Bits.Pluck_Index => 64]);
+               Report (L & ": the other squares read are 256, as many"
+                       & " as the comparisons of assert_hash (a count)",
+                       Other = 256);
+            end;
+         end loop;
+      end if;
+
       Free (Doc);
       Free (Tr);
       Free (X0);
@@ -1116,6 +1308,7 @@ begin
                   Mutate        => Index (Rest, "mutate") > 0,
                   Reference     => Index (Rest, "reference") > 0,
                   Padding       => Index (Rest, "padding") > 0,
+                  Count         => Index (Rest, "count") > 0,
                   Rename        =>
                     (if R_At = 0 then "" else Rest (R_At + 7 .. R_To)));
             end;
