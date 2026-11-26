@@ -14,7 +14,8 @@ set -euo pipefail
 
 usage() {
    echo "usage: scripts/check.sh {build|prove|prove-partition <name>|" \
-        "partitions-check|test|cli|vectors|lint|lean|lean-source|all|reuse}" >&2
+        "partitions-check|test|cli|vectors|lint|lean|lean-source|all|reuse|" \
+        "reuse-spark|reuse-lean}" >&2
    exit 2
 }
 
@@ -522,17 +523,26 @@ case "${1:-}" in
       do_lint
       header "all checks passed"
       ;;
-   reuse)
-      #  Every check but the proof, for a commit whose proof inputs are
-      #  those of a commit already proved (ADR 0088); scripts/remote-check.sh
-      #  chooses it and names the proved commit in the status.
+   reuse|reuse-spark|reuse-lean)
+      #  Every check but the proofs reused, for a commit whose inputs of
+      #  the SPARK proof, of the Lean proofs or of both are those of a
+      #  commit already proved (ADR 0088): reuse reuses both, reuse-spark
+      #  the SPARK proof and runs the step lean, reuse-lean the Lean
+      #  proofs and runs the SPARK proof. scripts/remote-check.sh chooses
+      #  it and names the proved commits in the status.
       do_build
       do_partitions_check
+      if [ "$1" = reuse-lean ]; then do_prove; fi
+      if [ "$1" = reuse-spark ]; then do_lean; fi
       do_test
       do_cli
       do_vectors
       do_lint
-      header "all checks but the proofs passed; the SPARK and Lean proofs are reused (ADR 0088)"
+      case "$1" in
+         reuse)       header "all checks but the proofs passed; the SPARK and Lean proofs are reused (ADR 0088)" ;;
+         reuse-spark) header "all checks but the SPARK proof passed; the SPARK proof is reused (ADR 0088)" ;;
+         reuse-lean)  header "all checks but the Lean proofs passed; the Lean proofs are reused (ADR 0088)" ;;
+      esac
       ;;
    *) usage ;;
 esac

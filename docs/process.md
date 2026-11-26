@@ -102,27 +102,39 @@ The step lint (`make lint`), in both checks, holds these rules:
   small runs right and refuses those whose units do not add up to the summary of GNATprove
   (`scripts/vc-count-test.py`, for `scripts/vc-count.py`);
 - every body of `src/` outside SPARK, which the proof takes as given, has a row in the register
-  of the trusted base whose column Item names it, qualified, the aspect or pragma found across
-  line breaks (`scripts/check-spark-off.py`, after its tests
-  `scripts/check-spark-off-test.py`);
+  of the trusted base whose column Item names it by its full name (its unit, the packages that
+  enclose it, its own name); the aspect or pragma is found across line breaks, in the text read
+  as Ada's lexer reads it (comments removed, string and character literals blanked); a body
+  outside SPARK nested in a subprogram body, and a file whose scopes the script cannot follow,
+  are refused (`scripts/check-spark-off.py`, after its tests `scripts/check-spark-off-test.py`);
 - no em-dash in any tracked file but the files ported from upstream under `lean/Upstream/`,
   which keep upstream's bytes;
 - none of the attribution and tooling words that `scripts/check.sh` lists, in any tracked file.
 
-The proof is proved again only when its inputs changed (ADR 0088). `scripts/remote-check.sh`
-lists the proof inputs of the commit, every file gnatprove reads: the project file and the
-source directories it names, `alire.toml` (the toolchain pins), the partition list, every
-configuration pragma file, and the gnatprove command lines of `scripts/check.sh` and the
-Makefile, each by its git object hash; the digest of the list identifies the proof's inputs.
-If an ancestor along any parent has the same digest and its status `prove` is success, the
-machine runs every check but the proof (`make check-reuse`: build, partitions, tests, the
-command line with the 38 test documents and the cross-check of the mDoc proofs, vectors, lint, about twenty minutes)
-and `prove` is posted naming the proved commit and the digest. Otherwise the machine runs
-`make check` and proves from scratch; so it does when the project file names a source
-directory, a file or an attribute the list does not cover, declares its source directories
-conditionally or more than once, or when a project file the list does not know appears. A merge of `main` into a branch that brings no change of the inputs
-reuses the proof like any other commit. `scripts/remote-check.sh --digest [commit]` shows the
-list, the digest and the proved ancestor without starting anything.
+Each proof is proved again only when its inputs changed (ADR 0088). `scripts/remote-check.sh`
+lists the proof inputs of the commit for each prover, each file by its git object hash, and
+digests each list:
+
+- **the SPARK proof**, every file gnatprove reads: the project file and the source directories
+  it names, `alire.toml` (the toolchain pins), the partition list, every configuration pragma
+  file, and the gnatprove command lines of `scripts/check.sh` and the Makefile;
+- **the Lean proofs**: the tree of `lean/` (the Lake project, its pinned versions, the sources
+  and the scripts of the step), the vectors `tests/vectors/lean_gf2_128.txt` that the step
+  compares with the model's output, and the text of the step `lean` of `scripts/check.sh`.
+
+For each prover, if an ancestor along any parent has the same digest and its status `prove` is
+success, that proof is reused. When both are, the machine runs every check but the proofs
+(`make check-reuse`: build, partitions, tests, the command line with the 38 test documents and
+the cross-check of the mDoc proofs, vectors, lint, about twenty minutes). When only the SPARK
+proof is, it runs the step `lean` too (`make check-reuse-spark`, a few minutes more); when only
+the Lean proofs are, it runs the SPARK proof too (`make check-reuse-lean`). `prove` is posted
+naming, for each proof reused, the proved commit and the digest. Otherwise the machine runs
+`make check` and proves both from scratch. The SPARK proof runs whenever the project file names
+a source directory, a file or an attribute the list does not cover, declares its source
+directories conditionally or more than once, or when a project file the list does not know
+appears. A merge of `main` into a branch that brings no change of the inputs reuses the proofs
+like any other commit. `scripts/remote-check.sh --digest [commit]` shows both lists, both
+digests and the proved ancestor of each without starting anything.
 
 The proof from scratch stays the rule at three points, with `scripts/remote-check.sh --full`:
 every release tag, every milestone close, and once a week on `main`, started on Monday at
@@ -137,7 +149,7 @@ The proving machine is a virtual machine on Google Cloud (c4-standard-24, 12 cor
 ```bash
 scripts/remote-check.sh               # make check on the pushed commit, posts the status prove
 scripts/remote-check.sh --collect     # picks up that run later, if the terminal was closed
-scripts/remote-check.sh --digest      # the proof inputs of HEAD, their digest, the proved ancestor with the same
+scripts/remote-check.sh --digest      # the proof inputs of HEAD for each prover, the digests, the proved ancestor of each
 scripts/remote-check.sh --full        # the proof from scratch even when the inputs are unchanged
 scripts/remote-check.sh --tree prove  # the working tree as it is, any target, posts nothing
 scripts/remote-check.sh --tree-collect  # picks up a tree run later, if the terminal was closed

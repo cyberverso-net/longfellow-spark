@@ -24,25 +24,32 @@
 #
 #  scripts/remote-check.sh [--full] [commit]
 #     Before starting, the commit mode lists the proof inputs of the
-#     commit (ADR 0088): the project file and the source directories it
-#     names, the toolchain pins alire.toml and alire.lock, the partition
-#     list, every configuration pragma file, and the gnatprove command
-#     lines of scripts/check.sh and the Makefile, each by its git object
-#     hash, and digests the list. If an ancestor, along every parent,
-#     has the same digest and its status `prove` is success, the proof
-#     is reused: the VM runs make check-reuse (build, partitions, test,
-#     cli with the cross-check, vectors, lint; about fifteen minutes)
-#     and the status names the proved commit and the digest. Otherwise,
-#     or with --full, the VM runs make check and proves from scratch.
-#     The reuse is refused, and the proof runs, when the project file
+#     commit for each prover (ADR 0088), each file by its git object
+#     hash, and digests each list:
+#     - the SPARK proof: the project file and the source directories it
+#       names, the toolchain pins alire.toml and alire.lock, the
+#       partition list, every configuration pragma file, and the
+#       gnatprove command lines of scripts/check.sh and the Makefile;
+#     - the Lean proofs: the tree of lean/, the vectors the step lean
+#       compares with the model's output, and the text of the step.
+#     For each prover, if an ancestor, along every parent, has the same
+#     digest and its status `prove` is success, that proof is reused.
+#     The VM runs make check-reuse when both are (build, partitions,
+#     test, cli with the cross-check, vectors, lint; about twenty
+#     minutes), make check-reuse-spark when only the SPARK proof is
+#     (the step lean runs too), make check-reuse-lean when only the
+#     Lean proofs are (the SPARK proof runs too), and the status names
+#     each proved commit and digest. Otherwise, or with --full, the VM
+#     runs make check and proves both from scratch. The reuse of the
+#     SPARK proof is refused, and that proof runs, when the project file
 #     names a source, a file or an attribute the list does not cover.
 #     The commit defaults to HEAD, which must be clean and pushed; with
 #     a commit given (origin/main for the weekly proof), only pushed.
 #
 #  scripts/remote-check.sh --digest [commit]
-#     Prints the proof inputs and the digest of the commit (HEAD by
-#     default) and the proved ancestor with the same digest, if any.
-#     Starts nothing; needs no gcloud.
+#     Prints, for each prover, the proof inputs and the digest of the
+#     commit (HEAD by default) and the proved ancestor with the same
+#     digest, if any. Starts nothing; needs no gcloud.
 #
 #  scripts/remote-check.sh --tree [make target...]
 #     Copies the working tree as it is, committed or not, and runs the
@@ -207,27 +214,40 @@ collect() {
                exit 1 ;;
             [0-9]*\ [0-9]*)
                fetch_log
-               #  What the run was: "check", or "check-reuse <base> <digest>"
-               #  (ADR 0088); a run of an older script has no file, which
-               #  the VM reports as "none": check. A VM that cannot be
-               #  reached is not a missing file: nothing is posted.
+               #  What the run was (ADR 0088): "check"; "check-reuse
+               #  <SPARK base> <digest> <Lean base> <digest>";
+               #  "check-reuse-spark <base> <digest>"; "check-reuse-lean
+               #  <base> <digest>"; or, from a run of the script before
+               #  the two digests, "check-reuse <base> <digest>". A run of
+               #  an older script still has no file, which the VM reports
+               #  as "none": check. A VM that cannot be reached is not a
+               #  missing file: nothing is posted.
                if ! targets="$(fetch_targets)"; then
                   echo "remote-check: the run of ${SHA:0:12} ended with status ${result%% *} but its kind could not be read from $VM; run --collect again" >&2
                   exit 1
                fi
                vm_stop
-               local code minutes step target base digest
+               local code minutes step target base digest base2 digest2
                code="${result%% *}"
                minutes="${result##* }"
                if [ "$targets" = none ]; then targets=check; fi
                target="${targets%% *}"
                if [ "$code" = 0 ]; then
-                  if [ "$target" = check-reuse ]; then
-                     read -r _ base digest <<< "$targets"
-                     post_status success "proof inputs ${digest:0:12} as ${base:0:7}, proved; build, test, cli, vectors, lint passed on $VM in $minutes min"
-                  else
-                     post_status success "make check passed on $VM in $minutes min"
-                  fi
+                  read -r _ base digest base2 digest2 <<< "$targets"
+                  case "$target" in
+                     check-reuse)
+                        if [ -n "${digest2:-}" ]; then
+                           post_status success "SPARK ${digest:0:8} as ${base:0:7}, Lean ${digest2:0:8} as ${base2:0:7}, proved; build, test, cli, vectors, lint passed on $VM in $minutes min"
+                        else
+                           post_status success "proof inputs ${digest:0:12} as ${base:0:7}, proved; build, test, cli, vectors, lint passed on $VM in $minutes min"
+                        fi ;;
+                     check-reuse-spark)
+                        post_status success "SPARK ${digest:0:12} as ${base:0:7}, proved; lean, build, test, cli, vectors, lint passed on $VM in $minutes min" ;;
+                     check-reuse-lean)
+                        post_status success "Lean ${digest:0:12} as ${base:0:7}, proved; SPARK proof, build, test, cli, vectors, lint passed on $VM in $minutes min" ;;
+                     *)
+                        post_status success "make check passed on $VM in $minutes min" ;;
+                  esac
                   echo "remote-check: make $target passed (remote-check.log)"
                   exit 0
                fi
@@ -260,7 +280,7 @@ if [ "$MODE" != digest ]; then
    need_user
 fi
 
-#  The proof inputs of a commit (ADR 0088): every file gnatprove reads,
+#  The inputs of the SPARK proof of a commit (ADR 0088): every file gnatprove reads,
 #  each with its git object hash, one per line. The source directories
 #  are read from the project file, so that a new one cannot be missed;
 #  config/ is generated by Alire from alire.toml and alire.lock and is
@@ -305,7 +325,7 @@ gpr_source_dirs() {
    done
 }
 
-proof_inputs() {  # commit
+spark_inputs() {  # commit
    local c="$1" gpr dirs d f
    gpr="$(git show "$c:longfellow_spark.gpr" 2> /dev/null)" || {
       echo "no longfellow_spark.gpr in $c" >&2; return 1; }
@@ -359,19 +379,31 @@ proof_inputs() {  # commit
    done
    echo "gnatprove-lines $( { git show "$c:scripts/check.sh"; git show "$c:Makefile"; } \
       | gnatprove_lines | shasum -a 256 | cut -d' ' -f1)"
-   #  The Lean proofs (ADR 0091): the tree of lean/ and the command
-   #  lines of the step lean, as gnatprove-lines for the SPARK proof. A
-   #  commit before lean/ existed has neither line.
-   if git cat-file -e "$c:lean" 2> /dev/null; then
-      echo "lean/ $(git rev-parse "$c:lean")"
-      echo "lean-lines $(git show "$c:scripts/check.sh" | lean_lines | shasum -a 256 | cut -d' ' -f1)"
-   fi
 }
 
-#  The lake and lean command lines of the text on stdin, joined and
-#  without comments as for gnatprove_lines.
-lean_lines() {
-   sed -e ':a' -e '/\\$/N; s/\\\n//; ta' | grep -v -E '^[[:space:]]*#' | grep -E '\blake\b'
+#  The inputs of the Lean proofs of a commit (ADR 0091): the tree of
+#  lean/ (the Lake project, its pinned toolchain and Mathlib, the
+#  sources and the scripts the step runs), the committed vectors the
+#  step compares with the model's output, and the text of the step, the
+#  function do_lean of scripts/check.sh without its comment lines: the
+#  step takes minutes, so any change to it runs it again. Fails for a
+#  commit without lean/ or without the step: there is nothing to reuse.
+LEAN_VECTORS=tests/vectors/lean_gf2_128.txt
+lean_inputs() {  # commit
+   local c="$1" step
+   git cat-file -e "$c:lean" 2> /dev/null || { echo "no lean/ in $c" >&2; return 1; }
+   echo "lean/ $(git rev-parse "$c:lean")"
+   if git cat-file -e "$c:$LEAN_VECTORS" 2> /dev/null; then
+      echo "$LEAN_VECTORS $(git rev-parse "$c:$LEAN_VECTORS")"
+   else
+      echo "$LEAN_VECTORS absent"
+   fi
+   step="$(git show "$c:scripts/check.sh" 2> /dev/null \
+      | sed -n '/^do_lean() {$/,/^}$/p' | grep -v -E '^[[:space:]]*#')"
+   if [ -z "$step" ]; then
+      echo "no step lean (do_lean) in scripts/check.sh of $c" >&2; return 1
+   fi
+   echo "lean-step $(printf '%s\n' "$step" | shasum -a 256 | cut -d' ' -f1)"
 }
 
 #  The gnatprove command lines of the text on stdin: continuation lines
@@ -381,50 +413,98 @@ gnatprove_lines() {
    sed -e ':a' -e '/\\$/N; s/\\\n//; ta' | grep -v -E '^[[:space:]]*#' | grep -F gnatprove
 }
 
-#  The digest of the proof inputs of a commit; fails as proof_inputs.
-proof_digest() {  # commit
+#  The digest of the inputs of one prover (spark or lean) of a commit;
+#  fails as spark_inputs or lean_inputs.
+digest_of() {  # spark|lean, commit
    local l
-   l="$(proof_inputs "$1")" || return 1
+   l="$("$1_inputs" "$2")" || return 1
    printf '%s\n' "$l" | shasum -a 256 | cut -d' ' -f1
 }
 
-#  An ancestor of $SHA whose proof inputs have the digest $DIGEST and
-#  whose status `prove` is success; empty if none within 200 commits.
+#  The proved ancestors of $SHA, one per prover: the first commit of the
+#  walk whose SPARK digest is $SPARK_DIGEST, and the first whose Lean
+#  digest is $LEAN_DIGEST, each with its status `prove` success; "-"
+#  for none within 200 commits, or when the digest is empty (the inputs
+#  could not be listed). Prints "<SPARK base> <Lean base>".
 #  The walk is topological (children before parents) over every parent
 #  of a merge, not the first parents only: the proved head of a branch
 #  is the second parent of its merge into main, and a walk along the
 #  first parents would miss every one of them. The walk starts from
 #  every parent of $SHA ($SHA^@), since $SHA may itself be a merge whose
-#  proved head is its second parent. A reused status counts: it names
-#  the commit it rests on, and the chain ends at a proof from scratch.
-proved_base() {
-   local c d
+#  proved head is its second parent. A status `prove` that is success
+#  means both proofs of that commit hold, proved there or reused: a
+#  reused status names the commit it rests on, and each chain ends at a
+#  proof from scratch.
+proved_bases() {
+   local c sd ld sb=- lb=-
    for c in $(git rev-list --topo-order --max-count=200 "$SHA^@" 2> /dev/null); do
-      d="$(proof_digest "$c" 2> /dev/null)" || continue
-      [ "$d" = "$DIGEST" ] || continue
+      if { [ "$sb" != - ] || [ -z "$SPARK_DIGEST" ]; } && { [ "$lb" != - ] || [ -z "$LEAN_DIGEST" ]; }; then
+         break
+      fi
+      sd=""; ld=""
+      if [ "$sb" = - ] && [ -n "$SPARK_DIGEST" ]; then
+         sd="$(digest_of spark "$c" 2> /dev/null)" || sd=""
+         [ "$sd" = "$SPARK_DIGEST" ] || sd=""
+      fi
+      if [ "$lb" = - ] && [ -n "$LEAN_DIGEST" ]; then
+         ld="$(digest_of lean "$c" 2> /dev/null)" || ld=""
+         [ "$ld" = "$LEAN_DIGEST" ] || ld=""
+      fi
+      [ -n "$sd" ] || [ -n "$ld" ] || continue
       if [ "$(gh api "repos/$(repo)/commits/$c/statuses" \
                 --jq "[.[] | select(.context == \"$CONTEXT\")][0].state" 2> /dev/null)" = success ]; then
-         echo "$c"
-         return 0
+         if [ -n "$sd" ]; then sb="$c"; fi
+         if [ -n "$ld" ]; then lb="$c"; fi
       fi
    done
+   echo "$sb $lb"
+}
+
+#  The digests of $SHA in SPARK_DIGEST and LEAN_DIGEST, each empty when
+#  its inputs cannot be listed (the reason on stderr), and, unless
+#  QUIET is set, each list printed under its name.
+SPARK_DIGEST=""
+LEAN_DIGEST=""
+digests() {
+   local kind inputs d
+   for kind in spark lean; do
+      d=""
+      if inputs="$("${kind}_inputs" "$SHA")"; then
+         d="$(printf '%s\n' "$inputs" | shasum -a 256 | cut -d' ' -f1)"
+         if [ -z "${QUIET:-}" ]; then
+            echo "$kind inputs:"
+            printf '%s\n' "$inputs" | sed 's/^/   /'
+            echo "$kind digest $d"
+         fi
+      fi
+      if [ "$kind" = spark ]; then SPARK_DIGEST="$d"; else LEAN_DIGEST="$d"; fi
+   done
+}
+
+#  What the bases mean, one line per prover; reads SPARK_DIGEST,
+#  LEAN_DIGEST, SPARK_BASE, LEAN_BASE. $1 is "would run" or "runs".
+report_bases() {
+   if [ -z "$SPARK_DIGEST" ]; then
+      echo "SPARK: the inputs cannot be listed: the SPARK proof $1"
+   elif [ "$SPARK_BASE" != - ]; then
+      echo "SPARK: inputs ${SPARK_DIGEST:0:12} proved at $SPARK_BASE: reused"
+   else
+      echo "SPARK: no proved ancestor with inputs ${SPARK_DIGEST:0:12} within 200 commits: the SPARK proof $1"
+   fi
+   if [ -z "$LEAN_DIGEST" ]; then
+      echo "Lean: the inputs cannot be listed: the Lean proofs $1"
+   elif [ "$LEAN_BASE" != - ]; then
+      echo "Lean: inputs ${LEAN_DIGEST:0:12} proved at $LEAN_BASE: reused"
+   else
+      echo "Lean: no proved ancestor with inputs ${LEAN_DIGEST:0:12} within 200 commits: the Lean proofs $1"
+   fi
 }
 
 if [ "$MODE" = digest ]; then
    SHA="$(git rev-parse "${1:-HEAD}")"
-   if ! inputs="$(proof_inputs "$SHA")"; then
-      echo "remote-check: the proof inputs of ${SHA:0:12} cannot be listed; the proof would run" >&2
-      exit 1
-   fi
-   DIGEST="$(printf '%s\n' "$inputs" | shasum -a 256 | cut -d' ' -f1)"
-   printf '%s\n' "$inputs"
-   echo "digest $DIGEST"
-   BASE="$(proved_base)"
-   if [ -n "$BASE" ]; then
-      echo "proved with the same inputs: $BASE"
-   else
-      echo "no proved ancestor with the same inputs within 200 commits: the proof would run"
-   fi
+   digests
+   read -r SPARK_BASE LEAN_BASE <<< "$(proved_bases)"
+   report_bases "would run"
    exit 0
 fi
 
@@ -443,31 +523,36 @@ if [ "$MODE" = commit ]; then
    else
       commit_preconditions
    fi
-   #  What the VM runs: make check, or make check-reuse when an ancestor
-   #  proved the same proof inputs (ADR 0088). The choice travels to the
-   #  VM in ~/runs/<commit>.targets, so that --collect reads it back.
+   #  What the VM runs (ADR 0088): make check, or, when an ancestor
+   #  proved the same inputs of one prover or of both, make
+   #  check-reuse-spark, check-reuse-lean or check-reuse. The choice
+   #  travels to the VM in ~/runs/<commit>.targets, with the proved
+   #  commit and the digest of each proof reused, so that --collect
+   #  reads it back.
    TARGET=check
    REUSE=""
    if [ -n "$FULL" ]; then
-      echo "remote-check: --full: the proof runs from scratch"
-   elif inputs="$(proof_inputs "$SHA" 2> /tmp/remote-check-inputs.$$)"; then
-      DIGEST="$(printf '%s\n' "$inputs" | shasum -a 256 | cut -d' ' -f1)"
-      git fetch -q origin main 2> /dev/null || true
-      BASE="$(proved_base)"
-      if [ -n "$BASE" ]; then
-         TARGET=check-reuse
-         REUSE="${BASE} ${DIGEST}"
-         echo "remote-check: proof inputs ${DIGEST:0:12} identical to ${BASE:0:12}, proved: the proof is reused, make check-reuse runs"
-      else
-         echo "remote-check: no proved ancestor with the proof inputs ${DIGEST:0:12}: the proof runs"
-      fi
+      echo "remote-check: --full: the SPARK and Lean proofs run from scratch"
    else
-      echo "remote-check: the proof inputs cannot be listed ($(cat /tmp/remote-check-inputs.$$)): the proof runs"
+      QUIET=yes digests
+      git fetch -q origin main 2> /dev/null || true
+      read -r SPARK_BASE LEAN_BASE <<< "$(proved_bases)"
+      report_bases runs | sed 's/^/remote-check: /'
+      if [ "$SPARK_BASE" != - ] && [ "$LEAN_BASE" != - ]; then
+         TARGET=check-reuse
+         REUSE="$SPARK_BASE $SPARK_DIGEST $LEAN_BASE $LEAN_DIGEST"
+      elif [ "$SPARK_BASE" != - ]; then
+         TARGET=check-reuse-spark
+         REUSE="$SPARK_BASE $SPARK_DIGEST"
+      elif [ "$LEAN_BASE" != - ]; then
+         TARGET=check-reuse-lean
+         REUSE="$LEAN_BASE $LEAN_DIGEST"
+      fi
+      echo "remote-check: make $TARGET runs"
    fi
-   rm -f /tmp/remote-check-inputs.$$
-   #  Both targets are spelt make "chec"k... so that no command line but
+   #  Every target is spelt make "chec"k... so that no command line but
    #  the one of make itself matches the pattern [m]ake check of BUSY.
-   if [ "$TARGET" = check ]; then MAKE_CMD='make "chec"k'; else MAKE_CMD='make "chec"k-reuse'; fi
+   MAKE_CMD='make "chec"k'"${TARGET#check}"
    vm_start
    #  The run, detached from this connection: the VM's own clone at
    #  exactly this commit (untracked files go, ignored ones such as the
@@ -492,11 +577,12 @@ if [ "$MODE" = commit ]; then
       echo started" 2> /dev/null || echo unreachable)"
    case "$launched" in
       started)
-         if [ "$TARGET" = check ]; then
-            post_status pending "make check running on $VM"
-         else
-            post_status pending "make check-reuse running on $VM, the proof reused from ${BASE:0:7}"
-         fi ;;
+         case "$TARGET" in
+            check)             post_status pending "make check running on $VM" ;;
+            check-reuse)       post_status pending "make check-reuse running on $VM, SPARK reused from ${SPARK_BASE:0:7}, Lean from ${LEAN_BASE:0:7}" ;;
+            check-reuse-spark) post_status pending "make check-reuse-spark running on $VM, SPARK reused from ${SPARK_BASE:0:7}" ;;
+            check-reuse-lean)  post_status pending "make check-reuse-lean running on $VM, Lean reused from ${LEAN_BASE:0:7}" ;;
+         esac ;;
       busy*)
          echo "remote-check: $VM is already checking ${launched#busy }; wait for it, or --collect it" >&2
          exit 2 ;;
