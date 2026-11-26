@@ -210,9 +210,12 @@ def off_parts(path):
         if tok == ";":
             decl = None
         elif w == "is" and decl is not None:
+            #  A body opens its scope; its aspects came before "is". Any
+            #  other form (an expression function, a null procedure, an
+            #  instance) may still have aspects after it, up to its ";".
             if nxt not in NOT_A_BODY:
                 frames.append(Frame(decl[0], decl[1]))
-            decl = None
+                decl = None
         elif w == "declare":
             frames.append(Frame("block", None))
         elif w == "begin":

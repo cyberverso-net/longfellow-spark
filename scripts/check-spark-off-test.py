@@ -99,6 +99,12 @@ CHAR_AFTER_WORD = ("package body Alpha is\n"
                    "         when others => return False;\n"
                    "      end case;\n   end G;\n"
                    "end Alpha;\n")
+#  Aspects after an expression function and after a null procedure.
+TRAILING = ("package body Alpha is\n"
+            "   function Lemma return Boolean is (True) with SPARK_Mode => Off;\n"
+            "   procedure Nothing (X : Integer) is null\n"
+            "     with SPARK_Mode => Off;\n"
+            "end Alpha;\n")
 PACKAGE_OFF = ("package body Epsilon with SPARK_Mode => Off is\n"
                "   procedure P is\n   begin\n      null;\n   end P;\n"
                "end Epsilon;\n")
@@ -135,6 +141,10 @@ CASES = [
      "| L1 | `Gamma.Lemma` | x |\n", 1),
     ("character literal after a reserved word, named", {"src/alpha.adb": CHAR_AFTER_WORD},
      "| L1 | `Alpha.Lemma` | x |\n", 0),
+    ("aspects after an expression function and a null procedure, named", {"src/alpha.adb": TRAILING},
+     "| L1 | `Alpha.Lemma` | x |\n| L2 | `Alpha.Nothing` | x |\n", 0),
+    ("aspects after an expression function and a null procedure, one not named", {"src/alpha.adb": TRAILING},
+     "| L1 | `Alpha.Lemma` | x |\n", 1),
     ("aspect on a package, named", {"src/epsilon.adb": PACKAGE_OFF}, "| L2 | `Epsilon` | x |\n", 0),
     ("aspect on a package, not named", {"src/epsilon.adb": PACKAGE_OFF}, "| L2 | `Epsilon.P` | x |\n", 1),
 ]
