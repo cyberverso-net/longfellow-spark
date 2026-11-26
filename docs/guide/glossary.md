@@ -12,11 +12,11 @@ One recomputation of a hash by a cheating prover in the hope of a favourable cha
 
 ### Bits of security
 
-A probability of failure of at most 2^-k gives k bits of security. Upstream's bound, (1 + N + tA) / 2^116, gives about 116 bits, less the logarithm of the number of attempts. ([A3.4](00-primer-cryptography.md#a34-bits-of-security), [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee))
+A probability of failure of at most 2^-k gives k bits of security. Upstream's bound, (1 + N + tA) / 2^115, gives about 115 bits, less the logarithm of the number of attempts. ([A3.4](00-primer-cryptography.md#a34-bits-of-security), [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee))
 
 ### Certificate
 
-Three senses, kept apart. (1) Upstream's **Lean certificate**: its theorems of soundness at 116 bits for the version 7 configuration. (2) A **certificate for a circuit**, the untrusted data that the planned checker of ADR 0091 will check against a registered circuit. (3) An **X.509 certificate** of the issuer's key, which this project does not read: trust in the issuer's key is the relying party's. ([A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee), [A1.5](00-primer-cryptography.md#a15-what-stays-outside))
+Three senses, kept apart. (1) Upstream's **Lean certificate**: its theorems of soundness at 115 bits for the version 7 configuration, proved under hypotheses whose joint satisfiability is not established. (2) A **certificate for a circuit**, the untrusted data that the planned checker of ADR 0091 will check against a registered circuit. (3) An **X.509 certificate** of the issuer's key, which this project does not read: trust in the issuer's key is the relying party's. ([A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee), [A1.5](00-primer-cryptography.md#a15-what-stays-outside))
 
 Aliases: "Lean certificate" (ADR 0089, chapter 9 Section 6).
 
@@ -62,7 +62,7 @@ See: [Zero pattern](#zero-pattern).
 
 ### Negligible
 
-A probability so small that it can be ignored in practice, below any bound that matters for the system's use; for the version 7 row, about 2^-116 per attempt of a cheating prover. ([A1.1](00-primer-cryptography.md#a11-the-situation), [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee))
+A probability so small that it can be ignored in practice, below any bound that matters for the system's use; for the version 7 row, about 2^-115 per attempt of a cheating prover. ([A1.1](00-primer-cryptography.md#a11-the-situation), [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee))
 
 ### Outside the proofs
 
@@ -106,7 +106,7 @@ See: [Statement](#statement), [Hypothesis of the relation](#hypothesis-of-the-re
 
 ### Soundness
 
-That a false statement is accepted only with negligible probability. A theorem of upstream, for the version 7 row, at about 116 bits. ([A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee), [A12.1](00-primer-cryptography.md#a121-the-cheating-prover))
+That a false statement is accepted only with negligible probability. A theorem of upstream, for the version 7 row, at about 115 bits, under hypotheses whose joint satisfiability is not established. ([A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee), [A12.1](00-primer-cryptography.md#a121-the-cheating-prover))
 
 See: [Extraction](#extraction), [Bits of security](#bits-of-security).
 

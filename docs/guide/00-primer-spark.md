@@ -717,7 +717,7 @@ ADR 0091 sets a rule for this project's Lean lemmas: no `native_decide` counts a
 
 Upstream's evidence does not meet that rule, and the difference must be stated.
 
-- **`native_decide` in upstream's results.** Upstream's audit finds no `sorry` and no extra axiom of its own. But its numerical results, the steps that compute the bound of 116 bits, use `native_decide`. So the security level carries the trust of Lean's compiler, beyond its kernel.
+- **`native_decide` in upstream's results.** Upstream's audit finds no `sorry` and no extra axiom of its own. But its numerical results, the steps that compute the bound of 115 bits, use `native_decide`. So the security level carries the trust of Lean's compiler, beyond its kernel.
 - **The ECDSA theorem.** At the commit read (7bf8a6b), upstream's theorems on its ECDSA circuit hold only vacuously on real keys: a hypothesis compares points in a way no real public key satisfies, so the theorem is true but says nothing. A fix is under review upstream (its issue 224). The Lean correspondence page explains it and will be reread when the fix is merged.
 
 So an evaluator should read upstream's Lean results as strong evidence for the protocol, with two marked weaknesses, and not as evidence that already meets the stricter rule this project sets for itself.
