@@ -69,8 +69,8 @@ generic
    Max_Form           : Circuit_Certificates.Form_Bound;
    Max_Terms_Per_Wire : Positive;
    Max_Slots          : Circuit_Certificates.Slot_Count;
-   Max_Layer_Slots    : Positive;
-   Max_Vars           : Positive;
+   Max_Layer_Slots    : Circuit_Certificates.Capacity;
+   Max_Vars           : Circuit_Certificates.Capacity;
 package Circuit_Checker is
 
    package CC renames Circuit_Certificates;
@@ -78,6 +78,7 @@ package Circuit_Checker is
    subtype Element is SA.Element;
    Zero : Element renames SA.Zero;
    use type SA.F.Element;
+   use type SA.Seg_Access;
 
    type Status is
      (Accepted,
@@ -158,7 +159,19 @@ package Circuit_Checker is
       return Natural
    is (if CC.Spans_Ok (K) and then G < Span (P, K, J).Wires
        then K.Counts (Span (P, K, J).First_Wire + G + 1) else 0)
-   with Global => null, Pre => J <= P.Last_Layer;
+   with Global => null, Pre => J <= P.Last_Layer,
+        Post => Count_Of'Result <= CC.Max_Count,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
+
+   --  What Count_Of reads, where the spans tile the arrays.
+   procedure Lemma_Count_Of
+     (P : PC.Packed_Circuit; K : CC.Certificate; J, G : Natural)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => J <= P.Last_Layer and then CC.Spans_Ok (K)
+                and then G < Span (P, K, J).Wires,
+        Post => Span (P, K, J).First_Wire + G + 1 in K.Counts'Range
+                and then Count_Of (P, K, J, G)
+                         = K.Counts (Span (P, K, J).First_Wire + G + 1);
 
    --  The hint at position X (from 0) of layer J; beyond the span, one
    --  no slot has.
@@ -169,7 +182,23 @@ package Circuit_Checker is
           and then X in 0 .. Long_Long_Integer (Span (P, K, J).Hints) - 1
        then K.Hints (Span (P, K, J).First_Hint + Natural (X) + 1)
        else CC.Max_Count + 1)
-   with Global => null, Pre => J <= P.Last_Layer;
+   with Global => null, Pre => J <= P.Last_Layer,
+        Post => Hint_At'Result <= CC.Max_Count + 1,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
+
+   --  What Hint_At reads.
+   procedure Lemma_Hint_At
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      X : Long_Long_Integer)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => J <= P.Last_Layer and then CC.Spans_Ok (K),
+        Post => (if X in 0 .. Long_Long_Integer (Span (P, K, J).Hints) - 1
+                 then Span (P, K, J).First_Hint + Natural (X) + 1
+                        in K.Hints'Range
+                      and then Hint_At (P, K, J, X)
+                               = K.Hints (Span (P, K, J).First_Hint
+                                          + Natural (X) + 1)
+                 else Hint_At (P, K, J, X) = CC.Max_Count + 1);
 
    -------------------------------------------------------------------
    --  The model of one layer, over the shapes M of the wires it reads
@@ -219,7 +248,7 @@ package Circuit_Checker is
    is (Hint_At (P, K, J,
                 Hint_Pos (P, J, M, N - 1) + Long_Long_Integer (Q - 1)))
    with Ghost => Proof_Only, Global => null,
-        Pre => J <= P.Last_Layer and then N <= SA.Max_Terms;
+        Pre => J <= P.Last_Layer and then N <= SA.Max_Terms + 1;
 
    --  The used slots of wire G after the terms before N and Q pairs of
    --  term N (Q = 0: after the terms before N).
@@ -237,7 +266,8 @@ package Circuit_Checker is
                then 1 else 0))
    with Ghost => Proof_Only, Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms,
+        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms + 1,
+        Post => Used'Result <= CC.Max_Count + 2,
         Subprogram_Variant => (Decreases => N, Decreases => Q);
 
    --  The monomial of slot S (from 0) of wire G at the same point.
@@ -255,7 +285,7 @@ package Circuit_Checker is
        else Slot_Mono (P, K, J, M, N, Q - 1, G, S))
    with Ghost => Proof_Only, Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms,
+        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms + 1,
         Subprogram_Variant => (Decreases => N, Decreases => Q);
 
    --  Pair Q of term N passes the checks on its hint.
@@ -275,7 +305,7 @@ package Circuit_Checker is
                 => Slot_Mono (P, K, J, M, N, Q - 1, TT (P, J, N).G, S)
                    /= Pair_Mono (M, TT (P, J, N), Q))))
    with Ghost => Proof_Only, Global => null,
-        Pre => J <= P.Last_Layer and then N <= SA.Max_Terms;
+        Pre => J <= P.Last_Layer and then N <= SA.Max_Terms + 1;
 
    --  Every pair up to pair Q of term N passes.
    function Pairs_Ok
@@ -287,7 +317,7 @@ package Circuit_Checker is
             and then Pair_Ok (P, K, J, M, N, Q))
    with Ghost => Proof_Only, Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms,
+        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms + 1,
         Subprogram_Variant => (Decreases => N, Decreases => Q);
 
    --  The terms (k /= 0) of wire G among the first N.
@@ -354,6 +384,7 @@ package Circuit_Checker is
                             <= Max_Terms_Per_Wire
                    and then Used_End (P, K, J, M, G) = Count_Of (P, K, J, G)))
    with Ghost => Proof_Only, Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
         Pre => J <= P.Last_Layer and then Len (P, J) <= SA.Max_Terms
                and then Out_Count (P, J) <= SA.Max_Wires;
 
@@ -410,39 +441,289 @@ package Circuit_Checker is
                and then Out_Count (P, J) <= SA.Max_Wires;
 
    -------------------------------------------------------------------
-   --  The model of the walk, and what it accepts
+   --  The layers as the walk reaches them, and what it accepts
    -------------------------------------------------------------------
+
+   --  Two arrays of shapes with the same bounds and, field by field, the
+   --  same shapes: what the walk states of its own arrays and Reads.
+   function Same_Shapes (A, B : Shape_Array) return Boolean is
+     (A'First = B'First and then A'Last = B'Last
+      and then (for all H in A'Range =>
+                  A (H).N = B (H).N
+                  and then (for all E in Entry_Index =>
+                              A (H).V (E) = B (H).V (E))))
+   with Global => null;
 
    --  The shapes of the input wires: input wire I is variable I.
    function Input_Shapes (P : PC.Packed_Circuit) return Shape_Array is
      ([for I in 0 .. P.Ninput - 1 => (N => 1, V => [1 => I, others => 0])])
-   with Ghost => Proof_Only, Global => null;
+   with Global => null;
 
-   --  The walk from layer J down to layer 0, the wires of layer J reading
-   --  shapes M, the variables numbered from Vb.
-   function Walk_From
-     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
-      M : Shape_Array; Vb : Natural) return Boolean
-   is (Layer_Ok (P, K, J, M)
-       and then Vb + Declared_Before (P, K, J, M, Out_Count (P, J))
-                <= Max_Vars
-       and then
-       (J = 0
-        or else Walk_From
-                  (P, K, J - 1, Out_Shapes (P, K, J, M, Vb),
-                   Vb + Declared_Before (P, K, J, M, Out_Count (P, J)))))
+   --  The shapes the wires of layer J read, and the first variable of its
+   --  declared wires, by recursion from the inputs (layer Last_Layer reads
+   --  the inputs, numbered from 0, its variables from Ninput). The model
+   --  of every layer is stated over Reads, one term: the provers do not
+   --  carry the predefined equality of two arrays through a hidden
+   --  function, so the walk relates its own arrays to Reads field by
+   --  field instead.
+   function Reads
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural)
+      return Shape_Array
+   with Ghost => Proof_Only, Global => null,
+        Pre  => J <= P.Last_Layer,
+        Subprogram_Variant => (Increases => J);
+
+   function First_Var
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural) return Natural
+   with Ghost => Proof_Only, Global => null,
+        Pre  => J <= P.Last_Layer,
+        Post => First_Var'Result <= Max_Vars,
+        Subprogram_Variant => (Increases => J);
+
+   --  Layer J passes, with the shapes the walk reaches it with, and its
+   --  declared variables fit.
+   function Layer_Accepted
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural) return Boolean
+   is (Layer_Ok (P, K, J, Reads (P, K, J))
+       and then First_Var (P, K, J)
+                + Declared_Before (P, K, J, Reads (P, K, J), Out_Count (P, J))
+                <= Max_Vars)
    with Ghost => Proof_Only, Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre  => J <= P.Last_Layer and then Vb <= Max_Vars,
-        Subprogram_Variant => (Decreases => J);
+        Pre => J <= P.Last_Layer;
 
+   --  The walk accepts: the certificate has the circuit's layers, its
+   --  spans tile its arrays, the inputs fit the variables, and every
+   --  layer passes. A conjunction over the circuit's layers.
    function Accepts (P : PC.Packed_Circuit; K : CC.Certificate)
      return Boolean
    is (K.NL = P.Last_Layer + 1
        and then CC.Spans_Ok (K)
        and then P.Ninput <= Max_Vars
-       and then Walk_From (P, K, P.Last_Layer, Input_Shapes (P), P.Ninput))
+       and then (for all J in 0 .. P.Last_Layer => Layer_Accepted (P, K, J)))
+   with Ghost => Proof_Only, Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
+
+   -------------------------------------------------------------------
+   --  The model of the coefficients
+   -------------------------------------------------------------------
+
+   type Coef_List is array (Entry_Index) of Element;
+   type Coef_Array is array (Natural range <>) of Coef_List;
+   No_Coefs : constant Coef_List := [others => Zero];
+
+   function Coefs_At (C : Coef_Array; H : Natural) return Coef_List is
+     (if H in C'Range then C (H) else No_Coefs)
    with Ghost => Proof_Only, Global => null;
+
+   --  What pair Q of a term adds to its slot: (k * c1) * c0, c1 and c0 the
+   --  coefficients of the two entries the pair takes, as the walk
+   --  computes it.
+   function Pair_Coef
+     (M : Shape_Array; CM : Coef_Array; Tm : SA.Term; Q : Positive)
+      return Element
+   is (if Shape_At (M, Tm.H0).N = 0 then Zero
+       else SA."*"
+         (SA."*" (Tm.K,
+                  Coefs_At (CM, Tm.H1)
+                    (Integer'Min (Max_Entries,
+                                  (Q - 1) / Shape_At (M, Tm.H0).N + 1))),
+          Coefs_At (CM, Tm.H0) ((Q - 1) mod Shape_At (M, Tm.H0).N + 1)))
+   with Ghost => Proof_Only, Global => null;
+
+   --  The coefficient of slot S of wire G after the terms before N and Q
+   --  pairs of term N: each pair adds to the slot its hint names.
+   function Slot_Coef
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      M : Shape_Array; CM : Coef_Array; N : Positive; Q : Natural;
+      G, S : Natural) return Element
+   is (if Q = 0 then
+         (if N = 1 then Zero
+          else Slot_Coef (P, K, J, M, CM, N - 1, Pairs (P, J, M, N - 1),
+                          G, S))
+       elsif G = TT (P, J, N).G and then S = H (P, K, J, M, N, Q)
+       then SA."+" (Slot_Coef (P, K, J, M, CM, N, Q - 1, G, S),
+                    Pair_Coef (M, CM, TT (P, J, N), Q))
+       else Slot_Coef (P, K, J, M, CM, N, Q - 1, G, S))
+   with Ghost => Proof_Only, Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms + 1,
+        Subprogram_Variant => (Decreases => N, Decreases => Q);
+
+   function Coef_End
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      M : Shape_Array; CM : Coef_Array; G, S : Natural) return Element
+   is (if Len (P, J) = 0 then Zero
+       else Slot_Coef (P, K, J, M, CM, Len (P, J),
+                       Pairs (P, J, M, Len (P, J)), G, S))
+   with Ghost => Proof_Only, Global => null,
+        Pre => J <= P.Last_Layer;
+
+   --  The coefficients of the meanings of layer J's wires.
+   function Out_Coefs
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      M : Shape_Array; CM : Coef_Array) return Coef_Array
+   is ([for G in 0 .. Out_Count (P, J) - 1 =>
+          (if Linear (P, K, J, M, G)
+             and then Count_Of (P, K, J, G) <= Max_Entries
+           then [for E in Entry_Index =>
+                   (if E <= Count_Of (P, K, J, G)
+                    then Coef_End (P, K, J, M, CM, G, E - 1) else Zero)]
+           else [1 => SA.One, others => Zero])])
+   with Ghost => Proof_Only, Global => null,
+        Pre => J <= P.Last_Layer;
+
+   --  The coefficients of the meanings the wires of layer J read.
+   function Read_Coefs
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural)
+      return Coef_Array
+   with Ghost => Proof_Only, Global => null,
+        Pre  => J <= P.Last_Layer,
+        Subprogram_Variant => (Increases => J);
+
+   -------------------------------------------------------------------
+   --  The facts
+   -------------------------------------------------------------------
+
+   --  The value of variable X in V, Zero beyond it.
+   function V_At (V : SA.Element_Array; X : Natural) return Element is
+     (if X in V'Range then V (X) else Zero)
+   with Ghost => Proof_Only, Global => null;
+
+   --  A meaning's value: the sum of its first N entries, coefficient
+   --  times variable, entry by entry from the first.
+   function Eval_Meaning
+     (Sh : Form_Shape; C : Coef_List; V : SA.Element_Array; N : Natural)
+      return Element
+   is (if N = 0 then Zero
+       else SA."+" (Eval_Meaning (Sh, C, V, N - 1),
+                    SA."*" (C (Integer'Min (N, Max_Entries)),
+                            V_At (V, Sh.V (Integer'Min (N, Max_Entries))))))
+   with Ghost => Proof_Only, Global => null,
+        Pre  => N <= Max_Entries,
+        Subprogram_Variant => (Decreases => N);
+
+   --  The value of wire G's slots, coefficient times monomial, the first
+   --  S of them.
+   function Eval_Slots
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      M : Shape_Array; CM : Coef_Array; V : SA.Element_Array;
+      G, S : Natural) return Element
+   is (if S = 0 then Zero
+       else SA."+"
+         (Eval_Slots (P, K, J, M, CM, V, G, S - 1),
+          SA."*" (Coef_End (P, K, J, M, CM, G, S - 1),
+                  SA."*" (V_At (V, Mono_End (P, K, J, M, G, S - 1).A),
+                          V_At (V, Mono_End (P, K, J, M, G, S - 1).B)))))
+   with Ghost => Proof_Only, Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre  => J <= P.Last_Layer and then S <= CC.Max_Count,
+        Subprogram_Variant => (Decreases => S);
+
+   --  The facts of layer J at the values V: each assertion's product of
+   --  meanings is zero (with the field's equality, as the circuit's
+   --  Z_Ref states it), each declared wire's variable is its slots'
+   --  value, and on layer 0 each output's meaning is zero.
+   function Layer_Facts
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      V : SA.Element_Array) return Boolean
+   is ((for all N in 1 .. Len (P, J) =>
+          (if TT (P, J, N).K = Zero then
+             SA."*" (Eval_Meaning (Shape_At (Reads (P, K, J), TT (P, J, N).H1),
+                                   Coefs_At (Read_Coefs (P, K, J),
+                                             TT (P, J, N).H1),
+                                   V,
+                                   Shape_At (Reads (P, K, J),
+                                             TT (P, J, N).H1).N),
+                     Eval_Meaning (Shape_At (Reads (P, K, J), TT (P, J, N).H0),
+                                   Coefs_At (Read_Coefs (P, K, J),
+                                             TT (P, J, N).H0),
+                                   V,
+                                   Shape_At (Reads (P, K, J),
+                                             TT (P, J, N).H0).N))
+             = Zero))
+       and then
+       (for all G in 0 .. Out_Count (P, J) - 1 =>
+          (if not Linear (P, K, J, Reads (P, K, J), G) then
+             SA.Same
+               (V_At (V, First_Var (P, K, J)
+                         + Declared_Before (P, K, J, Reads (P, K, J), G)),
+                Eval_Slots (P, K, J, Reads (P, K, J), Read_Coefs (P, K, J),
+                            V, G, Count_Of (P, K, J, G)))))
+       and then
+       (if J = 0 then
+          (for all G in 0 .. Out_Count (P, J) - 1 =>
+             Eval_Meaning
+               (Out_Shape (P, K, J, Reads (P, K, J), First_Var (P, K, J), G),
+                Coefs_At (Out_Coefs (P, K, J, Reads (P, K, J),
+                                     Read_Coefs (P, K, J)), G),
+                V, Out_Shape (P, K, J, Reads (P, K, J),
+                              First_Var (P, K, J), G).N)
+             = Zero)))
+   with Ghost => Proof_Only, Global => null,
+        Pre => J <= P.Last_Layer;
+
+   function Facts_Hold
+     (P : PC.Packed_Circuit; K : CC.Certificate; V : SA.Element_Array)
+      return Boolean
+   is (for all J in 0 .. P.Last_Layer => Layer_Facts (P, K, J, V))
+   with Ghost => Proof_Only, Global => null;
+
+   --  V holds, for each variable, the value of its home wire in the
+   --  evaluation Wr (segments of Packed_Eval.Eval_Circuit): input wire I
+   --  for variable I, declared wire G of layer J for its variable.
+   function Homes_Hold
+     (P : PC.Packed_Circuit; K : CC.Certificate; Wr : SA.Seg_Array;
+      V : SA.Element_Array) return Boolean
+   is ((for all I in 0 .. P.Ninput - 1 =>
+          SA.Same (V_At (V, I), SA.W_At (Wr (P.Last_Layer + 1).all, I)))
+       and then
+       (for all J in 0 .. P.Last_Layer =>
+          (for all G in 0 .. Out_Count (P, J) - 1 =>
+             (if not Linear (P, K, J, Reads (P, K, J), G) then
+                SA.Same (V_At (V, First_Var (P, K, J)
+                                  + Declared_Before (P, K, J,
+                                                     Reads (P, K, J), G)),
+                         SA.W_At (Wr (J).all, G))))))
+   with Ghost => Proof_Only, Global => null,
+        Pre => Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+               and then (for all L in Wr'Range =>
+                           Wr (L) /= null and then Wr (L)'First = 0);
+
+   --  The theorem: when the walk accepts and the verifier's evaluation of
+   --  the packed circuit returned OK, with input wire 0 equal to one,
+   --  then V, the values of the home wires, satisfies every fact.
+   procedure Lemma_Accepts
+     (P  : PC.Packed_Circuit;
+      K  : CC.Certificate;
+      W  : SA.Element_Array;
+      Wr : SA.Seg_Array;
+      V  : out SA.Element_Array)
+   with
+     Ghost  => Proof_Only,
+     Global => null,
+     Pre    =>
+       PC.Valid (P) and then SA.Well_Formed (PC.Expand (P))
+       and then Accepts (P, K)
+       and then W'First = 0 and then W'Length = P.Ninput
+       and then P.Ninput >= 1 and then SA.Same (W (0), SA.One)
+       and then V'First = 0 and then V'Length = Max_Vars
+       and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+       and then (for all L in Wr'Range =>
+                   Wr (L) /= null and then Wr (L)'First = 0)
+       and then Wr (P.Last_Layer + 1)'Length = P.Ninput
+       and then (for all I in 0 .. P.Ninput - 1 =>
+                   SA.Same (Wr (P.Last_Layer + 1) (I), W (I)))
+       and then (for all J in 0 .. P.Last_Layer =>
+                   Wr (J)'Length = Out_Count (P, J)
+                   and then SA.Layer_Holds_Seg (PC.Expand (P), Wr (J).all,
+                                                Wr (J + 1).all, J)
+                   and then SA.Layer_Z_Seg (PC.Expand (P), Wr (J + 1).all,
+                                            J))
+       and then (for all G in 0 .. P.Noutput - 1 =>
+                   SA.F."=" (Wr (0) (G), Zero)),
+     Post   =>
+       Homes_Hold (P, K, Wr, V) and then Facts_Hold (P, K, V);
 
    -------------------------------------------------------------------
    --  The walk

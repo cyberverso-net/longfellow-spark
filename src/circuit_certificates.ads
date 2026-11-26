@@ -57,6 +57,12 @@ package Circuit_Certificates is
    --  P-256); a meaning then has at most four entries.
    subtype Form_Bound is Positive range 1 .. 3;
 
+   --  The capacities an instance may take for its declared variables and
+   --  for the slots of one layer: room above the measured values (ADR
+   --  0093), small enough that sums of them with wire counts do not
+   --  overflow.
+   subtype Capacity is Positive range 1 .. 2 ** 26;
+
    subtype Layer_Count is Natural range 0 .. Max_Layers;
    subtype Slot_Count is Natural range 0 .. Max_Count;
    subtype Hint is Natural range 0 .. Max_Count;

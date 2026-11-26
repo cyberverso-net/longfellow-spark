@@ -57,11 +57,11 @@ The walk goes over the layers from the inputs to the outputs.
   - every pair goes to a slot of its own monomial;
   - the slots of a wire are distinct monomials.
 - **Q.** The coefficient of a slot is what the expansion collects there. The polynomial Q of the wire is its slots with those coefficients, in normal form because the slots are distinct.
-- **The order of the slots.** A pair whose monomial is new takes the next unused slot, so the slots are in the order their monomials first appear. The normal form is therefore one, order included, whatever the certificate.
-- **Zero coefficients are kept.** A slot whose contributions cancel stays in Q with the coefficient zero. The walk never compares two field elements: in a unit generic over the field, the predefined equality of the element type does not give the logical equality `Same` the proofs use, and the kind rule below looks at monomials only. On the registered pair this changes no count of the census.
+- **The order of the slots.** A pair whose monomial is new to its wire takes the first free slot, so the slots are in the order their monomials first appear. Every hint is then determined by the circuit: the certificate spares the checker a search and cannot choose anything.
+- **Zero coefficients are kept.** A slot whose contributions cancel stays in Q with the coefficient zero. The normal form is the set of monomials the expansion forms, in their order, with what each collects, zero included.
 
 **The kind of a wire is a rule of the checker, not a field of the certificate.**
-- **Linear:** every slot of Q has degree at most 1, and they name at most `Max_Form` variables besides the constant. Its meaning is Q.
+- **Linear:** every slot of Q has degree at most 1, and they name at most `Max_Form` variables besides the constant. Its meaning is Q. The rule looks at the monomials, not at the coefficients: a wire whose degree-2 contributions cancel keeps their slots, with the coefficient zero, and is declared; its fact is a polynomial whose degree-2 coefficients are zero.
 - **Declared:** otherwise. The wire becomes the variable of which it is the home, its meaning is that variable, and its fact is d_g = Q.
 
 Any such rule is sound. This one fixes the form of the facts: short meanings, and a declared variable wherever a product or a long sum appears.
@@ -69,6 +69,13 @@ Any such rule is sound. This one fixes the form of the facts: short meanings, an
 **The other facts:**
 - every assertion of the circuit (a term with k = 0): the product of the two meanings is zero;
 - every output of layer 0: its meaning is zero.
+
+**Structure and coefficients are separate.**
+- **Acceptance is structural.** `Accepts` depends on the circuit's terms and on the variables and monomials of the meanings, never on a coefficient. The walk computes it exactly.
+- **The coefficients of the facts are ghost.** They are given by a model of the coefficients, a function of the circuit and the certificate, and `Lemma_Accepts` states the facts with them.
+- **The coefficients the walk computes** at run time (`Layer_Coefficients`, proved `Same` to the model's) serve the comparison with `scripts/census.py`, a test, and the checks of block 4, which compare them with a gadget's constants through the field's own equality and its link to `Same`.
+
+This separation is why the kind rule looks at monomials only, and why a zero coefficient is kept: the walk's proof never reasons about the field's values.
 
 **Why the distinctness of the slots is checked and proved.** It is not needed for soundness. It is what makes Q a normal form: a catalogue lemma compares Q with its gadget's polynomial coefficient by coefficient, and block 4 rests on that.
 
@@ -130,7 +137,7 @@ Every constant whose excess refuses a circuit is a constant of the checker's con
 
 ### The run on the registered circuits
 
-The theorem is proved for every circuit and certificate. That the registered pair is accepted is one run of the proved checker on it, which the register lists as row T9:
+The theorem is proved for every circuit and certificate. That the registered pair is accepted, and that its coefficients are its gadgets' constants, are two runs of proved code on it: the walk, and the catalogue's check of block 4. The register lists them as row T9, written with block 4:
 - the digest of the circuit file;
 - the digest of the certificate;
 - the digest of the checker's sources at the commit;
@@ -163,6 +170,7 @@ The theorem is proved for every circuit and certificate. That the registered pai
   - About 16 million field products on the hash circuit, about half a second.
   - The meanings of two adjacent layers in memory, at most 1.6 million wires, on the order of 100 MB beside the packed circuit.
   - Reading the certificate dominates, seconds to a minute. Block 4 measures it.
+- **What acceptance says and does not say.** That the walk accepts a circuit says that every wire's expansion has the slots the certificate gives, distinct and all reached, and that the variables fit. With `Lemma_Accepts`, it says that every fact holds at the values of the evaluation, with the coefficients the circuit's own constants produce. It says nothing about what those coefficients are: that a wire's coefficient is the constant its gadget expects is the catalogue's check, block 4 onwards. A circuit whose constants were changed is still accepted, with other facts; the catalogue then refuses it.
 - **Which circuit the statement is about.** The checker reads the file through the same reader and the same packed form as the verifier (`Circuit_Reader`, `Packed_Circuits`). The theorem, stated over `Expand (P)`, is therefore about the circuit the verifier evaluates. No meaning of the file's bytes is trusted beyond what the register already lists: row R4 (upstream's production reader defines the LFC2 format) and row T8 (the contracts at `Proof_Only`, `Expand` and `Cursor_At` among them, are not compiled).
 - **The interface of blocks 4 to 6** is `Accepts`, `Walk` and `Lemma_Accepts`, and the form of the facts. A change goes through a review, as ADR 0091 says.
 
@@ -173,7 +181,7 @@ The theorem is proved for every circuit and certificate. That the registered pai
   - `Cert_Reader`: Silver on any bytes.
 - **`Local_Check`** enters main, generic over the field, with its regrouping lemma extended to a sequence of terms each the product of two forms. Gold.
 - No existing contract changes, and no prover setting.
-- **The register gains T9** with block 4, which runs the checker on the registered circuit and fills in its digests.
+- **The register gains T9** with block 4, which runs the checker and the catalogue's check on the registered circuit and fills in their digests: the final statement rests on both runs.
 - **The vectors step gains the comparison** with the census.
 
 ## References

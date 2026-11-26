@@ -46,8 +46,16 @@ It also prints the limits the checker's contract bounds: the variables,
 the terms of one wire, the slots of one wire and of one layer, and the
 pairs of one term's expansion.
 
+With --certificate, it also writes the certificate the walk expects
+(Circuit_Certificates): for each layer, each wire's slot count and, for
+every pair, the slot its monomial took, the gadget instances left 0. It
+is a test vehicle for the checker on the registered circuits, not the
+certificate of block 4, which the instrumented generator emits with the
+gadget instances.
+
 Run from the repository root:
   python3 -I scripts/census.py CIRCUIT.lfc2 gf2_128|p256 [--json OUT]
+                               [--certificate OUT]
 Exit status 0, or 2 when the file is refused by the reader.
 """
 
@@ -72,7 +80,7 @@ def u32(n):
 def census(data, field):
     fld = cv.FIELDS[field]
     F = fld["F"]
-    st, circ, _, _ = cv.read_lfc2(fld, data)
+    st, circ, _, ident = cv.read_lfc2(fld, data)
     if st != "ok":
         return st, None
     max_form = MAX_FORM[field]
@@ -90,6 +98,7 @@ def census(data, field):
 
     layers = circ["layers"]
     ninput = circ["ninput"]
+    cert = [b"LFCK", cv.uleb(1), ident, cv.uleb(len(layers))]
     prev = [{0: one}] + [{i: one} for i in range(1, ninput)]
     nvar = ninput
     out = hashlib.sha256()
@@ -101,6 +110,7 @@ def census(data, field):
         nv = circ["noutput"] if j == 0 else layers[j - 1][1]
         slots = [dict() for _ in range(nv)]
         nterms = [0] * nv
+        hints = []
         for g, h0, h1, k in terms:
             a, b = prev[h1], prev[h0]
             lim["pairs_per_term"] = max(lim["pairs_per_term"], len(a) * len(b))
@@ -114,8 +124,14 @@ def census(data, field):
                 kca = mul(k, ca)
                 for vb, cb in b.items():
                     key = (va, vb) if va <= vb else (vb, va)
-                    s[key] = F.add(s.get(key, 0), mul(kca, cb))
+                    if key not in s:
+                        s[key] = 0
+                    hints.append(list(s).index(key))
+                    s[key] = F.add(s[key], mul(kca, cb))
         lim["slots_per_layer"] = max(lim["slots_per_layer"], sum(len(s) for s in slots))
+        cert.append(cv.uleb(nv) + cv.uleb(len(hints)))
+        cert.append(b"".join(cv.uleb(len(slots[g])) + cv.uleb(0) for g in range(nv)))
+        cert.append(b"".join(cv.uleb(h) for h in hints))
         cur = [None] * nv
         for g in range(nv):
             lim["terms_per_wire"] = max(lim["terms_per_wire"], nterms[g])
@@ -146,6 +162,7 @@ def census(data, field):
         "shapes": sorted([[a, b, c, n] for (a, b, c), n in shapes.items()],
                          key=lambda x: -x[3]),
         "facts_sha256": out.hexdigest(),
+        "certificate": b"".join(cert),
     }
     return "ok", res
 
@@ -155,6 +172,7 @@ def main():
     ap.add_argument("circuit")
     ap.add_argument("field", choices=sorted(MAX_FORM))
     ap.add_argument("--json")
+    ap.add_argument("--certificate")
     args = ap.parse_args()
     st, res = census(Path(args.circuit).read_bytes(), args.field)
     if st != "ok":
@@ -163,6 +181,9 @@ def main():
     print("census: %s, %d wires: %s" % (res["field"], res["wires"], res["kinds"]))
     print("census: limits %s" % res["limits"])
     print("census: facts %s" % res["facts_sha256"])
+    certificate = res.pop("certificate")
+    if args.certificate:
+        Path(args.certificate).write_bytes(certificate)
     if args.json:
         Path(args.json).write_text(json.dumps(res, indent=1, sort_keys=True) + "\n")
     return 0

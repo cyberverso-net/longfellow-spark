@@ -388,6 +388,14 @@ package body Local_Check is
       M : Pair_Map; V : Values)
    is
    begin
+      --  The check's comparisons, to Same.
+      for K in 1 .. NT loop
+         Lemma_Same (T (K).K, Collected (A, NA, B, NB, M, K, NA, NB));
+         pragma Loop_Invariant
+           (for all L in 1 .. K =>
+              Same (T (L).K, Collected (A, NA, B, NB, M, L, NA, NB)));
+      end loop;
+      pragma Assert (Check_Product_Same (T, NT, A, NA, B, NB, M));
       Lemma_Regroup (T, NT, A, NA, B, NB, M, NA, NB, V);
       Lemma_Final (T, NT, NT, A, NA, B, NB, M, V);
       Lemma_Expand (A, NA, B, NB, NA, V);

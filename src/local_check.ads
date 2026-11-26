@@ -26,10 +26,12 @@
 --  of Sumcheck_Algebra, wrappers whose bodies are hidden (ADR 0070): the
 --  provers see them as opaque, and only the ring laws look inside them.
 --  The executable check compares coefficients with the predefined
---  equality; the lemma takes the check stated with Same
---  (Check_Product_Same), since a unit generic over the field cannot turn
---  one into the other. Each field's instance has a unit that does
---  (Local_Check_GF2_128_Laws, from Field_GF2_128.Laws).
+--  equality, and the formal Lemma_Same turns each comparison into Same.
+--  The formal carries no contract: GNATprove proves the instances, where
+--  it is its actual (Field_GF2_128.Laws.Lemma_Same, Field_P256.Laws.
+--  Lemma_Same) with the actual's contract, as the lemmas of
+--  Field_Signature are (docs/guide/verification-approach.md, "Lessons
+--  of the proofs").
 --
 --  Documentation: docs/guide/10-certified-circuits.md, Section 3.
 --  Decisions: ADR 0091, ADR 0093.
@@ -47,6 +49,8 @@ with Sumcheck_Algebra;
 
 generic
    with package SA is new Sumcheck_Algebra (<>);
+   --  X = Y gives Same (X, Y), by the actual's contract.
+   with procedure Lemma_Same (X, Y : SA.F.Element) with Ghost => Proof_Only;
 package Local_Check is
 
    Max_Wire  : constant := 2 ** 24;
@@ -151,7 +155,8 @@ package Local_Check is
           T (K).K = Collected (A, NA, B, NB, M, K, NA, NB)))
    with Global => null;
 
-   --  Check_Product with Same for the coefficients: what the lemma uses.
+   --  Check_Product with Same for the coefficients, which the lemma
+   --  derives from Check_Product.
    function Check_Product_Same
      (T : Term_Array; NT : Term_Count;
       A : Form_Array; NA : Form_Count;
@@ -176,7 +181,7 @@ package Local_Check is
    with Ghost => Proof_Only, Global => null,
         Pre  => Wires_In (T, NT, V)
                 and then Form_In (A, NA, V) and then Form_In (B, NB, V)
-                and then Check_Product_Same (T, NT, A, NA, B, NB, M),
+                and then Check_Product (T, NT, A, NA, B, NB, M),
         Post => Same (Sum_Terms (T, NT, V),
                       Sum_Form (A, NA, V) * Sum_Form (B, NB, V));
 
