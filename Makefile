@@ -3,16 +3,24 @@
 #  definition of done for every commit and every pull request (ADR
 #  0041, ADR 0044).
 
-.PHONY: check check-reuse build prove prove-partition partitions-check test cli vectors lint lean lean-source mdoc-cases
+.PHONY: check check-reuse check-reuse-spark check-reuse-lean build prove prove-partition partitions-check test cli vectors lint lean lean-source mdoc-cases
 
 check:
 	scripts/check.sh all
 
-#  Every check but the proof, for a commit whose proof inputs equal those
-#  of a commit already proved (ADR 0088); scripts/remote-check.sh chooses
-#  it, never a developer by hand.
+#  Every check but the proofs reused, for a commit whose proof inputs
+#  equal those of a commit already proved (ADR 0088): check-reuse reuses
+#  the SPARK and the Lean proofs, check-reuse-spark the SPARK proof only,
+#  check-reuse-lean the Lean proofs only. scripts/remote-check.sh chooses
+#  them, never a developer by hand.
 check-reuse:
 	scripts/check.sh reuse
+
+check-reuse-spark:
+	scripts/check.sh reuse-spark
+
+check-reuse-lean:
+	scripts/check.sh reuse-lean
 
 build:
 	scripts/check.sh build
