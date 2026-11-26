@@ -83,6 +83,22 @@ MISMATCH = ("package body Alpha is\n"
             "   procedure Lemma (X : Integer) with SPARK_Mode => Off is\n"
             "   begin\n      null;\n   end Other;\n"
             "end Alpha;\n")
+#  A character literal after a reserved word: "when '(' =>" read as an
+#  opening parenthesis would hide everything up to "when ')' =>".
+CHAR_AFTER_WORD = ("package body Alpha is\n"
+                   "   function F (C : Character) return Boolean is\n"
+                   "   begin\n      case C is\n"
+                   "         when '(' => return True;\n"
+                   "         when others => return C in 'a' .. 'z';\n"
+                   "      end case;\n   end F;\n"
+                   "   procedure Lemma (X : Integer) with SPARK_Mode => Off is\n"
+                   "   begin\n      null;\n   end Lemma;\n"
+                   "   function G (C : Character) return Boolean is\n"
+                   "   begin\n      case C is\n"
+                   "         when ')' => return True;\n"
+                   "         when others => return False;\n"
+                   "      end case;\n   end G;\n"
+                   "end Alpha;\n")
 PACKAGE_OFF = ("package body Epsilon with SPARK_Mode => Off is\n"
                "   procedure P is\n   begin\n      null;\n   end P;\n"
                "end Epsilon;\n")
@@ -115,6 +131,10 @@ CASES = [
     ("local to a subprogram body", {"src/alpha.adb": LOCAL},
      "| L1 | `Alpha.Local` `Alpha.Outer.Local` | x |\n", 1),
     ("scopes that cannot be followed", {"src/alpha.adb": MISMATCH}, "| L1 | `Alpha.Lemma` | x |\n", 1),
+    ("character literal after a reserved word, not named", {"src/alpha.adb": CHAR_AFTER_WORD},
+     "| L1 | `Gamma.Lemma` | x |\n", 1),
+    ("character literal after a reserved word, named", {"src/alpha.adb": CHAR_AFTER_WORD},
+     "| L1 | `Alpha.Lemma` | x |\n", 0),
     ("aspect on a package, named", {"src/epsilon.adb": PACKAGE_OFF}, "| L2 | `Epsilon` | x |\n", 0),
     ("aspect on a package, not named", {"src/epsilon.adb": PACKAGE_OFF}, "| L2 | `Epsilon.P` | x |\n", 1),
 ]

@@ -51,6 +51,18 @@ END_KEYWORDS = {"if", "loop", "case", "record", "select", "return"}
 NOT_A_BODY = {"new", "separate", "null", "abstract", "(", "[", "<>"}
 
 
+#  Ada's reserved words (RM 2.9) after which an apostrophe starts a
+#  character literal: "when '(' =>", "in 'a' .. 'z'". "all" is left out:
+#  after it the apostrophe is an attribute (P.all'Address).
+RESERVED = set("""abort abs abstract accept access aliased and array at begin body
+case constant declare delay delta digits do else elsif end entry exception
+exit for function generic goto if in interface is limited loop mod new not
+null of or others out overriding package parallel pragma private procedure
+protected raise range record rem renames requeue return reverse select
+separate some subtype synchronized tagged task terminate then type until use
+when while with xor""".split())
+
+
 class Refused(Exception):
     """The scopes of a file cannot be followed."""
 
@@ -82,8 +94,12 @@ def blank_literals(line):
         if c == "'":
             #  A character literal, unless the apostrophe follows a name
             #  or a closing parenthesis: then it is an attribute or a
-            #  qualified expression (Character'('-') is both).
-            if not (prev.isalnum() or prev in "_)") and i + 2 < n and line[i + 2] == "'":
+            #  qualified expression (Character'('-') is both). A reserved
+            #  word is not a name.
+            word = re.search(r"[A-Za-z_][\w]*$", "".join(out).rstrip())
+            after_name = prev != "" and (prev in "_)" or (prev.isalnum() and not (
+                word and word.group(0).lower() in RESERVED)))
+            if not after_name and i + 2 < n and line[i + 2] == "'":
                 out.append("' '")
                 prev = "'"
                 i += 3

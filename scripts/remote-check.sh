@@ -40,7 +40,8 @@
 #     (the step lean runs too), make check-reuse-lean when only the
 #     Lean proofs are (the SPARK proof runs too), and the status names
 #     each proved commit and digest. Otherwise, or with --full, the VM
-#     runs make check and proves both from scratch. The reuse of the
+#     runs make check and proves both from scratch; so it does when the
+#     commit's own Makefile lacks the target chosen. The reuse of the
 #     SPARK proof is refused, and that proof runs, when the project file
 #     names a source, a file or an attribute the list does not cover.
 #     The commit defaults to HEAD, which must be clean and pushed; with
@@ -491,7 +492,9 @@ report_bases() {
    else
       echo "SPARK: no proved ancestor with inputs ${SPARK_DIGEST:0:12} within 200 commits: the SPARK proof $1"
    fi
-   if [ -z "$LEAN_DIGEST" ]; then
+   if ! git cat-file -e "$SHA:lean" 2> /dev/null; then
+      echo "Lean: no lean/ in this commit: no Lean proofs"
+   elif [ -z "$LEAN_DIGEST" ]; then
       echo "Lean: the inputs cannot be listed: the Lean proofs $1"
    elif [ "$LEAN_BASE" != - ]; then
       echo "Lean: inputs ${LEAN_DIGEST:0:12} proved at $LEAN_BASE: reused"
@@ -500,11 +503,44 @@ report_bases() {
    fi
 }
 
+#  The target the machine runs for $SHA, in TARGET, and what it reuses,
+#  in REUSE (the proved commit and the digest of each proof reused):
+#  check, check-reuse (both reused), check-reuse-spark or
+#  check-reuse-lean. A commit without lean/ has no Lean proofs, so the
+#  reuse of its SPARK proof is check-reuse with one pair, as before the
+#  two digests. The target must be one the commit's own Makefile has: a
+#  commit older than the partial targets runs make check instead.
+choose_target() {
+   TARGET=check
+   REUSE=""
+   if [ "$SPARK_BASE" != - ] && ! git cat-file -e "$SHA:lean" 2> /dev/null; then
+      TARGET=check-reuse
+      REUSE="$SPARK_BASE $SPARK_DIGEST"
+   elif [ "$SPARK_BASE" != - ] && [ "$LEAN_BASE" != - ]; then
+      TARGET=check-reuse
+      REUSE="$SPARK_BASE $SPARK_DIGEST $LEAN_BASE $LEAN_DIGEST"
+   elif [ "$SPARK_BASE" != - ]; then
+      TARGET=check-reuse-spark
+      REUSE="$SPARK_BASE $SPARK_DIGEST"
+   elif [ "$LEAN_BASE" != - ]; then
+      TARGET=check-reuse-lean
+      REUSE="$LEAN_BASE $LEAN_DIGEST"
+   fi
+   if [ "$TARGET" != check ] \
+         && ! git show "$SHA:Makefile" 2> /dev/null | grep -q -E "^$TARGET:"; then
+      echo "${SAY:-}the Makefile of ${SHA:0:12} has no target $TARGET: make check runs instead"
+      TARGET=check
+      REUSE=""
+   fi
+}
+
 if [ "$MODE" = digest ]; then
    SHA="$(git rev-parse "${1:-HEAD}")"
    digests
    read -r SPARK_BASE LEAN_BASE <<< "$(proved_bases)"
    report_bases "would run"
+   choose_target
+   echo "make $TARGET would run"
    exit 0
 fi
 
@@ -538,16 +574,7 @@ if [ "$MODE" = commit ]; then
       git fetch -q origin main 2> /dev/null || true
       read -r SPARK_BASE LEAN_BASE <<< "$(proved_bases)"
       report_bases runs | sed 's/^/remote-check: /'
-      if [ "$SPARK_BASE" != - ] && [ "$LEAN_BASE" != - ]; then
-         TARGET=check-reuse
-         REUSE="$SPARK_BASE $SPARK_DIGEST $LEAN_BASE $LEAN_DIGEST"
-      elif [ "$SPARK_BASE" != - ]; then
-         TARGET=check-reuse-spark
-         REUSE="$SPARK_BASE $SPARK_DIGEST"
-      elif [ "$LEAN_BASE" != - ]; then
-         TARGET=check-reuse-lean
-         REUSE="$LEAN_BASE $LEAN_DIGEST"
-      fi
+      SAY="remote-check: " choose_target
       echo "remote-check: make $TARGET runs"
    fi
    #  Every target is spelt make "chec"k... so that no command line but
@@ -579,7 +606,12 @@ if [ "$MODE" = commit ]; then
       started)
          case "$TARGET" in
             check)             post_status pending "make check running on $VM" ;;
-            check-reuse)       post_status pending "make check-reuse running on $VM, SPARK reused from ${SPARK_BASE:0:7}, Lean from ${LEAN_BASE:0:7}" ;;
+            check-reuse)
+               if [ "$LEAN_BASE" != - ] && git cat-file -e "$SHA:lean" 2> /dev/null; then
+                  post_status pending "make check-reuse running on $VM, SPARK reused from ${SPARK_BASE:0:7}, Lean from ${LEAN_BASE:0:7}"
+               else
+                  post_status pending "make check-reuse running on $VM, the proof reused from ${SPARK_BASE:0:7}"
+               fi ;;
             check-reuse-spark) post_status pending "make check-reuse-spark running on $VM, SPARK reused from ${SPARK_BASE:0:7}" ;;
             check-reuse-lean)  post_status pending "make check-reuse-lean running on $VM, Lean reused from ${LEAN_BASE:0:7}" ;;
          esac ;;
