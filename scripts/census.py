@@ -20,11 +20,13 @@ The model (ADR 0093):
   per monomial of degree at most 2 (variable 0 standing for one); a term
   with k = 0 is an assertion, whose fact is the pair of meanings;
 - at the end of the layer, wire by wire in order, the wire's polynomial Q
-  is its slots with their collected coefficients, zero ones dropped; the
-  wire is linear when Q has degree at most 1 and at most Max_Form
-  variables besides the constant (its meaning is Q), declared otherwise
-  (it becomes the next variable, its meaning is that variable, its fact
-  is d = Q);
+  is its slots with their collected coefficients, in the order their
+  monomials first appear; a slot whose coefficient is zero is kept, so
+  that the kind does not depend on comparing field elements: the wire is
+  linear when every slot has degree at most 1 and they name at most
+  Max_Form variables besides the constant (its meaning is Q), declared
+  otherwise (it becomes the next variable, its meaning is that variable,
+  its fact is d = Q);
 - the outputs of layer 0 have the fact "meaning = 0".
 
 The facts, in the order of the walk (for each layer from the last: its
@@ -33,11 +35,10 @@ the outputs in wire order), are written to a byte string and digested
 with SHA-256:
 
 - an assertion: b"A", then the two meanings, of h1 and of h0;
-- a declared wire: b"D", its variable, then its slots by (a, b): a, b
+- a declared wire: b"D", its variable, then its slots in order: a, b
   and the coefficient;
 - an output: b"O", its wire, then its meaning;
-- a meaning or form: its entries by variable: the variable, then the
-  coefficient;
+- a meaning: its entries in order: the variable, then the coefficient;
 - a variable or wire: 4 bytes little-endian; a coefficient: the field's
   bytes as in the circuit file.
 
@@ -85,7 +86,7 @@ def census(data, field):
         return F.mul(a, b)
 
     def form_bytes(m):
-        return b"".join(u32(v) + cv.elt_bytes(fld, c) for v, c in sorted(m.items()))
+        return b"".join(u32(v) + cv.elt_bytes(fld, c) for v, c in m.items())
 
     layers = circ["layers"]
     ninput = circ["ninput"]
@@ -119,7 +120,7 @@ def census(data, field):
         for g in range(nv):
             lim["terms_per_wire"] = max(lim["terms_per_wire"], nterms[g])
             lim["slots_per_wire"] = max(lim["slots_per_wire"], len(slots[g]))
-            q = {kk: c for kk, c in slots[g].items() if c}
+            q = slots[g]
             deg2 = [kk for kk in q if kk[0] != 0]
             nvars = len({kk[1] for kk in q if kk[1] != 0}) if not deg2 else None
             if not deg2 and nvars <= max_form:
@@ -129,7 +130,7 @@ def census(data, field):
                 kinds["declared"] += 1
                 shapes[(len(deg2), len({v for kk in q for v in kk if v}), len(q))] += 1
                 out.update(b"D" + u32(nvar) + b"".join(
-                    u32(a) + u32(b) + cv.elt_bytes(fld, c) for (a, b), c in sorted(q.items())))
+                    u32(a) + u32(b) + cv.elt_bytes(fld, c) for (a, b), c in q.items()))
                 cur[g] = {nvar: one}
                 nvar += 1
         if j == 0:

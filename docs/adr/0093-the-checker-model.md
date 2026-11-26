@@ -57,9 +57,11 @@ The walk goes over the layers from the inputs to the outputs.
   - every pair goes to a slot of its own monomial;
   - the slots of a wire are distinct monomials.
 - **Q.** The coefficient of a slot is what the expansion collects there. The polynomial Q of the wire is its slots with those coefficients, in normal form because the slots are distinct.
+- **The order of the slots.** A pair whose monomial is new takes the next unused slot, so the slots are in the order their monomials first appear. The normal form is therefore one, order included, whatever the certificate.
+- **Zero coefficients are kept.** A slot whose contributions cancel stays in Q with the coefficient zero. The walk never compares two field elements: in a unit generic over the field, the predefined equality of the element type does not give the logical equality `Same` the proofs use, and the kind rule below looks at monomials only. On the registered pair this changes no count of the census.
 
 **The kind of a wire is a rule of the checker, not a field of the certificate.**
-- **Linear:** Q has degree at most 1 and at most `Max_Form` variables besides the constant. Its meaning is Q.
+- **Linear:** every slot of Q has degree at most 1, and they name at most `Max_Form` variables besides the constant. Its meaning is Q.
 - **Declared:** otherwise. The wire becomes the variable of which it is the home, its meaning is that variable, and its fact is d_g = Q.
 
 Any such rule is sound. This one fixes the form of the facts: short meanings, and a declared variable wherever a product or a long sum appears.
