@@ -718,9 +718,10 @@ fi
 #  --tree: the working tree copied, make detached, posts nothing.
 #  The rsync below reads the root .gitignore alone, with --exclude-from,
 #  and a negated pattern (!) means something else to rsync: a tree with
-#  either is refused here, before anything starts, rather than have the
+#  another .gitignore, tracked or not, or a negated pattern is refused here, before anything starts, rather than have the
 #  rsync delete what should stay.
-if [ -n "$(git ls-files -- '*.gitignore' ':!.gitignore')" ] || grep -q '^!' .gitignore; then
+if [ -n "$(git ls-files --cached --others --exclude-standard -- '*.gitignore' ':!.gitignore')" ] \
+      || grep -q '^!' .gitignore; then
    echo "remote-check: a .gitignore other than the root one, or a negated pattern; --tree reads the root .gitignore alone" >&2
    exit 2
 fi
