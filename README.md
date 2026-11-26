@@ -7,7 +7,7 @@ It follows **IETF draft-irtf-cfrg-longfellow-00 (22 October 2026)**, the CFRG ve
 What the system does, and why its proofs matter:
 
 - A holder proves one fact about a signed credential, for example that they are over 18.
-- The relying party learns that fact. By upstream's zero-knowledge theorem it learns nothing else of the credential but [which of six hidden values are zero](docs/guide/00-primer-cryptography.md#a114-how-strong-is-the-guarantee): the halves of the three secret values the two circuits share, and for a real credential none is zero in practice.
+- The relying party learns that fact. By upstream's zero-knowledge theorem (proved under hypotheses whose joint satisfiability is not established, [the correspondence page](docs/guide/lean-correspondence.md)) it learns nothing else of the credential but [which of six hidden values are zero](docs/guide/00-primer-cryptography.md#a114-how-strong-is-the-guarantee): the halves of the three secret values the two circuits share, and for a real credential none is zero in practice.
 - The code runs on inputs an adversary chooses: the proofs, the circuits and the credential. A crash, a read out of bounds or a wrong field operation would be a flaw, whatever the cryptography guarantees.
 - This project proves that its SPARK code has no run-time error, for any input that meets the preconditions of its units.
 - It proves that its fields and the formulas of its building blocks are those of their references.

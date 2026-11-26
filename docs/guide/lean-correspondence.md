@@ -4,6 +4,8 @@ Upstream proves the security of the Longfellow protocol in Lean. This project pr
 
 It is written for an evaluator who has to judge a chain of evidence from a formal model of the protocol down to the code that runs. The reference is longfellow-zk/longfellow-zk at 7bf8a6b (26 October 2026), directory `formal/`: in particular `formal/README.md`, `formal/AUDIT.md` and `formal/lfzk-v1/README.md`. The circuit premises below are word for word those of the earlier commit d9d8d6a.
 
+As read on 26 November 2026, upstream's main at 80ed72e3 has replaced the theorems of the first four rows below. Its 125-bit soundness result and its zero-knowledge result are in `formal/lfzk-v1/`, at new paths. The rows of this page stay at 7bf8a6b until the Lean reference moves (#215).
+
 **Before reading:** the primer's account of how strong the guarantee is ([A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee)) and the register's rows S1 and S2 ([the trusted base register](trusted-base.md)).
 
 ## What upstream proves
@@ -12,22 +14,48 @@ Upstream's Lean development (Lean 4.31.0 with Mathlib) models the v7 mDoc protoc
 
 The notions of the table, in the primer:
 
-- **soundness and extraction**, and what a bound such as (1 + N + tA) / 2^116 means as bits of security: [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee), with the cheating prover of [A12.1](00-primer-cryptography.md#a121-the-cheating-prover);
+- **soundness and extraction**, and what a bound such as (1 + N + tA) / 2^115 means as bits of security: [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee), with the cheating prover of [A12.1](00-primer-cryptography.md#a121-the-cheating-prover);
 - **zero knowledge** and the zero pattern of the six message blocks: [A11.4](00-primer-cryptography.md#a114-how-strong-is-the-guarantee) and [A12.2](00-primer-cryptography.md#a122-the-curious-verifier);
 - **witness indistinguishability**, a weaker property than zero knowledge: two proofs made from two witnesses with the same zero pattern cannot be told apart, though nothing says the proof could be imitated without a witness;
 - **what a Lean theorem is**, what makes it trustworthy, and how its chain of evidence meets this project's SPARK proofs: [B8.1, B8.2 and B8.5](00-primer-spark.md#b8-lean-and-spark-two-kinds-of-proof), with the rule on `native_decide` in [B8.6](00-primer-spark.md#b86-the-rule-on-native_decide-and-upstreams-own-evidence).
 
 | Property | Result in Lean | Theorem |
 |----------|----------------|---------|
-| Extraction and soundness of the pair of circuits, 1 to 4 attributes | 116-bit T-security: at most (1 + N + tA) / 2^116, for N transcript queries and tA Merkle queries | `LfzkV1.CompiledZk.FlatV7Headline.v7Hash1_deployed_fs_extraction_116_circuit` and `LfzkV1.CompiledZk.FlatV7Headline.v7Hash1_deployed_fs_false_statement_116` for one attribute, the same pair under `FlatV7Hash2Headline`, `FlatV7Hash3Headline` and `FlatV7Hash4Headline` (`v7Hash2` to `v7Hash4`) for two to four, all in the target `LfzkV1.FlatV7All` |
+| Extraction and soundness of the pair of circuits, 1 to 4 attributes | stated at 116-bit T-security, (1 + N + tA) / 2^116, for N transcript queries and tA Merkle queries; its hypotheses cannot hold together, so it is no evidence (the note below) | `LfzkV1.CompiledZk.FlatV7Headline.v7Hash1_deployed_fs_extraction_116_circuit` and `LfzkV1.CompiledZk.FlatV7Headline.v7Hash1_deployed_fs_false_statement_116` for one attribute, the same pair under `FlatV7Hash2Headline`, `FlatV7Hash3Headline` and `FlatV7Hash4Headline` (`v7Hash2` to `v7Hash4`) for two to four, all in the target `LfzkV1.FlatV7All` |
 | Zero knowledge, 256-bit nonces | at most 2^-127 for the two fields, against 2^115 Merkle queries; the simulator receives the zero pattern of the six common message blocks | `CompiledLongfellowZkV7Mac.v7mac_twofield_zk_q115` |
 | Zero knowledge, 542-bit nonces | statistical, at most 2^-131, with the same zero pattern | `CompiledLongfellowZkV7Mac.v7mac_twofield_zk_stat542` |
 | Witness indistinguishability, 256-bit nonces | at most 2^-127 per side, 2^-126 for the two fields, against 2^115 Merkle queries, for messages with equal zero patterns | `CompiledLongfellowZk.compiled_longfellow_wi`, `CompiledLongfellowZkV7Mac.twofield_wi_v7` |
 | The ECDSA circuit | stated: soundness and completeness of the signature circuit's verification; at 7bf8a6b the two theorems hold only vacuously on real keys (the note below) | `ecdsa_circuit_soundness`, `ecdsa_circuit_completeness` (`formal/circuits/ECDSA/`) |
 
+For the three rows of zero knowledge and witness indistinguishability, upstream builds no instance of the records the theorems take, for the version 7 rows: the theorems are proved under hypotheses whose joint satisfiability is not established. Nothing found makes them unsatisfiable: they constrain no size of an alphabet.
+
 **The ECDSA row, read with care.** At 7bf8a6b the specification `StandardEcdsaVerify` (`formal/circuits/ECDSA/EcdsaSpec.lean`) and the hypothesis `h_pk_order` of the soundness theorem compare `[order]·PK` with the point at infinity by structural equality, `(0, 1, 0)`, where the curve operations leave a projective point `(0, Y, 0)` with Y other than 1. For a real P-256 key the premise is therefore false and the two theorems hold vacuously (upstream's issue 224, 3 November 2026). Upstream's pull requests 225 and 215 replace the equality with the projective equivalence `ProjectiveEquiv`. Neither is merged at 7bf8a6b, nor at 1c06629, the head of upstream's main read on 14 November 2026, where `EcdsaSpec.lean` still compares with `infinityPoint`. So this row is no evidence: what covers the signature circuit is this project's Gold proof that a circuit is evaluated as its terms say, and the upstream proofs and vectors it reproduces; what the circuit computes stays trusted (register row R2, ADR 0011). The row is reread at their merge (issue #122).
 
-The earlier 115-bit results, per pair and per circuit, are also in the development: `CompiledZkProfileRows.v7P256Sha{1,2,3,4}_zk_circuit_tsec_sepMac`, `v7SigHahn_zk_circuit_tsec` (127 bits, the signature circuit alone) and `v7Hash{1,2,3,4}_zk_circuit_tsec` (115 bits, the hash circuit alone). The 116-bit endpoints supersede them as the headline.
+**The first row, read with care.** At 7bf8a6b the two 116-bit endpoints of each of the four hash profiles (`v7Hash{1..4}_deployed_fs_extraction_116_circuit` and `v7Hash{1..4}_deployed_fs_false_statement_116`) take two hypotheses that cannot hold together.
+
+- `hC : Fintype.card C = 2 ^ 256`: the transcript's answers are 256-bit values.
+- `H : CircuitSide …`, the hash side. Among its fields, `decodeQuery : C → Qry` reads the set of opened columns from an answer. `hbalQuery` bounds by `kq` the number of answers that give each set, and `hkq` requires `kq · card Qry ≤ card C`.
+
+A set of 132 columns out of 3,230 is one of C(3230, 132), about 2^790, choices; more for the other profiles. So `hkq` forces `kq = 0`. Then for any answer c, the answers that give the set `decodeQuery c` number at least one, c itself, and `hbalQuery` bounds them by 0. No configuration meets both hypotheses: the theorems are true of none, as the ECDSA theorems are, and they are no evidence.
+
+The argument is checked by Lean against upstream's `formal/` at 7bf8a6b. The check was run on 26 November 2026, with Lean 4.31.0 and Mathlib v4.31.0, and this project's gate does not run it. The file is [`lean-checks/upstream-7bf8a6b-v7-116-hypotheses.lean`](lean-checks/upstream-7bf8a6b-v7-116-hypotheses.lean). For each of the eight endpoints it derives `False` from the binders of the statement as stated. To reproduce, from upstream's `formal/` at 7bf8a6b with Mathlib v4.31.0 at `../../mathlib4`, as upstream's `lakefile.toml` requires:
+
+```sh
+lake build LfzkV1.FlatV7All
+lake env lean upstream-7bf8a6b-v7-116-hypotheses.lean
+```
+
+Lean prints the eight theorems and their axioms. The lemma that carries the argument uses only Lean's standard axioms. The `native_decide` facts listed with the eight theorems are upstream's, named in the statements' own types.
+
+At the same commit, the earlier pair rows `CompiledZkProfileRows.v7P256Sha{1..4}_zk_circuit_tsec_sepMac` (in `CompiledZkProfileSepMac.lean`) bound the same kind of event by (1 + tA + N) · 2^-115. They put no bound on the size of `C`, so the argument above does not apply to them. They are proved under hypotheses whose joint satisfiability is not established. What is known of those hypotheses:
+
+- upstream checks the circuit premises (`WellFormedP`, `Isolated`, `DeadEnd`) on the registered files, with inspectors written in Rust, outside Lean;
+- it builds balanced decoders on an ideal alphabet (`IdealSampler`);
+- it assembles no complete `CircuitSide` in Lean, nor the records the zero-knowledge rows take.
+
+Upstream's main at 80ed72e3 (25 November 2026) has removed the 116-bit endpoints. It replaces them by a 125-bit result in an ideal prefix-oracle model (`V7Soundness125.annotated_fs_knowledge_soundness_125`), whose answers are not limited to 256 bits. It also proves that no expansion of a 256-bit digest realises that model literally (`V7SamplerAudit125`). This page does not cite that result yet: its premises are read when the Lean reference moves (#215).
+
+The earlier 115-bit results, per pair and per circuit, are also in the development: `CompiledZkProfileRows.v7P256Sha{1,2,3,4}_zk_circuit_tsec_sepMac`, `v7SigHahn_zk_circuit_tsec` (127 bits, the signature circuit alone) and `v7Hash{1,2,3,4}_zk_circuit_tsec` (115 bits, the hash circuit alone). The 116-bit endpoints were meant to supersede them as the headline; by the note on the first row, they do not.
 
 The components behind the headline are proved too, among them: the sumcheck rounds and chains (`SumcheckV1.sumcheck_step_reduction`, `sumcheck_multi_reduction`, `sumcheck_multi_completeness`), the extraction of Ligero V1 (`Ligero.V1.scalarGap_extraction_failure`), the distance of the Reed-Solomon code (`ReedSolomon.evaluation_code_minimum_distance`) and the binding of Merkle prefixes (`Merkle.MH.PrefixBindingGame.bad_ratio_le`).
 

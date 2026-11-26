@@ -4,6 +4,8 @@
 
 Accepted (2026-11-11, at the merge of pull request #153; proposed 2026-11-10 with #79). Completes [ADR 0058](0058-mdoc-layer.md), whose specification table becomes the rows of the profile, and [ADR 0086](0086-mdoc-witness-bounds-and-constant-time.md), whose bounds become part of its invariants.
 
+Note of 26 November 2026 (#209), on the version 7 row's citation. The 116-bit endpoints this record names (`v7Hash1_deployed_fs_extraction_116_circuit`, `v7Hash1_deployed_fs_false_statement_116` at 7bf8a6b) cannot have their hypotheses met, as a Lean check against upstream's `formal/` shows ([the Lean correspondence](../guide/lean-correspondence.md)). The version 7 row cites instead the 115-bit pair row `v7P256Sha1_zk_circuit_tsec_sepMac` of the same commit, as proved under hypotheses whose joint satisfiability is not established. The version 6 row is unchanged.
+
 ## Date
 
 2026-11-10
