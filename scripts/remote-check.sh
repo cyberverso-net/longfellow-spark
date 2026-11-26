@@ -54,7 +54,9 @@
 #
 #  scripts/remote-check.sh --tree [make target...]
 #     Copies the working tree as it is, committed or not, and runs the
-#     make target (default check) there. Posts nothing: it is for a
+#     make target (default check) there. What .gitignore ignores (the
+#     build, the toolchain state, lean/.lake) is neither sent nor
+#     deleted: the machine keeps its own between tree runs. Posts nothing: it is for a
 #     result before a push. The run is detached on the VM, as in the
 #     commit mode: the laptop may sleep or lose the network, the VM
 #     keeps the log and powers itself off when done, and this script
@@ -714,6 +716,14 @@ if [ "$MODE" = tree-collect ]; then
 fi
 
 #  --tree: the working tree copied, make detached, posts nothing.
+#  The rsync below reads the root .gitignore alone, with --exclude-from,
+#  and a negated pattern (!) means something else to rsync: a tree with
+#  either is refused here, before anything starts, rather than have the
+#  rsync delete what should stay.
+if [ -n "$(git ls-files -- '*.gitignore' ':!.gitignore')" ] || grep -q '^!' .gitignore; then
+   echo "remote-check: a .gitignore other than the root one, or a negated pattern; --tree reads the root .gitignore alone" >&2
+   exit 2
+fi
 RUN="tree-$(date +%Y%m%d-%H%M%S)-$$"
 vm_start
 remote "mkdir -p ~/remote-check ~/runs"
@@ -748,9 +758,17 @@ fi
 #  Until the run starts, any exit releases the reservation and stops
 #  the VM if nothing else holds it.
 trap 'remote "if [ -e ~/runs/tree.reserved/$RUN ]; then rm -rf ~/runs/tree.reserved; fi" 2> /dev/null || true; stop_if_idle' EXIT
+#  What .gitignore ignores is neither sent nor deleted: the machine keeps
+#  its own build, toolchain state and lean/.lake between tree runs, as
+#  its clone does for the commit mode. The rules go in with
+#  --exclude-from, which the receiving side applies to --delete too; a
+#  dir-merge filter (:- .gitignore) keeps them from being sent only, and
+#  both openrsync and rsync 3 then delete every ignored directory of the
+#  destination (#218). --exclude-from reads the root .gitignore alone;
+#  the check before the VM is reserved refuses a tree it cannot follow.
 echo "remote-check: copying the working tree"
 rsync -az --delete --exclude .git --exclude remote-check.log \
-   --filter=':- .gitignore' -e "$SSH_STRING" ./ "$USER_NAME@$VM:remote-check/"
+   --exclude-from=.gitignore -e "$SSH_STRING" ./ "$USER_NAME@$VM:remote-check/"
 TARGETS="${*:-check}"
 echo "remote-check: make $TARGETS on $VM, detached, as $RUN"
 if [ -n "${REMOTE_CHECK_KEEP:-}" ]; then OFF=true; else OFF='echo $$ > ~/runs/off.pid; sleep 300 && sudo poweroff'; fi
