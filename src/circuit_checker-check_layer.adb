@@ -384,6 +384,24 @@ is
                        (Same_Shapes (Next.all, Out_Shapes (P, K, J, RJ, Vb))));
    end Build_Next;
 
+   --  The state after term N is the model's at (N + 1, 0).
+   procedure Lemma_Next_Term
+     (Base : Base_Array; Used_A : Nat_Array; Pool : Mono_Array;
+      N : Positive)
+   with
+     Ghost => Proof_Only,
+     Pre   => Ctx and then Bases_Ok (Base)
+              and then Used_A'First = 0 and then Used_A'Last = NO
+              and then Pool'First = 1 and then Pool'Last = Max_Layer_Slots
+              and then N <= L
+              and then State_Ok (Base, Used_A, Pool, N, Pairs (P, J, RJ, N)),
+     Post  => State_Ok (Base, Used_A, Pool, N + 1, 0)
+   is
+   begin
+      Lemma_Used_All (P, K, J, RJ, N + 1, 0, NO);
+      Lemma_Slot_Mono_All (P, K, J, RJ, N + 1, 0, NO);
+   end Lemma_Next_Term;
+
    Base   : Base_Access;
    Used_A : Nat_Access;
    Terms  : Nat_Access;
@@ -512,8 +530,10 @@ begin
         (Proof_Only =>
            (if Pairs_Ok_F then
              State_Ok (Base.all, Used_A.all, Pool, N, Pairs (P, J, RJ, N))));
+      if Pairs_Ok_F then
+         Lemma_Next_Term (Base.all, Used_A.all, Pool, N);
+      end if;
       Lemma_Used_All (P, K, J, RJ, N + 1, 0, NO);
-      Lemma_Slot_Mono_All (P, K, J, RJ, N + 1, 0, NO);
       Lemma_Pairs_Ok_Def (P, K, J, RJ, N + 1, 0);
    end loop;
 

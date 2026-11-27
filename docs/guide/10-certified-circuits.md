@@ -583,21 +583,21 @@ The verification conditions of the partition `checker`, from a run on the provin
 | Termination | 1 | 73 | 0 | flow analysis |
 | Range checks | 22 | 213 | 0 | provers |
 | Division checks (`/`, `mod`) | 0 | 10 | 0 | provers |
-| Overflow checks | 22 | 335 | 0 | provers |
+| Overflow checks | 22 | 337 | 0 | provers |
 | Index checks | 37 | 414 | 0 | provers |
 | Length checks | 5 | 3 | 0 | provers |
 | Discriminant checks | 2 | 0 | 0 | provers |
-| Null dereferences | 2 | 168 | 4 | provers |
+| Null dereferences | 2 | 170 | 4 | provers |
 | Type predicates | 0 | 14 | 0 | provers |
-| Preconditions of the calls | 16 | 1,495 | 4 | provers |
-| Assertions | 0 | 158 | 0 | provers |
+| Preconditions of the calls | 16 | 1,506 | 4 | provers |
+| Assertions | 0 | 159 | 0 | provers |
 | Loop invariants (base case and preservation) | 12 | 158 | 0 | provers |
-| Postconditions | 6 | 81 | 1 | provers |
+| Postconditions | 6 | 82 | 1 | provers |
 | Variants of the recursive functions | 0 | 33 | 0 | provers |
 | Memory leaks (an allocation freed) | 2 | 21 | 4 | provers |
-| **Total** | **163** | **3,298** | **21** | all proved: none justified, none unproved, no `pragma Assume` |
+| **Total** | **163** | **3,315** | **21** | all proved: none justified, none unproved, no `pragma Assume` |
 
-In all, 3,482 checks, 3,242 discharged by the provers. The flow analysis prints 16 warnings, none about a check: statements that free memory and have no effect after the return (the lesson of `Circuit_Reader`, [verification approach](verification-approach.md#lessons-of-the-proofs)), an output of a deallocation not used after it, and initial values overwritten before they are read.
+In all, 3,499 checks, 3,259 discharged by the provers. The flow analysis prints 16 warnings, none about a check: statements that free memory and have no effect after the return (the lesson of `Circuit_Reader`, [verification approach](verification-approach.md#lessons-of-the-proofs)), an output of a deallocation not used after it, and initial values overwritten before they are read.
 
 ## 5. What is only tested
 
@@ -687,7 +687,7 @@ Two checks of `Accepts` have no hostile certificate of their own:
 
 **census.py's own test,** `scripts/census-test.py`, in the step `lint`: small circuits whose facts are written out by hand, byte for byte, and the certificate census.py writes for them, each named after the rule of ADR 0093 it checks (the order of the slots, zero coefficients kept, the kind from the monomials only, the limit `Max_Form`).
 
-The results, on the proving machine on 27 November 2026: `checker_kat` 26 checks, none failed (23 certificates with their outcome and status, the facts of the two accepted ones against census.py's, and paragraph D); on the registered pair, the checker accepts both circuits and gives census.py's digest of the facts, `e88954c8…` for the hash circuit and `668d59e1…` for the signature circuit; `census-test.py` 9 checks, none failed.
+The results, on the proving machine on 27 November 2026: `checker_kat` 26 checks, none failed (23 certificates with their outcome and status, the facts of the two accepted ones against census.py's, and paragraph D); on the registered pair, the checker accepts both circuits and gives census.py's digest of the facts, `69a7ce55…` for the hash circuit and `e34dec13…` for the signature circuit; `census-test.py` 10 checks, none failed.
 
 ## 6. What stays trusted
 
