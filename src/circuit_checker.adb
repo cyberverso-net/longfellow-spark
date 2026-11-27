@@ -515,10 +515,6 @@ package body Circuit_Checker is
       W  : SA.Element_Array;
       Wr : SA.Seg_Array;
       V  : out SA.Element_Array)
-   is
-   begin
-      --  To come: the induction over the layers (ADR 0093).
-      V := [others => Zero];
-   end Lemma_Accepts;
+   is separate;
 
 end Circuit_Checker;

@@ -206,6 +206,14 @@ is
              else CC.Max_Count + 1);
       pragma Assert (Hi = H (P, K, J, RJ, N, Q));
       Pm := Pair_Mono (M, Tm, Q);
+      --  M and RJ agree field by field on the two wires the term reads.
+      pragma Assert
+        (Shape_At (M, Tm.H1).N = Shape_At (RJ, Tm.H1).N
+         and then Shape_At (M, Tm.H0).N = Shape_At (RJ, Tm.H0).N
+         and then (for all E in Entry_Index =>
+                     Shape_At (M, Tm.H1).V (E) = Shape_At (RJ, Tm.H1).V (E)
+                     and then Shape_At (M, Tm.H0).V (E)
+                              = Shape_At (RJ, Tm.H0).V (E)));
       pragma Assert (Pm = Pair_Mono (RJ, Tm, Q));
       U := Used_A (G);
       pragma Assert (U = Used (P, K, J, RJ, N, Q - 1, G));

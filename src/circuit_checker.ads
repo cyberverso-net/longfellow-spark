@@ -208,7 +208,8 @@ package Circuit_Checker is
    function Term_Pairs (M : Shape_Array; Tm : SA.Term) return Natural is
      (if Tm.K = Zero then 0
       else Shape_At (M, Tm.H1).N * Shape_At (M, Tm.H0).N)
-   with Global => null;
+   with Global => null,
+        Post => Term_Pairs'Result <= Max_Entries * Max_Entries;
 
    --  Pair Q (from 1) of a term's expansion: entry (Q - 1) / N0 + 1 of
    --  meaning (h1) times entry (Q - 1) mod N0 + 1 of meaning (h0), N0 the
