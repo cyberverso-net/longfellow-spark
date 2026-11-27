@@ -15,8 +15,8 @@
 --     of its slots at the end of the layer (Lemma_Layer_Sum).
 --  4. The meanings of the layer's wires are their values; the facts of
 --     the layer hold (Lemma_Layer).
---  5. V is built from the home wires, and the layers are taken from the
---     last to layer 0.
+--  5. V is built from the home wires, layer by layer from the inputs,
+--     and the layers are taken in turn from the last to layer 0.
 
 separate (Circuit_Checker)
 procedure Lemma_Accepts
@@ -860,9 +860,177 @@ is
                            + Declared_Before (P, K, J, Reads (P, K, J), G)),
                   SA.W_At (Wr (J).all, G))))
    with Ghost => Proof_Only,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
         Pre => J <= P.Last_Layer and then Wr'First = 0
                and then Wr'Last = P.Last_Layer + 1
                and then Wr (J) /= null and then Wr (J)'First = 0;
+
+   --  One wire: its value is its meaning. A linear wire's meaning is
+   --  its slots; a declared wire's is its variable, which holds the
+   --  wire's value. A declared wire's fact follows.
+   procedure Lemma_Wire (J : Natural; X : SA.Element_Array; G : Natural)
+   with Ghost => Proof_Only,
+        Pre  => J <= P.Last_Layer and then Len (P, J) <= SA.Max_Terms
+                and then Out_Count (P, J) <= SA.Max_Wires
+                and then G < Out_Count (P, J)
+                and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                and then Wr (J) /= null and then Wr (J)'First = 0
+                and then Same (V_At (X, 0), SA.One)
+                and then Same (SA.W_At (Wr (J).all, G),
+                               Eval_Slots (P, K, J, Reads (P, K, J),
+                                           Read_Coefs (P, K, J), X, G,
+                                           Count_Of (P, K, J, G)))
+                and then (if not Linear (P, K, J, Reads (P, K, J), G) then
+                            Same (V_At (X, First_Var (P, K, J)
+                                           + Declared_Before
+                                               (P, K, J, Reads (P, K, J), G)),
+                                  SA.W_At (Wr (J).all, G))),
+        Post => Same (SA.W_At (Wr (J).all, G),
+                      Mean (Out_Shapes (P, K, J, Reads (P, K, J),
+                                        First_Var (P, K, J)),
+                            Out_Coefs (P, K, J, Reads (P, K, J),
+                                       Read_Coefs (P, K, J)),
+                            X, G))
+                and then
+                (if not Linear (P, K, J, Reads (P, K, J), G) then
+                   Same (V_At (X, First_Var (P, K, J)
+                                  + Declared_Before
+                                      (P, K, J, Reads (P, K, J), G)),
+                         Eval_Slots (P, K, J, Reads (P, K, J),
+                                     Read_Coefs (P, K, J), X, G,
+                                     Count_Of (P, K, J, G))))
+   is
+      R  : constant Shape_Array := Reads (P, K, J);
+      CR : constant Coef_Array := Read_Coefs (P, K, J);
+      FV : constant Natural := First_Var (P, K, J);
+      C  : constant Natural := Count_Of (P, K, J, G);
+   begin
+      pragma Assert
+        (Shape_At (Out_Shapes (P, K, J, R, FV), G).N
+         = Out_Shape (P, K, J, R, FV, G).N);
+      pragma Assert
+        (for all E in Entry_Index =>
+           Shape_At (Out_Shapes (P, K, J, R, FV), G).V (E)
+           = Out_Shape (P, K, J, R, FV, G).V (E));
+      if Linear (P, K, J, R, G) then
+         pragma Assert (C <= Max_Entries);
+         pragma Assert (Out_Shape (P, K, J, R, FV, G).N = C);
+         Lemma_Linear_Eval (J, R, CR, X, FV, G, C);
+      else
+         pragma Assert (Out_Shape (P, K, J, R, FV, G).N = 1);
+         pragma Assert
+           (Out_Shape (P, K, J, R, FV, G).V (1)
+            = FV + Declared_Before (P, K, J, R, G));
+         pragma Assert
+           (Same (Coefs_At (Out_Coefs (P, K, J, R, CR), G) (1), SA.One));
+         SA.RL.Lemma_One_Mul (V_At (X, FV + Declared_Before (P, K, J, R, G)));
+         SA.RL.Lemma_Zero_Add
+           (SA.One * V_At (X, FV + Declared_Before (P, K, J, R, G)));
+      end if;
+   end Lemma_Wire;
+
+   --  The assertions of layer J, from the values of the wires: when the
+   --  product of an assertion's two wires is zero and the wires have
+   --  their meanings, the product of the meanings is zero.
+   procedure Lemma_Asserts_Of
+     (J : Natural; X : SA.Element_Array; Win : SA.Element_Array)
+   with Ghost => Proof_Only,
+        Pre  => J <= P.Last_Layer
+                and then Win'First = 0
+                and then (for all N in 1 .. Len (P, J) =>
+                            TT (P, J, N).H0 < P.Layers (J).NW_In
+                            and then TT (P, J, N).H1 < P.Layers (J).NW_In)
+                and then In_Mean (Reads (P, K, J), Read_Coefs (P, K, J), X,
+                                  Win, P.Layers (J).NW_In)
+                and then (for all N in 1 .. Len (P, J) =>
+                            (if TT (P, J, N).K = Zero then
+                               SA.W_At (Win, TT (P, J, N).H1)
+                               * SA.W_At (Win, TT (P, J, N).H0) = Zero)),
+        Post => Asserts_Hold (P, K, J, X)
+   is
+   begin
+      for N in 1 .. Len (P, J) loop
+         pragma Loop_Invariant
+           (for all N2 in 1 .. N =>
+              (if TT (P, J, N2).K = Zero then
+                 SA."*" (Eval_Meaning (Shape_At (Reads (P, K, J),
+                                                 TT (P, J, N2).H1),
+                                       Coefs_At (Read_Coefs (P, K, J),
+                                                 TT (P, J, N2).H1),
+                                       X,
+                                       Shape_At (Reads (P, K, J),
+                                                 TT (P, J, N2).H1).N),
+                         Eval_Meaning (Shape_At (Reads (P, K, J),
+                                                 TT (P, J, N2).H0),
+                                       Coefs_At (Read_Coefs (P, K, J),
+                                                 TT (P, J, N2).H0),
+                                       X,
+                                       Shape_At (Reads (P, K, J),
+                                                 TT (P, J, N2).H0).N))
+                 = Zero));
+      end loop;
+   end Lemma_Asserts_Of;
+
+   --  The assertions of layer J: the product of each one's two wires is
+   --  zero (Z_Ref), and the wires have their meanings.
+   procedure Lemma_Asserts (J : Natural; X : SA.Element_Array)
+   with Ghost => Proof_Only,
+        Pre  => J <= P.Last_Layer
+                and then PC.Valid (P) and then SA.Well_Formed (PC.Expand (P))
+                and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                and then Wr (J + 1) /= null and then Wr (J + 1)'First = 0
+                and then Wr (J + 1)'Length = P.Layers (J).NW_In
+                and then In_Mean (Reads (P, K, J), Read_Coefs (P, K, J), X,
+                                  Wr (J + 1).all, P.Layers (J).NW_In)
+                and then SA.Layer_Z_Seg (PC.Expand (P), Wr (J + 1).all, J),
+        Post => Asserts_Hold (P, K, J, X)
+   is
+      --  The facts of Z_Ref and of the circuit's shape, with the terms
+      --  named as the model names them.
+      procedure Z_Facts
+      with Ghost => Proof_Only,
+           Pre  => J <= P.Last_Layer
+                   and then PC.Valid (P)
+                   and then SA.Well_Formed (PC.Expand (P))
+                   and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                   and then Wr (J + 1) /= null and then Wr (J + 1)'First = 0
+                   and then SA.Layer_Z_Seg (PC.Expand (P), Wr (J + 1).all, J),
+           Post => (for all N in 1 .. Len (P, J) =>
+                      TT (P, J, N).H0 < P.Layers (J).NW_In
+                      and then TT (P, J, N).H1 < P.Layers (J).NW_In
+                      and then
+                      (if TT (P, J, N).K = Zero then
+                         SA.W_At (Wr (J + 1).all, TT (P, J, N).H1)
+                         * SA.W_At (Wr (J + 1).all, TT (P, J, N).H0) = Zero))
+      is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", SA.Layer_Z_Seg);
+         E  : constant SA.Circuit := PC.Expand (P);
+         T  : constant SA.Term_Array := SA.Layer_Terms (E, J);
+         L  : constant Natural := Len (P, J);
+         NW : constant Natural := P.Layers (J).NW_In;
+      begin
+         PC.Lemma_Valid (P);
+         pragma Assert (E.Layers (J) = P.Layers (J));
+         pragma Assert (T'First = P.Layers (J).First and then T'Length = L);
+         pragma Assert (SA.Fits (T, Out_Count (P, J), NW));
+         Lemma_Z_All (Wr (J + 1).all, T, L);
+         for N in 1 .. L loop
+            pragma Assert (T (T'First + N - 1) = TT (P, J, N));
+            pragma Assert (Same (T (T'First + N - 1).K, TT (P, J, N).K));
+            pragma Loop_Invariant
+              (for all N2 in 1 .. N =>
+                 TT (P, J, N2).H0 < NW and then TT (P, J, N2).H1 < NW
+                 and then
+                 (if TT (P, J, N2).K = Zero then
+                    SA.W_At (Wr (J + 1).all, TT (P, J, N2).H1)
+                    * SA.W_At (Wr (J + 1).all, TT (P, J, N2).H0) = Zero));
+         end loop;
+      end Z_Facts;
+   begin
+      Z_Facts;
+      Lemma_Asserts_Of (J, X, Wr (J + 1).all);
+   end Lemma_Asserts;
 
    --  One layer: its wires' values are their meanings, and its facts
    --  hold.
@@ -900,34 +1068,21 @@ is
         (GNATprove, Unhide_Info, "Expression_Function_Body",
          SA.Layer_Holds_Seg);
       pragma Annotate
-        (GNATprove, Unhide_Info, "Expression_Function_Body", SA.Layer_Z_Seg);
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Homes_Layer);
       R   : constant Shape_Array := Reads (P, K, J);
       CR  : constant Coef_Array := Read_Coefs (P, K, J);
       FV  : constant Natural := First_Var (P, K, J);
       E   : constant SA.Circuit := PC.Expand (P);
-      T   : constant SA.Term_Array := SA.Layer_Terms (E, J);
       NO  : constant Natural := Out_Count (P, J);
-      L   : constant Natural := Len (P, J);
    begin
       Lemma_Layer_Accepted_Def (P, K, J);
       Lemma_Layer_Ok_Def (P, K, J, R);
       PC.Lemma_Valid (P);
       pragma Assert (E.Layers (J) = P.Layers (J));
-      pragma Assert (T'First = P.Layers (J).First and then T'Length = L);
       Lemma_Layer_Sum (J, R, CR, X, Wr (J + 1).all);
-      --  The wires: each value is its slots', hence its meaning.
+      --  The wires.
       for G in 0 .. NO - 1 loop
-         pragma Assert
-           (Same (SA.W_At (Wr (J).all, G),
-                  Eval_Slots (P, K, J, R, CR, X, G, Count_Of (P, K, J, G))));
-         if Linear (P, K, J, R, G) then
-            Lemma_Linear_Eval (J, R, CR, X, FV, G, Count_Of (P, K, J, G));
-         else
-            SA.RL.Lemma_One_Mul
-              (V_At (X, FV + Declared_Before (P, K, J, R, G)));
-            SA.RL.Lemma_Zero_Add
-              (SA.One * V_At (X, FV + Declared_Before (P, K, J, R, G)));
-         end if;
+         Lemma_Wire (J, X, G);
          pragma Loop_Invariant
            (for all G2 in 0 .. G =>
               Same (SA.W_At (Wr (J).all, G2),
@@ -939,24 +1094,436 @@ is
                        Eval_Slots (P, K, J, R, CR, X, G2,
                                    Count_Of (P, K, J, G2)))));
       end loop;
+      pragma Assert (Declared_Hold (P, K, J, X));
       --  The assertions.
-      Lemma_Z_All (Wr (J + 1).all, T, L);
-      for N in 1 .. L loop
-         pragma Assert (T (T'First + N - 1) = TT (P, J, N));
-         pragma Assert (Same (T (T'First + N - 1).K, TT (P, J, N).K));
-         pragma Loop_Invariant
-           (for all N2 in 1 .. N =>
-              (if TT (P, J, N2).K = Zero then
-                 Mean (R, CR, X, TT (P, J, N2).H1)
-                 * Mean (R, CR, X, TT (P, J, N2).H0) = Zero));
-      end loop;
+      Lemma_Asserts (J, X);
+      --  The outputs, on layer 0.
+      if J = 0 then
+         for G in 0 .. NO - 1 loop
+            pragma Assert (SA.F."=" (SA.W_At (Wr (J).all, G), Zero));
+            pragma Loop_Invariant
+              (for all G2 in 0 .. G =>
+                 Eval_Meaning
+                   (Out_Shape (P, K, J, R, FV, G2),
+                    Coefs_At (Out_Coefs (P, K, J, R, CR), G2),
+                    X, Out_Shape (P, K, J, R, FV, G2).N)
+                 = Zero);
+         end loop;
+      end if;
+      pragma Assert (Outputs_Zero (P, K, J, X));
+      Lemma_Layer_Facts_Def (P, K, J, X);
    end Lemma_Layer;
 
    -------------------------------------------------------------------
    --  5. The values of the variables, and the layers in turn
    -------------------------------------------------------------------
 
+   --  Declared_Before grows: each wire before G that is declared counts
+   --  one, so two declared wires of a layer have distinct variables, and
+   --  all of them are below the layer's count.
+   procedure Lemma_Decl_Mono (J : Natural; G : Natural)
+   with Ghost => Proof_Only,
+        Pre  => J <= P.Last_Layer and then Len (P, J) <= SA.Max_Terms,
+        Post => (for all G2 in 0 .. G - 1 =>
+                   Declared_Before (P, K, J, Reads (P, K, J), G2)
+                   + (if Linear (P, K, J, Reads (P, K, J), G2) then 0 else 1)
+                   <= Declared_Before (P, K, J, Reads (P, K, J), G))
+   is
+   begin
+      for G1 in 1 .. G loop
+         Lemma_Declared_Def (P, K, J, Reads (P, K, J), G1);
+         pragma Loop_Invariant
+           (for all G2 in 0 .. G1 - 1 =>
+              Declared_Before (P, K, J, Reads (P, K, J), G2)
+              + (if Linear (P, K, J, Reads (P, K, J), G2) then 0 else 1)
+              <= Declared_Before (P, K, J, Reads (P, K, J), G1));
+      end loop;
+   end Lemma_Decl_Mono;
+
+   --  The variables of layer J's declared wires receive their home
+   --  wires' values; the variables below the layer's first are kept.
+   procedure Build_Layer (J : Natural; X : in out SA.Element_Array)
+   with Ghost => Proof_Only,
+        Pre  => J <= P.Last_Layer and then Len (P, J) <= SA.Max_Terms
+                and then X'First = 0 and then X'Length = Max_Vars
+                and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                and then (for all L in Wr'Range =>
+                            Wr (L) /= null and then Wr (L)'First = 0)
+                and then First_Var (P, K, J)
+                         + Declared_Before (P, K, J, Reads (P, K, J),
+                                            Out_Count (P, J))
+                         <= Max_Vars,
+        Post => (for all I in 0 .. First_Var (P, K, J) - 1 =>
+                   Same (X (I), X'Old (I)))
+                and then Homes_Layer (J, X)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Homes_Layer);
+      FV : constant Natural := First_Var (P, K, J);
+      NO : constant Natural := Out_Count (P, J);
+   begin
+      Lemma_Decl_Mono (J, NO);
+      for G in 0 .. NO - 1 loop
+         Lemma_Decl_Mono (J, G);
+         if not Linear (P, K, J, Reads (P, K, J), G) then
+            X (FV + Declared_Before (P, K, J, Reads (P, K, J), G)) :=
+              SA.W_At (Wr (J).all, G);
+         end if;
+         pragma Loop_Invariant
+           (for all I in 0 .. FV - 1 => Same (X (I), X'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all G2 in 0 .. G =>
+              (if not Linear (P, K, J, Reads (P, K, J), G2) then
+                 Same (V_At (X, FV + Declared_Before (P, K, J,
+                                                      Reads (P, K, J), G2)),
+                       SA.W_At (Wr (J).all, G2))));
+      end loop;
+   end Build_Layer;
+
+   --  The base: the input wires have their meanings, variable I with
+   --  the coefficient one.
+   procedure Lemma_Inputs_Mean (X : SA.Element_Array)
+   with Ghost => Proof_Only,
+        Pre  => P.Ninput <= Max_Vars
+                and then X'First = 0 and then X'Length = Max_Vars
+                and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                and then Wr (P.Last_Layer + 1) /= null
+                and then Wr (P.Last_Layer + 1)'First = 0
+                and then Wr (P.Last_Layer + 1)'Length = P.Ninput
+                and then (for all I in 0 .. P.Ninput - 1 =>
+                            Same (X (I), Wr (P.Last_Layer + 1) (I))),
+        Post => In_Mean (Reads (P, K, P.Last_Layer),
+                         Read_Coefs (P, K, P.Last_Layer), X,
+                         Wr (P.Last_Layer + 1).all, P.Ninput)
+   is
+   begin
+      Lemma_Reads_Def (P, K, P.Last_Layer);
+      for I in 0 .. P.Ninput - 1 loop
+         pragma Assert (Shape_At (Reads (P, K, P.Last_Layer), I).N = 1);
+         pragma Assert (Shape_At (Reads (P, K, P.Last_Layer), I).V (1) = I);
+         pragma Assert
+           (Same (Coefs_At (Read_Coefs (P, K, P.Last_Layer), I) (1), SA.One));
+         SA.RL.Lemma_One_Mul (V_At (X, I));
+         SA.RL.Lemma_Zero_Add (SA.One * V_At (X, I));
+         pragma Assert
+           (Same (Mean (Reads (P, K, P.Last_Layer),
+                        Read_Coefs (P, K, P.Last_Layer), X, I),
+                  V_At (X, I)));
+         pragma Loop_Invariant
+           (for all I2 in 0 .. I =>
+              Same (SA.W_At (Wr (P.Last_Layer + 1).all, I2),
+                    Mean (Reads (P, K, P.Last_Layer),
+                          Read_Coefs (P, K, P.Last_Layer), X, I2)));
+      end loop;
+   end Lemma_Inputs_Mean;
+
+   --  The step: the wires layer J reads are layer J + 1's, whose values
+   --  are their meanings.
+   procedure Lemma_Next_Mean (J : Natural; X : SA.Element_Array)
+   with Ghost => Proof_Only,
+        Pre  => J < P.Last_Layer
+                and then PC.Valid (P) and then SA.Well_Formed (PC.Expand (P))
+                and then Len (P, J + 1) <= SA.Max_Terms
+                and then Out_Count (P, J + 1) <= SA.Max_Wires
+                and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                and then Wr (J + 1) /= null and then Wr (J + 1)'First = 0
+                and then
+                (for all G in 0 .. Out_Count (P, J + 1) - 1 =>
+                   Same (SA.W_At (Wr (J + 1).all, G),
+                         Mean (Out_Shapes (P, K, J + 1, Reads (P, K, J + 1),
+                                           First_Var (P, K, J + 1)),
+                               Out_Coefs (P, K, J + 1, Reads (P, K, J + 1),
+                                          Read_Coefs (P, K, J + 1)),
+                               X, G))),
+        Post => In_Mean (Reads (P, K, J), Read_Coefs (P, K, J), X,
+                         Wr (J + 1).all, P.Layers (J).NW_In)
+   is
+   begin
+      Lemma_Reads_Def (P, K, J + 1);
+      pragma Assert (Out_Count (P, J + 1) = P.Layers (J).NW_In);
+   end Lemma_Next_Mean;
+
+   --  The first variable after layer J's: its first, plus its count of
+   --  declared wires.
+   function Top (J : Natural) return Natural is
+     (First_Var (P, K, J)
+      + Declared_Before (P, K, J, Reads (P, K, J), Out_Count (P, J)))
+   with Ghost => Proof_Only,
+        Pre => J <= P.Last_Layer and then Len (P, J) <= SA.Max_Terms;
+
+   --  Layer J's declared wires have variables below B, holding their
+   --  home wires' values.
+   function Homes_Below
+     (J : Natural; X : SA.Element_Array; B : Natural) return Boolean
+   is (for all G in 0 .. Out_Count (P, J) - 1 =>
+         (if not Linear (P, K, J, Reads (P, K, J), G) then
+            First_Var (P, K, J)
+            + Declared_Before (P, K, J, Reads (P, K, J), G) < B
+            and then
+            Same (V_At (X, First_Var (P, K, J)
+                           + Declared_Before (P, K, J, Reads (P, K, J), G)),
+                  SA.W_At (Wr (J).all, G))))
+   with Ghost => Proof_Only,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre => J <= P.Last_Layer and then Wr'First = 0
+               and then Wr'Last = P.Last_Layer + 1
+               and then Wr (J) /= null and then Wr (J)'First = 0;
+
+   --  A layer whose homes hold has them below its top.
+   procedure Lemma_Layer_Below (J : Natural; X : SA.Element_Array)
+   with Ghost => Proof_Only,
+        Pre  => J <= P.Last_Layer and then Len (P, J) <= SA.Max_Terms
+                and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                and then Wr (J) /= null and then Wr (J)'First = 0
+                and then Homes_Layer (J, X),
+        Post => Homes_Below (J, X, Top (J))
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Homes_Layer);
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Homes_Below);
+   begin
+      Lemma_Decl_Mono (J, Out_Count (P, J));
+   end Lemma_Layer_Below;
+
+   --  Homes below a bound hold.
+   procedure Lemma_Below_Layer (J : Natural; X : SA.Element_Array; B : Natural)
+   with Ghost => Proof_Only,
+        Pre  => J <= P.Last_Layer
+                and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                and then Wr (J) /= null and then Wr (J)'First = 0
+                and then Homes_Below (J, X, B),
+        Post => Homes_Layer (J, X)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Homes_Layer);
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Homes_Below);
+   begin
+      null;
+   end Lemma_Below_Layer;
+
+   --  Values kept below B1 keep the homes below B1, which are below B2.
+   procedure Lemma_Kept
+     (J : Natural; Xo, Xn : SA.Element_Array; B1, B2 : Natural)
+   with Ghost => Proof_Only,
+        Pre  => J <= P.Last_Layer and then Wr'First = 0
+                and then Wr'Last = P.Last_Layer + 1
+                and then Wr (J) /= null and then Wr (J)'First = 0
+                and then Xo'First = 0 and then Xn'First = 0
+                and then Xo'Length = Xn'Length
+                and then B1 <= B2 and then B1 <= Xo'Length
+                and then Homes_Below (J, Xo, B1)
+                and then (for all I in 0 .. B1 - 1 => Same (Xn (I), Xo (I))),
+        Post => Homes_Below (J, Xn, B2)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Homes_Below);
+   begin
+      null;
+   end Lemma_Kept;
+
+   --  One layer of the construction: layer J's variables are set, those
+   --  of the layers before it and of the inputs are kept.
+   procedure Step_Build (J : Natural; X : in out SA.Element_Array)
+   with Ghost => Proof_Only,
+        Pre  => J <= P.Last_Layer and then PC.Valid (P)
+                and then X'First = 0 and then X'Length = Max_Vars
+                and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                and then (for all L in Wr'Range =>
+                            Wr (L) /= null and then Wr (L)'First = 0)
+                and then Wr (P.Last_Layer + 1)'Length = P.Ninput
+                and then Layer_Accepted (P, K, J)
+                and then P.Ninput <= First_Var (P, K, J)
+                and then (for all I in 0 .. P.Ninput - 1 =>
+                            Same (X (I), Wr (P.Last_Layer + 1) (I)))
+                and then (for all J2 in J + 1 .. P.Last_Layer =>
+                            Homes_Below (J2, X, First_Var (P, K, J))),
+        Post => (for all I in 0 .. P.Ninput - 1 =>
+                   Same (X (I), Wr (P.Last_Layer + 1) (I)))
+                and then (for all J2 in J .. P.Last_Layer =>
+                            Homes_Below (J2, X, Top (J)))
+   is
+      Xo : constant SA.Element_Array := X;
+   begin
+      PC.Lemma_Valid (P);
+      pragma Assert (Len (P, J) <= SA.Max_Terms);
+      Lemma_Layer_Accepted_Def (P, K, J);
+      Build_Layer (J, X);
+      Lemma_Layer_Below (J, X);
+      for J2 in J + 1 .. P.Last_Layer loop
+         Lemma_Kept (J2, Xo, X, First_Var (P, K, J), Top (J));
+         pragma Loop_Invariant
+           (for all J3 in J + 1 .. J2 => Homes_Below (J3, X, Top (J)));
+      end loop;
+   end Step_Build;
+
+   --  The construction of the values: the inputs, then the declared
+   --  wires layer by layer from the last.
+   procedure Build_All (X : out SA.Element_Array)
+   with Ghost => Proof_Only,
+        Pre  => PC.Valid (P) and then Accepts (P, K)
+                and then X'First = 0 and then X'Length = Max_Vars
+                and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                and then (for all L in Wr'Range =>
+                            Wr (L) /= null and then Wr (L)'First = 0)
+                and then Wr (P.Last_Layer + 1)'Length = P.Ninput,
+        Post => (for all I in 0 .. P.Ninput - 1 =>
+                   Same (X (I), Wr (P.Last_Layer + 1) (I)))
+                and then (for all J in 0 .. P.Last_Layer => Homes_Layer (J, X))
+   is
+   begin
+      Lemma_Accepts_Def (P, K);
+      PC.Lemma_Valid (P);
+      X := [others => Zero];
+      for I in 0 .. P.Ninput - 1 loop
+         X (I) := Wr (P.Last_Layer + 1) (I);
+         pragma Loop_Invariant
+           (for all I2 in 0 .. I =>
+              Same (X (I2), Wr (P.Last_Layer + 1) (I2)));
+      end loop;
+      for J in reverse 0 .. P.Last_Layer loop
+         pragma Assert (Len (P, J) <= SA.Max_Terms);
+         pragma Assert (Layer_Accepted (P, K, J));
+         Lemma_Reads_Def (P, K, J);
+         if J < P.Last_Layer then
+            pragma Assert (Len (P, J + 1) <= SA.Max_Terms);
+            pragma Assert (Layer_Accepted (P, K, J + 1));
+            Lemma_Layer_Accepted_Def (P, K, J + 1);
+            Lemma_Reads_Def (P, K, J + 1);
+            pragma Assert (First_Var (P, K, J) = Top (J + 1));
+            pragma Assert (First_Var (P, K, J + 1) <= First_Var (P, K, J));
+         else
+            pragma Assert (First_Var (P, K, J) = P.Ninput);
+         end if;
+         Step_Build (J, X);
+         pragma Loop_Invariant (P.Ninput <= First_Var (P, K, J));
+         pragma Loop_Invariant
+           (for all I in 0 .. P.Ninput - 1 =>
+              Same (X (I), Wr (P.Last_Layer + 1) (I)));
+         pragma Loop_Invariant
+           (for all J2 in J .. P.Last_Layer => Homes_Below (J2, X, Top (J)));
+      end loop;
+      for J in 0 .. P.Last_Layer loop
+         pragma Assert (Len (P, 0) <= SA.Max_Terms);
+         Lemma_Below_Layer (J, X, Top (0));
+         pragma Loop_Invariant
+           (for all J2 in 0 .. J => Homes_Layer (J2, X));
+      end loop;
+   end Build_All;
+
+   --  The layers in turn, from the last: the wires each reads have their
+   --  meanings, so its wires have theirs and its facts hold.
+   procedure Check_All (X : SA.Element_Array)
+   with Ghost => Proof_Only,
+        Pre  =>
+          PC.Valid (P) and then SA.Well_Formed (PC.Expand (P))
+          and then Accepts (P, K)
+          and then X'First = 0 and then X'Length = Max_Vars
+          and then P.Ninput >= 1
+          and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+          and then (for all L in Wr'Range =>
+                      Wr (L) /= null and then Wr (L)'First = 0)
+          and then Wr (P.Last_Layer + 1)'Length = P.Ninput
+          and then P.Ninput <= Max_Vars
+          and then SA.Same (Wr (P.Last_Layer + 1) (0), SA.One)
+          and then (for all J in 0 .. P.Last_Layer =>
+                      Wr (J)'Length = Out_Count (P, J)
+                      and then SA.Layer_Holds_Seg (PC.Expand (P), Wr (J).all,
+                                                   Wr (J + 1).all, J)
+                      and then SA.Layer_Z_Seg (PC.Expand (P), Wr (J + 1).all,
+                                               J))
+          and then (for all G in 0 .. P.Noutput - 1 =>
+                      SA.F."=" (Wr (0) (G), Zero))
+          and then (for all I in 0 .. P.Ninput - 1 =>
+                      Same (X (I), Wr (P.Last_Layer + 1) (I)))
+          and then (for all J in 0 .. P.Last_Layer => Homes_Layer (J, X)),
+        Post => Facts_Hold (P, K, X)
+   is
+   begin
+      Lemma_Accepts_Def (P, K);
+      PC.Lemma_Valid (P);
+      pragma Assert (PC.Expand (P).Layers (P.Last_Layer).NW_In = P.Ninput);
+      pragma Assert (P.Layers (P.Last_Layer).NW_In = P.Ninput);
+      pragma Assert (Same (V_At (X, 0), SA.One));
+      for J in reverse 0 .. P.Last_Layer loop
+         pragma Assert (Layer_Accepted (P, K, J));
+         pragma Assert (Wr (J)'Length = Out_Count (P, J));
+         pragma Assert (SA.Layer_Holds_Seg (PC.Expand (P), Wr (J).all,
+                                            Wr (J + 1).all, J));
+         pragma Assert (SA.Layer_Z_Seg (PC.Expand (P), Wr (J + 1).all, J));
+         if J = P.Last_Layer then
+            Lemma_Inputs_Mean (X);
+         else
+            Lemma_Next_Mean (J, X);
+         end if;
+         Lemma_Layer (J, X);
+         pragma Loop_Invariant
+           (for all J2 in J .. P.Last_Layer => Layer_Facts (P, K, J2, X));
+         pragma Loop_Invariant
+           (for all G in 0 .. Out_Count (P, J) - 1 =>
+              Same (SA.W_At (Wr (J).all, G),
+                    Mean (Out_Shapes (P, K, J, Reads (P, K, J),
+                                      First_Var (P, K, J)),
+                          Out_Coefs (P, K, J, Reads (P, K, J),
+                                     Read_Coefs (P, K, J)),
+                          X, G)));
+      end loop;
+   end Check_All;
+
+   --  One layer's homes, unfolded.
+   procedure Lemma_Homes_Layer_Def (J : Natural; X : SA.Element_Array)
+   with Ghost => Proof_Only,
+        Pre  => J <= P.Last_Layer
+                and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                and then Wr (J) /= null and then Wr (J)'First = 0
+                and then Homes_Layer (J, X),
+        Post => (for all G in 0 .. Out_Count (P, J) - 1 =>
+                   (if not Linear (P, K, J, Reads (P, K, J), G) then
+                      SA.Same (V_At (X, First_Var (P, K, J)
+                                        + Declared_Before (P, K, J,
+                                                           Reads (P, K, J),
+                                                           G)),
+                               SA.W_At (Wr (J).all, G))))
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Homes_Layer);
+   begin
+      null;
+   end Lemma_Homes_Layer_Def;
+
+   --  The homes of the theorem's statement, from those of each layer.
+   procedure Lemma_Homes_Hold (X : SA.Element_Array)
+   with Ghost => Proof_Only,
+        Pre  => P.Ninput <= Max_Vars
+                and then X'First = 0 and then X'Length = Max_Vars
+                and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                and then (for all L in Wr'Range =>
+                            Wr (L) /= null and then Wr (L)'First = 0)
+                and then Wr (P.Last_Layer + 1)'Length = P.Ninput
+                and then (for all I in 0 .. P.Ninput - 1 =>
+                            Same (X (I), Wr (P.Last_Layer + 1) (I)))
+                and then (for all J in 0 .. P.Last_Layer =>
+                            Homes_Layer (J, X)),
+        Post => Homes_Hold (P, K, Wr, X)
+   is
+   begin
+      for J in 0 .. P.Last_Layer loop
+         Lemma_Homes_Layer_Def (J, X);
+         pragma Loop_Invariant
+           (for all J2 in 0 .. J =>
+              (for all G in 0 .. Out_Count (P, J2) - 1 =>
+                 (if not Linear (P, K, J2, Reads (P, K, J2), G) then
+                    SA.Same (V_At (X, First_Var (P, K, J2)
+                                      + Declared_Before (P, K, J2,
+                                                         Reads (P, K, J2), G)),
+                             SA.W_At (Wr (J2).all, G)))));
+      end loop;
+   end Lemma_Homes_Hold;
+
 begin
-   --  To come in the next steps: 2 to 5 (ADR 0093).
-   V := [others => Zero];
+   Lemma_Accepts_Def (P, K);
+   Build_All (V);
+   Check_All (V);
+   Lemma_Homes_Hold (V);
 end Lemma_Accepts;

@@ -330,6 +330,21 @@ package body Circuit_Checker is
       null;
    end Lemma_Layer_Accepted_Def;
 
+   procedure Lemma_Layer_Facts_Def
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      V : SA.Element_Array)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => J <= P.Last_Layer,
+        Post => Layer_Facts (P, K, J, V)
+                = (Asserts_Hold (P, K, J, V) and then Declared_Hold (P, K, J, V)
+                   and then Outputs_Zero (P, K, J, V))
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Layer_Facts);
+   begin
+      null;
+   end Lemma_Layer_Facts_Def;
+
    --  One step of Reads and First_Var from layer J to layer J - 1.
    procedure Lemma_Reads_Def
      (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural)

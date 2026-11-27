@@ -621,47 +621,70 @@ package Circuit_Checker is
         Pre  => J <= P.Last_Layer and then S <= CC.Max_Count,
         Subprogram_Variant => (Decreases => S);
 
-   --  The facts of layer J at the values V: each assertion's product of
-   --  meanings is zero (with the field's equality, as the circuit's
-   --  Z_Ref states it), each declared wire's variable is its slots'
-   --  value, and on layer 0 each output's meaning is zero.
+   --  The facts of layer J at the values V, in three parts.
+
+   --  Each assertion's product of meanings is zero, with the field's
+   --  equality, as the circuit's Z_Ref states it.
+   function Asserts_Hold
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      V : SA.Element_Array) return Boolean
+   is (for all N in 1 .. Len (P, J) =>
+         (if TT (P, J, N).K = Zero then
+            SA."*" (Eval_Meaning (Shape_At (Reads (P, K, J), TT (P, J, N).H1),
+                                  Coefs_At (Read_Coefs (P, K, J),
+                                            TT (P, J, N).H1),
+                                  V,
+                                  Shape_At (Reads (P, K, J),
+                                            TT (P, J, N).H1).N),
+                    Eval_Meaning (Shape_At (Reads (P, K, J), TT (P, J, N).H0),
+                                  Coefs_At (Read_Coefs (P, K, J),
+                                            TT (P, J, N).H0),
+                                  V,
+                                  Shape_At (Reads (P, K, J),
+                                            TT (P, J, N).H0).N))
+            = Zero))
+   with Ghost => Proof_Only, Global => null,
+        Pre => J <= P.Last_Layer;
+
+   --  Each declared wire's variable is its slots' value.
+   function Declared_Hold
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      V : SA.Element_Array) return Boolean
+   is (for all G in 0 .. Out_Count (P, J) - 1 =>
+         (if not Linear (P, K, J, Reads (P, K, J), G) then
+            SA.Same
+              (V_At (V, First_Var (P, K, J)
+                        + Declared_Before (P, K, J, Reads (P, K, J), G)),
+               Eval_Slots (P, K, J, Reads (P, K, J), Read_Coefs (P, K, J),
+                           V, G, Count_Of (P, K, J, G)))))
+   with Ghost => Proof_Only, Global => null,
+        Pre => J <= P.Last_Layer;
+
+   --  On layer 0, each output's meaning is zero.
+   function Outputs_Zero
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      V : SA.Element_Array) return Boolean
+   is (if J = 0 then
+         (for all G in 0 .. Out_Count (P, J) - 1 =>
+            Eval_Meaning
+              (Out_Shape (P, K, J, Reads (P, K, J), First_Var (P, K, J), G),
+               Coefs_At (Out_Coefs (P, K, J, Reads (P, K, J),
+                                    Read_Coefs (P, K, J)), G),
+               V, Out_Shape (P, K, J, Reads (P, K, J),
+                             First_Var (P, K, J), G).N)
+            = Zero))
+   with Ghost => Proof_Only, Global => null,
+        Pre => J <= P.Last_Layer;
+
+   --  The three together. Hidden, so that a proof that only carries the
+   --  facts of a layer does not unfold them.
    function Layer_Facts
      (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
       V : SA.Element_Array) return Boolean
-   is ((for all N in 1 .. Len (P, J) =>
-          (if TT (P, J, N).K = Zero then
-             SA."*" (Eval_Meaning (Shape_At (Reads (P, K, J), TT (P, J, N).H1),
-                                   Coefs_At (Read_Coefs (P, K, J),
-                                             TT (P, J, N).H1),
-                                   V,
-                                   Shape_At (Reads (P, K, J),
-                                             TT (P, J, N).H1).N),
-                     Eval_Meaning (Shape_At (Reads (P, K, J), TT (P, J, N).H0),
-                                   Coefs_At (Read_Coefs (P, K, J),
-                                             TT (P, J, N).H0),
-                                   V,
-                                   Shape_At (Reads (P, K, J),
-                                             TT (P, J, N).H0).N))
-             = Zero))
-       and then
-       (for all G in 0 .. Out_Count (P, J) - 1 =>
-          (if not Linear (P, K, J, Reads (P, K, J), G) then
-             SA.Same
-               (V_At (V, First_Var (P, K, J)
-                         + Declared_Before (P, K, J, Reads (P, K, J), G)),
-                Eval_Slots (P, K, J, Reads (P, K, J), Read_Coefs (P, K, J),
-                            V, G, Count_Of (P, K, J, G)))))
-       and then
-       (if J = 0 then
-          (for all G in 0 .. Out_Count (P, J) - 1 =>
-             Eval_Meaning
-               (Out_Shape (P, K, J, Reads (P, K, J), First_Var (P, K, J), G),
-                Coefs_At (Out_Coefs (P, K, J, Reads (P, K, J),
-                                     Read_Coefs (P, K, J)), G),
-                V, Out_Shape (P, K, J, Reads (P, K, J),
-                              First_Var (P, K, J), G).N)
-             = Zero)))
+   is (Asserts_Hold (P, K, J, V) and then Declared_Hold (P, K, J, V)
+       and then Outputs_Zero (P, K, J, V))
    with Ghost => Proof_Only, Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
         Pre => J <= P.Last_Layer;
 
    function Facts_Hold
