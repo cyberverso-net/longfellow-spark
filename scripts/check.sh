@@ -434,6 +434,27 @@ do_vectors() {
    if [ "$status" -ne 0 ]; then
       exit "$status"
    fi
+   #  The circuit checker against scripts/census.py, its independent
+   #  computation, on the registered version 7 pair (ADR 0093): with the
+   #  certificate census.py writes, the checker must accept and give the
+   #  digest of the facts census.py gives.
+   header "vectors: the circuit checker against census.py on the registered pair"
+   alr -n exec -- gprbuild -P tests/checker/checker_census.gpr -p -s
+   local kind field circuit want got
+   for kind in hash sig; do
+      field=gf2_128
+      [ "$kind" = sig ] && field=p256
+      circuit="tests/vectors/upstream/mdoc/8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121_$kind.lfc2"
+      python3 -I scripts/census.py "$circuit" "$field" \
+         --json "$scratch/census-$kind.json" --certificate "$scratch/$kind.lfck"
+      want="$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["facts_sha256"])' "$scratch/census-$kind.json")"
+      got="$(tests/checker/bin/checker_census "$field" "$circuit" "$scratch/$kind.lfck")"
+      echo "vectors: $kind: census.py $want; checker $got"
+      if [ "$got" != "accepted - $want" ]; then
+         echo "vectors: the checker differs from census.py on the $kind circuit" >&2
+         exit 1
+      fi
+   done
    echo "vectors: tests/vectors matches the generators"
 }
 
@@ -459,6 +480,10 @@ do_lint() {
    #  add up to their summary.
    header "lint: the counts of verification conditions (vc-count-test.py)"
    python3 -I scripts/vc-count-test.py
+   #  census.py, the independent computation of the checker's facts (ADR
+   #  0093), on small circuits whose facts are written out by hand.
+   header "lint: the census of a circuit's facts (census-test.py)"
+   python3 -I scripts/census-test.py
    #  Every body of src/ outside SPARK is an assumption of the proof and
    #  has its row in the register of the trusted base.
    header "lint: the code outside SPARK and its register rows (check-spark-off.py)"

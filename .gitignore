@@ -14,6 +14,8 @@ lib/
 /tests/bin/
 /tests/relation/obj/
 /tests/relation/bin/
+/tests/checker/obj/
+/tests/checker/bin/
 
 # Python caches of the vector generators
 __pycache__/

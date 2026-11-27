@@ -1,0 +1,33 @@
+--  The tool checker_census (ADR 0093): the circuit checker on a
+--  registered circuit file and a certificate, its outcome and the digest
+--  of the facts, for the comparison with scripts/census.py in the step
+--  vectors of scripts/check.sh. Test code, outside the proof perimeter.
+--  Its own project, as tests/relation's: the test project's flags
+--  (-O0 -gnatVa) are too slow for a circuit of millions of terms.
+--  NOT the constant-time build.
+--  Build:  alr exec -- gprbuild -P tests/checker/checker_census.gpr -p
+--  Run:    tests/checker/bin/checker_census gf2_128|p256 CIRCUIT CERTIFICATE
+
+with "sparklib";
+
+project Checker_Census is
+
+   for Source_Dirs use (".", "../../src", "../src");
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   for Create_Missing_Dirs use "True";
+   for Main use ("checker_census.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-gnat2022",
+         "-gnata",     --  Assertions and ghost code on
+         "-O2",
+         "-gnatW8");
+   end Compiler;
+
+   package Binder is
+      for Default_Switches ("Ada") use ("-Es");
+   end Binder;
+
+end Checker_Census;
