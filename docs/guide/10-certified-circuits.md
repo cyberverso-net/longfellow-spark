@@ -416,7 +416,7 @@ Where it is in the code:
 | D10.3 | [`Circuit_Checker`](../../src/circuit_checker.ads) | `Walk`, `Accepts` | Gold against `Accepts`, Silver on its statuses; partition `checker` | `checker_kat`, `checker_census` | ADR 0093, ADR 0091 | `eval_quad`, the layer's sum |
 | D10.4 | [`Circuit_Checker`](../../src/circuit_checker.ads) | `Lemma_Accepts`, `Facts_Hold`, `Homes_Hold` | Gold; partition `checker` | none: a theorem | ADR 0093 | none |
 | D10.5 | [`Circuit_Checker`](../../src/circuit_checker.ads) | `Layer_Coefficients`, `Next_Layer` | Gold against the model; partition `checker` | `checker_kat`, `checker_census`, `scripts/census.py` | ADR 0093 | none |
-| D10.6 | [`Local_Check`](../../src/local_check.ads) | `Check_Product`, `Lemma_Product` | Gold; partition `local-check` | none | ADR 0091 | none |
+| D10.6 | [`Local_Check`](../../src/local_check.ads) | `Check_Product`, `Lemma_Product` | Gold; partition `local-check` | `checker_kat` | ADR 0091 | none |
 
 ### 3.1 What the checker computes
 
@@ -570,7 +570,7 @@ The partition `checker` holds `Circuit_Certificates`, the instance `Circuit_Chec
 - **`Walk`** (Gold): it accepts exactly when the model does, `(St = Accepted) = Accepts (P, K)`;
 - **`Lemma_Accepts`** (Gold): when `Accepts` holds and the wires satisfy the circuit, with input wire 0 equal to one, the values of the home wires satisfy every fact;
 - **`Layer_Coefficients` and `Next_Layer`** (Gold): a layer's slots, coefficients and meanings are the model's;
-- **`Circuit_Certificates.Read`:** when it returns `Ok`, the spans of the certificate tile its arrays (`Spans_Ok`).
+- **`Circuit_Certificates.Read`:** when it returns `Ok`, the spans of the certificate tile its arrays from the first entry to the last (`Spans_Ok`).
 
 The partition `local-check` holds the instance `Local_Check_GF2_128` of `Local_Check`: its lemma, Gold, 281 checks, all proved.
 
@@ -583,8 +583,8 @@ The verification conditions of the partition `checker`, from a run on the provin
 | Termination | 1 | 73 | 0 | flow analysis |
 | Range checks | 22 | 213 | 0 | provers |
 | Division checks (`/`, `mod`) | 0 | 10 | 0 | provers |
-| Overflow checks | 22 | 337 | 0 | provers |
-| Index checks | 37 | 414 | 0 | provers |
+| Overflow checks | 24 | 337 | 0 | provers |
+| Index checks | 41 | 414 | 0 | provers |
 | Length checks | 5 | 3 | 0 | provers |
 | Discriminant checks | 2 | 0 | 0 | provers |
 | Null dereferences | 2 | 170 | 4 | provers |
@@ -595,9 +595,9 @@ The verification conditions of the partition `checker`, from a run on the provin
 | Postconditions | 6 | 82 | 1 | provers |
 | Variants of the recursive functions | 0 | 33 | 0 | provers |
 | Memory leaks (an allocation freed) | 2 | 21 | 4 | provers |
-| **Total** | **163** | **3,315** | **21** | all proved: none justified, none unproved, no `pragma Assume` |
+| **Total** | **169** | **3,315** | **21** | all proved: none justified, none unproved, no `pragma Assume` |
 
-In all, 3,499 checks, 3,259 discharged by the provers. The flow analysis prints 16 warnings, none about a check: statements that free memory and have no effect after the return (the lesson of `Circuit_Reader`, [verification approach](verification-approach.md#lessons-of-the-proofs)), an output of a deallocation not used after it, and initial values overwritten before they are read.
+In all, 3,505 checks, 3,265 discharged by the provers. The flow analysis prints 16 warnings, none about a check: statements that free memory and have no effect after the return (the lesson of `Circuit_Reader`, [verification approach](verification-approach.md#lessons-of-the-proofs)), an output of a deallocation not used after it, and initial values overwritten before they are read.
 
 ## 5. What is only tested
 
@@ -677,9 +677,11 @@ The cases, one per check of `Accepts` and one per status of the certificate's re
 | another circuit | one byte of the circuit identifier changed | `Wrong_Circuit` |
 | the reader | a wrong magic, a wrong version, a file cut short, an integer of five bytes, a count over its bound, a byte after the end | `Bad_Magic`, `Bad_Version`, `Truncated`, `Bad_Integer`, `Bound_Exceeded`, `Trailing` |
 
-Two checks of `Accepts` have no hostile certificate of their own:
-- **`Spans_Ok`:** a certificate reaches the walk only through `Circuit_Certificates.Read`, which computes the spans from the counts, and whose postcondition gives `Spans_Ok` whenever it returns `Ok`. The walk's check stays, for a certificate built otherwise.
+Two checks of `Accepts` need a word:
+- **`Spans_Ok`** has no hostile certificate file: `Circuit_Certificates.Read` computes the spans from the counts, and its postcondition gives `Spans_Ok` whenever it returns `Ok`. The walk's check is for a certificate built otherwise, and the harness builds one: the honest certificate of `c1` copied into a record with one wire and one hint more after the last span. `Spans_Ok` refuses it, since the spans must end at the last entry, and the walk refuses it with `Cert_Mismatch`; the copy without the tail is accepted.
 - **Too few hints:** not a check of its own. The pair that finds no hint reads one beyond every count and is refused with `Bad_Hint`; the case "one hint fewer" is it.
+
+**`Local_Check`** has its own cases, with no file: a product of two forms, 2 w1 + 3 w2 times 5 w3, against its two terms, accepted; refused with a coefficient changed, a pair mapped to the term of another monomial, and a map entry beyond the terms; and the empty form, whose product is zero, accepted with no term or a term of constant zero and refused with a term of another constant.
 
 **Paragraph D of the record.** The circuit `c1_k` is `c1` with one constant changed, 3 to 9. Its certificate has the same counts and hints, since a hint depends on no coefficient. Both are accepted, and their facts differ: the checker's digest of each equals census.py's, and the two digests are not equal. That the coefficients are the gadgets' constants is the catalogue's check, from block 4.
 
@@ -687,7 +689,7 @@ Two checks of `Accepts` have no hostile certificate of their own:
 
 **census.py's own test,** `scripts/census-test.py`, in the step `lint`: small circuits whose facts are written out by hand, byte for byte, and the certificate census.py writes for them, each named after the rule of ADR 0093 it checks (the order of the slots, zero coefficients kept, the kind from the monomials only, the limit `Max_Form`).
 
-The results, on the proving machine on 27 November 2026: `checker_kat` 26 checks, none failed (23 certificates with their outcome and status, the facts of the two accepted ones against census.py's, and paragraph D); on the registered pair, the checker accepts both circuits and gives census.py's digest of the facts, `69a7ce55…` for the hash circuit and `e34dec13…` for the signature circuit; `census-test.py` 10 checks, none failed.
+The results, on the proving machine on 27 November 2026: `checker_kat` 36 checks, none failed (23 certificates with their outcome and status, the facts of the two accepted ones against census.py's, paragraph D, three on the certificate built directly and seven on `Local_Check`); on the registered pair, the checker accepts both circuits and gives census.py's digest of the facts, `69a7ce55…` for the hash circuit and `e34dec13…` for the signature circuit; `census-test.py` 10 checks, none failed.
 
 ## 6. What stays trusted
 

@@ -92,7 +92,8 @@ package Circuit_Certificates is
       Hints      : Hint_Array (1 .. NH);
    end record;
 
-   --  The spans tile the arrays, layer after layer.
+   --  The spans tile the arrays, layer after layer, from the first entry
+   --  to the last: no entry outside a span.
    function Spans_Ok (K : Certificate) return Boolean is
      (K.NW <= Max_All_Wires and then K.NH <= Max_All_Hints
       and then (K.NL = 0
@@ -109,7 +110,11 @@ package Circuit_Certificates is
                   K.Layers (I).First_Wire
                     = K.Layers (I - 1).First_Wire + K.Layers (I - 1).Wires
                   and then K.Layers (I).First_Hint
-                    = K.Layers (I - 1).First_Hint + K.Layers (I - 1).Hints))
+                    = K.Layers (I - 1).First_Hint + K.Layers (I - 1).Hints)
+      and then (if K.NL = 0 then K.NW = 0 and then K.NH = 0
+                else K.Layers (K.NL).First_Wire + K.Layers (K.NL).Wires = K.NW
+                     and then K.Layers (K.NL).First_Hint
+                              + K.Layers (K.NL).Hints = K.NH))
    with Global => null;
 
    type Cert_Access is access Certificate;

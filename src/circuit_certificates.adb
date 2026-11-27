@@ -249,6 +249,12 @@ package body Circuit_Certificates is
             and then FW = K.Layers (I).First_Wire + K.Layers (I).Wires
             and then FH = K.Layers (I).First_Hint + K.Layers (I).Hints);
       end loop;
+      --  The spans end at the first pass's totals. The second pass reads
+      --  the same bytes, so this refuses nothing the first accepted; it
+      --  states the end of the tiling where the proof sees it.
+      if St = Ok and then (FW /= K.NW or else FH /= K.NH) then
+         St := Bound_Exceeded;
+      end if;
    end Fill;
 
    procedure Read

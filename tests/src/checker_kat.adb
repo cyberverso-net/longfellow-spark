@@ -43,6 +43,7 @@ with Circuit_Checker;
 with Circuit_Checker_GF2_128;
 with Circuit_Check;
 with Circuit_Check_GF2_128;
+with Local_Check_GF2_128;
 
 procedure Checker_KAT is
 
@@ -95,6 +96,8 @@ procedure Checker_KAT is
    package Text_Maps is new Ada.Containers.Indefinite_Ordered_Maps
      (Key_Type => String, Element_Type => String);
    Circuits : Text_Maps.Map;   --  name -> the circuit's bytes, in hex
+   type Bytes_Ptr is access Byte_Array;
+   Honest_Cert : Bytes_Ptr;    --  the certificate of the case "honest"
    Facts    : Text_Maps.Map;   --  name -> census.py's digest, in hex
 
    function Lower (S : String) return String
@@ -224,6 +227,121 @@ procedure Checker_KAT is
    --  The facts of the accepted circuits, by name, for paragraph D.
    Accepted_Facts : Text_Maps.Map;
 
+   -------------------------------------------------------------------
+   --  A certificate built directly, not read
+   -------------------------------------------------------------------
+
+   --  The honest certificate of c1, copied into a record with one wire
+   --  and one hint more after the spans: Spans_Ok refuses the tail, so
+   --  the walk does (Cert_Mismatch); the copy without a tail is accepted.
+   procedure Check_Built (Circuit, Cert : Byte_Array) is
+      use type CK.Status;
+      use type CC.Count_Array;
+      use type CC.Instance_Array;
+      use type CC.Hint_Array;
+      P   : CR.Packed_Access;
+      H   : CR.Header;
+      St  : Circuit_Status.Status;
+      K   : CC.Cert_Access;
+      KSt : CC.Status;
+      WSt : CK.Status;
+   begin
+      CR.Read_Packed (Circuit, False, [others => 0], P, H, St);
+      CC.Read (Cert, K, KSt);
+      if St /= Circuit_Status.Ok or else KSt /= CC.Ok then
+         Check (False, "built: the honest files are refused");
+         return;
+      end if;
+      declare
+         Same_Size : constant CC.Certificate := K.all;
+         Tail      : CC.Certificate (K.NL, K.NW + 1, K.NH + 1);
+      begin
+         CK.Walk (P.all, Same_Size, WSt);
+         Check (WSt = CK.Accepted,
+                "built: the copy is refused, " & Lower (WSt'Image));
+         Tail.Circuit_Id := K.Circuit_Id;
+         Tail.Layers := K.Layers;
+         Tail.Counts := K.Counts & [1 => 0];
+         Tail.Instances := K.Instances & [1 => 0];
+         Tail.Hints := K.Hints & [1 => 0];
+         Check (not CC.Spans_Ok (Tail), "built: Spans_Ok accepts a tail");
+         CK.Walk (P.all, Tail, WSt);
+         Check (WSt = CK.Cert_Mismatch,
+                "built: a tail after the spans, " & Lower (WSt'Image));
+      end;
+   end Check_Built;
+
+   -------------------------------------------------------------------
+   --  Local_Check: the executable check of a product of two forms
+   -------------------------------------------------------------------
+
+   procedure Check_Local is
+      package LC renames Local_Check_GF2_128;
+
+      function E (V : Unsigned_8) return LC.Element is
+         R  : LC.Element;
+         Ok : Boolean;
+      begin
+         GF2_128.From_Bytes ([0 => V, others => 0], R, Ok);
+         if not Ok then
+            raise Program_Error;
+         end if;
+         return R;
+      end E;
+
+      --  A = 2 w1 + 3 w2, B = 5 w3; A * B = (2 * 5) w1 w3 + (3 * 5) w2 w3.
+      A : constant LC.Form_Array :=
+        [1 => (W => 1, C => E (2)), 2 => (W => 2, C => E (3)),
+         others => (W => 0, C => SA.Zero)];
+      B : constant LC.Form_Array :=
+        [1 => (W => 3, C => E (5)), others => (W => 0, C => SA.Zero)];
+      T : LC.Term_Array :=
+        [1 => (H0 => 1, H1 => 3, K => SA."*" (E (2), E (5))),
+         2 => (H0 => 3, H1 => 2, K => SA."*" (E (3), E (5))),
+         others => (H0 => 0, H1 => 0, K => SA.Zero)];
+      M : LC.Pair_Map := [others => [others => 1]];
+      None : constant LC.Form_Array := [others => (W => 0, C => SA.Zero)];
+   begin
+      M (2, 1) := 2;
+      Check (LC.Check_Product (T, 2, A, 2, B, 1, M),
+             "local check: an honest factorisation refused");
+      --  A changed coefficient.
+      declare
+         T2 : LC.Term_Array := T;
+      begin
+         T2 (1).K := SA."+" (T2 (1).K, SA.One);
+         Check (not LC.Check_Product (T2, 2, A, 2, B, 1, M),
+                "local check: a changed coefficient accepted");
+      end;
+      --  A pair mapped to the term of another monomial.
+      declare
+         M2 : LC.Pair_Map := M;
+      begin
+         M2 (1, 1) := 2;
+         Check (not LC.Check_Product (T, 2, A, 2, B, 1, M2),
+                "local check: a wrong monomial accepted");
+      end;
+      --  A map entry beyond the terms.
+      declare
+         M2 : LC.Pair_Map := M;
+      begin
+         M2 (2, 1) := 3;
+         Check (not LC.Check_Product (T, 2, A, 2, B, 1, M2),
+                "local check: a map entry beyond NT accepted");
+      end;
+      --  Empty forms: the product is zero, so no term, or a term whose
+      --  constant is zero, passes, and a term with another constant does
+      --  not.
+      Check (LC.Check_Product (T, 0, None, 0, B, 1, M),
+             "local check: an empty form with no term refused");
+      T (1).K := SA.Zero;
+      Check (LC.Check_Product (T, 1, None, 0, B, 1, M),
+             "local check: an empty form with a zero term refused");
+      T (1).K := E (7);
+      Check (not LC.Check_Product (T, 1, A, 0, B, 1, M),
+             "local check: an empty form with a nonzero term accepted");
+   end Check_Local;
+
    procedure Check_Line (Line : String) is
       type Bounds is record
          Lo, Hi : Natural;
@@ -276,6 +394,9 @@ procedure Checker_KAT is
               (if Instance = "gf2_128" and then Facts.Contains (Circ)
                then Facts (Circ) else "");
          begin
+            if Name = "honest" then
+               Honest_Cert := new Byte_Array'(Cert);
+            end if;
             if Instance = "gf2_128" then
                Run_Registered (Name, Instance, F (5), F (6), Circuit, Cert,
                                Digest);
@@ -337,6 +458,17 @@ begin
           and then Accepted_Facts.Contains ("c1_k")
           and then Accepted_Facts ("c1") /= Accepted_Facts ("c1_k"),
           "paragraph D: c1 and c1_k accepted with different facts");
+   Kat_Sections.Count ("paragraph D", Passed, Failed);
+   --  A certificate built directly, and the local check, need no file.
+   Kat_Sections.Start ("no file", Passed, Failed);
+   if Circuits.Contains ("c1") and then Honest_Cert /= null then
+      Check_Built (From_Hex (Circuits ("c1")), Honest_Cert.all);
+   else
+      Check (False, "built: the honest certificate of c1 is not in the file");
+   end if;
+   Kat_Sections.Count ("built certificate", Passed, Failed);
+   Check_Local;
+   Kat_Sections.Count ("local check", Passed, Failed);
    Kat_Sections.Print;
    TIO.Put_Line ("checker_kat:" & Passed'Image & " passed," & Failed'Image
                  & " failed");
