@@ -336,7 +336,8 @@ package body Circuit_Checker is
    with Ghost => Proof_Only, Global => null,
         Pre  => J <= P.Last_Layer,
         Post => Layer_Facts (P, K, J, V)
-                = (Asserts_Hold (P, K, J, V) and then Declared_Hold (P, K, J, V)
+                = (Asserts_Hold (P, K, J, V)
+                   and then Declared_Hold (P, K, J, V)
                    and then Outputs_Zero (P, K, J, V))
    is
       pragma Annotate
@@ -381,7 +382,6 @@ package body Circuit_Checker is
    subtype Slot_Pos is Natural range 0 .. CC.Capacity'Last;
    type Base_Array is array (Natural range <>) of Slot_Pos;
    type Base_Access is access Base_Array;
-   type Mono_Array is array (Positive range <>) of Monomial;
    type Mono_Access is access Mono_Array;
 
    procedure Free_Shapes is new Ada.Unchecked_Deallocation
@@ -530,6 +530,57 @@ package body Circuit_Checker is
       W  : SA.Element_Array;
       Wr : SA.Seg_Array;
       V  : out SA.Element_Array)
+   is separate;
+
+   --  One step of Slot_Coef, for every wire and slot.
+   procedure Lemma_Slot_Coef_Step
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      M : Shape_Array; CM : Coef_Array; N : Positive; Q : Natural;
+      NO : Natural)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms + 1,
+        Post => (for all G in 0 .. NO - 1 =>
+                   (for all S in 0 .. CC.Max_Count =>
+                      SA.Same
+                        (Slot_Coef (P, K, J, M, CM, N, Q, G, S),
+                         (if Q = 0 then
+                            (if N = 1 then Zero
+                             else Slot_Coef (P, K, J, M, CM, N - 1,
+                                             Pairs (P, J, M, N - 1), G, S))
+                          elsif G = TT (P, J, N).G
+                            and then S = H (P, K, J, M, N, Q)
+                          then SA."+" (Slot_Coef (P, K, J, M, CM, N, Q - 1,
+                                                  G, S),
+                                       Pair_Coef (M, CM, TT (P, J, N), Q))
+                          else Slot_Coef (P, K, J, M, CM, N, Q - 1, G, S)))))
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Slot_Coef);
+   begin
+      null;
+   end Lemma_Slot_Coef_Step;
+
+   procedure Layer_Coefficients
+     (P    : PC.Packed_Circuit;
+      K    : CC.Certificate;
+      J    : Natural;
+      M    : Shape_Array;
+      CM   : Coef_Array;
+      Mono : in out Mono_Array;
+      C    : in out Coef_Pool;
+      Fits : out Boolean)
+   is separate;
+
+   procedure Next_Layer
+     (P    : PC.Packed_Circuit;
+      K    : CC.Certificate;
+      J    : Natural;
+      Vb   : Natural;
+      Mono : Mono_Array;
+      C    : Coef_Pool;
+      NM   : in out Shape_Array;
+      NC   : in out Coef_Array;
+      Lin  : in out Flag_Array)
    is separate;
 
 end Circuit_Checker;

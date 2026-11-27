@@ -28,7 +28,7 @@ is
 
    --  The shapes the model reads: the walk's M, field by field.
    function RJ return Shape_Array is (Reads (P, K, J))
-   with Ghost => Proof_Only, Pre => J <= P.Last_Layer;
+   with Ghost => Proof_Only, Pre => (Proof_Only => J <= P.Last_Layer);
 
    --  What the nested subprograms know of the layer: the precondition of
    --  Check_Layer and the values of the constants above, which they do
@@ -64,15 +64,17 @@ is
       Counts_Ok : out Boolean;
       Fits      : out Boolean)
    with
-     Pre  => Ctx and then Base'First = 0 and then Base'Last = NO,
-     Post => Base'First = 0 and then Base'Last = NO
+     Pre  => (Proof_Only =>
+             Ctx and then Base'First = 0 and then Base'Last = NO),
+     Post => (Proof_Only =>
+             Base'First = 0 and then Base'Last = NO
              and then Counts_Ok
                       = (for all G in 0 .. NO - 1 =>
                            Count_Of (P, K, J, G) <= Max_Slots)
              and then Fits
                       = (Slot_Base (P, K, J, NO)
                          <= Long_Long_Integer (Max_Layer_Slots))
-             and then (if Fits then Bases_Ok (Base))
+             and then (if Fits then Bases_Ok (Base)))
    is
       Total : Long_Long_Integer := 0;
       Cnt   : Natural;
@@ -83,26 +85,29 @@ is
       for G in 0 .. NO - 1 loop
          Lemma_Count_Of (P, K, J, G);
          Cnt := K.Counts (S.First_Wire + G + 1);
-         pragma Assert (Cnt = Count_Of (P, K, J, G));
+         pragma Assert (Proof_Only => Cnt = Count_Of (P, K, J, G));
          Counts_Ok := Counts_Ok and then Cnt <= Max_Slots;
          Lemma_Slot_Base_Def (P, K, J, G + 1);
          Total := Total + Long_Long_Integer (Cnt);
          Base (G + 1) :=
            (if Total <= Long_Long_Integer (Max_Layer_Slots)
             then Natural (Total) else Max_Layer_Slots);
-         pragma Loop_Invariant (Total = Slot_Base (P, K, J, G + 1));
-         pragma Loop_Invariant (Base (0) = 0);
+         pragma Loop_Invariant (Proof_Only =>
+                                  (Total = Slot_Base (P, K, J, G + 1)));
+         pragma Loop_Invariant (Proof_Only => Base (0) = 0);
          pragma Loop_Invariant
-           (Counts_Ok = (for all G2 in 0 .. G =>
-                           Count_Of (P, K, J, G2) <= Max_Slots));
+           (Proof_Only =>
+              (Counts_Ok = (for all G2 in 0 .. G =>
+                             Count_Of (P, K, J, G2) <= Max_Slots)));
          pragma Loop_Invariant
-           (if Total <= Long_Long_Integer (Max_Layer_Slots) then
-              Long_Long_Integer (Base (G + 1)) = Total
-              and then (for all G2 in 0 .. G =>
-                          Base (G2 + 1)
-                          = Base (G2) + Count_Of (P, K, J, G2))
-              and then (for all G2 in 0 .. G + 1 =>
-                          Base (G2) <= Base (G + 1)));
+           (Proof_Only =>
+              (if Total <= Long_Long_Integer (Max_Layer_Slots) then
+                Long_Long_Integer (Base (G + 1)) = Total
+                and then (for all G2 in 0 .. G =>
+                            Base (G2 + 1)
+                            = Base (G2) + Count_Of (P, K, J, G2))
+                and then (for all G2 in 0 .. G + 1 =>
+                            Base (G2) <= Base (G + 1))));
       end loop;
       Fits := Total <= Long_Long_Integer (Max_Layer_Slots);
    end Compute_Bases;
@@ -112,16 +117,18 @@ is
    procedure Lemma_Disjoint (Base : Base_Array; G1 : Natural)
    with
      Ghost => Proof_Only,
-     Pre   => Bases_Ok (Base) and then G1 < NO,
-     Post  => Base (G1) + Count_Of (P, K, J, G1) <= Base (NO)
+     Pre   => (Proof_Only => Bases_Ok (Base) and then G1 < NO),
+     Post  => (Proof_Only =>
+              Base (G1) + Count_Of (P, K, J, G1) <= Base (NO)
               and then (for all G2 in G1 + 1 .. NO =>
-                          Base (G1) + Count_Of (P, K, J, G1) <= Base (G2))
+                          Base (G1) + Count_Of (P, K, J, G1) <= Base (G2)))
    is
    begin
       for G2 in G1 + 1 .. NO loop
          pragma Loop_Invariant
-           (for all G3 in G1 + 1 .. G2 =>
-              Base (G1) + Count_Of (P, K, J, G1) <= Base (G3));
+           (Proof_Only =>
+              (for all G3 in G1 + 1 .. G2 =>
+                Base (G1) + Count_Of (P, K, J, G1) <= Base (G3)));
       end loop;
    end Lemma_Disjoint;
 
@@ -129,16 +136,18 @@ is
    procedure Lemma_Before (Base : Base_Array; G : Natural)
    with
      Ghost => Proof_Only,
-     Pre   => Bases_Ok (Base) and then G < NO,
-     Post  => (for all G1 in 0 .. G - 1 =>
-                 Base (G1) + Count_Of (P, K, J, G1) <= Base (G))
+     Pre   => (Proof_Only => Bases_Ok (Base) and then G < NO),
+     Post  => (Proof_Only =>
+              (for all G1 in 0 .. G - 1 =>
+                 Base (G1) + Count_Of (P, K, J, G1) <= Base (G)))
    is
    begin
       for G1 in 0 .. G - 1 loop
          Lemma_Disjoint (Base, G1);
          pragma Loop_Invariant
-           (for all G3 in 0 .. G1 =>
-              Base (G3) + Count_Of (P, K, J, G3) <= Base (G));
+           (Proof_Only =>
+              (for all G3 in 0 .. G1 =>
+                Base (G3) + Count_Of (P, K, J, G3) <= Base (G)));
       end loop;
    end Lemma_Before;
 
@@ -157,10 +166,11 @@ is
                      Pool (Base (G) + S2 + 1)
                      = Slot_Mono (P, K, J, RJ, N, Q, G, S2)))
    with Ghost => Proof_Only,
-        Pre => Ctx and then Bases_Ok (Base)
+        Pre => (Proof_Only =>
+               Ctx and then Bases_Ok (Base)
                and then Used_A'First = 0 and then Used_A'Last = NO
                and then Pool'First = 1 and then Pool'Last = Max_Layer_Slots
-               and then N <= SA.Max_Terms + 1;
+               and then N <= SA.Max_Terms + 1);
 
    procedure Check_Pair
      (Base   : Base_Array;
@@ -173,7 +183,8 @@ is
       Ok     : in out Boolean;
       Why    : in out Refusal)
    with
-     Pre  => Ctx and then Bases_Ok (Base)
+     Pre  => (Proof_Only =>
+             Ctx and then Bases_Ok (Base)
              and then Used_A'First = 0 and then Used_A'Last = NO
              and then Pool'First = 1 and then Pool'Last = Max_Layer_Slots
              and then N <= L
@@ -183,10 +194,11 @@ is
              and then HP = Hint_Pos (P, J, RJ, N - 1)
                            + Long_Long_Integer (Q - 1)
              and then Ok = Pairs_Ok (P, K, J, RJ, N, Q - 1)
-             and then (if Ok then State_Ok (Base, Used_A, Pool, N, Q - 1)),
-     Post => Used_A'First = 0 and then Used_A'Last = NO
+             and then (if Ok then State_Ok (Base, Used_A, Pool, N, Q - 1))),
+     Post => (Proof_Only =>
+             Used_A'First = 0 and then Used_A'Last = NO
              and then Ok = Pairs_Ok (P, K, J, RJ, N, Q)
-             and then (if Ok then State_Ok (Base, Used_A, Pool, N, Q))
+             and then (if Ok then State_Ok (Base, Used_A, Pool, N, Q)))
    is
       G  : constant Natural := Tm.G;
       Hi : Natural;
@@ -205,40 +217,44 @@ is
       Hi := (if HP < Long_Long_Integer (S.Hints)
              then K.Hints (S.First_Hint + Natural (HP) + 1)
              else CC.Max_Count + 1);
-      pragma Assert (Hi = H (P, K, J, RJ, N, Q));
+      pragma Assert (Proof_Only => Hi = H (P, K, J, RJ, N, Q));
       Pm := Pair_Mono (M, Tm, Q);
       --  M and RJ agree field by field on the two wires the term reads.
       pragma Assert
-        (Shape_At (M, Tm.H1).N = Shape_At (RJ, Tm.H1).N
-         and then Shape_At (M, Tm.H0).N = Shape_At (RJ, Tm.H0).N
-         and then (for all E in Entry_Index =>
-                     Shape_At (M, Tm.H1).V (E) = Shape_At (RJ, Tm.H1).V (E)
-                     and then Shape_At (M, Tm.H0).V (E)
-                              = Shape_At (RJ, Tm.H0).V (E)));
-      pragma Assert (Pm = Pair_Mono (RJ, Tm, Q));
+        (Proof_Only =>
+           (Shape_At (M, Tm.H1).N = Shape_At (RJ, Tm.H1).N
+           and then Shape_At (M, Tm.H0).N = Shape_At (RJ, Tm.H0).N
+           and then (for all E in Entry_Index =>
+                       Shape_At (M, Tm.H1).V (E) = Shape_At (RJ, Tm.H1).V (E)
+                       and then Shape_At (M, Tm.H0).V (E)
+                                = Shape_At (RJ, Tm.H0).V (E))));
+      pragma Assert (Proof_Only => Pm = Pair_Mono (RJ, Tm, Q));
       U := Used_A (G);
-      pragma Assert (U = Used (P, K, J, RJ, N, Q - 1, G));
+      pragma Assert (Proof_Only => U = Used (P, K, J, RJ, N, Q - 1, G));
       if Hi < Count_Of (P, K, J, G) and then Hi <= U then
          if Hi < U then
             pragma Assert
-              (Pool (Base (G) + Hi + 1)
-               = Slot_Mono (P, K, J, RJ, N, Q - 1, G, Hi));
+              (Proof_Only =>
+                 (Pool (Base (G) + Hi + 1)
+                 = Slot_Mono (P, K, J, RJ, N, Q - 1, G, Hi)));
             Ok := Pool (Base (G) + Hi + 1) = Pm;
-            pragma Assert (Ok = Pair_Ok (P, K, J, RJ, N, Q));
+            pragma Assert (Proof_Only => Ok = Pair_Ok (P, K, J, RJ, N, Q));
             if not Ok then
                Why := Wrong_Monomial;
             end if;
          else
             pragma Assert
-              (for all S2 in 0 .. U - 1 =>
-                 Pool (Base (G) + S2 + 1)
-                 = Slot_Mono (P, K, J, RJ, N, Q - 1, G, S2));
+              (Proof_Only =>
+                 (for all S2 in 0 .. U - 1 =>
+                   Pool (Base (G) + S2 + 1)
+                   = Slot_Mono (P, K, J, RJ, N, Q - 1, G, S2)));
             Ok := (for all S2 in 0 .. U - 1 =>
                      Pool (Base (G) + S2 + 1) /= Pm);
             pragma Assert
-              (Ok = (for all S2 in 0 .. U - 1 =>
-                       Slot_Mono (P, K, J, RJ, N, Q - 1, G, S2) /= Pm));
-            pragma Assert (Ok = Pair_Ok (P, K, J, RJ, N, Q));
+              (Proof_Only =>
+                 (Ok = (for all S2 in 0 .. U - 1 =>
+                         Slot_Mono (P, K, J, RJ, N, Q - 1, G, S2) /= Pm)));
+            pragma Assert (Proof_Only => Ok = Pair_Ok (P, K, J, RJ, N, Q));
             if Ok then
                Pool (Base (G) + U + 1) := Pm;
                Used_A (G) := U + 1;
@@ -249,7 +265,7 @@ is
       else
          Ok := False;
          Why := Bad_Hint;
-         pragma Assert (not Pair_Ok (P, K, J, RJ, N, Q));
+         pragma Assert (Proof_Only => not Pair_Ok (P, K, J, RJ, N, Q));
       end if;
    end Check_Pair;
 
@@ -265,15 +281,17 @@ is
       Sh       : out Form_Shape;
       Declared : out Boolean)
    with
-     Pre  => Ctx and then Bases_Ok (Base) and then G < NO
+     Pre  => (Proof_Only =>
+             Ctx and then Bases_Ok (Base) and then G < NO
              and then Pool'First = 1 and then Pool'Last = Max_Layer_Slots
              and then Decl = Declared_Before (P, K, J, RJ, G)
              and then Vb <= Max_Vars and then Decl <= G
              and then (for all S2 in 0 .. Count_Of (P, K, J, G) - 1 =>
                          Pool (Base (G) + S2 + 1)
-                         = Mono_End (P, K, J, RJ, G, S2)),
-     Post => Sh = Out_Shape (P, K, J, RJ, Vb, G)
-             and then Declared = not Linear (P, K, J, RJ, G)
+                         = Mono_End (P, K, J, RJ, G, S2))),
+     Post => (Proof_Only =>
+             Sh = Out_Shape (P, K, J, RJ, Vb, G)
+             and then Declared = not Linear (P, K, J, RJ, G))
    is
       Cn    : constant Natural := Count_Of (P, K, J, G);
       Lin   : Boolean;
@@ -285,26 +303,30 @@ is
          All_A := All_A and then Pool (Base (G) + S2 + 1).A = 0;
          Const := Const or else Pool (Base (G) + S2 + 1).B = 0;
          pragma Loop_Invariant
-           (All_A = (for all S3 in 0 .. S2 =>
-                       Mono_End (P, K, J, RJ, G, S3).A = 0));
+           (Proof_Only =>
+              (All_A = (for all S3 in 0 .. S2 =>
+                         Mono_End (P, K, J, RJ, G, S3).A = 0)));
          pragma Loop_Invariant
-           (Const = (for some S3 in 0 .. S2 =>
-                       Mono_End (P, K, J, RJ, G, S3).B = 0));
+           (Proof_Only =>
+              (Const = (for some S3 in 0 .. S2 =>
+                         Mono_End (P, K, J, RJ, G, S3).B = 0)));
       end loop;
       Lin := All_A and then Cn <= Max_Form + (if Const then 1 else 0);
-      pragma Assert (Lin = Linear (P, K, J, RJ, G));
+      pragma Assert (Proof_Only => Lin = Linear (P, K, J, RJ, G));
       Declared := not Lin;
       if Lin then
-         pragma Assert (Cn <= Max_Entries);
+         pragma Assert (Proof_Only => Cn <= Max_Entries);
          Sh := (N => Cn, V => [others => 0]);
          for E2 in 1 .. Cn loop
             Sh.V (E2) := Pool (Base (G) + E2).B;
-            pragma Loop_Invariant (Sh.N = Cn);
+            pragma Loop_Invariant (Proof_Only => Sh.N = Cn);
             pragma Loop_Invariant
-              (for all E3 in 1 .. E2 =>
-                 Sh.V (E3) = Mono_End (P, K, J, RJ, G, E3 - 1).B);
+              (Proof_Only =>
+                 (for all E3 in 1 .. E2 =>
+                   Sh.V (E3) = Mono_End (P, K, J, RJ, G, E3 - 1).B));
             pragma Loop_Invariant
-              (for all E3 in E2 + 1 .. Max_Entries => Sh.V (E3) = 0);
+              (Proof_Only =>
+                 (for all E3 in E2 + 1 .. Max_Entries => Sh.V (E3) = 0));
          end loop;
       else
          Sh := (N => 1, V => [1 => Vb + Decl, others => 0]);
@@ -318,17 +340,19 @@ is
       Next : out Shape_Access;
       Decl : out Natural)
    with
-     Pre  => Ctx and then Bases_Ok (Base)
+     Pre  => (Proof_Only =>
+             Ctx and then Bases_Ok (Base)
              and then Pool'First = 1 and then Pool'Last = Max_Layer_Slots
              and then (for all G in 0 .. NO - 1 =>
                          (for all S2 in 0 .. Count_Of (P, K, J, G) - 1 =>
                             Pool (Base (G) + S2 + 1)
-                            = Mono_End (P, K, J, RJ, G, S2))),
-     Post => Next /= null and then Next'First = 0
+                            = Mono_End (P, K, J, RJ, G, S2)))),
+     Post => (Proof_Only =>
+             Next /= null and then Next'First = 0
              and then Next'Last = NO - 1
              and then Same_Shapes (Next.all, Out_Shapes (P, K, J, RJ, Vb))
              and then Decl = Declared_Before (P, K, J, RJ, NO)
-             and then Decl <= NO
+             and then Decl <= NO)
    is
       Sh       : Form_Shape;
       Declared : Boolean;
@@ -344,16 +368,20 @@ is
             Decl := Decl + 1;
          end if;
          pragma Loop_Invariant
-           (Next /= null and then Next'First = 0
-            and then Next'Last = NO - 1);
+           (Proof_Only =>
+              (Next /= null and then Next'First = 0
+              and then Next'Last = NO - 1));
          pragma Loop_Invariant
-           (Decl = Declared_Before (P, K, J, RJ, G + 1)
-            and then Decl <= G + 1);
+           (Proof_Only =>
+              (Decl = Declared_Before (P, K, J, RJ, G + 1)
+              and then Decl <= G + 1));
          pragma Loop_Invariant
-           (for all G2 in 0 .. G =>
-              Next (G2) = Out_Shape (P, K, J, RJ, Vb, G2));
+           (Proof_Only =>
+              (for all G2 in 0 .. G =>
+                Next (G2) = Out_Shape (P, K, J, RJ, Vb, G2)));
       end loop;
-      pragma Assert (Same_Shapes (Next.all, Out_Shapes (P, K, J, RJ, Vb)));
+      pragma Assert (Proof_Only =>
+                       (Same_Shapes (Next.all, Out_Shapes (P, K, J, RJ, Vb))));
    end Build_Next;
 
    Base   : Base_Access;
@@ -370,21 +398,22 @@ is
 begin
    Next := null;
    Vb_Next := Vb;
-   pragma Assert (S = Span (P, K, J));
+   pragma Assert (Proof_Only => S = Span (P, K, J));
    if S.Wires /= NO then
       Lemma_Layer_Ok_Def (P, K, J, RJ);
-      pragma Assert (not Layer_Ok (P, K, J, RJ));
+      pragma Assert (Proof_Only => not Layer_Ok (P, K, J, RJ));
       St := Cert_Mismatch;
       return;
    end if;
-   pragma Assert (NO <= SA.Max_Wires and then NW <= SA.Max_Wires);
-   pragma Assert (Ctx);
+   pragma Assert (Proof_Only =>
+                    (NO <= SA.Max_Wires and then NW <= SA.Max_Wires));
+   pragma Assert (Proof_Only => Ctx);
 
    Base := new Base_Array'(0 .. NO => 0);
    Compute_Bases (Base.all, Counts_Ok, Fits);
    if not Fits then
       Lemma_Layer_Ok_Def (P, K, J, RJ);
-      pragma Assert (not Layer_Ok (P, K, J, RJ));
+      pragma Assert (Proof_Only => not Layer_Ok (P, K, J, RJ));
       Free_Bases (Base);
       St := Pool_Full;
       return;
@@ -395,60 +424,70 @@ begin
    PC.Lemma_Valid (P);
    --  The terms of the layer name wires in range: the conjunct of
    --  Well_Formed on layer J of the expansion, whose layer table is P's.
-   pragma Assert (PC.Expand (P).Layers (J) = P.Layers (J));
+   pragma Assert (Proof_Only => PC.Expand (P).Layers (J) = P.Layers (J));
    pragma Assert
-     (SA.Fits (PC.Expand (P).Terms (P.Layers (J).First .. P.Layers (J).Last),
-               NO, NW));
+     (Proof_Only =>
+        (SA.Fits (PC.Expand (P).Terms (P.Layers (J).First .. P.Layers (J).Last),
+                 NO, NW)));
    PC.Lemma_Walked_Start (P, J);
    Lemma_Hint_Pos_Zero (P, J, RJ);
    Lemma_Used_All (P, K, J, RJ, 1, 0, NO);
    Lemma_Slot_Mono_All (P, K, J, RJ, 1, 0, NO);
-   pragma Assert (State_Ok (Base.all, Used_A.all, Pool, 1, 0));
+   pragma Assert (Proof_Only => State_Ok (Base.all, Used_A.all, Pool, 1, 0));
    for N in 1 .. L loop
       pragma Loop_Invariant (Proof_Only => PC.Walked (P, J, N - 1, C));
       pragma Loop_Invariant
-        (Base /= null and then Used_A /= null and then Terms /= null
-         and then Base'First = 0 and then Base'Last = NO
-         and then Used_A'First = 0 and then Used_A'Last = NO
-         and then Terms'First = 0 and then Terms'Last = NO);
-      pragma Loop_Invariant (Bases_Ok (Base.all));
-      pragma Loop_Invariant (HP = Hint_Pos (P, J, RJ, N - 1));
+        (Proof_Only =>
+           (Base /= null and then Used_A /= null and then Terms /= null
+           and then Base'First = 0 and then Base'Last = NO
+           and then Used_A'First = 0 and then Used_A'Last = NO
+           and then Terms'First = 0 and then Terms'Last = NO));
+      pragma Loop_Invariant (Proof_Only => Bases_Ok (Base.all));
+      pragma Loop_Invariant (Proof_Only => HP = Hint_Pos (P, J, RJ, N - 1));
       pragma Loop_Invariant
-        (for all G in 0 .. NO - 1 =>
-           Terms (G) = Wire_Terms (P, J, N - 1, G)
-           and then Terms (G) <= N - 1);
+        (Proof_Only =>
+           (for all G in 0 .. NO - 1 =>
+             Terms (G) = Wire_Terms (P, J, N - 1, G)
+             and then Terms (G) <= N - 1));
       pragma Loop_Invariant
-        (Pairs_Ok_F = (N = 1
-                       or else Pairs_Ok (P, K, J, RJ, N - 1,
-                                         Pairs (P, J, RJ, N - 1))));
+        (Proof_Only =>
+           (Pairs_Ok_F = (N = 1
+                         or else Pairs_Ok (P, K, J, RJ, N - 1,
+                                           Pairs (P, J, RJ, N - 1)))));
       pragma Loop_Invariant
-        (if Pairs_Ok_F then State_Ok (Base.all, Used_A.all, Pool, N, 0));
+        (Proof_Only =>
+           (if Pairs_Ok_F then State_Ok (Base.all, Used_A.all, Pool, N, 0)));
       PC.Lemma_Walked_Step (P, J, N, C);
       Tm := PC.Term_Of (P, C);
       C := PC.Step (P, C);
-      pragma Assert (Tm = PC.Expand (P).Terms (P.Layers (J).First + N - 1));
-      pragma Assert (Tm = TT (P, J, N));
+      pragma Assert (Proof_Only =>
+                       (Tm = PC.Expand (P).Terms (P.Layers (J).First + N - 1)));
+      pragma Assert (Proof_Only => Tm = TT (P, J, N));
       pragma Assert
-        (Tm.G < NO and then Tm.H0 < NW and then Tm.H1 < NW);
+        (Proof_Only => Tm.G < NO and then Tm.H0 < NW and then Tm.H1 < NW);
       Lemma_Wire_Terms_All (P, J, N, NO);
       Lemma_Hint_Pos_Step (P, J, RJ, N);
       Lemma_Pairs_Ok_Def (P, K, J, RJ, N, 0);
       if Tm.K /= Zero then
          Terms (Tm.G) := Terms (Tm.G) + 1;
          pragma Assert
-           (Shape_At (M, Tm.H1).N * Shape_At (M, Tm.H0).N
-            = Pairs (P, J, RJ, N));
+           (Proof_Only =>
+              (Shape_At (M, Tm.H1).N * Shape_At (M, Tm.H0).N
+              = Pairs (P, J, RJ, N)));
          for Q in 1 .. Shape_At (M, Tm.H1).N * Shape_At (M, Tm.H0).N loop
             pragma Loop_Invariant
-              (HP = Hint_Pos (P, J, RJ, N - 1) + Long_Long_Integer (Q - 1));
+              (Proof_Only =>
+                 (HP = Hint_Pos (P, J, RJ, N - 1) + Long_Long_Integer (Q - 1)));
             pragma Loop_Invariant
-              (Pairs_Ok_F = Pairs_Ok (P, K, J, RJ, N, Q - 1));
+              (Proof_Only => Pairs_Ok_F = Pairs_Ok (P, K, J, RJ, N, Q - 1));
             pragma Loop_Invariant
-              (if Pairs_Ok_F then
-                 State_Ok (Base.all, Used_A.all, Pool, N, Q - 1));
+              (Proof_Only =>
+                 (if Pairs_Ok_F then
+                   State_Ok (Base.all, Used_A.all, Pool, N, Q - 1)));
             pragma Loop_Invariant
-              (Bases_Ok (Base.all)
-               and then Used_A'First = 0 and then Used_A'Last = NO);
+              (Proof_Only =>
+                 (Bases_Ok (Base.all)
+                 and then Used_A'First = 0 and then Used_A'Last = NO));
             Check_Pair (Base.all, Used_A.all, Pool, Tm, N, Q, HP,
                         Pairs_Ok_F, Pair_Why);
             HP := HP + 1;
@@ -456,31 +495,36 @@ begin
       end if;
       --  The state after term N is the model's at (N, Pairs (N)), which
       --  is its state at (N + 1, 0).
-      pragma Assert (HP = Hint_Pos (P, J, RJ, N));
+      pragma Assert (Proof_Only => HP = Hint_Pos (P, J, RJ, N));
       pragma Assert
-        (Pairs_Ok_F = Pairs_Ok (P, K, J, RJ, N, Pairs (P, J, RJ, N)));
+        (Proof_Only =>
+           (Pairs_Ok_F = Pairs_Ok (P, K, J, RJ, N, Pairs (P, J, RJ, N))));
       pragma Assert
-        (if Pairs_Ok_F then
-           State_Ok (Base.all, Used_A.all, Pool, N, Pairs (P, J, RJ, N)));
+        (Proof_Only =>
+           (if Pairs_Ok_F then
+             State_Ok (Base.all, Used_A.all, Pool, N, Pairs (P, J, RJ, N))));
       Lemma_Used_All (P, K, J, RJ, N + 1, 0, NO);
       Lemma_Slot_Mono_All (P, K, J, RJ, N + 1, 0, NO);
       Lemma_Pairs_Ok_Def (P, K, J, RJ, N + 1, 0);
    end loop;
 
    --  The end of the walk of the layer, in the model's terms.
-   pragma Assert (HP = Hint_Pos (P, J, RJ, L));
+   pragma Assert (Proof_Only => HP = Hint_Pos (P, J, RJ, L));
    pragma Assert
-     (for all G in 0 .. NO - 1 => Terms (G) = Wire_Terms (P, J, L, G));
+     (Proof_Only =>
+        (for all G in 0 .. NO - 1 => Terms (G) = Wire_Terms (P, J, L, G)));
    pragma Assert
-     (Pairs_Ok_F
-      = (L = 0 or else Pairs_Ok (P, K, J, RJ, L, Pairs (P, J, RJ, L))));
+     (Proof_Only =>
+        (Pairs_Ok_F
+        = (L = 0 or else Pairs_Ok (P, K, J, RJ, L, Pairs (P, J, RJ, L)))));
    pragma Assert
-     (if Pairs_Ok_F then
-        (for all G in 0 .. NO - 1 =>
-           Used_A (G) = Used_End (P, K, J, RJ, G)
-           and then (for all S2 in 0 .. Used_A (G) - 1 =>
-                       Pool (Base (G) + S2 + 1)
-                       = Mono_End (P, K, J, RJ, G, S2))));
+     (Proof_Only =>
+        (if Pairs_Ok_F then
+          (for all G in 0 .. NO - 1 =>
+             Used_A (G) = Used_End (P, K, J, RJ, G)
+             and then (for all S2 in 0 .. Used_A (G) - 1 =>
+                         Pool (Base (G) + S2 + 1)
+                         = Mono_End (P, K, J, RJ, G, S2)))));
 
    declare
       Ok : constant Boolean :=
@@ -492,7 +536,7 @@ begin
       Decl     : Natural := 0;
    begin
       Lemma_Layer_Ok_Def (P, K, J, RJ);
-      pragma Assert (Ok = Layer_Ok (P, K, J, RJ));
+      pragma Assert (Proof_Only => Ok = Layer_Ok (P, K, J, RJ));
       if not Ok then
          St := (if not Counts_Ok then Too_Many_Slots
                 elsif not Pairs_Ok_F then Pair_Why
@@ -511,9 +555,10 @@ begin
             St := Accepted;
          end if;
          pragma Assert
-           ((St = Accepted)
-            = (Layer_Ok (P, K, J, RJ)
-               and then Vb + Declared_Before (P, K, J, RJ, NO) <= Max_Vars));
+           (Proof_Only =>
+              (St = Accepted)
+              = (Layer_Ok (P, K, J, RJ)
+                 and then Vb + Declared_Before (P, K, J, RJ, NO) <= Max_Vars));
       end if;
    end;
    Free_Bases (Base);

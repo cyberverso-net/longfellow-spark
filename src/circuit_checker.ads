@@ -23,19 +23,22 @@
 --  the next variable, which the checker numbers in the order of the
 --  walk). The certificate names no variable, no coefficient, no kind.
 --
---  What is proved, in two parts:
+--  What is proved, in three parts:
 --
 --  - Walk computes Accepts exactly: (St = Accepted) = Accepts (P, K).
 --    Accepts is a function of the circuit and the certificate, defined
 --    by a model of the walk over the shapes of the meanings (their
---    variables), which is all that acceptance depends on. Coverage is
---    by construction: the model ranges over the circuit's terms and
---    wires, not over the certificate's entries.
---  - Lemma_Accepts (block 3, in the body's second part): when Accepts
---    holds and the packed evaluation of the verifier returned OK, with
---    input wire 0 equal to one, there are values of the declared
---    variables, each the value of its home wire, at which every fact of
---    the model holds.
+--    variables and monomials), which is all that acceptance depends on;
+--    it never compares a coefficient. Coverage is by construction: the
+--    model ranges over the circuit's terms and wires, not over the
+--    certificate's entries.
+--  - Lemma_Accepts, the theorem: when Accepts holds and the packed
+--    evaluation of the verifier returned OK, with input wire 0 equal to
+--    one, the values of the home wires (Homes_Hold) satisfy every fact
+--    of the model (Facts_Hold), with the coefficients of the model of
+--    the coefficients, a function of the circuit and the certificate.
+--  - Layer_Coefficients and Next_Layer compute a layer's slots, their
+--    coefficients and the meanings of its wires, Same to the model's.
 --
 --  The model is written as recursive expression functions over the
 --  position of the walk in a layer: the terms before N, and the first Q
@@ -45,8 +48,9 @@
 --  Documentation: docs/guide/10-certified-circuits.md, Section 3.
 --  Decisions: ADR 0091, ADR 0093 (the model, the limits).
 --
---  Proof status (per instance): Walk Gold against Accepts, Silver on its
---  statuses.
+--  Proof status (per instance): Gold. Walk against Accepts, and Silver
+--  on its statuses; Lemma_Accepts; Layer_Coefficients and Next_Layer
+--  against the model.
 --
 --  Trusted: Same as the equality of the field (register row T6); the
 --  contracts at Proof_Only, the model among them, never compiled (T8);
@@ -768,5 +772,131 @@ package Circuit_Checker is
      Post   =>
        (Proof_Only =>
           (St = Accepted) = Accepts (P, K));
+
+   -------------------------------------------------------------------
+   --  The coefficients (ADR 0093: what is structural and what is ghost)
+   -------------------------------------------------------------------
+
+   --  The slots of one layer, laid out wire by wire from the counts, as
+   --  the walk lays out its pool: wire G's slot S is at Slot_Base (G) +
+   --  S + 1.
+   type Mono_Array is array (Positive range <>) of Monomial;
+   type Coef_Pool is array (Positive range <>) of Element;
+   type Flag_Array is array (Natural range <>) of Boolean;
+
+   --  Two arrays of coefficients with the same bounds and, entry by
+   --  entry, the same elements.
+   function Same_Coefs (A, B : Coef_Array) return Boolean is
+     (A'First = B'First and then A'Last = B'Last
+      and then (for all H in A'Range =>
+                  (for all E in Entry_Index =>
+                     SA.Same (A (H) (E), B (H) (E)))))
+   with Ghost => Proof_Only, Global => null;
+
+   --  The coefficients of the inputs' meanings: one each.
+   function Input_Coefs (P : PC.Packed_Circuit) return Coef_Array is
+     ([for I in 0 .. P.Ninput - 1 => Coef_List'[1 => SA.One, others => Zero]])
+   with Global => null;
+
+   --  The slots of layer J from the certificate's counts and hints: each
+   --  slot's monomial, and the coefficient it collects from the circuit's
+   --  constants and the coefficients CM of the meanings it reads. Nothing
+   --  is checked: a hint beyond its wire's count is skipped (the walk
+   --  refuses such a certificate). Fits is false when the counts do not
+   --  fit the pool. The result is the model's, Mono_End and Coef_End:
+   --  the same sums in the same order, so Same by construction.
+   procedure Layer_Coefficients
+     (P    : PC.Packed_Circuit;
+      K    : CC.Certificate;
+      J    : Natural;
+      M    : Shape_Array;
+      CM   : Coef_Array;
+      Mono : in out Mono_Array;
+      C    : in out Coef_Pool;
+      Fits : out Boolean)
+   with
+     Global => null,
+     Pre    =>
+       (Runtime    =>
+          J <= P.Last_Layer and then M'First = 0
+          and then M'Last = P.Layers (J).NW_In - 1
+          and then CM'First = 0 and then CM'Last = M'Last
+          and then Mono'First = 1 and then Mono'Last = Max_Layer_Slots
+          and then C'First = 1 and then C'Last = Max_Layer_Slots
+          and then CC.Spans_Ok (K) and then K.NL = P.Last_Layer + 1,
+        Proof_Only =>
+          PC.Valid (P) and then SA.Well_Formed (PC.Expand (P))
+          and then Span (P, K, J).Wires = Out_Count (P, J)
+          and then Same_Shapes (M, Reads (P, K, J))
+          and then Same_Coefs (CM, Read_Coefs (P, K, J))),
+     Post   =>
+       (Proof_Only =>
+          Fits = (Slot_Base (P, K, J, Out_Count (P, J))
+                  <= Long_Long_Integer (Max_Layer_Slots))
+          and then
+          (if Fits then
+             (for all G in 0 .. Out_Count (P, J) - 1 =>
+                Slot_Base (P, K, J, G) + Long_Long_Integer
+                                           (Count_Of (P, K, J, G))
+                <= Long_Long_Integer (Max_Layer_Slots)
+                and then
+                (for all S in 0 .. Count_Of (P, K, J, G) - 1 =>
+                   Mono (Natural (Slot_Base (P, K, J, G)) + S + 1)
+                   = Mono_End (P, K, J, Reads (P, K, J), G, S)
+                   and then
+                   SA.Same (C (Natural (Slot_Base (P, K, J, G)) + S + 1),
+                            Coef_End (P, K, J, Reads (P, K, J),
+                                      Read_Coefs (P, K, J), G, S))))));
+
+   --  The meanings of layer J's wires from its slots: a linear wire's
+   --  meaning is its slots, a declared wire's is its variable, numbered
+   --  from Vb in wire order. Lin gives the kinds. The result is the
+   --  model's, Out_Shapes and Out_Coefs.
+   procedure Next_Layer
+     (P    : PC.Packed_Circuit;
+      K    : CC.Certificate;
+      J    : Natural;
+      Vb   : Natural;
+      Mono : Mono_Array;
+      C    : Coef_Pool;
+      NM   : in out Shape_Array;
+      NC   : in out Coef_Array;
+      Lin  : in out Flag_Array)
+   with
+     Global => null,
+     Pre    =>
+       (Runtime    =>
+          J <= P.Last_Layer and then Vb <= Max_Vars
+          and then Mono'First = 1 and then Mono'Last = Max_Layer_Slots
+          and then C'First = 1 and then C'Last = Max_Layer_Slots
+          and then NM'First = 0 and then NM'Last = Out_Count (P, J) - 1
+          and then NC'First = 0 and then NC'Last = NM'Last
+          and then Lin'First = 0 and then Lin'Last = NM'Last
+          and then CC.Spans_Ok (K) and then K.NL = P.Last_Layer + 1,
+        Proof_Only =>
+          PC.Valid (P) and then SA.Well_Formed (PC.Expand (P))
+          and then Span (P, K, J).Wires = Out_Count (P, J)
+          and then Slot_Base (P, K, J, Out_Count (P, J))
+                   <= Long_Long_Integer (Max_Layer_Slots)
+          and then
+          (for all G in 0 .. Out_Count (P, J) - 1 =>
+             Slot_Base (P, K, J, G) + Long_Long_Integer
+                                        (Count_Of (P, K, J, G))
+             <= Long_Long_Integer (Max_Layer_Slots)
+             and then
+             (for all S in 0 .. Count_Of (P, K, J, G) - 1 =>
+                Mono (Natural (Slot_Base (P, K, J, G)) + S + 1)
+                = Mono_End (P, K, J, Reads (P, K, J), G, S)
+                and then
+                SA.Same (C (Natural (Slot_Base (P, K, J, G)) + S + 1),
+                         Coef_End (P, K, J, Reads (P, K, J),
+                                   Read_Coefs (P, K, J), G, S))))),
+     Post   =>
+       (Proof_Only =>
+          Same_Shapes (NM, Out_Shapes (P, K, J, Reads (P, K, J), Vb))
+          and then Same_Coefs (NC, Out_Coefs (P, K, J, Reads (P, K, J),
+                                              Read_Coefs (P, K, J)))
+          and then (for all G in 0 .. Out_Count (P, J) - 1 =>
+                      Lin (G) = Linear (P, K, J, Reads (P, K, J), G)));
 
 end Circuit_Checker;

@@ -1032,6 +1032,35 @@ is
       Lemma_Asserts_Of (J, X, Wr (J + 1).all);
    end Lemma_Asserts;
 
+   --  One output of layer 0: its value is zero and its meaning, so its
+   --  meaning is zero.
+   procedure Lemma_Output (X : SA.Element_Array; G : Natural)
+   with Ghost => Proof_Only,
+        Pre  => Len (P, 0) <= SA.Max_Terms
+                and then Out_Count (P, 0) <= SA.Max_Wires
+                and then G < Out_Count (P, 0)
+                and then Wr'First = 0 and then Wr'Last = P.Last_Layer + 1
+                and then Wr (0) /= null
+                and then Wr (0)'First = 0
+                and then SA.F."=" (SA.W_At (Wr (0).all, G), Zero)
+                and then Same (SA.W_At (Wr (0).all, G),
+                               Mean (Out_Shapes (P, K, 0, Reads (P, K, 0),
+                                                 First_Var (P, K, 0)),
+                                     Out_Coefs (P, K, 0, Reads (P, K, 0),
+                                                Read_Coefs (P, K, 0)),
+                                     X, G)),
+        Post => Eval_Meaning
+                  (Out_Shape (P, K, 0, Reads (P, K, 0), First_Var (P, K, 0), G),
+                   Coefs_At (Out_Coefs (P, K, 0, Reads (P, K, 0),
+                                        Read_Coefs (P, K, 0)), G),
+                   X, Out_Shape (P, K, 0, Reads (P, K, 0),
+                                 First_Var (P, K, 0), G).N)
+                = Zero
+   is
+   begin
+      null;
+   end Lemma_Output;
+
    --  One layer: its wires' values are their meanings, and its facts
    --  hold.
    procedure Lemma_Layer (J : Natural; X : SA.Element_Array)
@@ -1101,6 +1130,7 @@ is
       if J = 0 then
          for G in 0 .. NO - 1 loop
             pragma Assert (SA.F."=" (SA.W_At (Wr (J).all, G), Zero));
+            Lemma_Output (X, G);
             pragma Loop_Invariant
               (for all G2 in 0 .. G =>
                  Eval_Meaning

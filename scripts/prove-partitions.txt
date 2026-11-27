@@ -28,4 +28,4 @@ ligero-prover ligero_prover_gf2_128 ligero_prover_p256 zk_prover_gf2_128 zk_prov
 packed_hquad packed_hquad_gf2_128 packed_hquad_p256 packed_eval_gf2_128 packed_eval_p256
 mdoc       mdoc_status cbor_encode mdoc_mac mdoc_proof device_auth mdoc_spec mdoc_inputs mdoc_verifier mdoc_prover_lib
 local-check local_check_gf2_128
-checker    circuit_certificates circuit_checker_gf2_128
+checker    circuit_certificates circuit_checker_gf2_128 circuit_check_gf2_128

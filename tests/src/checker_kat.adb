@@ -1,0 +1,455 @@
+--  CHECKER_KAT: the harness of the circuit checker (ADR 0093) on the
+--  vectors of gen_checker_vectors.py: small circuits written by hand,
+--  their honest certificates, which are accepted, and one hostile
+--  certificate for each check of Circuit_Checker.Accepts and each status
+--  of the certificate reader, each refused with its status.
+--
+--  Every certificate goes through Circuit_Check, the checker on two
+--  files: the circuit's reader, the certificate's reader, the comparison
+--  of the identifiers, the walk. The capacities are reached on small
+--  instances of the checker, each with one limit low.
+--
+--  For every accepted certificate the facts are computed with
+--  Layer_Coefficients and Next_Layer, digested as scripts/census.py
+--  digests them (the order of the walk, the same bytes), and compared
+--  with census.py's digest in the vector file. Two circuits that differ
+--  in one constant are accepted with the same hints and have different
+--  facts (paragraph D of the record).
+--
+--  Test code, outside the proof perimeter: SPARK_Mode is Off. Built with
+--  -gnata, so the library's executable contracts run. Reads the vector
+--  file given as argument (default: tests/vectors/checker.txt).
+--
+--  Exit status: success only if at least one case ran and none failed.
+
+pragma SPARK_Mode (Off);
+
+with Ada.Characters.Handling;
+with Ada.Command_Line;
+with Ada.Containers.Indefinite_Ordered_Maps;
+with Ada.Exceptions;
+with Ada.Text_IO;
+with Interfaces;    use Interfaces;
+with Bytes;         use Bytes;
+with Sha256;
+with GF2_128;
+with Kat_Sections;
+with Circuit_Status;
+with Circuit_Certificates;
+with Sumcheck_Algebra_GF2_128;
+with Packed_Circuits_GF2_128;
+with Circuit_Reader_GF2_128;
+with Circuit_Checker;
+with Circuit_Checker_GF2_128;
+with Circuit_Check;
+with Circuit_Check_GF2_128;
+
+procedure Checker_KAT is
+
+   package TIO renames Ada.Text_IO;
+   package SA renames Sumcheck_Algebra_GF2_128;
+   package PC renames Packed_Circuits_GF2_128;
+   package CR renames Circuit_Reader_GF2_128;
+   package CC renames Circuit_Certificates;
+   package CK renames Circuit_Checker_GF2_128;
+
+   use type SA.Element;
+   use type Circuit_Status.Status;
+   use type CC.Status;
+
+   --  The small instances: one limit each, the others as the registered
+   --  instance's.
+   package Small_Terms is new Circuit_Checker
+     (SA, PC, Max_Form => 3, Max_Terms_Per_Wire => 2, Max_Slots => 128,
+      Max_Layer_Slots => 2 ** 22, Max_Vars => 2 ** 22);
+   package Small_Slots is new Circuit_Checker
+     (SA, PC, Max_Form => 3, Max_Terms_Per_Wire => 128, Max_Slots => 3,
+      Max_Layer_Slots => 2 ** 22, Max_Vars => 2 ** 22);
+   package Small_Pool is new Circuit_Checker
+     (SA, PC, Max_Form => 3, Max_Terms_Per_Wire => 128, Max_Slots => 128,
+      Max_Layer_Slots => 5, Max_Vars => 2 ** 22);
+   package Small_Vars is new Circuit_Checker
+     (SA, PC, Max_Form => 3, Max_Terms_Per_Wire => 128, Max_Slots => 128,
+      Max_Layer_Slots => 2 ** 22, Max_Vars => 5);
+   package Small_Inputs is new Circuit_Checker
+     (SA, PC, Max_Form => 3, Max_Terms_Per_Wire => 128, Max_Slots => 128,
+      Max_Layer_Slots => 2 ** 22, Max_Vars => 3);
+
+   package Check_Terms is new Circuit_Check (SA, PC, CR, Small_Terms);
+   package Check_Slots is new Circuit_Check (SA, PC, CR, Small_Slots);
+   package Check_Pool is new Circuit_Check (SA, PC, CR, Small_Pool);
+   package Check_Vars is new Circuit_Check (SA, PC, CR, Small_Vars);
+   package Check_Inputs is new Circuit_Check (SA, PC, CR, Small_Inputs);
+
+   Default_Path : constant String := "tests/vectors/checker.txt";
+
+   --  The pool of the registered instance (Max_Layer_Slots).
+   Pool_Size : constant := 2 ** 22;
+
+   Passed  : Natural := 0;
+   Failed  : Natural := 0;
+   Line_No : Natural := 0;
+
+   Parse_Error : exception;
+
+   package Text_Maps is new Ada.Containers.Indefinite_Ordered_Maps
+     (Key_Type => String, Element_Type => String);
+   Circuits : Text_Maps.Map;   --  name -> the circuit's bytes, in hex
+   Facts    : Text_Maps.Map;   --  name -> census.py's digest, in hex
+
+   function Lower (S : String) return String
+     renames Ada.Characters.Handling.To_Lower;
+
+   procedure Check (Ok : Boolean; Msg : String) is
+   begin
+      if Ok then
+         Passed := Passed + 1;
+      else
+         Failed := Failed + 1;
+         TIO.Put_Line ("FAIL line" & Line_No'Image & ": " & Msg);
+      end if;
+   end Check;
+
+   function Hex_Digit (C : Character) return Unsigned_8 is
+   begin
+      case C is
+         when '0' .. '9' =>
+            return Character'Pos (C) - Character'Pos ('0');
+         when 'a' .. 'f' =>
+            return Character'Pos (C) - Character'Pos ('a') + 10;
+         when others =>
+            raise Parse_Error with "bad hex digit '" & C & "'";
+      end case;
+   end Hex_Digit;
+
+   function From_Hex (S : String) return Byte_Array is
+      R : Byte_Array (0 .. S'Length / 2 - 1);
+   begin
+      if S'Length mod 2 /= 0 then
+         raise Parse_Error with "odd number of hex digits";
+      end if;
+      for I in R'Range loop
+         R (I) := Shift_Left (Hex_Digit (S (S'First + 2 * I)), 4)
+                  or Hex_Digit (S (S'First + 2 * I + 1));
+      end loop;
+      return R;
+   end From_Hex;
+
+   function To_Hex (B : Byte_Array) return String is
+      Hex : constant String := "0123456789abcdef";
+      R   : String (1 .. 2 * B'Length);
+   begin
+      for I in 0 .. B'Length - 1 loop
+         R (2 * I + 1) := Hex (Integer (Shift_Right (B (B'First + I), 4)) + 1);
+         R (2 * I + 2) := Hex (Integer (B (B'First + I) and 15) + 1);
+      end loop;
+      return R;
+   end To_Hex;
+
+   -------------------------------------------------------------------
+   --  The facts, digested as scripts/census.py digests them
+   -------------------------------------------------------------------
+
+   type Shape_Ptr is access CK.Shape_Array;
+   type Coef_Ptr is access CK.Coef_Array;
+   type Flag_Ptr is access CK.Flag_Array;
+   type Mono_Ptr is access CK.Mono_Array;
+   type Pool_Ptr is access CK.Coef_Pool;
+
+   procedure Put_U32 (Ctx : in out Sha256.Context; V : Natural) is
+      X : constant Unsigned_32 := Unsigned_32 (V);
+   begin
+      Sha256.Update
+        (Ctx, [0 => Unsigned_8 (X and 255),
+               1 => Unsigned_8 (Shift_Right (X, 8) and 255),
+               2 => Unsigned_8 (Shift_Right (X, 16) and 255),
+               3 => Unsigned_8 (Shift_Right (X, 24))]);
+   end Put_U32;
+
+   procedure Put_Tag (Ctx : in out Sha256.Context; C : Character) is
+   begin
+      Sha256.Update (Ctx, [0 => Character'Pos (C)]);
+   end Put_Tag;
+
+   procedure Put_Elt (Ctx : in out Sha256.Context; E : SA.Element) is
+   begin
+      Sha256.Update (Ctx, GF2_128.To_Bytes (E));
+   end Put_Elt;
+
+   --  A meaning: its entries, the variable and then the coefficient.
+   procedure Put_Form
+     (Ctx : in out Sha256.Context; Sh : CK.Form_Shape; Cf : CK.Coef_List) is
+   begin
+      for E in 1 .. Sh.N loop
+         Put_U32 (Ctx, Sh.V (E));
+         Put_Elt (Ctx, Cf (E));
+      end loop;
+   end Put_Form;
+
+   --  The digest of the facts of P with the accepted certificate K: for
+   --  each layer from the last, its assertions in term order, then its
+   --  declared wires; then the outputs.
+   function Facts_Digest
+     (P : PC.Packed_Circuit; K : CC.Certificate) return Bytes_32
+   is
+      Ctx  : Sha256.Context := Sha256.Initial;
+      M    : Shape_Ptr := new CK.Shape_Array'(CK.Input_Shapes (P));
+      CM   : Coef_Ptr := new CK.Coef_Array'(CK.Input_Coefs (P));
+      Mono : constant Mono_Ptr :=
+        new CK.Mono_Array'(1 .. Pool_Size => (A => 0, B => 0));
+      C    : constant Pool_Ptr :=
+        new CK.Coef_Pool'(1 .. Pool_Size => SA.Zero);
+      Vb   : Natural := P.Ninput;
+      Fits : Boolean;
+   begin
+      for J in reverse 0 .. P.Last_Layer loop
+         declare
+            NO   : constant Natural := CK.Out_Count (P, J);
+            S    : constant CC.Layer_Span := K.Layers (CK.Walk_Index (P, J));
+            NM   : constant Shape_Ptr :=
+              new CK.Shape_Array'(0 .. NO - 1 => CK.No_Shape);
+            NC   : constant Coef_Ptr :=
+              new CK.Coef_Array'(0 .. NO - 1 => CK.No_Coefs);
+            Lin  : constant Flag_Ptr :=
+              new CK.Flag_Array'(0 .. NO - 1 => False);
+            Cur  : PC.Cursor := PC.Start (P, J);
+            Tm   : SA.Term;
+            Base : Natural := 0;
+            Decl : Natural := 0;
+         begin
+            CK.Layer_Coefficients (P, K, J, M.all, CM.all, Mono.all, C.all,
+                                   Fits);
+            if not Fits then
+               raise Program_Error with "an accepted layer does not fit";
+            end if;
+            for N in 1 .. CK.Len (P, J) loop
+               Tm := PC.Term_Of (P, Cur);
+               Cur := PC.Step (P, Cur);
+               if Tm.K = SA.Zero then
+                  Put_Tag (Ctx, 'A');
+                  Put_Form (Ctx, M (Tm.H1), CM (Tm.H1));
+                  Put_Form (Ctx, M (Tm.H0), CM (Tm.H0));
+               end if;
+            end loop;
+            CK.Next_Layer (P, K, J, Vb, Mono.all, C.all, NM.all, NC.all,
+                           Lin.all);
+            for G in 0 .. NO - 1 loop
+               declare
+                  Cnt : constant Natural := K.Counts (S.First_Wire + G + 1);
+               begin
+                  if not Lin (G) then
+                     Put_Tag (Ctx, 'D');
+                     Put_U32 (Ctx, NM (G).V (1));
+                     for X in 1 .. Cnt loop
+                        Put_U32 (Ctx, Mono (Base + X).A);
+                        Put_U32 (Ctx, Mono (Base + X).B);
+                        Put_Elt (Ctx, C (Base + X));
+                     end loop;
+                     Decl := Decl + 1;
+                  end if;
+                  Base := Base + Cnt;
+               end;
+            end loop;
+            if J = 0 then
+               for G in 0 .. NO - 1 loop
+                  Put_Tag (Ctx, 'O');
+                  Put_U32 (Ctx, G);
+                  Put_Form (Ctx, NM (G), NC (G));
+               end loop;
+            end if;
+            M := NM;
+            CM := NC;
+            Vb := Vb + Decl;
+         end;
+      end loop;
+      return Sha256.Digest (Ctx);
+   end Facts_Digest;
+
+   -------------------------------------------------------------------
+   --  One case
+   -------------------------------------------------------------------
+
+   generic
+      with package Chk is new Circuit_Check (others => <>);
+   procedure Run_Case
+     (Name, Instance, Outcome, Status : String;
+      Circuit, Cert : Byte_Array;
+      Digest_Of : String);
+
+   procedure Run_Case
+     (Name, Instance, Outcome, Status : String;
+      Circuit, Cert : Byte_Array;
+      Digest_Of : String)
+   is
+      use type Chk.Outcome;
+      R : Chk.Result;
+   begin
+      Chk.Check (Circuit, Cert, R);
+      declare
+         Got_Outcome : constant String := Lower (R.Outcome'Image);
+         Got_Status  : constant String :=
+           (case R.Outcome is
+              when Chk.Certificate_Refused => Lower (R.Certificate'Image),
+              when Chk.Walk_Refused        => Lower (R.Walk'Image),
+              when Chk.Circuit_Refused     => Lower (R.Circuit'Image),
+              when others                  => "-");
+      begin
+         Check (Got_Outcome = Outcome and then Got_Status = Status,
+                Name & " on " & Instance & ": expected " & Outcome & " "
+                & Status & ", got " & Got_Outcome & " " & Got_Status);
+      end;
+      --  The facts of an accepted certificate, against census.py's.
+      if Digest_Of /= "" and then R.Outcome = Chk.Accepted then
+         declare
+            P   : CR.Packed_Access;
+            H   : CR.Header;
+            St  : Circuit_Status.Status;
+            K   : CC.Cert_Access;
+            KSt : CC.Status;
+         begin
+            CR.Read_Packed (Circuit, False, [others => 0], P, H, St);
+            CC.Read (Cert, K, KSt);
+            if St /= Circuit_Status.Ok or else KSt /= CC.Ok then
+               Check (False, Name & ": the files read again are refused");
+            else
+               declare
+                  D : constant String := To_Hex (Facts_Digest (P.all, K.all));
+               begin
+                  Check (D = Digest_Of,
+                         Name & ": facts " & D & ", census.py " & Digest_Of);
+               end;
+            end if;
+         end;
+      end if;
+   end Run_Case;
+
+   procedure Run_Registered is new Run_Case (Circuit_Check_GF2_128);
+   procedure Run_Terms is new Run_Case (Check_Terms);
+   procedure Run_Slots is new Run_Case (Check_Slots);
+   procedure Run_Pool is new Run_Case (Check_Pool);
+   procedure Run_Vars is new Run_Case (Check_Vars);
+   procedure Run_Inputs is new Run_Case (Check_Inputs);
+
+   --  The facts of the accepted circuits, by name, for paragraph D.
+   Accepted_Facts : Text_Maps.Map;
+
+   procedure Check_Line (Line : String) is
+      type Bounds is record
+         Lo, Hi : Natural;
+      end record;
+      Fields : array (1 .. 7) of Bounds;
+      Count  : Natural := 0;
+      I      : Natural := Line'First;
+      J      : Natural;
+      function F (X : Positive) return String is
+        (Line (Fields (X).Lo .. Fields (X).Hi));
+   begin
+      if Line'Length = 0 or else Line (Line'First) = '#' then
+         return;
+      end if;
+      while I <= Line'Last loop
+         if Line (I) = ' ' then
+            I := I + 1;
+         else
+            J := I;
+            while J < Line'Last and then Line (J + 1) /= ' ' loop
+               J := J + 1;
+            end loop;
+            if Count = Fields'Length then
+               raise Parse_Error with "too many fields";
+            end if;
+            Count := Count + 1;
+            Fields (Count) := (I, J);
+            I := J + 1;
+         end if;
+      end loop;
+      if Count = 0 then
+         return;
+      end if;
+      if F (1) = "field" then
+         if Count /= 2 or else F (2) /= "gf2_128" then
+            raise Parse_Error with "only the field gf2_128 is checked";
+         end if;
+      elsif F (1) = "circuit" and then Count = 3 then
+         Circuits.Include (F (2), F (3));
+      elsif F (1) = "facts" and then Count = 3 then
+         Facts.Include (F (2), F (3));
+      elsif F (1) = "cert" and then Count = 7 then
+         declare
+            Name     : constant String := F (2);
+            Circ     : constant String := F (3);
+            Instance : constant String := F (4);
+            Circuit  : constant Byte_Array := From_Hex (Circuits (Circ));
+            Cert     : constant Byte_Array := From_Hex (F (7));
+            Digest   : constant String :=
+              (if Instance = "gf2_128" and then Facts.Contains (Circ)
+               then Facts (Circ) else "");
+         begin
+            if Instance = "gf2_128" then
+               Run_Registered (Name, Instance, F (5), F (6), Circuit, Cert,
+                               Digest);
+               if F (5) = "accepted" then
+                  Accepted_Facts.Include (Circ, Digest);
+               end if;
+            elsif Instance = "small_terms" then
+               Run_Terms (Name, Instance, F (5), F (6), Circuit, Cert, "");
+            elsif Instance = "small_slots" then
+               Run_Slots (Name, Instance, F (5), F (6), Circuit, Cert, "");
+            elsif Instance = "small_pool" then
+               Run_Pool (Name, Instance, F (5), F (6), Circuit, Cert, "");
+            elsif Instance = "small_vars" then
+               Run_Vars (Name, Instance, F (5), F (6), Circuit, Cert, "");
+            elsif Instance = "small_inputs" then
+               Run_Inputs (Name, Instance, F (5), F (6), Circuit, Cert, "");
+            else
+               raise Parse_Error with "unknown instance " & Instance;
+            end if;
+         end;
+      else
+         raise Parse_Error with "unknown line";
+      end if;
+   end Check_Line;
+
+   procedure Run_File (Path : String) is
+      File : TIO.File_Type;
+   begin
+      Kat_Sections.Start (Path, Passed, Failed);
+      TIO.Open (File, TIO.In_File, Path);
+      Line_No := 0;
+      while not TIO.End_Of_File (File) loop
+         Line_No := Line_No + 1;
+         declare
+            Line : constant String := TIO.Get_Line (File);
+         begin
+            Check_Line (Line);
+            Kat_Sections.Count (Kat_Sections.Kind_Of (Line), Passed, Failed);
+         exception
+            when E : Parse_Error =>
+               Check (False, "parse error: "
+                             & Ada.Exceptions.Exception_Message (E));
+         end;
+      end loop;
+      TIO.Close (File);
+   end Run_File;
+
+begin
+   if Ada.Command_Line.Argument_Count = 0 then
+      Run_File (Default_Path);
+   else
+      for A in 1 .. Ada.Command_Line.Argument_Count loop
+         Run_File (Ada.Command_Line.Argument (A));
+      end loop;
+   end if;
+   --  Paragraph D: the circuit and its copy with one constant changed are
+   --  both accepted, and their facts differ.
+   Check (Accepted_Facts.Contains ("c1")
+          and then Accepted_Facts.Contains ("c1_k")
+          and then Accepted_Facts ("c1") /= Accepted_Facts ("c1_k"),
+          "paragraph D: c1 and c1_k accepted with different facts");
+   Kat_Sections.Print;
+   TIO.Put_Line ("checker_kat:" & Passed'Image & " passed," & Failed'Image
+                 & " failed");
+   Ada.Command_Line.Set_Exit_Status
+     (if Failed = 0 and then Passed > 0 then Ada.Command_Line.Success
+      else Ada.Command_Line.Failure);
+end Checker_KAT;
