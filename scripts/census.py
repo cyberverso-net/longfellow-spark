@@ -35,10 +35,11 @@ the outputs in wire order), are written to a byte string and digested
 with SHA-256:
 
 - an assertion: b"A", then the two meanings, of h1 and of h0;
-- a declared wire: b"D", its variable, then its slots in order: a, b
-  and the coefficient;
+- a declared wire: b"D", its variable, the number of its slots, then
+  its slots in order: a, b and the coefficient;
 - an output: b"O", its wire, then its meaning;
-- a meaning: its entries in order: the variable, then the coefficient;
+- a meaning: the number of its entries, then its entries in order: the
+  variable, then the coefficient;
 - a variable or wire: 4 bytes little-endian; a coefficient: the field's
   bytes as in the circuit file.
 
@@ -94,7 +95,8 @@ def census(data, field):
         return F.mul(a, b)
 
     def form_bytes(m):
-        return b"".join(u32(v) + cv.elt_bytes(fld, c) for v, c in m.items())
+        return u32(len(m)) + b"".join(
+            u32(v) + cv.elt_bytes(fld, c) for v, c in m.items())
 
     layers = circ["layers"]
     ninput = circ["ninput"]
@@ -145,7 +147,7 @@ def census(data, field):
             else:
                 kinds["declared"] += 1
                 shapes[(len(deg2), len({v for kk in q for v in kk if v}), len(q))] += 1
-                out.update(b"D" + u32(nvar) + b"".join(
+                out.update(b"D" + u32(nvar) + u32(len(q)) + b"".join(
                     u32(a) + u32(b) + cv.elt_bytes(fld, c) for (a, b), c in q.items()))
                 cur[g] = {nvar: one}
                 nvar += 1

@@ -65,8 +65,9 @@ def digest(*parts):
 #    appear: (1, 2) with 1, (0, 0) with 3. It has degree 2: declared,
 #    variable 3, fact d3 = x1 x2 + 3; the output's meaning is d3.
 data, res = run([(3, [(0, 2, 1, 1), (0, 0, 0, 3)])], 3, 1)
-want = digest(b"D", u32(3), u32(1), u32(2), elt(1), u32(0), u32(0), elt(3),
-              b"O", u32(0), u32(3), elt(1))
+want = digest(b"D", u32(3), u32(2), u32(1), u32(2), elt(1), u32(0), u32(0),
+              elt(3),
+              b"O", u32(0), u32(1), u32(3), elt(1))
 check(res["facts_sha256"] == want, "a declared wire: the facts' bytes")
 check(res["kinds"] == {"declared": 1}, f"a declared wire: kinds {res['kinds']}")
 check(res["limits"]["variables"] == 4, "a declared wire: four variables")
@@ -78,8 +79,9 @@ check(res["limits"]["variables"] == 4, "a declared wire: four variables")
 data, res = run([(3, [(0, 0, 1, 1), (0, 0, 0, 7)]),
                  (3, [(0, 0, 0, 1), (1, 0, 1, 1), (1, 0, 2, 5),
                       (2, 2, 1, 0)])], 3, 1)
-want = digest(b"A", u32(1), elt(1), u32(2), elt(1),
-              b"O", u32(0), u32(1), elt(1), u32(2), elt(5), u32(0), elt(7))
+want = digest(b"A", u32(1), u32(1), elt(1), u32(1), u32(2), elt(1),
+              b"O", u32(0), u32(3), u32(1), elt(1), u32(2), elt(5), u32(0),
+              elt(7))
 check(res["facts_sha256"] == want, "a linear wire and an assertion: the bytes")
 check(res["kinds"] == {"linear": 4, "assertion": 1},
       f"a linear wire and an assertion: kinds {res['kinds']}")
@@ -91,9 +93,9 @@ check(res["kinds"] == {"linear": 4, "assertion": 1},
 #    declared (variable 3) with the fact d3 = 0 x1 x2.
 data, res = run([(3, [(0, 0, 1, 1), (0, 0, 1, 1),
                       (1, 2, 1, 1), (1, 2, 1, 1)])], 3, 2)
-want = digest(b"D", u32(3), u32(1), u32(2), elt(0),
-              b"O", u32(0), u32(1), elt(0),
-              b"O", u32(1), u32(3), elt(1))
+want = digest(b"D", u32(3), u32(1), u32(1), u32(2), elt(0),
+              b"O", u32(0), u32(1), u32(1), elt(0),
+              b"O", u32(1), u32(1), u32(3), elt(1))
 check(res["facts_sha256"] == want, "zero coefficients kept: the bytes")
 check(res["kinds"] == {"linear": 1, "declared": 1},
       f"zero coefficients kept: kinds {res['kinds']}")
@@ -113,6 +115,18 @@ check(res["certificate"] == want, "the certificate's bytes")
 data, res = run([(5, [(0, 0, 1, 1), (0, 0, 2, 1), (0, 0, 3, 1),
                       (0, 0, 4, 1)])], 5, 1)
 check(res["kinds"] == {"declared": 1}, f"over Max_Form: kinds {res['kinds']}")
+
+# 6. The facts are length-prefixed: two assertions whose meanings split
+#    the same entries differently have different digests. Layer 1: w0,
+#    w1; layer 0: the assertion w0 * w1 = 0. In the first circuit w0 = x1
+#    + x2 and w1 = x3, in the second w0 = x1 and w1 = x2 + x3: (x1 + x2)
+#    x3 and x1 (x2 + x3) differ at x1 x2.
+_, r1 = run([(2, [(0, 1, 0, 0)]),
+             (4, [(0, 0, 1, 1), (0, 0, 2, 1), (1, 0, 3, 1)])], 4, 1)
+_, r2 = run([(2, [(0, 1, 0, 0)]),
+             (4, [(0, 0, 1, 1), (1, 0, 2, 1), (1, 0, 3, 1)])], 4, 1)
+check(r1["facts_sha256"] != r2["facts_sha256"],
+      "two assertions that split the same entries: different digests")
 
 print(f"census-test: {passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

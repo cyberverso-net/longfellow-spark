@@ -387,7 +387,7 @@ cd lean && lake env leanchecker --fresh LongfellowSpark
 
 Block 3 (#170) adds the core of the checker: the certificate and its reader, the walk over a circuit, and the theorem of the walk. The record is [ADR 0093](../adr/0093-the-checker-model.md). The checker is generic over the field, as the protocol code is (chapter 3), and instantiated for GF(2^128), the hash circuit's field; the instance for P-256 comes with the signature circuit.
 
-The question the checker answers is the one this chapter's relations need: what does a circuit file compute? The verifier evaluates the circuit and checks that its outputs are zero (chapter 3), but the file itself is a list of terms, millions of them, written by upstream's generator. The checker reads that list and states, for every wire, a polynomial identity that holds whenever the evaluation succeeds. These identities are the circuit's facts. The later blocks match them against the gadgets of Section 2 and the clauses of Section 1.
+The question the checker answers is the one this chapter's relations need: what does a circuit file compute? A proof the verifier accepts says that the prover holds wires on which the circuit's outputs are zero (chapter 3), but the file itself is a list of terms, millions of them, written by upstream's generator. The checker reads that list and states, for every wire, a polynomial identity that holds whenever the evaluation succeeds. These identities are the circuit's facts. The later blocks match them against the gadgets of Section 2 and the clauses of Section 1.
 
 The units: [`Circuit_Certificates`](../../src/circuit_certificates.ads), [`Circuit_Checker`](../../src/circuit_checker.ads), [`Circuit_Check`](../../src/circuit_check.ads) and [`Local_Check`](../../src/local_check.ads), with their instances over GF(2^128).
 
@@ -468,7 +468,7 @@ The limits are those of ADR 0093, measured on the registered pair: the terms of 
 
 `Lemma_Accepts` is the theorem of the walk. Its hypotheses:
 - `Accepts (P, K)`;
-- an evaluation of the packed circuit by the verifier's `Packed_Eval` that returned OK, given as its segments: every layer holds and every assertion is zero, the outputs are zero;
+- wires that satisfy the circuit, given as segments: every layer holds, every assertion is zero and the outputs are zero, as `Packed_Eval.Eval_Circuit` (chapter 3) gives them when it returns OK;
 - input wire 0 equal to one.
 
 Its conclusion: there are values V of the declared variables, each the value of its home wire in that evaluation (`Homes_Hold`), at which every fact holds (`Facts_Hold`).
@@ -482,7 +482,7 @@ The proof goes layer by layer from the inputs, each step a lemma of its own:
 
 The proof does not depend on the circuit's size: it is an induction, not a computation. The equalities of field elements are stated with `Same`, the logical equality of the field (register row T6), which lets the provers substitute one element for another; the ring laws come from the field's signature (chapter 3).
 
-**What is a hypothesis and what is proved.** The evaluation is the verifier's own, proved in chapter 3; the theorem takes it as given, which is what a verifier that accepted a proof provides. Nothing about the gadgets enters here: the facts are what the circuit's terms collect, whatever the generator meant.
+**What is a hypothesis and what is proved.** The theorem is conditional on a satisfying evaluation of the circuit. The verifier does not compute one: the prover does, with `Packed_Eval.Eval_Circuit`, and the verifier checks a proof of it. That a verifier which accepts a proof implies a satisfying evaluation exists is the soundness of the protocol, register row S1, trusted and outside this theorem. Nothing about the gadgets enters here: the facts are what the circuit's terms collect, whatever the generator meant.
 
 ### 3.5 The coefficients
 
@@ -568,7 +568,7 @@ The partition `checker` holds `Circuit_Certificates`, the instance `Circuit_Chec
 
 - **Silver** for all three: no run-time error on any bytes and any circuit the reader accepts, every recursive function terminates, every allocation freed;
 - **`Walk`** (Gold): it accepts exactly when the model does, `(St = Accepted) = Accepts (P, K)`;
-- **`Lemma_Accepts`** (Gold): when `Accepts` holds and the packed evaluation returned OK with input wire 0 equal to one, the values of the home wires satisfy every fact;
+- **`Lemma_Accepts`** (Gold): when `Accepts` holds and the wires satisfy the circuit, with input wire 0 equal to one, the values of the home wires satisfy every fact;
 - **`Layer_Coefficients` and `Next_Layer`** (Gold): a layer's slots, coefficients and meanings are the model's;
 - **`Circuit_Certificates.Read`:** when it returns `Ok`, the spans of the certificate tile its arrays (`Spans_Ok`).
 
@@ -703,6 +703,6 @@ The results, on the proving machine on 27 November 2026: `checker_kat` 26 checks
 - **For the circuit checker** (Section 3):
   - **`Same`** is the equality of the field (row T6), as for the protocol code;
   - **the contracts at the level `Proof_Only`**, the checker's model among them, are never compiled (row T8);
-  - **the reader of the circuit file and `Expand`** are the verifier's (rows R4 and T8), so the theorem is about the circuit the verifier evaluates;
+  - **the reader of the circuit file and `Expand`** are the verifier's (rows R4 and T8), so the theorem is about the circuit the verifier checks proofs for;
   - **the coefficients are not checked here:** the checker proves that the facts hold with the coefficients the circuit's own constants produce, and the catalogue of block 4 will check them against the gadgets' constants (row R2 stays until then);
   - **the certificate's circuit identifier** is a guard against passing the wrong file, not part of the theorem. The statement about the registered circuit will rest on the structure the walk checks and on the digests of row T9, which block 4 adds.

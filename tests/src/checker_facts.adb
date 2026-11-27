@@ -34,10 +34,12 @@ package body Checker_Facts is
       Sha256.Update (Ctx, To_Bytes (E));
    end Put_Elt;
 
-   --  A meaning: its entries, the variable and then the coefficient.
+   --  A meaning: the number of its entries, then each entry, the
+   --  variable and then the coefficient.
    procedure Put_Form
      (Ctx : in out Sha256.Context; Sh : CK.Form_Shape; Cf : CK.Coef_List) is
    begin
+      Put_U32 (Ctx, Sh.N);
       for E in 1 .. Sh.N loop
          Put_U32 (Ctx, Sh.V (E));
          Put_Elt (Ctx, Cf (E));
@@ -99,6 +101,7 @@ package body Checker_Facts is
                   if not Lin (G) then
                      Put_Tag (Ctx, 'D');
                      Put_U32 (Ctx, NM (G).V (1));
+                     Put_U32 (Ctx, Cnt);
                      for X in 1 .. Cnt loop
                         Put_U32 (Ctx, Mono (Base + X).A);
                         Put_U32 (Ctx, Mono (Base + X).B);

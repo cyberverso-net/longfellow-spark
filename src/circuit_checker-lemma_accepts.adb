@@ -1,7 +1,7 @@
 --  Lemma_Accepts: the theorem of the walk (ADR 0093). When the walk
---  accepts and the verifier's evaluation of the packed circuit returned
---  OK, with input wire 0 equal to one, the values of the home wires
---  satisfy every fact of the model.
+--  accepts and the wires satisfy the circuit (the segments of a packed
+--  evaluation that returned OK), with input wire 0 equal to one, the
+--  values of the home wires satisfy every fact of the model.
 --
 --  The proof, layer by layer from the inputs (each step a lemma of its
 --  own, so that each proof sees only the facts it needs):

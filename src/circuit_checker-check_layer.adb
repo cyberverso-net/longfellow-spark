@@ -418,6 +418,15 @@ begin
       St := Pool_Full;
       return;
    end if;
+   --  A wire over Max_Slots is refused before any pair is expanded, so
+   --  that the work of a layer is bounded by Max_Slots per pair.
+   if not Counts_Ok then
+      Lemma_Layer_Ok_Def (P, K, J, RJ);
+      pragma Assert (Proof_Only => not Layer_Ok (P, K, J, RJ));
+      Free_Bases (Base);
+      St := Too_Many_Slots;
+      return;
+   end if;
 
    Used_A := new Nat_Array'(0 .. NO => 0);
    Terms := new Nat_Array'(0 .. NO => 0);

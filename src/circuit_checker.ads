@@ -32,11 +32,15 @@
 --    it never compares a coefficient. Coverage is by construction: the
 --    model ranges over the circuit's terms and wires, not over the
 --    certificate's entries.
---  - Lemma_Accepts, the theorem: when Accepts holds and the packed
---    evaluation of the verifier returned OK, with input wire 0 equal to
---    one, the values of the home wires (Homes_Hold) satisfy every fact
---    of the model (Facts_Hold), with the coefficients of the model of
---    the coefficients, a function of the circuit and the certificate.
+--  - Lemma_Accepts, the theorem: when Accepts holds and the wires Wr
+--    satisfy the circuit (every layer holds, every assertion and every
+--    output is zero, as Packed_Eval.Eval_Circuit gives them when it
+--    returns OK), with input wire 0 equal to one, the values of the home
+--    wires (Homes_Hold) satisfy every fact of the model (Facts_Hold),
+--    with the coefficients of the model of the coefficients, a function
+--    of the circuit and the certificate. The theorem is conditional on
+--    that satisfying evaluation; that a verifier which accepts a proof
+--    implies one exists is the protocol's soundness (register row S1).
 --  - Layer_Coefficients and Next_Layer compute a layer's slots, their
 --    coefficients and the meanings of its wires, Same to the model's.
 --
@@ -721,9 +725,10 @@ package Circuit_Checker is
                and then (for all L in Wr'Range =>
                            Wr (L) /= null and then Wr (L)'First = 0);
 
-   --  The theorem: when the walk accepts and the verifier's evaluation of
-   --  the packed circuit returned OK, with input wire 0 equal to one,
-   --  then V, the values of the home wires, satisfies every fact.
+   --  The theorem: when the walk accepts and the wires Wr satisfy the
+   --  circuit (the segments of a packed evaluation that returned OK),
+   --  with input wire 0 equal to one, then V, the values of the home
+   --  wires, satisfies every fact.
    procedure Lemma_Accepts
      (P  : PC.Packed_Circuit;
       K  : CC.Certificate;
