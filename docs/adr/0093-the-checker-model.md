@@ -86,6 +86,7 @@ This separation is why the kind rule looks at monomials only, and why a zero coe
   - for every pair of every term's expansion, its slot, which spares the checker a search for the monomial;
   - for every wire, the gadget instance and the catalogue type it belongs to, for the catalogue's lemmas.
 - **What it does not carry:** no coefficient, no meaning, no kind and no fact. Those are computed.
+- **The circuit's identifier.** The certificate also carries the identifier of the circuit it was made for, as the circuit file's header gives it. The checker's driver compares the two and refuses a mismatch (`Wrong_Circuit`): a guard against passing the wrong file, no part of the theorem. The link between certificate and circuit that the statement rests on is the structure the walk checks and the digests of row T9.
 - **Its failure mode.** A wrong slot makes the walk refuse. It cannot make a false fact, because a fact is what the circuit's own terms collect.
 
 ### The theorem

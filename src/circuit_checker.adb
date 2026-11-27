@@ -473,7 +473,7 @@ package body Circuit_Checker is
         or else P.Ninput > Max_Vars
       then
          Lemma_Accepts_Def (P, K);
-         St := Cert_Mismatch;
+         St := (if P.Ninput > Max_Vars then Too_Many_Vars else Cert_Mismatch);
          return;
       end if;
       Pool := new Mono_Array'(1 .. Max_Layer_Slots => (A => 0, B => 0));

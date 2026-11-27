@@ -170,7 +170,8 @@ is
       N      : Positive;
       Q      : Positive;
       HP     : Long_Long_Integer;
-      Ok     : in out Boolean)
+      Ok     : in out Boolean;
+      Why    : in out Refusal)
    with
      Pre  => Ctx and then Bases_Ok (Base)
              and then Used_A'First = 0 and then Used_A'Last = NO
@@ -224,6 +225,9 @@ is
                = Slot_Mono (P, K, J, RJ, N, Q - 1, G, Hi));
             Ok := Pool (Base (G) + Hi + 1) = Pm;
             pragma Assert (Ok = Pair_Ok (P, K, J, RJ, N, Q));
+            if not Ok then
+               Why := Wrong_Monomial;
+            end if;
          else
             pragma Assert
               (for all S2 in 0 .. U - 1 =>
@@ -238,10 +242,13 @@ is
             if Ok then
                Pool (Base (G) + U + 1) := Pm;
                Used_A (G) := U + 1;
+            else
+               Why := Duplicate_Slot;
             end if;
          end if;
       else
          Ok := False;
+         Why := Bad_Hint;
          pragma Assert (not Pair_Ok (P, K, J, RJ, N, Q));
       end if;
    end Check_Pair;
@@ -356,6 +363,7 @@ is
    Counts_Ok  : Boolean;
    Fits       : Boolean;
    Pairs_Ok_F : Boolean := True;
+   Pair_Why   : Refusal := Bad_Hint;
    HP     : Long_Long_Integer := 0;
    C      : PC.Cursor := PC.Start (P, J);
    Tm     : SA.Term;
@@ -442,7 +450,7 @@ begin
               (Bases_Ok (Base.all)
                and then Used_A'First = 0 and then Used_A'Last = NO);
             Check_Pair (Base.all, Used_A.all, Pool, Tm, N, Q, HP,
-                        Pairs_Ok_F);
+                        Pairs_Ok_F, Pair_Why);
             HP := HP + 1;
          end loop;
       end if;
@@ -487,7 +495,7 @@ begin
       pragma Assert (Ok = Layer_Ok (P, K, J, RJ));
       if not Ok then
          St := (if not Counts_Ok then Too_Many_Slots
-                elsif not Pairs_Ok_F then Bad_Hint
+                elsif not Pairs_Ok_F then Pair_Why
                 elsif HP /= Long_Long_Integer (S.Hints) then Hints_Left
                 elsif (for some G in 0 .. NO - 1 =>
                          Used_A (G) /= Count_Of (P, K, J, G))

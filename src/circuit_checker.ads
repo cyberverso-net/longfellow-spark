@@ -91,7 +91,10 @@ package Circuit_Checker is
       Wrong_Monomial,  --  a pair sent to a slot of another monomial
       Duplicate_Slot,  --  a new slot whose monomial the wire already has
       Empty_Slot,      --  a counted slot no pair reaches
-      Hints_Left);     --  a layer's hints not all used, or too few
+      Hints_Left);     --  a layer's hints not all used (too few: Bad_Hint)
+
+   --  The statuses of a refusal.
+   subtype Refusal is Status range Cert_Mismatch .. Hints_Left;
 
    -------------------------------------------------------------------
    --  Shapes and monomials
