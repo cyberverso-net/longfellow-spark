@@ -51,6 +51,9 @@ package Circuit_Check is
       Circuit     : Circuit_Status.Status;  --  the circuit reader's
       Certificate : CC.Status;              --  the certificate reader's
       Walk        : CK.Status;              --  the walk's
+      Id          : Bytes_32;               --  the circuit's identifier,
+                                            --  as its header gives it
+                                            --  (zeros when it is refused)
    end record;
 
    procedure Check

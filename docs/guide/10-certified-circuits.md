@@ -166,7 +166,7 @@ nb is eight bits the circuit asserts, so no other value is possible. The 256 fai
 
 Every clause reads the public part through `Decode_Public`. The claim the relation makes is therefore about an X that the verifier built with `Mdoc_Inputs.Hash_Inputs`, the same code as upstream's encoder. A verifier that passed other lengths would change what is compared: an identifier's length of 18 would make the clause `Item` compare the key `elementIdentifier` alone.
 
-That `Decode_Public` of the encoder's output is the request it encoded is **tested** (Section 5), not proved: its proof needs the encoder's contract to state the layout it writes, and belongs with the emitter's block (block 4).
+That `Decode_Public` of the encoder's output is the request it encoded is **tested** (Section 5), not proved: its proof needs the encoder's contract to state the layout it writes, and belongs with the catalogue's block, #222.
 
 The same holds of `now`, under `H_Now_Form`: its 20 bytes are the relying party's current time in the form `YYYY-MM-DDThh:mm:ssZ`, upper-case T and Z. The clauses compare bytes, and their reading as times holds for that form on both sides. `Limit_Date_Separators` is the same form on the issuer's side.
 
@@ -395,28 +395,31 @@ The units: [`Circuit_Certificates`](../../src/circuit_certificates.ads), [`Circu
 flowchart TB
   D10_1["D10.1 the certificate as data, read from bytes<br/>Circuit_Certificates.Read"]
   D10_2["D10.2 the checker on two files: the identifiers compared, then the walk<br/>Circuit_Check.Check"]
-  D10_3["D10.3 the walk: each pair's hint checked, each wire's kind<br/>Circuit_Checker.Walk"]
+  D10_3["D10.3 the walk: each pair's slot found, each wire's kind<br/>Circuit_Checker.Walk"]
   D10_4["D10.4 the theorem: every fact holds at the home wires' values<br/>Circuit_Checker.Lemma_Accepts"]
   D10_5["D10.5 the coefficients of a layer and the meanings of its wires<br/>Circuit_Checker.Layer_Coefficients, Circuit_Checker.Next_Layer"]
   D10_6["D10.6 a product of two linear forms checked against a wire's terms<br/>Local_Check.Check_Product, Local_Check.Lemma_Product"]
+  D10_7["D10.7 the command-line program: two files, the verdict, the digests<br/>Longfellow_Check_Circuit"]
+  D10_7 --> D10_2
   D10_1 --> D10_2
   D10_2 --> D10_3
   D10_3 --> D10_4
   D10_4 --> D10_5
 ```
 
-*D10. The circuit checker. The driver (D10.2) reads the certificate (D10.1) and the circuit, and walks (D10.3); the walk accepts exactly when the model `Accepts` holds, and the theorem (D10.4) gives the facts under `Accepts`, with the coefficients D10.5 computes. D10.6 stands apart: the walk does not need it, and a gadget lemma that asks for a factoring of a wire's polynomial can.*
+*D10. The circuit checker. The program (D10.7) reads two files and calls the driver (D10.2), which reads the certificate (D10.1) and the circuit, and walks (D10.3); the walk accepts exactly when the model `Accepts` holds, and the theorem (D10.4) gives the facts under `Accepts`, with the coefficients D10.5 computes. D10.6 stands apart: the walk does not need it, and a gadget lemma that asks for a factoring of a wire's polynomial can.*
 
 Where it is in the code:
 
 | Box | Units | Key subprograms | Assurance | Harnesses and vectors | Draft and records | Upstream |
 |---|---|---|---|---|---|---|
-| D10.1 | [`Circuit_Certificates`](../../src/circuit_certificates.ads) | `Read`, `Spans_Ok` | Silver; partition `checker` | `checker_kat`, `checker.txt` | ADR 0093 | none: the certificate is this project's |
+| D10.1 | [`Circuit_Certificates`](../../src/circuit_certificates.ads) | `Read`, `Spans_Ok` | Silver; partition `checker` | `checker_kat`, `checker.txt` | ADR 0093, ADR 0094 | none: the certificate is this project's |
 | D10.2 | [`Circuit_Check`](../../src/circuit_check.ads) | `Check` | Silver; partition `checker` | `checker_kat`, `checker_census` | ADR 0093 | none |
-| D10.3 | [`Circuit_Checker`](../../src/circuit_checker.ads) | `Walk`, `Accepts` | Gold against `Accepts`, Silver on its statuses; partition `checker` | `checker_kat`, `checker_census` | ADR 0093, ADR 0091 | `eval_quad`, the layer's sum |
+| D10.3 | [`Circuit_Checker`](../../src/circuit_checker.ads) | `Walk`, `Accepts`, `Lemma_Slots` | Gold against `Accepts`, Silver on its statuses; partition `checker` | `checker_kat`, `checker_census` | ADR 0093, ADR 0094, ADR 0091 | `eval_quad`, the layer's sum |
 | D10.4 | [`Circuit_Checker`](../../src/circuit_checker.ads) | `Lemma_Accepts`, `Facts_Hold`, `Homes_Hold` | Gold; partition `checker` | none: a theorem | ADR 0093 | none |
 | D10.5 | [`Circuit_Checker`](../../src/circuit_checker.ads) | `Layer_Coefficients`, `Next_Layer` | Gold against the model; partition `checker` | `checker_kat`, `checker_census`, `scripts/census.py` | ADR 0093 | none |
 | D10.6 | [`Local_Check`](../../src/local_check.ads) | `Check_Product`, `Lemma_Product` | Gold; partition `local-check` | `checker_kat` | ADR 0091 | none |
+| D10.7 | [`Longfellow_Check_Circuit`](../../cli/src/longfellow_check_circuit.adb) | the main program | outside the proofs (register row C2) | the `cli` step on the registered hash circuit and two mutations | ADR 0094 | none |
 
 ### 3.1 What the checker computes
 
@@ -442,27 +445,31 @@ So every meaning is short, at most four entries, and the expansion of a term has
 
 ### 3.2 The certificate
 
-The walk needs, for every pair, the slot of its monomial among the slots the wire already has. Finding it is a search; the certificate spares it. It is a hint:
-- for every wire, the number of its slots;
-- for every pair of every term's expansion, in term order, the slot it falls into;
-- for every wire, its gadget instance, for the catalogue of the later blocks, which the walk of this block does not read.
+The walk needs, for every pair, the slot of its monomial among the slots the wire already has. It finds it by a search of those slots (ADR 0094). The certificate gives what the search cannot know in advance, the room each wire takes in the pool of the layer:
+- for each layer, the number of its wires;
+- for each wire, the number of its slots.
 
-It carries no coefficient, no meaning, no kind and no fact: those are computed from the circuit. A wrong hint makes the walk refuse; it cannot make a false fact, because a fact is what the circuit's own terms collect. The certificate also carries the identifier of the circuit it was made for. The checker's driver, `Circuit_Check`, compares it with the circuit's and refuses a mismatch (`Wrong_Circuit`): a guard against passing the wrong file, no part of the theorem. The link between certificate and circuit that the statement rests on is the structure the walk checks and the digests of register row T9.
+The gadget instances are added by the catalogue's block, #222, in a section of their own.
 
-The bytes are in `src/circuit_certificates.ads`: the magic `LFCK`, a version, the identifier, then each layer in the order of the walk, its counts and its hints, all integers in ULEB128 as in the circuit file. `Circuit_Certificates.Read` refuses any other bytes with a status of its own.
+It carries no coefficient, no meaning, no kind and no fact: those are computed from the circuit. A wrong count makes the walk refuse; it cannot make a false fact, because a fact is what the circuit's own terms collect.
+
+The certificate also carries the identifier of the circuit it was made for. The checker's driver, `Circuit_Check`, compares it with the circuit's and refuses a mismatch (`Wrong_Circuit`): a guard against passing the wrong file, no part of the theorem. The link between certificate and circuit that the statement rests on is the structure the walk checks and the digests of register row T9.
+
+The bytes are in `src/circuit_certificates.ads`: the magic `LFCK`, version 2, the identifier, then each layer in the order of the walk with its counts, all integers in ULEB128 as in the circuit file. `Circuit_Certificates.Read` refuses any other bytes with a status of its own.
+
+**Why there is no hint.** ADR 0093 had the certificate name each pair's slot as well, to spare the search. On the registered hash circuit, all but 32 of the 7,666,061 pairs open a new slot. That certificate was 14.4 MB, and the search it spared costs 1.5 comparisons per pair. ADR 0094 withdrew the hint.
 
 ### 3.3 The walk and what it accepts
 
-`Circuit_Checker.Walk` goes over the layers from the last to layer 0. For each pair it checks the hint:
-- a pair whose monomial the wire already has goes to that monomial's slot (otherwise `Wrong_Monomial`);
-- a pair whose monomial is new goes to the first free slot (otherwise `Bad_Hint`), and its monomial is none of the wire's used slots (otherwise `Duplicate_Slot`);
-- a hint is below the wire's count (otherwise `Bad_Hint`).
+`Circuit_Checker.Walk` goes over the layers from the last to layer 0. For each pair it searches the wire's used slots for the pair's monomial:
+- found, the pair adds to that slot;
+- not found, the pair opens the next slot, which must be below the wire's count (otherwise `Count_Exceeded`).
 
-At the end of each layer, every slot the certificate counts is reached (otherwise `Empty_Slot`), and the layer's hints are all used (otherwise `Hints_Left`). So a wire's slots are the distinct monomials of its expansion in the order they first appear: one normal form, whatever the certificate.
+At the end of each layer, every slot the certificate counts is reached (otherwise `Empty_Slot`). So a wire's slots are the distinct monomials of its expansion in the order they first appear: one normal form, and the counts are exactly the circuit's.
 
 The limits are those of ADR 0093, measured on the registered pair: the terms of one wire (`Too_Many_Terms`), the slots of one wire (`Too_Many_Slots`), the slots of one layer (`Pool_Full`), the declared variables (`Too_Many_Vars`). A certificate whose layers or wires are not the circuit's is refused with `Cert_Mismatch`.
 
-`Accepts (P, K)` is the model of all of this: a ghost function of the packed circuit P and the certificate K, defined by recursive functions over the position of the walk in a layer. It depends on the circuit's terms and on the variables and monomials of the meanings, never on a coefficient. The walk's postcondition is that it accepts exactly when the model does: `(St = Accepted) = Accepts (P, K)`.
+`Accepts (P, K)` is the model of all of this: a ghost function of the packed circuit P and the certificate K, defined by recursive functions over the position of the walk in a layer. Whether a wire already has a monomial (`Present`) and at which slot (`Index_Of`) are two of them, and a lemma, `Lemma_Slots`, states what the search relies on: a monomial the wire has is at a used slot, and a used slot's monomial is one the wire has, at that slot. The model depends on the circuit's terms and on the variables and monomials of the meanings, never on a coefficient. The walk's postcondition is that it accepts exactly when the model does: `(St = Accepted) = Accepts (P, K)`.
 
 ### 3.4 The theorem
 
@@ -487,12 +494,12 @@ The proof does not depend on the circuit's size: it is an induction, not a compu
 ### 3.5 The coefficients
 
 `Accepts` is structural; the coefficients of the facts are ghost. They are given by a model of the coefficients, a function of the circuit and the certificate, and `Lemma_Accepts` states the facts with them. Two executable procedures compute them:
-- **`Layer_Coefficients`:** the slots of one layer, their monomials and the coefficients they collect, from the certificate's counts and hints. It checks nothing, and is proved to give the model's values, `Same` to them, for any certificate whose counts fit.
+- **`Layer_Coefficients`:** the slots of one layer, their monomials and the coefficients they collect, from the certificate's counts, each pair placed by the walk's search. It checks nothing, and is proved to give the model's values, `Same` to them, for any certificate whose counts fit: the used count of a wire is kept up to its count, and a pair whose slot falls at or beyond it changes no slot of the pool, in the program as in the model.
 - **`Next_Layer`:** the meanings of the layer's wires from its slots, and the kinds, proved to be the model's.
 
 They serve the comparison with `scripts/census.py`, a test, and the checks of the later blocks, which compare a wire's coefficient with the constant its gadget expects.
 
-**What acceptance says and does not say.** That the walk accepts a circuit says that every wire's expansion has the slots the certificate gives, distinct and all reached, and that the variables fit. With `Lemma_Accepts`, every fact holds at the values of the evaluation, with the coefficients the circuit's own constants produce. It says nothing about what those coefficients are. A circuit whose constants were changed is still accepted, with other facts (the harness shows it, Section 5.2); that a wire's coefficient is its gadget's constant is the catalogue's check, from block 4.
+**What acceptance says and does not say.** That the walk accepts a circuit says that every wire's expansion has the slots the certificate gives, distinct and all reached, and that the variables fit. With `Lemma_Accepts`, every fact holds at the values of the evaluation, with the coefficients the circuit's own constants produce. It says nothing about what those coefficients are. A circuit whose constants were changed is still accepted, with other facts (the harness shows it, Section 5.2); that a wire's coefficient is its gadget's constant is the catalogue's check, #222.
 
 ## 4. What the proofs guarantee
 
@@ -574,30 +581,30 @@ The partition `checker` holds `Circuit_Certificates`, the instance `Circuit_Chec
 
 The partition `local-check` holds the instance `Local_Check_GF2_128` of `Local_Check`: its lemma, Gold, 281 checks, all proved.
 
-The verification conditions of the partition `checker`, from a run on the proving machine on 27 November 2026, the block's final sources, with the same toolchain and prover configuration as above; command `make prove-partition PARTITION=checker`, then `python3 -I scripts/vc-count.py --partition checker`:
+The verification conditions of the partition `checker`, from a run on the proving machine on 28 November 2026, the final sources of #171, with the same toolchain and prover configuration as above; command `make prove-partition PARTITION=checker`, then `python3 -I scripts/vc-count.py --partition checker`:
 
 | Check | `Circuit_Certificates` | `Circuit_Checker_GF2_128` | `Circuit_Check_GF2_128` | Discharged by |
 |---|---|---|---|---|
-| Data dependencies (`Global`) | 7 | 74 | 1 | flow analysis |
-| Initialisation | 29 | 48 | 7 | flow analysis |
+| Data dependencies (`Global`) | 7 | 72 | 1 | flow analysis |
+| Initialisation | 22 | 48 | 7 | flow analysis |
 | Termination | 1 | 73 | 0 | flow analysis |
-| Range checks | 22 | 213 | 0 | provers |
+| Range checks | 17 | 220 | 0 | provers |
 | Division checks (`/`, `mod`) | 0 | 10 | 0 | provers |
-| Overflow checks | 24 | 337 | 0 | provers |
-| Index checks | 41 | 414 | 0 | provers |
-| Length checks | 5 | 3 | 0 | provers |
+| Overflow checks | 13 | 325 | 0 | provers |
+| Index checks | 21 | 416 | 0 | provers |
+| Length checks | 3 | 3 | 0 | provers |
 | Discriminant checks | 2 | 0 | 0 | provers |
 | Null dereferences | 2 | 170 | 4 | provers |
 | Type predicates | 0 | 14 | 0 | provers |
-| Preconditions of the calls | 16 | 1,506 | 4 | provers |
-| Assertions | 0 | 159 | 0 | provers |
-| Loop invariants (base case and preservation) | 12 | 158 | 0 | provers |
-| Postconditions | 6 | 82 | 1 | provers |
-| Variants of the recursive functions | 0 | 33 | 0 | provers |
+| Preconditions of the calls | 10 | 1,532 | 4 | provers |
+| Assertions | 0 | 167 | 0 | provers |
+| Loop invariants (base case and preservation) | 8 | 154 | 0 | provers |
+| Postconditions | 6 | 80 | 1 | provers |
+| Variants of the recursive functions | 0 | 38 | 0 | provers |
 | Memory leaks (an allocation freed) | 2 | 21 | 4 | provers |
-| **Total** | **169** | **3,315** | **21** | all proved: none justified, none unproved, no `pragma Assume` |
+| **Total** | **114** | **3,343** | **21** | all proved: none justified, none unproved, no `pragma Assume` |
 
-In all, 3,505 checks, 3,265 discharged by the provers. The flow analysis prints 16 warnings, none about a check: statements that free memory and have no effect after the return (the lesson of `Circuit_Reader`, [verification approach](verification-approach.md#lessons-of-the-proofs)), an output of a deallocation not used after it, and initial values overwritten before they are read.
+In all, 3,478 checks, 3,247 discharged by the provers. The flow analysis prints 15 warnings, none about a check: statements that free memory and have no effect after the return (the lesson of `Circuit_Reader`, [verification approach](verification-approach.md#lessons-of-the-proofs)), an output of a deallocation not used after it, and initial values overwritten before they are read; #221 diagnoses each.
 
 ## 5. What is only tested
 
@@ -652,7 +659,7 @@ The result, on the proving machine on 25 November 2026: `gadgets_kat` 1,330 chec
 
 `tests/src/checker_kat.adb`, in `make test`, runs every certificate of `tests/vectors/checker.txt` through `Circuit_Check`, the checker on two files. The vectors come from `tests/vectors/gen_checker_vectors.py`:
 - **The circuit** `c1`, written by hand: four inputs (the constant one, x1, x2, x3); a first layer with the constant carried by a wire, a declared wire x1 x2, a linear wire x1 + x2 + 7 x1 whose monomial x1 appears twice, a linear wire 3 x3 and an assertion x1 x3 = 0; two outputs, a declared product and a linear wire with the constant, four slots.
-- **The honest certificate** is `scripts/census.py`'s. The generator rebuilds it from its structure, the counts and the hints of each layer, and requires the rebuilt bytes to equal census.py's; every hostile certificate changes one thing in that structure.
+- **The honest certificate** is `scripts/census.py`'s. The generator rebuilds it from its structure, the slot counts of each layer, and requires the rebuilt bytes to equal census.py's; every hostile certificate changes one thing in that structure.
 - **The facts:** for each accepted certificate, the harness computes the facts with `Layer_Coefficients` and `Next_Layer`, digests them as census.py does (`tests/src/checker_facts.adb`), and compares the digest with census.py's.
 
 The cases, one per check of `Accepts` and one per status of the certificate's reader:
@@ -662,13 +669,8 @@ The cases, one per check of `Accepts` and one per status of the certificate's re
 | honest | census.py's certificate | accepted, the facts census.py's |
 | one layer fewer | the circuit has two layers, the certificate one | `Cert_Mismatch` |
 | one wire fewer | a layer's last wire missing | `Cert_Mismatch` |
-| one hint more | a hint left at the end of a layer | `Hints_Left` |
-| one hint fewer | the last pair finds no hint | `Bad_Hint` |
-| a count below | a wire's slot count one below the true one | `Bad_Hint` |
+| a count below | a wire's slot count one below the true one: its second monomial opens a slot beyond it | `Count_Exceeded` |
 | a count above | a wire's slot count one above the true one: a slot no pair reaches | `Empty_Slot` |
-| a new monomial not in the first free slot | its hint one past it | `Bad_Hint` |
-| another monomial | a pair sent to a used slot of another monomial | `Wrong_Monomial` |
-| a duplicate slot | a pair whose monomial is used sent to the first free slot | `Duplicate_Slot` |
 | over the terms of a wire | honest, on an instance with `Max_Terms_Per_Wire` 2 | `Too_Many_Terms` |
 | over the slots of a wire | honest, on an instance with `Max_Slots` 3 | `Too_Many_Slots` |
 | over the pool | honest, on an instance with `Max_Layer_Slots` 5 | `Pool_Full` |
@@ -677,19 +679,52 @@ The cases, one per check of `Accepts` and one per status of the certificate's re
 | another circuit | one byte of the circuit identifier changed | `Wrong_Circuit` |
 | the reader | a wrong magic, a wrong version, a file cut short, an integer of five bytes, a count over its bound, a byte after the end | `Bad_Magic`, `Bad_Version`, `Truncated`, `Bad_Integer`, `Bound_Exceeded`, `Trailing` |
 
-Two checks of `Accepts` need a word:
-- **`Spans_Ok`** has no hostile certificate file: `Circuit_Certificates.Read` computes the spans from the counts, and its postcondition gives `Spans_Ok` whenever it returns `Ok`. The walk's check is for a certificate built otherwise, and the harness builds one: the honest certificate of `c1` copied into a record with one wire and one hint more after the last span. `Spans_Ok` refuses it, since the spans must end at the last entry, and the walk refuses it with `Cert_Mismatch`; the copy without the tail is accepted.
-- **Too few hints:** not a check of its own. The pair that finds no hint reads one beyond every count and is refused with `Bad_Hint`; the case "one hint fewer" is it.
+One check of `Accepts` needs a word. **`Spans_Ok`** has no hostile certificate file: `Circuit_Certificates.Read` computes the spans from the counts, and its postcondition gives `Spans_Ok` whenever it returns `Ok`. The walk's check is for a certificate built otherwise, and the harness builds one: the honest certificate of `c1` copied into a record with one wire more after the last span. `Spans_Ok` refuses it, since the spans must end at the last entry, and the walk refuses it with `Cert_Mismatch`; the copy without the tail is accepted.
+
+The search itself is exercised by `c1`: the third pair of w2, x1 again, finds the slot of the first, and every other pair opens a slot. The five hostile certificates of ADR 0093's hints (one hint more, one fewer, a new slot out of place, another monomial, a duplicate slot) left the harness with the hint (ADR 0094).
 
 **`Local_Check`** has its own cases, with no file: a product of two forms, 2 w1 + 3 w2 times 5 w3, against its two terms, accepted; refused with a coefficient changed, a pair mapped to the term of another monomial, and a map entry beyond the terms; and the empty form, whose product is zero, accepted with no term or a term of constant zero and refused with a term of another constant.
 
-**Paragraph D of the record.** The circuit `c1_k` is `c1` with one constant changed, 3 to 9. Its certificate has the same counts and hints, since a hint depends on no coefficient. Both are accepted, and their facts differ: the checker's digest of each equals census.py's, and the two digests are not equal. That the coefficients are the gadgets' constants is the catalogue's check, from block 4.
+**Paragraph D of ADR 0093.** The circuit `c1_k` is `c1` with one constant changed, 3 to 9. Its certificate has the same counts, since a count depends on no coefficient. Both are accepted, and their facts differ: the checker's digest of each equals census.py's, and the two digests are not equal. That the coefficients are the gadgets' constants is the catalogue's check, #222.
 
 **On the registered pair,** the step `vectors` of `make check` runs census.py on the two circuit files of the version 7 pair (`8d079211…_hash.lfc2` over GF(2^128), `8d079211…_sig.lfc2` over P-256), with the certificate it writes, and then `tests/checker/checker_census`, the checker on the same files. The checker must accept and give census.py's digest of the facts. The signature circuit is checked with an instance over P-256 declared in the test code, with the record's limits; the proved instance over P-256 comes with block 6.
 
 **census.py's own test,** `scripts/census-test.py`, in the step `lint`: small circuits whose facts are written out by hand, byte for byte, and the certificate census.py writes for them, each named after the rule of ADR 0093 it checks (the order of the slots, zero coefficients kept, the kind from the monomials only, the limit `Max_Form`).
 
-The results, on the proving machine on 27 November 2026: `checker_kat` 36 checks, none failed (23 certificates with their outcome and status, the facts of the two accepted ones against census.py's, paragraph D, three on the certificate built directly and seven on `Local_Check`); on the registered pair, the checker accepts both circuits and gives census.py's digest of the facts, `69a7ce55…` for the hash circuit and `e34dec13…` for the signature circuit; `census-test.py` 10 checks, none failed.
+**The registered hash circuit and its certificate.** The certificate `tests/vectors/certificates/8d079211…_hash.lfck` (3,367,047 bytes) is the one `scripts/census.py` writes: the slot count of each of the circuit's 3,366,957 wires. The step `vectors` writes it again and requires the committed file to be the same, with the SHA-256 pinned beside it (`…_hash.lfck.sha256`). No generator of upstream's is needed to make it, and nothing in it is trusted: the walk checks every count (ADR 0094).
+
+The step `cli` runs the checker on it in the release build, as anyone can:
+
+```
+cli/bin/longfellow_check_circuit --field gf2_128 \
+  --circuit tests/vectors/upstream/mdoc/8d079211…_hash.lfc2 \
+  --certificate tests/vectors/certificates/8d079211…_hash.lfck
+```
+
+It prints the circuit's identifier (`58248d20…`, the hash circuit's own; the file is named after the pair's), the SHA-256 of both files, `walk: accepted`, what is proved and what is not run yet: the catalogue's check, #222. The step then changes one count of the certificate and one byte of the circuit, and requires both to be refused: the first by the walk (`empty_slot`), the second by the reader (`not_well_formed`). On the proving machine the program takes 3.1 seconds and 100 MB at peak, reading the two files included (28 November 2026, three runs, the median).
+
+The results, on the proving machine on 28 November 2026: `checker_kat` 31 checks, none failed (18 certificates with their outcome and status, the facts of the two accepted ones against census.py's, paragraph D, three on the certificate built directly and seven on `Local_Check`); on the registered pair, the checker accepts both circuits and gives census.py's digest of the facts, `69a7ce55…` for the hash circuit and `e34dec13…` for the signature circuit; `census-test.py` 10 checks, none failed.
+
+### 5.3 The values check of four clauses
+
+Until the catalogue proves that the registered hash circuit implies the clauses `Bits`, `Chain`, `Zero_Tail` and `Length` of the relation (#222), a test says it: `scripts/values-check.py`, in the step `values` of `make check` (register row V15).
+
+**What it computes.** From the relation's layout of the inputs (`Mdoc_Relation.Hash`) and from upstream's gadget code at 0d92f80c, the assertions those four clauses require the circuit to make. Each is a polynomial of the inputs:
+- every input the relation says is a bit, its bit check (`Bits`);
+- every plucked bit of the 40 blocks' traces, its bit check (G1);
+- every word of the schedule, every round and the final state of every block, the product of `assert_eqmod` (G3, inside G4);
+- the digest e equal to the state of block nb, the selection over the 40 blocks (`Chain`);
+- every byte from block nb on zero (`Zero_Tail`), and the length's bits and bounds (`Length`).
+
+That is 269,092 assertions. The set is computed from the relation's side, not read from a certificate or from the generator.
+
+**What it checks.** Every input gets a field element at two points, derived from the SHA-256 of the circuit file, so the run is repeatable and the points are fixed only once the file is. The circuit is evaluated at both, and so is every required polynomial P. P counts as found when some assertion A of the circuit, a product of two wires that must be zero, satisfies P = c A for a constant c other than zero, tested as P (r1) A (r2) = P (r2) A (r1). Then wherever the circuit's assertion holds, the required one does.
+
+**What it does not prove.** It is a tested polynomial identity, not a proof. If P is not a multiple of A, the test passes only at a root of a nonzero polynomial of degree at most deg P + deg A, which at uniform points has probability at most that degree over 2^128 (the Schwartz-Zippel lemma). On the registered circuit the degrees are at most 14,336 for an assertion and 28,672 for a pair compared, and the bound over all the pairs is 2^-77, the points treated as uniform. Its sufficiency for the four clauses, that these assertions imply them, is what the catalogue's proof will establish.
+
+**Its own test,** `scripts/values-check-test.py`, in the step `lint`: the field's product, the plucker's polynomials at their points, and small circuits where a required assertion is found, also up to a constant, one is missing, and a changed constant is detected.
+
+The result, on the proving machine on 28 November 2026: all 269,092 required assertions found, in 8 minutes 5 seconds and 1.6 GB at peak (three runs, the median). It runs in every gate, the gates that reuse the proofs included.
 
 ## 6. What stays trusted
 
@@ -706,5 +741,5 @@ The results, on the proving machine on 27 November 2026: `checker_kat` 36 checks
   - **`Same`** is the equality of the field (row T6), as for the protocol code;
   - **the contracts at the level `Proof_Only`**, the checker's model among them, are never compiled (row T8);
   - **the reader of the circuit file and `Expand`** are the verifier's (rows R4 and T8), so the theorem is about the circuit the verifier checks proofs for;
-  - **the coefficients are not checked here:** the checker proves that the facts hold with the coefficients the circuit's own constants produce, and the catalogue of block 4 will check them against the gadgets' constants (row R2 stays until then);
-  - **the certificate's circuit identifier** is a guard against passing the wrong file, not part of the theorem. The statement about the registered circuit will rest on the structure the walk checks and on the digests of row T9, which block 4 adds.
+  - **the coefficients are not checked here:** the checker proves that the facts hold with the coefficients the circuit's own constants produce, and the catalogue (#222) will check them against the gadgets' constants. Until then, row R2 stays, reduced for the clauses `Bits`, `Chain`, `Zero_Tail` and `Length` by the values check (row V15, Section 5.3);
+  - **the certificate's circuit identifier** is a guard against passing the wrong file, not part of the theorem. The statement about the registered circuit will rest on the structure the walk checks and on the digests of row T9, which the catalogue's block (#222) adds.

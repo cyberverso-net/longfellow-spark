@@ -7,14 +7,14 @@
 #  script stops at the first failure with a non-zero exit status.
 #
 #  Subcommands: build, prove, prove-partition <name>, partitions-check,
-#  test, cli, vectors, lint, all. The proof partitions of the hosted
+#  test, cli, vectors, values, lint, all. The proof partitions of the hosted
 #  runner are listed in scripts/prove-partitions.txt (ADR 0033).
 
 set -euo pipefail
 
 usage() {
    echo "usage: scripts/check.sh {build|prove|prove-partition <name>|" \
-        "partitions-check|test|cli|vectors|lint|lean|lean-source|all|reuse|" \
+        "partitions-check|test|cli|vectors|values|lint|lean|lean-source|all|reuse|" \
         "reuse-spark|reuse-lean}" >&2
    exit 2
 }
@@ -302,6 +302,46 @@ do_cli() {
    local m=tests/vectors/upstream/mdoc h=8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121
    cli/bin/first_step_bench --field gf2_128 --circuit $m/${h}_hash.lfc2 --check
    cli/bin/first_step_bench --field p256 --circuit $m/${h}_sig.lfc2 --check
+   #  The checker's walk on the registered hash circuit with its pinned
+   #  certificate (ADR 0094), in the release build; then one changed
+   #  count of the certificate and one changed byte of the circuit, each
+   #  refused (exit status 1).
+   header "cli: longfellow_check_circuit, the walk on the registered hash circuit"
+   local cert=tests/vectors/certificates/${h}_hash.lfck out mut
+   out="$(cli/bin/longfellow_check_circuit --field gf2_128 \
+      --circuit $m/${h}_hash.lfc2 --certificate $cert)"
+   echo "$out"
+   if ! grep -qx "walk: accepted" <<< "$out"; then
+      echo "cli: the walk does not accept the registered hash circuit" >&2
+      exit 1
+   fi
+   mut="$(mktemp -d)"
+   python3 -I -c 'import sys; d = bytearray(open(sys.argv[1], "rb").read()); d[-1] ^= 1; open(sys.argv[2], "wb").write(d)' \
+      "$cert" "$mut/count.lfck"
+   python3 -I -c 'import sys; d = bytearray(open(sys.argv[1], "rb").read()); d[len(d) // 2] ^= 1; open(sys.argv[2], "wb").write(d)' \
+      "$m/${h}_hash.lfc2" "$mut/circuit.lfc2"
+   status=0
+   cli/bin/longfellow_check_circuit --field gf2_128 --circuit $m/${h}_hash.lfc2 \
+      --certificate "$mut/count.lfck" || status=$?
+   if [ "$status" -ne 1 ]; then
+      echo "cli: a changed count is not refused (exit $status)" >&2
+      exit 1
+   fi
+   status=0
+   cli/bin/longfellow_check_circuit --field gf2_128 --circuit "$mut/circuit.lfc2" \
+      --certificate $cert || status=$?
+   if [ "$status" -ne 1 ]; then
+      echo "cli: a changed byte of the circuit is not refused (exit $status)" >&2
+      exit 1
+   fi
+   status=0
+   cli/bin/longfellow_check_circuit --field gf2_128 --circuit "$mut/none.lfc2" \
+      --certificate $cert || status=$?
+   if [ "$status" -ne 2 ]; then
+      echo "cli: a missing file is not a usage error (exit $status)" >&2
+      exit 1
+   fi
+   rm -rf "$mut"
    header "cli: longfellow_verify on the two upstream proofs"
    cli/bin/longfellow_verify --field gf2_128 --circuit $c/sha256_circuit.lfc2 \
       --proof $c/sha256_proof.bin --label sha256_spec_test \
@@ -397,6 +437,18 @@ do_cli() {
    scripts/cross-check-upstream.sh
 }
 
+#  The values check (#171): every assertion that the clauses Bits, Chain,
+#  Zero_Tail and Length of the hash relation require is found in the
+#  registered hash circuit, at two points derived from the file's digest.
+#  A tested polynomial identity, not a proof (register row V15). It runs
+#  in every gate, the gates that reuse a proof included, since its
+#  inputs are no proof's.
+do_values() {
+   header "values: the SHA-256 clauses of the hash relation on the registered circuit (values-check.py)"
+   python3 -I scripts/values-check.py \
+      tests/vectors/upstream/mdoc/8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121_hash.lfc2
+}
+
 do_vectors() {
    header "vectors: regenerate into a scratch directory and compare"
    #  The generators take an output directory as their first argument;
@@ -455,6 +507,17 @@ do_vectors() {
          exit 1
       fi
    done
+   #  The pinned certificate of the hash circuit (ADR 0094) is the one
+   #  census.py writes, and has the digest pinned beside it.
+   local pinned=tests/vectors/certificates/8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121_hash.lfck
+   if ! cmp -s "$pinned" "$scratch/hash.lfck"; then
+      echo "vectors: $pinned is not the certificate census.py writes" >&2
+      exit 1
+   fi
+   if ! (cd tests/vectors/certificates && sha256sum -c "$(basename "$pinned").sha256"); then
+      echo "vectors: $pinned does not have its pinned digest" >&2
+      exit 1
+   fi
    echo "vectors: tests/vectors matches the generators"
 }
 
@@ -484,6 +547,8 @@ do_lint() {
    #  0093), on small circuits whose facts are written out by hand.
    header "lint: the census of a circuit's facts (census-test.py)"
    python3 -I scripts/census-test.py
+   header "lint: the values check of the SHA-256 clauses (values-check-test.py)"
+   python3 -I scripts/values-check-test.py
    #  Every body of src/ outside SPARK is an assumption of the proof and
    #  has its row in the register of the trusted base.
    header "lint: the code outside SPARK and its register rows (check-spark-off.py)"
@@ -535,6 +600,7 @@ case "${1:-}" in
    test)             do_test ;;
    cli)              do_cli ;;
    vectors)          do_vectors ;;
+   values)           do_values ;;
    lint)             do_lint ;;
    lean)             do_lean ;;
    lean-source)      do_lean_source ;;
@@ -546,6 +612,7 @@ case "${1:-}" in
       do_test
       do_cli
       do_vectors
+      do_values
       do_lint
       header "all checks passed"
       ;;
@@ -563,6 +630,7 @@ case "${1:-}" in
       do_test
       do_cli
       do_vectors
+      do_values
       do_lint
       case "$1" in
          reuse)       header "all checks but the proofs passed; the SPARK and Lean proofs are reused (ADR 0088)" ;;

@@ -291,6 +291,17 @@ In the same session:
 - the single-circuit programs on the version 7 pair, as at the close of the memory milestone: the hash proof 4.64 s and 124,919,880 B, its verification 2.31 s and 62,389,072 B, the signature proof 0.45 s and 19,673,208 B, its verification 0.27 s and 9,538,152 B. These are within 400 bytes of the peaks of release 0.4.0, and the two proofs are the release's byte for byte;
 - the 38 test documents at both versions, `make mdoc-cases`: 6 min 25 s, every case as expected.
 
+## The circuit checker on the registered hash circuit
+
+The checker of the certified circuits milestone on the version 7 hash circuit `8d079211…_hash.lfc2` (#171; [chapter 10 Section 5.2](10-certified-circuits.md#52-the-circuit-checker)). Upstream has no such check, so there is no comparison. One session on the proving machine, 28 November 2026, three runs of each and the median:
+
+| | Time | Peak memory |
+|---|---|---|
+| `longfellow_check_circuit`: the walk on the circuit and its certificate of slot counts, the two files read and hashed, release build | 3.1 s | 100 MB |
+| `scripts/values-check.py`: the 269,092 assertions of four clauses of the hash relation at two points, in Python | 8 min 5 s | 1.6 GB |
+
+The walk is well inside the expectation of ADR 0091, minutes rather than hours. The values check is a test in Python, not the proved check: it evaluates the circuit's 7.76 million terms at two points without an optimised field. It runs in every gate, the gates that reuse the proofs included.
+
 ## By step
 
 Where the time and the peak heap of the proof of age go, step by step. The steps are those of the [system map](system-map.md): PS1 to PS11 for the prover, VS1 to VS8 for the verifier. They are not rows of the [trusted base register](trusted-base.md).

@@ -22,12 +22,14 @@ package body Circuit_Check is
       R := (Outcome     => Circuit_Refused,
             Circuit     => Circuit_Status.Bad_Magic,
             Certificate => CC.Bad_Magic,
-            Walk        => CK.Cert_Mismatch);
+            Walk        => CK.Cert_Mismatch,
+            Id          => [others => 0]);
       CR.Read_Packed (Circuit_File, False, No_Pin, P, H, CSt);
       R.Circuit := CSt;
       if CSt /= Circuit_Status.Ok then
          return;
       end if;
+      R.Id := H.Id;
       CC.Read (Certificate_File, K, KSt);
       R.Certificate := KSt;
       if KSt /= CC.Ok then
