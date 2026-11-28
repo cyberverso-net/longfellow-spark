@@ -13,8 +13,8 @@
 --  Layer_Coefficients and Next_Layer, digested as scripts/census.py
 --  digests them (Checker_Facts), and compared with census.py's digest in
 --  the vector file. Two circuits that differ
---  in one constant are accepted with the same hints and have different
---  facts (paragraph D of the record).
+--  in one constant are accepted with the same slot counts and have
+--  different facts (paragraph D of ADR 0093).
 --
 --  Test code, outside the proof perimeter: SPARK_Mode is Off. Built with
 --  -gnata, so the library's executable contracts run. Reads the vector
@@ -232,13 +232,11 @@ procedure Checker_KAT is
    -------------------------------------------------------------------
 
    --  The honest certificate of c1, copied into a record with one wire
-   --  and one hint more after the spans: Spans_Ok refuses the tail, so
-   --  the walk does (Cert_Mismatch); the copy without a tail is accepted.
+   --  more after the spans: Spans_Ok refuses the tail, so the walk does
+   --  (Cert_Mismatch); the copy without a tail is accepted.
    procedure Check_Built (Circuit, Cert : Byte_Array) is
       use type CK.Status;
       use type CC.Count_Array;
-      use type CC.Instance_Array;
-      use type CC.Hint_Array;
       P   : CR.Packed_Access;
       H   : CR.Header;
       St  : Circuit_Status.Status;
@@ -254,7 +252,7 @@ procedure Checker_KAT is
       end if;
       declare
          Same_Size : constant CC.Certificate := K.all;
-         Tail      : CC.Certificate (K.NL, K.NW + 1, K.NH + 1);
+         Tail      : CC.Certificate (K.NL, K.NW + 1);
       begin
          CK.Walk (P.all, Same_Size, WSt);
          Check (WSt = CK.Accepted,
@@ -262,8 +260,6 @@ procedure Checker_KAT is
          Tail.Circuit_Id := K.Circuit_Id;
          Tail.Layers := K.Layers;
          Tail.Counts := K.Counts & [1 => 0];
-         Tail.Instances := K.Instances & [1 => 0];
-         Tail.Hints := K.Hints & [1 => 0];
          Check (not CC.Spans_Ok (Tail), "built: Spans_Ok accepts a tail");
          CK.Walk (P.all, Tail, WSt);
          Check (WSt = CK.Cert_Mismatch,

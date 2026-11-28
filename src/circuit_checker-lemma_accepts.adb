@@ -405,8 +405,16 @@ is
       Lemma_Slot_Coef_All (J, R, CR, N, Q, NO);
       Lemma_Slot_Mono_All (P, K, J, R, N, Q, NO);
       Lemma_Used_All (P, K, J, R, N, Q, NO);
-      --  The pair's hint is below the wire's count, at most Max_Count.
+      --  The pair's slot is below the wire's count, at most Max_Count.
       pragma Assert (Hq < Count_Of (P, K, J, G0) and then Hq <= U);
+      --  A slot at U is a new one: a monomial the wire has is below U
+      --  (Lemma_Slots, ADR 0094), so the used count grows.
+      Lemma_Slots
+        (P, K, J, R, N, Q - 1, G0, Pair_Mono (R, TT (P, J, N), Q), 0);
+      pragma Assert
+        (if Hq = U then
+           not Present (P, J, R, N, Q - 1, G0, Pair_Mono (R, TT (P, J, N), Q))
+           and then Used (P, K, J, R, N, Q, G0) = U + 1);
       --  Every wire's unused slots stay empty: the pair writes slot Hq of
       --  G0 only, and Hq is below G0's count after the pair.
       for G in 0 .. NO - 1 loop

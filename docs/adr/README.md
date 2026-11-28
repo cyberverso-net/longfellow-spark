@@ -96,4 +96,5 @@ Format and lifecycle: see [0001](0001-record-architecture-decisions.md) and, for
 | [0088](0088-proof-inputs-and-the-reuse-of-a-proof.md) | The proof inputs and the reuse of a proof: the gate proves again only what changed the proof's inputs | Accepted | 2026-11-09 |
 | [0091](0091-certified-circuits-milestone.md) | Certified circuits: a proved checker for the registered circuits, with two proof backends | Accepted | 2026-11-12 |
 | [0092](0092-guide-milestone-closed.md) | The guide for the evaluator closed | Accepted | 2026-11-19 |
-| [0093](0093-the-checker-model.md) | The circuit checker's model: meanings over declared variables, facts computed from the circuit, the certificate as a hint | Accepted | 2026-11-26 |
+| [0093](0093-the-checker-model.md) | The circuit checker's model: meanings over declared variables, facts computed from the circuit, the certificate as a hint | Accepted, amended by 0094 | 2026-11-26 |
+| [0094](0094-the-certificate-without-hints.md) | The certificate without hints: the walk finds each pair's slot | Accepted | 2026-11-28 |

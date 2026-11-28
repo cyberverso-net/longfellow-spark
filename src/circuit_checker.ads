@@ -95,14 +95,11 @@ package Circuit_Checker is
       Too_Many_Slots,  --  a wire with more than Max_Slots slots
       Pool_Full,       --  a layer with more than Max_Layer_Slots slots
       Too_Many_Vars,   --  more than Max_Vars declared variables
-      Bad_Hint,        --  a slot beyond the count, or not the next unused one
-      Wrong_Monomial,  --  a pair sent to a slot of another monomial
-      Duplicate_Slot,  --  a new slot whose monomial the wire already has
-      Empty_Slot,      --  a counted slot no pair reaches
-      Hints_Left);     --  a layer's hints not all used (too few: Bad_Hint)
+      Count_Exceeded,  --  a new slot beyond the wire's count
+      Empty_Slot);     --  a counted slot no pair reaches
 
    --  The statuses of a refusal.
-   subtype Refusal is Status range Cert_Mismatch .. Hints_Left;
+   subtype Refusal is Status range Cert_Mismatch .. Empty_Slot;
 
    -------------------------------------------------------------------
    --  Shapes and monomials
@@ -184,33 +181,6 @@ package Circuit_Checker is
                 and then Count_Of (P, K, J, G)
                          = K.Counts (Span (P, K, J).First_Wire + G + 1);
 
-   --  The hint at position X (from 0) of layer J; beyond the span, one
-   --  no slot has.
-   function Hint_At
-     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
-      X : Long_Long_Integer) return Natural
-   is (if CC.Spans_Ok (K)
-          and then X in 0 .. Long_Long_Integer (Span (P, K, J).Hints) - 1
-       then K.Hints (Span (P, K, J).First_Hint + Natural (X) + 1)
-       else CC.Max_Count + 1)
-   with Global => null, Pre => J <= P.Last_Layer,
-        Post => Hint_At'Result <= CC.Max_Count + 1,
-        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body");
-
-   --  What Hint_At reads.
-   procedure Lemma_Hint_At
-     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
-      X : Long_Long_Integer)
-   with Ghost => Proof_Only, Global => null,
-        Pre  => J <= P.Last_Layer and then CC.Spans_Ok (K),
-        Post => (if X in 0 .. Long_Long_Integer (Span (P, K, J).Hints) - 1
-                 then Span (P, K, J).First_Hint + Natural (X) + 1
-                        in K.Hints'Range
-                      and then Hint_At (P, K, J, X)
-                               = K.Hints (Span (P, K, J).First_Hint
-                                          + Natural (X) + 1)
-                 else Hint_At (P, K, J, X) = CC.Max_Count + 1);
-
    -------------------------------------------------------------------
    --  The model of one layer, over the shapes M of the wires it reads
    -------------------------------------------------------------------
@@ -240,30 +210,27 @@ package Circuit_Checker is
    is (Term_Pairs (M, TT (P, J, N)))
    with Ghost => Proof_Only, Global => null, Pre => J <= P.Last_Layer;
 
-   --  The hints the terms before N + 1 use.
-   function Hint_Pos
-     (P : PC.Packed_Circuit; J : Natural; M : Shape_Array; N : Natural)
-      return Long_Long_Integer
-   is (if N = 0 then 0
-       else Hint_Pos (P, J, M, N - 1) + Long_Long_Integer (Pairs (P, J, M, N)))
+   --  Whether wire G has a slot of monomial X after the terms before N
+   --  and Q pairs of term N (Q = 0: after the terms before N). Each pair
+   --  of a term of wire G gives the wire a slot of its monomial.
+   function Present
+     (P : PC.Packed_Circuit; J : Natural; M : Shape_Array;
+      N : Positive; Q : Natural; G : Natural; X : Monomial) return Boolean
+   is (if Q = 0 then
+         (if N = 1 then False
+          else Present (P, J, M, N - 1, Pairs (P, J, M, N - 1), G, X))
+       else Present (P, J, M, N, Q - 1, G, X)
+            or else (G = TT (P, J, N).G
+                     and then Pair_Mono (M, TT (P, J, N), Q) = X))
    with Ghost => Proof_Only, Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
-        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms,
-        Post => Hint_Pos'Result in
-                  0 .. Long_Long_Integer (N) * Max_Entries * Max_Entries,
-        Subprogram_Variant => (Decreases => N);
+        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms + 1,
+        Subprogram_Variant => (Decreases => N, Decreases => Q);
 
-   --  The hint of pair Q of term N.
-   function H
-     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
-      M : Shape_Array; N : Positive; Q : Positive) return Natural
-   is (Hint_At (P, K, J,
-                Hint_Pos (P, J, M, N - 1) + Long_Long_Integer (Q - 1)))
-   with Ghost => Proof_Only, Global => null,
-        Pre => J <= P.Last_Layer and then N <= SA.Max_Terms + 1;
-
-   --  The used slots of wire G after the terms before N and Q pairs of
-   --  term N (Q = 0: after the terms before N).
+   --  The used slots of wire G at the same point: one more for each pair
+   --  whose monomial the wire does not have yet (ADR 0094). The count
+   --  stops at Max_Count + 1, above every slot count a certificate can
+   --  give, where the walk has refused already.
    function Used
      (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
       M : Shape_Array; N : Positive; Q : Natural; G : Natural)
@@ -273,14 +240,49 @@ package Circuit_Checker is
           else Used (P, K, J, M, N - 1, Pairs (P, J, M, N - 1), G))
        else Used (P, K, J, M, N, Q - 1, G)
             + (if G = TT (P, J, N).G
-                  and then H (P, K, J, M, N, Q)
-                           = Used (P, K, J, M, N, Q - 1, G)
+                  and then not Present (P, J, M, N, Q - 1, G,
+                                        Pair_Mono (M, TT (P, J, N), Q))
+                  and then Used (P, K, J, M, N, Q - 1, G) <= CC.Max_Count
                then 1 else 0))
    with Ghost => Proof_Only, Global => null,
         Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
         Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms + 1,
-        Post => Used'Result <= CC.Max_Count + 2,
+        Post => Used'Result <= CC.Max_Count + 1,
         Subprogram_Variant => (Decreases => N, Decreases => Q);
+
+   --  The slot of monomial X in wire G at the same point, when Present:
+   --  the used count at the pair that first gave the wire that monomial.
+   function Index_Of
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      M : Shape_Array; N : Positive; Q : Natural; G : Natural;
+      X : Monomial) return Natural
+   is (if Q = 0 then
+         (if N = 1 then 0
+          else Index_Of (P, K, J, M, N - 1, Pairs (P, J, M, N - 1), G, X))
+       elsif Present (P, J, M, N, Q - 1, G, X) then
+         Index_Of (P, K, J, M, N, Q - 1, G, X)
+       elsif G = TT (P, J, N).G and then Pair_Mono (M, TT (P, J, N), Q) = X
+       then Used (P, K, J, M, N, Q - 1, G)
+       else 0)
+   with Ghost => Proof_Only, Global => null,
+        Annotate => (GNATprove, Hide_Info, "Expression_Function_Body"),
+        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms + 1,
+        Post => Index_Of'Result <= CC.Max_Count + 1,
+        Subprogram_Variant => (Decreases => N, Decreases => Q);
+
+   --  The slot pair Q of term N takes: the slot of its monomial if the
+   --  wire has one, else the next (ADR 0094).
+   function H
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      M : Shape_Array; N : Positive; Q : Positive) return Natural
+   is (if Present (P, J, M, N, Q - 1, TT (P, J, N).G,
+                   Pair_Mono (M, TT (P, J, N), Q))
+       then Index_Of (P, K, J, M, N, Q - 1, TT (P, J, N).G,
+                      Pair_Mono (M, TT (P, J, N), Q))
+       else Used (P, K, J, M, N, Q - 1, TT (P, J, N).G))
+   with Ghost => Proof_Only, Global => null,
+        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms + 1,
+        Post => H'Result <= CC.Max_Count + 1;
 
    --  The monomial of slot S (from 0) of wire G at the same point.
    function Slot_Mono
@@ -300,7 +302,10 @@ package Circuit_Checker is
         Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms + 1,
         Subprogram_Variant => (Decreases => N, Decreases => Q);
 
-   --  Pair Q of term N passes the checks on its hint.
+   --  Pair Q of term N passes: its slot is below the wire's count. The
+   --  other two conjuncts hold by Lemma_Slots, whatever the certificate:
+   --  the slot is a used one with the pair's monomial, or the next one
+   --  when no used slot has it.
    function Pair_Ok
      (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
       M : Shape_Array; N : Positive; Q : Positive) return Boolean
@@ -383,8 +388,6 @@ package Circuit_Checker is
      (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
       M : Shape_Array) return Boolean
    is (Span (P, K, J).Wires = Out_Count (P, J)
-       and then Hint_Pos (P, J, M, Len (P, J))
-                = Long_Long_Integer (Span (P, K, J).Hints)
        and then Slot_Base (P, K, J, Out_Count (P, J))
                 <= Long_Long_Integer (Max_Layer_Slots)
        and then (Len (P, J) = 0
@@ -544,7 +547,7 @@ package Circuit_Checker is
    with Ghost => Proof_Only, Global => null;
 
    --  The coefficient of slot S of wire G after the terms before N and Q
-   --  pairs of term N: each pair adds to the slot its hint names.
+   --  pairs of term N: each pair adds to the slot H it takes.
    function Slot_Coef
      (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
       M : Shape_Array; CM : Coef_Array; N : Positive; Q : Natural;
@@ -803,13 +806,15 @@ package Circuit_Checker is
      ([for I in 0 .. P.Ninput - 1 => Coef_List'[1 => SA.One, others => Zero]])
    with Global => null;
 
-   --  The slots of layer J from the certificate's counts and hints: each
-   --  slot's monomial, and the coefficient it collects from the circuit's
-   --  constants and the coefficients CM of the meanings it reads. Nothing
-   --  is checked: a hint beyond its wire's count is skipped (the walk
-   --  refuses such a certificate). Fits is false when the counts do not
-   --  fit the pool. The result is the model's, Mono_End and Coef_End:
-   --  the same sums in the same order, so Same by construction.
+   --  The slots of layer J from the certificate's counts: each slot's
+   --  monomial, and the coefficient it collects from the circuit's
+   --  constants and the coefficients CM of the meanings it reads, each
+   --  pair placed by the search of the walk (ADR 0094). Nothing is
+   --  checked: a pair whose slot falls beyond its wire's count changes
+   --  no slot of the pool (the walk refuses such a certificate). Fits is
+   --  false when the counts do not fit the pool. The result is the
+   --  model's, Mono_End and Coef_End: the same sums in the same order,
+   --  so Same by construction.
    procedure Layer_Coefficients
      (P    : PC.Packed_Circuit;
       K    : CC.Certificate;

@@ -179,7 +179,6 @@ is
       Tm     : SA.Term;
       N      : Positive;
       Q      : Positive;
-      HP     : Long_Long_Integer;
       Ok     : in out Boolean;
       Why    : in out Refusal)
    with
@@ -191,8 +190,6 @@ is
              and then Tm = TT (P, J, N) and then Tm.G < NO
              and then Tm.K /= Zero
              and then Q <= Pairs (P, J, RJ, N)
-             and then HP = Hint_Pos (P, J, RJ, N - 1)
-                           + Long_Long_Integer (Q - 1)
              and then Ok = Pairs_Ok (P, K, J, RJ, N, Q - 1)
              and then (if Ok then State_Ok (Base, Used_A, Pool, N, Q - 1))),
      Post => (Proof_Only =>
@@ -213,11 +210,6 @@ is
       if not Ok then
          return;
       end if;
-      Lemma_Hint_At (P, K, J, HP);
-      Hi := (if HP < Long_Long_Integer (S.Hints)
-             then K.Hints (S.First_Hint + Natural (HP) + 1)
-             else CC.Max_Count + 1);
-      pragma Assert (Proof_Only => Hi = H (P, K, J, RJ, N, Q));
       Pm := Pair_Mono (M, Tm, Q);
       --  M and RJ agree field by field on the two wires the term reads.
       pragma Assert
@@ -231,41 +223,49 @@ is
       pragma Assert (Proof_Only => Pm = Pair_Mono (RJ, Tm, Q));
       U := Used_A (G);
       pragma Assert (Proof_Only => U = Used (P, K, J, RJ, N, Q - 1, G));
-      if Hi < Count_Of (P, K, J, G) and then Hi <= U then
-         if Hi < U then
-            pragma Assert
-              (Proof_Only =>
-                 (Pool (Base (G) + Hi + 1)
-                 = Slot_Mono (P, K, J, RJ, N, Q - 1, G, Hi)));
-            Ok := Pool (Base (G) + Hi + 1) = Pm;
-            pragma Assert (Proof_Only => Ok = Pair_Ok (P, K, J, RJ, N, Q));
-            if not Ok then
-               Why := Wrong_Monomial;
-            end if;
-         else
-            pragma Assert
-              (Proof_Only =>
-                 (for all S2 in 0 .. U - 1 =>
-                   Pool (Base (G) + S2 + 1)
-                   = Slot_Mono (P, K, J, RJ, N, Q - 1, G, S2)));
-            Ok := (for all S2 in 0 .. U - 1 =>
-                     Pool (Base (G) + S2 + 1) /= Pm);
-            pragma Assert
-              (Proof_Only =>
-                 (Ok = (for all S2 in 0 .. U - 1 =>
-                         Slot_Mono (P, K, J, RJ, N, Q - 1, G, S2) /= Pm)));
-            pragma Assert (Proof_Only => Ok = Pair_Ok (P, K, J, RJ, N, Q));
-            if Ok then
-               Pool (Base (G) + U + 1) := Pm;
-               Used_A (G) := U + 1;
-            else
-               Why := Duplicate_Slot;
-            end if;
+      pragma Assert
+        (Proof_Only =>
+           (for all S2 in 0 .. U - 1 =>
+              Pool (Base (G) + S2 + 1)
+              = Slot_Mono (P, K, J, RJ, N, Q - 1, G, S2)));
+
+      --  The search: the first used slot of the pair's monomial, else
+      --  the next one (ADR 0094).
+      Hi := U;
+      for S2 in 0 .. U - 1 loop
+         if Pool (Base (G) + S2 + 1) = Pm then
+            Hi := S2;
+            exit;
          end if;
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (Hi = U
+              and then (for all S3 in 0 .. S2 =>
+                          Pool (Base (G) + S3 + 1) /= Pm)));
+      end loop;
+      if Hi < U then
+         pragma Assert (Proof_Only => Pool (Base (G) + Hi + 1) = Pm);
+         pragma Assert
+           (Proof_Only => Slot_Mono (P, K, J, RJ, N, Q - 1, G, Hi) = Pm);
+         Lemma_Slots (P, K, J, RJ, N, Q - 1, G, Pm, Hi);
       else
-         Ok := False;
-         Why := Bad_Hint;
-         pragma Assert (Proof_Only => not Pair_Ok (P, K, J, RJ, N, Q));
+         pragma Assert
+           (Proof_Only =>
+              (for all S2 in 0 .. U - 1 =>
+                 Slot_Mono (P, K, J, RJ, N, Q - 1, G, S2) /= Pm));
+         Lemma_Slots (P, K, J, RJ, N, Q - 1, G, Pm, 0);
+         pragma Assert
+           (Proof_Only => not Present (P, J, RJ, N, Q - 1, G, Pm));
+      end if;
+      pragma Assert (Proof_Only => Hi = H (P, K, J, RJ, N, Q));
+
+      Ok := Hi < Count_Of (P, K, J, G);
+      pragma Assert (Proof_Only => Ok = Pair_Ok (P, K, J, RJ, N, Q));
+      if not Ok then
+         Why := Count_Exceeded;
+      elsif Hi = U then
+         Pool (Base (G) + U + 1) := Pm;
+         Used_A (G) := U + 1;
       end if;
    end Check_Pair;
 
@@ -409,8 +409,7 @@ is
    Counts_Ok  : Boolean;
    Fits       : Boolean;
    Pairs_Ok_F : Boolean := True;
-   Pair_Why   : Refusal := Bad_Hint;
-   HP     : Long_Long_Integer := 0;
+   Pair_Why   : Refusal := Count_Exceeded;
    C      : PC.Cursor := PC.Start (P, J);
    Tm     : SA.Term;
 begin
@@ -457,7 +456,6 @@ begin
         (SA.Fits (PC.Expand (P).Terms (P.Layers (J).First .. P.Layers (J).Last),
                  NO, NW)));
    PC.Lemma_Walked_Start (P, J);
-   Lemma_Hint_Pos_Zero (P, J, RJ);
    Lemma_Used_All (P, K, J, RJ, 1, 0, NO);
    Lemma_Slot_Mono_All (P, K, J, RJ, 1, 0, NO);
    pragma Assert (Proof_Only => State_Ok (Base.all, Used_A.all, Pool, 1, 0));
@@ -470,7 +468,6 @@ begin
            and then Used_A'First = 0 and then Used_A'Last = NO
            and then Terms'First = 0 and then Terms'Last = NO));
       pragma Loop_Invariant (Proof_Only => Bases_Ok (Base.all));
-      pragma Loop_Invariant (Proof_Only => HP = Hint_Pos (P, J, RJ, N - 1));
       pragma Loop_Invariant
         (Proof_Only =>
            (for all G in 0 .. NO - 1 =>
@@ -493,7 +490,6 @@ begin
       pragma Assert
         (Proof_Only => Tm.G < NO and then Tm.H0 < NW and then Tm.H1 < NW);
       Lemma_Wire_Terms_All (P, J, N, NO);
-      Lemma_Hint_Pos_Step (P, J, RJ, N);
       Lemma_Pairs_Ok_Def (P, K, J, RJ, N, 0);
       if Tm.K /= Zero then
          Terms (Tm.G) := Terms (Tm.G) + 1;
@@ -502,9 +498,6 @@ begin
               (Shape_At (M, Tm.H1).N * Shape_At (M, Tm.H0).N
               = Pairs (P, J, RJ, N)));
          for Q in 1 .. Shape_At (M, Tm.H1).N * Shape_At (M, Tm.H0).N loop
-            pragma Loop_Invariant
-              (Proof_Only =>
-                 (HP = Hint_Pos (P, J, RJ, N - 1) + Long_Long_Integer (Q - 1)));
             pragma Loop_Invariant
               (Proof_Only => Pairs_Ok_F = Pairs_Ok (P, K, J, RJ, N, Q - 1));
             pragma Loop_Invariant
@@ -515,14 +508,12 @@ begin
               (Proof_Only =>
                  (Bases_Ok (Base.all)
                  and then Used_A'First = 0 and then Used_A'Last = NO));
-            Check_Pair (Base.all, Used_A.all, Pool, Tm, N, Q, HP,
+            Check_Pair (Base.all, Used_A.all, Pool, Tm, N, Q,
                         Pairs_Ok_F, Pair_Why);
-            HP := HP + 1;
          end loop;
       end if;
       --  The state after term N is the model's at (N, Pairs (N)), which
       --  is its state at (N + 1, 0).
-      pragma Assert (Proof_Only => HP = Hint_Pos (P, J, RJ, N));
       pragma Assert
         (Proof_Only =>
            (Pairs_Ok_F = Pairs_Ok (P, K, J, RJ, N, Pairs (P, J, RJ, N))));
@@ -538,7 +529,6 @@ begin
    end loop;
 
    --  The end of the walk of the layer, in the model's terms.
-   pragma Assert (Proof_Only => HP = Hint_Pos (P, J, RJ, L));
    pragma Assert
      (Proof_Only =>
         (for all G in 0 .. NO - 1 => Terms (G) = Wire_Terms (P, J, L, G)));
@@ -558,7 +548,6 @@ begin
    declare
       Ok : constant Boolean :=
         Counts_Ok and then Pairs_Ok_F
-        and then HP = Long_Long_Integer (S.Hints)
         and then (for all G in 0 .. NO - 1 =>
                     Used_A (G) = Count_Of (P, K, J, G)
                     and then Terms (G) <= Max_Terms_Per_Wire);
@@ -569,7 +558,6 @@ begin
       if not Ok then
          St := (if not Counts_Ok then Too_Many_Slots
                 elsif not Pairs_Ok_F then Pair_Why
-                elsif HP /= Long_Long_Integer (S.Hints) then Hints_Left
                 elsif (for some G in 0 .. NO - 1 =>
                          Used_A (G) /= Count_Of (P, K, J, G))
                 then Empty_Slot

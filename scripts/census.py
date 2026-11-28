@@ -48,11 +48,9 @@ the terms of one wire, the slots of one wire and of one layer, and the
 pairs of one term's expansion.
 
 With --certificate, it also writes the certificate the walk expects
-(Circuit_Certificates): for each layer, each wire's slot count and, for
-every pair, the slot its monomial took, the gadget instances left 0. It
-is a test vehicle for the checker on the registered circuits, not the
-certificate of block 4, which the instrumented generator emits with the
-gadget instances.
+(Circuit_Certificates, ADR 0094): for each layer, each wire's slot
+count. The certificate of the registered hash circuit in tests/vectors/
+is written this way.
 
 Run from the repository root:
   python3 -I scripts/census.py CIRCUIT.lfc2 gf2_128|p256 [--json OUT]
@@ -100,7 +98,7 @@ def census(data, field):
 
     layers = circ["layers"]
     ninput = circ["ninput"]
-    cert = [b"LFCK", cv.uleb(1), ident, cv.uleb(len(layers))]
+    cert = [b"LFCK", cv.uleb(2), ident, cv.uleb(len(layers))]
     prev = [{0: one}] + [{i: one} for i in range(1, ninput)]
     nvar = ninput
     out = hashlib.sha256()
@@ -112,7 +110,6 @@ def census(data, field):
         nv = circ["noutput"] if j == 0 else layers[j - 1][1]
         slots = [dict() for _ in range(nv)]
         nterms = [0] * nv
-        hints = []
         for g, h0, h1, k in terms:
             a, b = prev[h1], prev[h0]
             lim["pairs_per_term"] = max(lim["pairs_per_term"], len(a) * len(b))
@@ -128,12 +125,10 @@ def census(data, field):
                     key = (va, vb) if va <= vb else (vb, va)
                     if key not in s:
                         s[key] = 0
-                    hints.append(list(s).index(key))
                     s[key] = F.add(s[key], mul(kca, cb))
         lim["slots_per_layer"] = max(lim["slots_per_layer"], sum(len(s) for s in slots))
-        cert.append(cv.uleb(nv) + cv.uleb(len(hints)))
-        cert.append(b"".join(cv.uleb(len(slots[g])) + cv.uleb(0) for g in range(nv)))
-        cert.append(b"".join(cv.uleb(h) for h in hints))
+        cert.append(cv.uleb(nv))
+        cert.append(b"".join(cv.uleb(len(slots[g])) for g in range(nv)))
         cur = [None] * nv
         for g in range(nv):
             lim["terms_per_wire"] = max(lim["terms_per_wire"], nterms[g])
