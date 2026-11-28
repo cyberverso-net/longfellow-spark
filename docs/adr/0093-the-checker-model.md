@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-26, with #170, block 3 of the milestone Certified circuits, before its code; proposed the same day from the census of the registered circuits).
+Accepted (2026-11-26, with #170, block 3 of the milestone Certified circuits, before its code; proposed the same day from the census of the registered circuits). Amended by [ADR 0094](0094-the-certificate-without-hints.md) (28 November 2026): the hint is withdrawn, and the walk finds each pair's slot by a search, the fallback of "Normal forms computed without a hint" below. The statuses `Wrong_Monomial`, `Duplicate_Slot` and `Hints_Left` go, and `Bad_Hint` becomes `Count_Exceeded`; the certificate carries the slot counts and the gadget instances.
 
 ## Date
 

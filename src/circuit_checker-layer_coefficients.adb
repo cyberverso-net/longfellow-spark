@@ -1,10 +1,13 @@
 --  Layer_Coefficients: the slots of one layer, their monomials and their
---  coefficients, from the certificate's counts and hints (ADR 0093). The
---  layer is walked as Check_Layer walks it, with no check: each pair adds
---  its coefficient to the slot its hint names, and a new slot takes its
---  monomial when the hint is the wire's next unused slot. A hint beyond
---  the wire's count names no slot of the pool and is skipped; the model
---  changes no slot below the count there either.
+--  coefficients, from the certificate's counts (ADR 0093, ADR 0094). The
+--  layer is walked as Check_Layer walks it, with no check: each pair
+--  adds its coefficient to the slot of its monomial, found by a search
+--  of the wire's used slots below its count, and a monomial the wire
+--  does not have yet takes the next slot. Only the slots below a wire's
+--  count are in the pool, so the used count is kept up to the wire's
+--  count: once a wire has used them all, a pair whose monomial is not
+--  among them falls at or beyond the count, and the model changes no
+--  slot below the count either.
 --
 --  Each step is a subprogram of its own with its contract, as in
 --  Check_Layer: the slot bases, one pair.
@@ -148,13 +151,14 @@ is
    --  One pair
    -------------------------------------------------------------------
 
-   --  The used counts and the monomials of the slots below each wire's
-   --  count are the model's at (N, Q).
+   --  The used counts, up to each wire's count, and the monomials of the
+   --  slots below the count are the model's at (N, Q).
    function Monos_Ok
      (Base : Base_Array; Used_A : Nat_Array; Mo : Mono_Array;
       N : Positive; Q : Natural) return Boolean
    is (for all G in 0 .. NO - 1 =>
-         Used_A (G) = Used (P, K, J, RJ, N, Q, G)
+         Used_A (G)
+         = Natural'Min (Used (P, K, J, RJ, N, Q, G), Count_Of (P, K, J, G))
          and then (for all S2 in 0 .. Count_Of (P, K, J, G) - 1 =>
                      Mo (Base (G) + S2 + 1)
                      = Slot_Mono (P, K, J, RJ, N, Q, G, S2)))
@@ -192,8 +196,8 @@ is
                and then Co'First = 1 and then Co'Last = Max_Layer_Slots
                and then N <= SA.Max_Terms + 1);
 
-   --  The pair's coefficient Pc added to the slot its hint Hi names,
-   --  when that slot is below the wire's count.
+   --  The pair's coefficient Pc added to the slot Hi it takes, when that
+   --  slot is below the wire's count.
    procedure Add_Coef
      (Base : Base_Array;
       Co   : in out Coef_Pool;
@@ -257,8 +261,7 @@ is
       Co     : in out Coef_Pool;
       Tm     : SA.Term;
       N      : Positive;
-      Q      : Positive;
-      HP     : Long_Long_Integer)
+      Q      : Positive)
    with
      Pre  => (Proof_Only =>
              Ctx and then Bases_Ok (Base)
@@ -271,8 +274,6 @@ is
              and then Tm.K /= Zero
              and then SA.Same (Tm.K, TT (P, J, N).K)
              and then Q <= Pairs (P, J, RJ, N)
-             and then HP = Hint_Pos (P, J, RJ, N - 1)
-                           + Long_Long_Integer (Q - 1)
              and then State_Ok (Base, Used_A, Mo, Co, N, Q - 1)),
      Post => (Proof_Only =>
              Used_A'First = 0 and then Used_A'Last = NO
@@ -293,7 +294,6 @@ is
       Lemma_Used_All (P, K, J, RJ, N, Q, NO);
       Lemma_Slot_Mono_All (P, K, J, RJ, N, Q, NO);
       Lemma_Slot_Coef_Step (P, K, J, RJ, CJ, N, Q, NO);
-      Lemma_Hint_At (P, K, J, HP);
       Lemma_Count_Of (P, K, J, G);
       pragma Assert (Proof_Only =>
                        (Shape_At (M, Tm.H0).N = Shape_At (RJ, Tm.H0).N));
@@ -302,10 +302,6 @@ is
       pragma Assert (Proof_Only => N0 >= 1);
       Row := Integer'Min (Max_Entries, (Q - 1) / N0 + 1);
       Col := (Q - 1) mod N0 + 1;
-      Hi := (if HP < Long_Long_Integer (S.Hints)
-             then K.Hints (S.First_Hint + Natural (HP) + 1)
-             else CC.Max_Count + 1);
-      pragma Assert (Proof_Only => Hi = H (P, K, J, RJ, N, Q));
       Cn := K.Counts (S.First_Wire + G + 1);
       pragma Assert (Proof_Only => Cn = Count_Of (P, K, J, G));
       --  The pair's monomial and coefficient, from the executable shapes
@@ -325,14 +321,70 @@ is
       pragma Assert
         (Proof_Only => SA.Same (Pc, Pair_Coef (RJ, CJ, TT (P, J, N), Q)));
       U := Used_A (G);
-      pragma Assert (Proof_Only => U = Used (P, K, J, RJ, N, Q - 1, G));
-      Add_Coef (Base, Co, Tm, N, Q, Hi, Pc);
-      if Hi < Cn and then Hi = U then
-         Mo (Base (G) + Hi + 1) := Pm;
+      pragma Assert
+        (Proof_Only =>
+           U = Natural'Min (Used (P, K, J, RJ, N, Q - 1, G), Cn));
+      pragma Assert
+        (Proof_Only =>
+           (for all S2 in 0 .. U - 1 =>
+              Mo (Base (G) + S2 + 1)
+              = Slot_Mono (P, K, J, RJ, N, Q - 1, G, S2)));
+
+      --  The search, as in Check_Layer: the first used slot of the
+      --  pair's monomial below the count, else U (ADR 0094).
+      Hi := U;
+      for S2 in 0 .. U - 1 loop
+         if Mo (Base (G) + S2 + 1) = Pm then
+            Hi := S2;
+            exit;
+         end if;
+         pragma Loop_Invariant
+           (Proof_Only =>
+              (Hi = U
+              and then (for all S3 in 0 .. S2 =>
+                          Mo (Base (G) + S3 + 1) /= Pm)));
+      end loop;
+      if Hi < U then
+         --  Found: the pair adds to that slot, and the wire has the
+         --  monomial already, so no slot opens.
+         pragma Assert
+           (Proof_Only => Slot_Mono (P, K, J, RJ, N, Q - 1, G, Hi) = Pm);
+         Lemma_Slots (P, K, J, RJ, N, Q - 1, G, Pm, Hi);
+         pragma Assert (Proof_Only => Hi = H (P, K, J, RJ, N, Q));
+         Add_Coef (Base, Co, Tm, N, Q, Hi, Pc);
+      else
+         pragma Assert
+           (Proof_Only =>
+              (for all S2 in 0 .. U - 1 =>
+                 Slot_Mono (P, K, J, RJ, N, Q - 1, G, S2) /= Pm));
+         Lemma_Slots (P, K, J, RJ, N, Q - 1, G, Pm, 0);
+         if U < Cn then
+            --  Not found, and the wire's used slots are all in the pool:
+            --  the wire does not have the monomial, and it opens slot U.
+            pragma Assert
+              (Proof_Only => U = Used (P, K, J, RJ, N, Q - 1, G));
+            pragma Assert
+              (Proof_Only => not Present (P, J, RJ, N, Q - 1, G, Pm));
+            pragma Assert (Proof_Only => Hi = H (P, K, J, RJ, N, Q));
+            Add_Coef (Base, Co, Tm, N, Q, Hi, Pc);
+            Mo (Base (G) + U + 1) := Pm;
+            Used_A (G) := U + 1;
+         else
+            --  Not found among the wire's Cn slots, all used: the pair's
+            --  slot is at or beyond the count, and nothing below it
+            --  changes.
+            pragma Assert
+              (Proof_Only => Cn <= Used (P, K, J, RJ, N, Q - 1, G));
+            pragma Assert (Proof_Only => H (P, K, J, RJ, N, Q) >= Cn);
+            pragma Assert
+              (Proof_Only =>
+                 (for all S2 in 0 .. Cn - 1 =>
+                    SA.Same (Slot_Coef (P, K, J, RJ, CJ, N, Q, G, S2),
+                             Slot_Coef (P, K, J, RJ, CJ, N, Q - 1, G, S2))));
+         end if;
       end if;
-      if Hi = U then
-         Used_A (G) := U + 1;
-      end if;
+      pragma Assert
+        (Proof_Only => Coefs_Ok (Base, Co, N, Q));
       pragma Assert
         (Proof_Only => Monos_Ok (Base, Used_A, Mo, N, Q));
    end Add_Pair;
@@ -361,7 +413,6 @@ is
 
    Base   : Base_Access;
    Used_A : Nat_Access;
-   HP     : Long_Long_Integer := 0;
    Cur    : PC.Cursor := PC.Start (P, J);
    Tm     : SA.Term;
    Ok     : Boolean;
@@ -389,7 +440,6 @@ begin
         (SA.Fits (PC.Expand (P).Terms (P.Layers (J).First .. P.Layers (J).Last),
                  NO, NW)));
    PC.Lemma_Walked_Start (P, J);
-   Lemma_Hint_Pos_Zero (P, J, RJ);
    Lemma_Used_All (P, K, J, RJ, 1, 0, NO);
    Lemma_Slot_Mono_All (P, K, J, RJ, 1, 0, NO);
    Lemma_Slot_Coef_Step (P, K, J, RJ, CJ, 1, 0, NO);
@@ -403,7 +453,6 @@ begin
            and then Base'First = 0 and then Base'Last = NO
            and then Used_A'First = 0 and then Used_A'Last = NO));
       pragma Loop_Invariant (Proof_Only => Bases_Ok (Base.all));
-      pragma Loop_Invariant (Proof_Only => HP = Hint_Pos (P, J, RJ, N - 1));
       pragma Loop_Invariant (Proof_Only =>
                                (State_Ok (Base.all, Used_A.all, Mono, C, N, 0)));
       PC.Lemma_Walked_Step (P, J, N, Cur);
@@ -415,14 +464,10 @@ begin
       pragma Assert (Proof_Only => SA.Same (Tm.K, TT (P, J, N).K));
       pragma Assert (Proof_Only =>
                        (Tm.G < NO and then Tm.H0 < NW and then Tm.H1 < NW));
-      Lemma_Hint_Pos_Step (P, J, RJ, N);
       if Tm.K /= Zero then
          pragma Assert
            (Proof_Only => M (Tm.H1).N * M (Tm.H0).N = Pairs (P, J, RJ, N));
          for Q in 1 .. M (Tm.H1).N * M (Tm.H0).N loop
-            pragma Loop_Invariant
-              (Proof_Only =>
-                 (HP = Hint_Pos (P, J, RJ, N - 1) + Long_Long_Integer (Q - 1)));
             pragma Loop_Invariant
               (Proof_Only =>
                  (State_Ok (Base.all, Used_A.all, Mono, C, N, Q - 1)));
@@ -430,13 +475,11 @@ begin
               (Proof_Only =>
                  (Bases_Ok (Base.all)
                  and then Used_A'First = 0 and then Used_A'Last = NO));
-            Add_Pair (Base.all, Used_A.all, Mono, C, Tm, N, Q, HP);
-            HP := HP + 1;
+            Add_Pair (Base.all, Used_A.all, Mono, C, Tm, N, Q);
          end loop;
       end if;
       --  The state after term N is the model's at (N, Pairs (N)), which
       --  is its state at (N + 1, 0).
-      pragma Assert (Proof_Only => HP = Hint_Pos (P, J, RJ, N));
       pragma Assert
         (Proof_Only =>
            (State_Ok (Base.all, Used_A.all, Mono, C, N, Pairs (P, J, RJ, N))));

@@ -262,6 +262,7 @@ Each item below has a row in the [trusted base register](trusted-base.md), named
 - That the Lagrange tables of the Ligero verifier interpolate (V12).
 - That the rows of the prover's tableau compose into the tableau of the specification, and that the polynomials of its Ligero proof are the reference's sums (V13; ADR 0052).
 - That the plucker's interpolation, `Gadgets.Bits.Interpolate`, gives at the point of each nibble its four bits, with constant terms neither 0 nor 1 (V14).
+- That the registered hash circuit makes every assertion the clauses `Bits`, `Chain`, `Zero_Tail` and `Length` of the hash relation require, tested as a polynomial identity at two points derived from the circuit file, until the catalogue's proof (V15; #222).
 - Full absorption into the transcript beyond the two Appendix B.3 proofs. The sequence of calls in `Replay_Challenges` is the checklist (S3).
 
 **The machine.**

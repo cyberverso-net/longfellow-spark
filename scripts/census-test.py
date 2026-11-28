@@ -100,14 +100,12 @@ check(res["facts_sha256"] == want, "zero coefficients kept: the bytes")
 check(res["kinds"] == {"linear": 1, "declared": 1},
       f"zero coefficients kept: kinds {res['kinds']}")
 
-# 4. The certificate: the slots in the order their monomials first
-#    appear, the hint of each pair. o0 = x1 + x2 + x1: hints 0, 1, 0, two
-#    slots.
+# 4. The certificate (ADR 0094): each wire's slot count, the distinct
+#    monomials of its expansion. o0 = x1 + x2 + x1: two slots.
 data, res = run([(3, [(0, 0, 1, 1), (0, 0, 2, 1), (0, 0, 1, 1)])], 3, 1)
 _, _, _, ident = cv.read_lfc2(FLD, data)
-want = (b"LFCK" + cv.uleb(1) + ident + cv.uleb(1)
-        + cv.uleb(1) + cv.uleb(3) + cv.uleb(2) + cv.uleb(0)
-        + cv.uleb(0) + cv.uleb(1) + cv.uleb(0))
+want = (b"LFCK" + cv.uleb(2) + ident + cv.uleb(1)
+        + cv.uleb(1) + cv.uleb(2))
 check(res["certificate"] == want, "the certificate's bytes")
 
 # 5. A linear wire longer than Max_Form is declared: o0 = x1 + x2 + x3 +

@@ -65,7 +65,7 @@ package body Circuit_Certificates is
       if St /= Ok then
          return;
       end if;
-      if V /= 1 then
+      if V /= 2 then
          St := Bad_Version;
          return;
       end if;
@@ -86,50 +86,37 @@ package body Circuit_Certificates is
       NL := V;
    end Header;
 
-   --  The first pass: the totals of wires and hints, every integer read
-   --  and bounded, and nothing after the last layer.
+   --  The first pass: the total of wires, every integer read and
+   --  bounded, and nothing after the last layer.
    procedure Scan
      (B     : Byte_Array;
       Start : Natural;
       NL    : Layer_Count;
       NW    : out Natural;
-      NH    : out Natural;
       St    : out Status)
    with
      Global => null,
      Pre    => B'First = 0 and then Start <= B'Length,
-     Post   => (if St = Ok then NW <= Max_All_Wires
-                                and then NH <= Max_All_Hints)
+     Post   => (if St = Ok then NW <= Max_All_Wires)
    is
-      Pos    : Natural := Start;
-      W, H   : Natural;
-      C, Ins : Natural;
-      X      : Natural;
+      Pos : Natural := Start;
+      W   : Natural;
+      C   : Natural;
    begin
       NW := 0;
-      NH := 0;
       St := Ok;
       for I in 1 .. NL loop
          Next (B, Pos, W, St);
          if St /= Ok then
             return;
          end if;
-         Next (B, Pos, H, St);
-         if St /= Ok then
-            return;
-         end if;
-         if W > Max_All_Wires - NW or else H > Max_All_Hints - NH then
+         if W > Max_All_Wires - NW then
             St := Bound_Exceeded;
             return;
          end if;
          NW := NW + W;
-         NH := NH + H;
          for J in 1 .. W loop
             Next (B, Pos, C, St);
-            if St /= Ok then
-               return;
-            end if;
-            Next (B, Pos, Ins, St);
             if St /= Ok then
                return;
             end if;
@@ -139,20 +126,8 @@ package body Circuit_Certificates is
             end if;
             pragma Loop_Invariant (St = Ok and then Pos <= B'Length);
          end loop;
-         for J in 1 .. H loop
-            Next (B, Pos, X, St);
-            if St /= Ok then
-               return;
-            end if;
-            if X > Max_Count then
-               St := Bound_Exceeded;
-               return;
-            end if;
-            pragma Loop_Invariant (St = Ok and then Pos <= B'Length);
-         end loop;
          pragma Loop_Invariant
-           (St = Ok and then Pos <= B'Length
-            and then NW <= Max_All_Wires and then NH <= Max_All_Hints);
+           (St = Ok and then Pos <= B'Length and then NW <= Max_All_Wires);
       end loop;
       if Pos /= B'Length then
          St := Trailing;
@@ -169,39 +144,28 @@ package body Circuit_Certificates is
    with
      Global => null,
      Pre    => B'First = 0 and then Start <= B'Length
-               and then K.NW <= Max_All_Wires and then K.NH <= Max_All_Hints,
+               and then K.NW <= Max_All_Wires,
      Post   => (if St = Ok then Spans_Ok (K))
    is
-      Pos    : Natural := Start;
-      W, H   : Natural;
-      C, Ins : Natural;
-      X      : Natural;
-      FW, FH : Natural := 0;
+      Pos : Natural := Start;
+      W   : Natural;
+      C   : Natural;
+      FW  : Natural := 0;
    begin
       St := Ok;
       for I in 1 .. K.NL loop
-         K.Layers (I) := (First_Wire => FW, Wires => 0,
-                          First_Hint => FH, Hints => 0);
+         K.Layers (I) := (First_Wire => FW, Wires => 0);
          Next (B, Pos, W, St);
          if St /= Ok then
             return;
          end if;
-         Next (B, Pos, H, St);
-         if St /= Ok then
-            return;
-         end if;
-         if W > K.NW - FW or else H > K.NH - FH then
+         if W > K.NW - FW then
             St := Bound_Exceeded;
             return;
          end if;
-         K.Layers (I) := (First_Wire => FW, Wires => W,
-                          First_Hint => FH, Hints => H);
+         K.Layers (I) := (First_Wire => FW, Wires => W);
          for J in 1 .. W loop
             Next (B, Pos, C, St);
-            if St /= Ok then
-               return;
-            end if;
-            Next (B, Pos, Ins, St);
             if St /= Ok then
                return;
             end if;
@@ -210,49 +174,27 @@ package body Circuit_Certificates is
                return;
             end if;
             K.Counts (FW + J) := C;
-            K.Instances (FW + J) := Unsigned_32 (Ins);
-            pragma Loop_Invariant (St = Ok and then Pos <= B'Length);
-         end loop;
-         for J in 1 .. H loop
-            Next (B, Pos, X, St);
-            if St /= Ok then
-               return;
-            end if;
-            if X > Max_Count then
-               St := Bound_Exceeded;
-               return;
-            end if;
-            K.Hints (FH + J) := X;
             pragma Loop_Invariant (St = Ok and then Pos <= B'Length);
          end loop;
          FW := FW + W;
-         FH := FH + H;
          pragma Loop_Invariant
            (St = Ok and then Pos <= B'Length
-            and then FW <= K.NW and then FH <= K.NH
+            and then FW <= K.NW
             and then K.Layers (1).First_Wire = 0
-            and then K.Layers (1).First_Hint = 0
             and then (for all L in 1 .. I =>
                         K.Layers (L).Wires <= K.NW
                         and then K.Layers (L).First_Wire
-                                   <= K.NW - K.Layers (L).Wires
-                        and then K.Layers (L).Hints <= K.NH
-                        and then K.Layers (L).First_Hint
-                                   <= K.NH - K.Layers (L).Hints)
+                                   <= K.NW - K.Layers (L).Wires)
             and then (for all L in 2 .. I =>
                         K.Layers (L).First_Wire
                           = K.Layers (L - 1).First_Wire
-                            + K.Layers (L - 1).Wires
-                        and then K.Layers (L).First_Hint
-                          = K.Layers (L - 1).First_Hint
-                            + K.Layers (L - 1).Hints)
-            and then FW = K.Layers (I).First_Wire + K.Layers (I).Wires
-            and then FH = K.Layers (I).First_Hint + K.Layers (I).Hints);
+                            + K.Layers (L - 1).Wires)
+            and then FW = K.Layers (I).First_Wire + K.Layers (I).Wires);
       end loop;
-      --  The spans end at the first pass's totals. The second pass reads
+      --  The spans end at the first pass's total. The second pass reads
       --  the same bytes, so this refuses nothing the first accepted; it
       --  states the end of the tiling where the proof sees it.
-      if St = Ok and then (FW /= K.NW or else FH /= K.NH) then
+      if St = Ok and then FW /= K.NW then
          St := Bound_Exceeded;
       end if;
    end Fill;
@@ -262,27 +204,25 @@ package body Circuit_Certificates is
       K  : out Cert_Access;
       St : out Status)
    is
-      Pos    : Natural;
-      Id     : Bytes_32;
-      NL     : Layer_Count;
-      NW, NH : Natural;
+      Pos : Natural;
+      Id  : Bytes_32;
+      NL  : Layer_Count;
+      NW  : Natural;
    begin
       K := null;
       Header (B, Pos, Id, NL, St);
       if St /= Ok then
          return;
       end if;
-      Scan (B, Pos, NL, NW, NH, St);
+      Scan (B, Pos, NL, NW, St);
       if St /= Ok then
          return;
       end if;
       K := new Certificate'
-        (NL => NL, NW => NW, NH => NH,
+        (NL => NL, NW => NW,
          Circuit_Id => Id,
          Layers     => [others => (others => 0)],
-         Counts     => [others => 0],
-         Instances  => [others => 0],
-         Hints      => [others => 0]);
+         Counts     => [others => 0]);
       Fill (B, Pos, K.all, St);
       if St /= Ok then
          Free (K);

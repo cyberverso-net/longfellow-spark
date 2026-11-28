@@ -45,32 +45,6 @@ package body Circuit_Checker is
    --  One step of each hidden function of the model
    -------------------------------------------------------------------
 
-   procedure Lemma_Hint_Pos_Step
-     (P : PC.Packed_Circuit; J : Natural; M : Shape_Array; N : Positive)
-   with Ghost => Proof_Only, Global => null,
-        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms,
-        Post => Hint_Pos (P, J, M, N)
-                = Hint_Pos (P, J, M, N - 1)
-                  + Long_Long_Integer (Pairs (P, J, M, N))
-   is
-      pragma Annotate
-        (GNATprove, Unhide_Info, "Expression_Function_Body", Hint_Pos);
-   begin
-      null;
-   end Lemma_Hint_Pos_Step;
-
-   procedure Lemma_Hint_Pos_Zero
-     (P : PC.Packed_Circuit; J : Natural; M : Shape_Array)
-   with Ghost => Proof_Only, Global => null,
-        Pre  => J <= P.Last_Layer,
-        Post => Hint_Pos (P, J, M, 0) = 0
-   is
-      pragma Annotate
-        (GNATprove, Unhide_Info, "Expression_Function_Body", Hint_Pos);
-   begin
-      null;
-   end Lemma_Hint_Pos_Zero;
-
    procedure Lemma_Used_Def
      (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
       M : Shape_Array; N : Positive; Q : Natural; G : Natural)
@@ -83,8 +57,11 @@ package body Circuit_Checker is
                                  G))
                    else Used (P, K, J, M, N, Q - 1, G)
                         + (if G = TT (P, J, N).G
-                              and then H (P, K, J, M, N, Q)
-                                       = Used (P, K, J, M, N, Q - 1, G)
+                              and then not Present
+                                (P, J, M, N, Q - 1, G,
+                                 Pair_Mono (M, TT (P, J, N), Q))
+                              and then Used (P, K, J, M, N, Q - 1, G)
+                                       <= CC.Max_Count
                            then 1 else 0))
    is
       pragma Annotate
@@ -199,8 +176,11 @@ package body Circuit_Checker is
                                     Pairs (P, J, M, N - 1), G))
                       else Used (P, K, J, M, N, Q - 1, G)
                            + (if G = TT (P, J, N).G
-                                 and then H (P, K, J, M, N, Q)
-                                          = Used (P, K, J, M, N, Q - 1, G)
+                                 and then not Present
+                                   (P, J, M, N, Q - 1, G,
+                                    Pair_Mono (M, TT (P, J, N), Q))
+                                 and then Used (P, K, J, M, N, Q - 1, G)
+                                          <= CC.Max_Count
                               then 1 else 0)))
    is
       pragma Annotate
@@ -234,6 +214,55 @@ package body Circuit_Checker is
       null;
    end Lemma_Slot_Mono_All;
 
+   --  What the slots of a wire are, at every point of the layer (ADR
+   --  0094), for a monomial X and a slot S:
+   --  - a monomial the wire has is at its Index_Of, a used slot; or its
+   --    Index_Of is the used count itself, which then has stopped at
+   --    Max_Count + 1;
+   --  - a used slot's monomial is one the wire has, at that slot.
+   --  So the slots are distinct, and a search of the used slots finds a
+   --  monomial exactly when the wire has it, at its Index_Of.
+   procedure Lemma_Slots
+     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
+      M : Shape_Array; N : Positive; Q : Natural; G : Natural;
+      X : Monomial; S : Natural)
+   with Ghost => Proof_Only, Global => null,
+        Pre  => J <= P.Last_Layer and then N <= SA.Max_Terms + 1,
+        Post =>
+          (if Present (P, J, M, N, Q, G, X)
+           then Index_Of (P, K, J, M, N, Q, G, X)
+                <= Used (P, K, J, M, N, Q, G)
+                and then
+                (if Index_Of (P, K, J, M, N, Q, G, X)
+                    < Used (P, K, J, M, N, Q, G)
+                 then Slot_Mono (P, K, J, M, N, Q, G,
+                                 Index_Of (P, K, J, M, N, Q, G, X)) = X
+                 else Used (P, K, J, M, N, Q, G) = CC.Max_Count + 1))
+          and then
+          (if S < Used (P, K, J, M, N, Q, G)
+           then Present (P, J, M, N, Q, G, Slot_Mono (P, K, J, M, N, Q, G, S))
+                and then Index_Of (P, K, J, M, N, Q, G,
+                                   Slot_Mono (P, K, J, M, N, Q, G, S)) = S),
+        Subprogram_Variant => (Decreases => N, Decreases => Q)
+   is
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Used);
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Present);
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Index_Of);
+      pragma Annotate
+        (GNATprove, Unhide_Info, "Expression_Function_Body", Slot_Mono);
+   begin
+      if Q = 0 then
+         if N > 1 then
+            Lemma_Slots (P, K, J, M, N - 1, Pairs (P, J, M, N - 1), G, X, S);
+         end if;
+      else
+         Lemma_Slots (P, K, J, M, N, Q - 1, G, X, S);
+      end if;
+   end Lemma_Slots;
+
    procedure Lemma_Wire_Terms_All
      (P : PC.Packed_Circuit; J : Natural; N : Positive; NO : Natural)
    with Ghost => Proof_Only, Global => null,
@@ -259,16 +288,6 @@ package body Circuit_Checker is
       null;
    end Lemma_Count_Of;
 
-   procedure Lemma_Hint_At
-     (P : PC.Packed_Circuit; K : CC.Certificate; J : Natural;
-      X : Long_Long_Integer)
-   is
-      pragma Annotate
-        (GNATprove, Unhide_Info, "Expression_Function_Body", Hint_At);
-   begin
-      null;
-   end Lemma_Hint_At;
-
    procedure Lemma_Accepts_Def (P : PC.Packed_Circuit; K : CC.Certificate)
    with Ghost => Proof_Only, Global => null,
         Post => Accepts (P, K)
@@ -292,8 +311,6 @@ package body Circuit_Checker is
                 and then Out_Count (P, J) <= SA.Max_Wires,
         Post => Layer_Ok (P, K, J, M)
                 = (Span (P, K, J).Wires = Out_Count (P, J)
-                   and then Hint_Pos (P, J, M, Len (P, J))
-                            = Long_Long_Integer (Span (P, K, J).Hints)
                    and then Slot_Base (P, K, J, Out_Count (P, J))
                             <= Long_Long_Integer (Max_Layer_Slots)
                    and then (Len (P, J) = 0

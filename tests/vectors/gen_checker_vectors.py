@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""The vectors of the circuit checker's harness (ADR 0093): small
+"""The vectors of the circuit checker's harness (ADR 0093, ADR 0094): small
 circuits written by hand, their honest certificates, and one hostile
 certificate for each check of Circuit_Checker.Accepts and each status of
 the certificate's reader, with the outcome each must give.
 
 The honest certificate and the digest of each circuit's facts come from
 scripts/census.py, the independent computation of the checker's model.
-Every certificate is rebuilt here from its structure (the counts and the
-hints of each layer), and the honest one is required to equal census.py's
-byte for byte; a hostile one changes one thing in that structure.
+Every certificate is rebuilt here from its structure (the slot counts of
+each layer), and the honest one is required to equal census.py's byte for
+byte; a hostile one changes one thing in that structure.
 
 The capacities (Pool_Full, Too_Many_Slots, Too_Many_Terms, Too_Many_Vars)
 are reached on small instances of the checker that the harness declares,
@@ -55,7 +55,7 @@ def fail(msg):
 
 def parse_cert(data):
     """(identifier, layers): the inverse of cert_bytes, for honest
-    certificates only."""
+    certificates only; a layer is the list of its wires' slot counts."""
     if data[:4] != b"LFCK":
         fail("census certificate: magic")
     pos = 4
@@ -71,42 +71,32 @@ def parse_cert(data):
             if b < 0x80:
                 return v
 
-    if nxt() != 1:
+    if nxt() != 2:
         fail("census certificate: version")
     ident = data[pos:pos + 32]
     pos += 32
     layers = []
     for _ in range(nxt()):
-        nw, nh = nxt(), nxt()
-        counts = []
-        for _ in range(nw):
-            counts.append(nxt())
-            nxt()
-        layers.append((counts, [nxt() for _ in range(nh)]))
+        layers.append([nxt() for _ in range(nxt())])
     if pos != len(data):
         fail("census certificate: trailing bytes")
     return ident, layers
 
 
-def cert_bytes(ident, layers):
-    out = bytearray(b"LFCK") + cv.uleb(1) + ident + cv.uleb(len(layers))
-    for counts, hints in layers:
-        out += cv.uleb(len(counts)) + cv.uleb(len(hints))
+def cert_bytes(ident, layers, version=2):
+    out = bytearray(b"LFCK") + cv.uleb(version) + ident + cv.uleb(len(layers))
+    for counts in layers:
+        out += cv.uleb(len(counts))
         for c in counts:
-            out += cv.uleb(c) + cv.uleb(0)
-        for h in hints:
-            out += cv.uleb(h)
+            out += cv.uleb(c)
     return bytes(out)
 
 
-def with_layer(layers, i, counts=None, hints=None):
+def with_layer(layers, i, counts):
     """The layers with the walk's layer i (0: the last circuit layer)
     replaced."""
-    out = [(list(c), list(h)) for c, h in layers]
-    if counts is not None:
-        out[i] = (counts, out[i][1])
-    if hints is not None:
-        out[i] = (out[i][0], hints)
+    out = [list(c) for c in layers]
+    out[i] = counts
     return out
 
 
@@ -190,7 +180,7 @@ def main():
     ia, la, fa = honest(a)
     ib, lb, fb = honest(b)
     if la != lb:
-        fail("paragraph D: the hints of the changed circuit differ")
+        fail("paragraph D: the counts of the changed circuit differ")
     if fa == fb:
         fail("paragraph D: the facts of the changed circuit are the same")
     emit(f"circuit c1 {a.hex()}")
@@ -199,14 +189,14 @@ def main():
     emit(f"facts c1_k {fb}")
 
     # The walk's layers: 0 is circuit layer 1 (reading the inputs), 1 is
-    # layer 0. Circuit layer 1: counts w0 1, w1 1, w2 2, w3 1, w4 0;
-    # hints w0 [0], w1 [0], w2 [0, 1, 0], w3 [0]. Layer 0: o0 2 slots,
-    # o1 4; hints o0 [0, 1], o1 [0, 1, 2, 3].
-    c_l1, h_l1 = la[0]
-    c_l0, h_l0 = la[1]
-    if c_l1 != [1, 1, 2, 1, 0] or h_l1 != [0, 0, 0, 1, 0, 0]:
+    # layer 0. Circuit layer 1: counts w0 1, w1 1, w2 2 (its third pair,
+    # x1 again, finds the slot of its first), w3 1, w4 0. Layer 0: o0 2
+    # slots, o1 4.
+    c_l1 = la[0]
+    c_l0 = la[1]
+    if c_l1 != [1, 1, 2, 1, 0]:
         fail(f"c1 layer 1 is not as written: {la[0]}")
-    if c_l0 != [2, 4] or h_l0 != [0, 1, 0, 1, 2, 3]:
+    if c_l0 != [2, 4]:
         fail(f"c1 layer 0 is not as written: {la[1]}")
 
     ok = cert_bytes(ia, la)
@@ -218,28 +208,12 @@ def main():
 
     # One certificate per check of Accepts.
     walk("one_layer_fewer", la[:1], "cert_mismatch")
-    walk("one_wire_fewer", with_layer(la, 0, counts=c_l1[:4]),
-         "cert_mismatch")
-    walk("one_hint_more", with_layer(la, 0, hints=h_l1 + [0]), "hints_left")
-    walk("one_hint_fewer", with_layer(la, 0, hints=h_l1[:-1]), "bad_hint")
-    # w2's count one below the true one: its second monomial's hint, 1,
-    # is beyond the count.
-    walk("count_below", with_layer(la, 0, counts=[1, 1, 1, 1, 0]),
-         "bad_hint")
+    walk("one_wire_fewer", with_layer(la, 0, c_l1[:4]), "cert_mismatch")
+    # w2's count one below the true one: its second monomial takes a slot
+    # beyond the count.
+    walk("count_below", with_layer(la, 0, [1, 1, 1, 1, 0]), "count_exceeded")
     # w3's count one above: a slot no pair reaches.
-    walk("count_above", with_layer(la, 0, counts=[1, 1, 2, 2, 0]),
-         "empty_slot")
-    # o1's second pair, a new monomial, sent one past the first free slot.
-    walk("new_not_first_free",
-         with_layer(la, 1, hints=[0, 1, 0, 2, 2, 3]), "bad_hint")
-    # o1's second pair (x2) sent to slot 0, which holds x1.
-    walk("other_monomial",
-         with_layer(la, 1, hints=[0, 1, 0, 0, 2, 3]), "wrong_monomial")
-    # w2's third pair (x1 again) sent to the first free slot, with a count
-    # that has room for it.
-    walk("duplicate_slot",
-         with_layer(la, 0, counts=[1, 1, 3, 1, 0], hints=[0, 0, 0, 1, 2, 0]),
-         "duplicate_slot")
+    walk("count_above", with_layer(la, 0, [1, 1, 2, 2, 0]), "empty_slot")
     # The capacities, each on a small instance with that limit low.
     walk("over_terms", la, "too_many_terms", inst="small_terms")
     walk("over_slots", la, "too_many_slots", inst="small_slots")
@@ -258,13 +232,13 @@ def main():
         case(name, "c1", "gf2_128", "certificate_refused", status, data)
 
     reader("bad_magic", b"LFCX" + ok[4:], "bad_magic")
-    reader("bad_version", ok[:4] + cv.uleb(2) + ok[5:], "bad_version")
+    reader("bad_version", ok[:4] + cv.uleb(1) + ok[5:], "bad_version")
     reader("truncated", ok[:-1], "truncated")
     reader("bad_integer",
            ok[:37] + bytes([0x82, 0x80, 0x80, 0x80, 0x00]) + ok[38:],
            "bad_integer")
     reader("bound_exceeded",
-           cert_bytes(ia, with_layer(la, 0, counts=[1, 1, 70000, 1, 0])),
+           cert_bytes(ia, with_layer(la, 0, [1, 1, 70000, 1, 0])),
            "bound_exceeded")
     reader("trailing", ok + b"\x00", "trailing")
 

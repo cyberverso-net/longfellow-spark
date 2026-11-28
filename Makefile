@@ -3,7 +3,7 @@
 #  definition of done for every commit and every pull request (ADR
 #  0041, ADR 0044).
 
-.PHONY: check check-reuse check-reuse-spark check-reuse-lean build prove prove-partition partitions-check test cli vectors lint lean lean-source mdoc-cases
+.PHONY: check check-reuse check-reuse-spark check-reuse-lean build prove prove-partition partitions-check test cli vectors values lint lean lean-source mdoc-cases
 
 check:
 	scripts/check.sh all
@@ -45,6 +45,11 @@ cli:
 
 vectors:
 	scripts/check.sh vectors
+
+#  The values check of the SHA-256 clauses on the registered hash circuit
+#  (#171), in make check.
+values:
+	scripts/check.sh values
 
 #  The proof of age from every test document of upstream, alone (the
 #  cli step of make check runs it too on the proving machine, not on
